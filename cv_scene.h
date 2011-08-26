@@ -48,13 +48,70 @@ typedef struct boundary_t {
     list lines;
 } boundary;
 
+typedef struct block_t {
+    /** row of block position in grid */
+    int row;
+    /** column of block position in grid */
+    int col;
+    /** y cordinate of block position (top left corner) */
+    int pos_x;
+    /** x coordinate of block position (top left corner) */
+    int pos_y;
+    /** width of block in pixels */
+    int width;
+    /** height of block in pixels */
+    int height;
+    /** mean of intensity (y) values */
+    int ymean;
+    /** deviation of intensity (y) values */
+    int ydeviation;
+    /** mean of u chromaticity values */
+    int umean;
+    /** deviation of u chromaticity values */
+    int udeviation;
+    /** mean of v chromaticity values */
+    int vmean;
+    /** deviation of v chromaticity values */
+    int vdeviation;
+    /** count of horizontal lines (weighted with line strength?) */
+    int hlines;
+    int vweight;
+    int vmotion;
+    /** count of vertical lines (weighted with line strength?) */
+    int vlines;
+    int hweight;
+    int hmotion;
+    /** total strength / salience of block */
+    int strength;
+    /** horizontal strength for reliability of horizontal motion estimation */
+    int hstrength;
+    /** vertical strength for reliability of vertical motion estimation */
+    int vstrength;
+
+    struct block_t *neighbor_nw;
+    struct block_t *neighbor_n;
+    struct block_t *neighbor_ne;
+    struct block_t *neighbor_e;
+    struct block_t *neighbor_se;
+    struct block_t *neighbor_s;
+    struct block_t *neighbor_sw;
+    struct block_t *neighbor_w;
+} block;
+
 typedef struct scene_t {
     edge_image previous_edges;
     edge_image current_edges;
     list_item *mid_line;
     list_item *mid_boundary;
+    long rows;
+    long cols;
+    long hstep;
+    long vstep;
+    long hmargin;
+    long vmargin;
     list all_lines;
     list boundaries;
+    block *blocks;
 } scene;
 
 result create_scene(scene *dst, pixel_image *src);

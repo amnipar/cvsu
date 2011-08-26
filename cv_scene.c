@@ -30,6 +30,7 @@
  */
 
 #include "cv_scene.h"
+#include "alloc.h"
 
 /**
  * Initialize a scene object by allocating the necessary contained objects.
@@ -40,6 +41,7 @@
 result create_scene(scene *dst, pixel_image *src)
 {
     result r;
+    long row, col, pos;
 
     if (dst == NULL) {
         return BAD_POINTER;
@@ -59,6 +61,91 @@ result create_scene(scene *dst, pixel_image *src)
     r = list_allocate(&dst->boundaries, 1000, sizeof(boundary));
     if (r != SUCCESS) {
         return r;
+    }
+
+    dst->rows = dst->current_edges.height;
+    dst->cols = dst->current_edges.width;
+    dst->hstep = dst->current_edges.hstep;
+    dst->vstep = dst->current_edges.vstep;
+    dst->hmargin = dst->current_edges.hmargin;
+    dst->vmargin = dst->current_edges.vmargin;
+
+    r = allocate((byte **)&dst->blocks, dst->rows * dst->cols, sizeof(block));
+    if (r != SUCCESS) {
+        return r;
+    }
+
+    pos = 0;
+    for (row = 0; row < dst->rows; row++) {
+        for (col = 0; col < dst->cols; col++) {
+            dst->blocks[pos].row = row;
+            dst->blocks[pos].col = col;
+            dst->blocks[pos].pos_x = col * dst->hstep + dst->hmargin;
+            dst->blocks[pos].pos_y = row * dst->vstep + dst->vmargin;
+            dst->blocks[pos].width = dst->hstep;
+            dst->blocks[pos].height = dst->vstep;
+
+            // define neighbors above the block
+            if (row > 0) {
+                if (col > 0) {
+                    dst->blocks[pos].neighbor_nw = &dst->blocks[pos - dst->cols - 1];
+                }
+                else {
+                    dst->blocks[pos].neighbor_nw = NULL;
+                }
+                dst->blocks[pos].neighbor_n = &dst->blocks[pos - dst->cols];
+                if (col < dst->cols - 1) {
+                    dst->blocks[pos].neighbor_ne = &dst->blocks[pos - dst->cols + 1];
+                }
+                else {
+                    dst->blocks[pos].neighbor_ne = NULL;
+                }
+            }
+            else {
+                dst->blocks[pos].neighbor_nw = NULL;
+                dst->blocks[pos].neighbor_n = NULL;
+                dst->blocks[pos].neighbor_ne = NULL;
+            }
+
+            // define the right neighbor
+            if (col < dst->cols - 1) {
+                dst->blocks[pos].neighbor_e = &dst->blocks[pos + 1];
+            }
+            else {
+                dst->blocks[pos].neighbor_e = NULL;
+            }
+
+            // define neighbors below the block
+            if (row < dst->rows - 1) {
+                if (col < dst->cols - 1) {
+                    dst->blocks[pos].neighbor_se = &dst->blocks[pos + dst->cols + 1];
+                }
+                else {
+                    dst->blocks[pos].neighbor_se = NULL;
+                }
+                dst->blocks[pos].neighbor_s = &dst->blocks[pos + dst->cols];
+                if (col > 0) {
+                    dst->blocks[pos].neighbor_sw = &dst->blocks[pos + dst->cols - 1];
+                }
+                else {
+                    dst->blocks[pos].neighbor_sw = NULL;
+                }
+            }
+            else {
+                dst->blocks[pos].neighbor_se = NULL;
+                dst->blocks[pos].neighbor_s = NULL;
+                dst->blocks[pos].neighbor_sw = NULL;
+            }
+
+            // define the left neighbor
+            if (col > 0) {
+                dst->blocks[pos].neighbor_w = &dst->blocks[pos - 1];
+            }
+            else {
+                dst->blocks[pos].neighbor_w = NULL;
+            }
+            pos++;
+        }
     }
 
     return SUCCESS;
@@ -87,6 +174,7 @@ result destroy_scene(scene *dst)
     if (r != SUCCESS) {
         return r;
     }
+    r = deallocate((byte **)&dst->blocks);
     return SUCCESS;
 }
 
