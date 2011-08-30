@@ -31,9 +31,8 @@
 
 #include "cv_edges.h"
 #include "cv_filter.h"
+#include "alloc.h"
 
-/* for memset */
-#include <string.h>
 #include <math.h>
 
 result create_edge_image(edge_image *dst, pixel_image *src, long hstep, long vstep, long hmargin, long vmargin, long box_width, long box_length)
@@ -154,24 +153,45 @@ result copy_edge_image(edge_image *dst, edge_image *src)
     return SUCCESS;
 }
 
-/*
-edgel_response_x
-Calculates edgel response results using box filters and deviation
+long edgel_fisher_unsigned(long N, long sum1, long sum2, double sumsqr1, double sumsqr2)
+{
+    double mean1, mean2, diff, var1, var2, var;
+    mean1 = (double)sum1 / N;
+    mean2 = (double)sum2 / N;
+    diff = mean2 - mean1;
+    diff = diff * diff;
+    var1 = (sumsqr1 / N) - (mean1 * mean1);
+    var2 = (sumsqr2 / N) - (mean2 * mean2);
+    var = var1 + var2;
+    if (var < 1) var = 1;
+    return (long)(diff / var);
+}
 
-accepts S32 image as integral, F64 image as integral2, S32 image as dst
-*/
-result edgel_response_x(integral_image *src, pixel_image *dst, long hsize, long vsize)
+long edgel_fisher_signed(long N, long sum1, long sum2, double sumsqr1, double sumsqr2)
+{
+    double mean1, mean2, var1, var2, var;
+
+    mean1 = (double)sum1 / N;
+    mean2 = (double)sum2 / N;
+    var1 = (sumsqr1 / N) - (mean1 * mean1);
+    var2 = (sumsqr2 / N) - (mean2 * mean2);
+    var = var1 + var2;
+    if (var < 1) var = 1;
+    return (long)((mean2 - mean1) / sqrt(var));
+}
+
+result edgel_response_x(integral_image *src, pixel_image *dst, long hsize, long vsize, edgel_criterion_calculator criterion)
 {
     long *dst_data;
     long *integral_data;
     double *integral2_data;
     long i, width, height, row, col, pos, rowInc, colInc, rInc;
-    double N, divisor;
+    double N;
     const long *iAl, *iBl, *iCl, *iDl, *iAr, *iBr, *iCr, *iDr;
     const double *i2Al, *i2Bl, *i2Cl, *i2Dl, *i2Ar, *i2Br, *i2Cr, *i2Dr;
 
     long g, sum1, sum2;
-    double sumsqr1, sumsqr2, mean1, mean2, var, var1, var2, grad;
+    double sumsqr1, sumsqr2;
 
     if (src == NULL || dst == NULL) {
         return BAD_POINTER;
@@ -200,9 +220,8 @@ result edgel_response_x(integral_image *src, pixel_image *dst, long hsize, long 
     rInc = hsize + 1;
 
     N = (double)(hsize * vsize);
-    divisor = N * (N - 1);
 
-    memset(dst_data, 0, (unsigned)(width * height) * sizeof(long));
+    reset((byte *)dst_data, (unsigned)(width * height), sizeof(long));
 
     for (row = 0; row < height - vsize; row += vsize) {
         iAl = integral_data + (row * width);
@@ -227,16 +246,10 @@ result edgel_response_x(integral_image *src, pixel_image *dst, long hsize, long 
         for (col = hsize + 1; col < width - hsize; col++) {
             sum1 = *iCl - *iBl - *iDl + *iAl;
             sum2 = *iCr - *iBr - *iDr + *iAr;
-            mean1 = ((double)sum1 / N);
-            mean2 = ((double)sum2 / N);
             sumsqr1 = *i2Cl - *i2Bl - *i2Dl + *i2Al;
             sumsqr2 = *i2Cr - *i2Br - *i2Dr + *i2Ar;
-            var1 = sqrt((N * sumsqr1 - ((double)sum1 * (double)sum1)) / divisor);
-            var2 = sqrt((N * sumsqr2 - ((double)sum2 * (double)sum2)) / divisor);
-            var = (var1 + var2);
-            if (var < 1) var = 1;
-            grad = (mean2 - mean1) / var;
-            g = (long)grad;
+
+            g = criterion(N, sum1, sum2, sumsqr1, sumsqr2);
             for (i = 0; i < vsize; i++) {
                 dst_data[pos + i * width] = g;
             }
@@ -264,20 +277,6 @@ result edgel_response_x(integral_image *src, pixel_image *dst, long hsize, long 
     return SUCCESS;
 }
 
-/*
-edges_x_box_deviation
-Finds edges in horizontal direction using deviation of box filters
-Calculates first the integral images
-Uses integral images to calculate efficiently edge responses
-Finds extrema of edge responses
-Normalizes to 8-bit greyscale image
-Parameters:
-src - initialized integral image containing source image
-temp - 32-bit integer (S32) image for temporary data
-dst - 8-bit (U8) image for final result
-hsize - horizontal size of box filter
-vsize - vertical size of box filter
-*/
 result edges_x_box_deviation(integral_image *src, pixel_image *temp, pixel_image *dst, long hsize, long vsize)
 {
     result r;
@@ -285,7 +284,7 @@ result edges_x_box_deviation(integral_image *src, pixel_image *temp, pixel_image
     if (r != SUCCESS) {
         return r;
     }
-    r = edgel_response_x(src, temp, hsize, vsize);
+    r = edgel_response_x(src, temp, hsize, vsize, &edgel_fisher_unsigned);
     if (r != SUCCESS) {
         return r;
     }
@@ -310,8 +309,7 @@ result calculate_edges(edge_image *edge)
     char *vedges_data;
     int width, height, row, rows, col, cols, pos, rowInc, colInc, g, prev;
     bool rising, falling;
-    double sum1, sum2, sumsqr1, sumsqr2, mean1, mean2, var, var1, var2;
-    double grad, N, divisor;
+    double N, sum1, sum2, sumsqr1, sumsqr2;
 
     if (edge == NULL) {
         return BAD_POINTER;
@@ -337,7 +335,6 @@ result calculate_edges(edge_image *edge)
     height = (*edge).integral.height;
 
     N = (double)(edge->box_width * edge->box_length);
-    divisor = N * (N - 1);
 
     /*
       calculate vertical edges
@@ -353,7 +350,7 @@ result calculate_edges(edge_image *edge)
         startcol = edge->box_length;
         endcol = width - edge->box_length;
 
-        memset(vedges_data, 0, (*edge).vedges.size * sizeof(char));
+        reset((byte *)vedges_data, (*edge).vedges.size, sizeof(char));
 
         rows = (*edge).vedges.height;
         for (row = 0; row < rows; row++) {
@@ -381,17 +378,10 @@ result calculate_edges(edge_image *edge)
             for (col = startcol; col < endcol; col++) {
                 sum1 = *iAl + ((*iCl - *iBl) - *iDl);
                 sum2 = *iAr + ((*iCr - *iBr) - *iDr);
-                mean1 = (sum1 / N);
-                mean2 = (sum2 / N);
                 sumsqr1 = *i2Al + ((*i2Cl - *i2Bl) - *i2Dl);
                 sumsqr2 = *i2Ar + ((*i2Cr - *i2Br) - *i2Dr);
-                var1 = sqrt((N * sumsqr1 - (sum1 * sum1)) / divisor);
-                var2 = sqrt((N * sumsqr2 - (sum2 * sum2)) / divisor);
-                var = (var1 + var2);
-                if (var < 1) var = 1;
 
-                grad = (mean2 - mean1) / var;
-                g = (int)grad;
+                g = edgel_fisher_signed(N, sum1, sum2, sumsqr1, sumsqr2);
 
                 if (col > startcol) {
                     if (g < prev) {
@@ -447,7 +437,7 @@ result calculate_edges(edge_image *edge)
         startrow = edge->box_length;
         endrow = height - edge->box_length;
 
-        memset(hedges_data, 0, (*edge).hedges.size * sizeof(char));
+        reset((byte *)hedges_data, (*edge).hedges.size, sizeof(char));
 
         cols = (*edge).hedges.width;
         for (col = 0; col < cols; col++) {
@@ -475,17 +465,10 @@ result calculate_edges(edge_image *edge)
             for (row = startrow; row < endrow; row++) {
                 sum1 = *iAt + ((*iCt - *iBt) - *iDt);
                 sum2 = *iAb + ((*iCb - *iBb) - *iDb);
-                mean1 = (sum1 / N);
-                mean2 = (sum2 / N);
                 sumsqr1 = *i2At + ((*i2Ct - *i2Bt) - *i2Dt);
                 sumsqr2 = *i2Ab + ((*i2Cb - *i2Bb) - *i2Db);
-                var1 = sqrt((N * sumsqr1 - (sum1 * sum1)) / divisor);
-                var2 = sqrt((N * sumsqr2 - (sum2 * sum2)) / divisor);
-                var = (var1 + var2);
-                if (var < 1) var = 1;
 
-                grad = (mean2 - mean1) / var;
-                g = (int)grad;
+                g = edgel_fisher_signed(N, sum1, sum2, sumsqr1, sumsqr2);
 
                 if (row > startrow) {
                     if (g < prev) {

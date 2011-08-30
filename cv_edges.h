@@ -38,6 +38,11 @@ extern "C" {
 
 #include "cv_basic.h"
 
+/**
+ * Stores an edge image.
+ * Is based on an integral image, which is used to calculate edge responses
+ * along horizontal and vertical scanlines.
+ */
 typedef struct edge_image_t {
     integral_image integral;
     pixel_image hedges;
@@ -55,13 +60,20 @@ typedef struct edge_image_t {
 } edge_image;
 
 /**
- *
+ * Pointer to a function that calculates edgel strength based on sums acquired
+ * from integral images.
+ */
+typedef long (*edgel_criterion_calculator)(long N, long sum1, long sum2, double sumsqr1, double sumsqr2);
+
+/**
+ * Creates an edge image by using the source image to create an integral image.
+ * Then creates the edge images and initializes the variables.
  */
 
 result create_edge_image(edge_image *dst, pixel_image *src, long width, long height, long hmargin, long vmargin, long box_width, long box_length);
 
 /**
- *
+ * Destroys the edge image and deallocates all memory.
  */
 
 result destroy_edge_image(edge_image *dst);
@@ -83,20 +95,56 @@ result clone_edge_image(edge_image *dst, edge_image *src);
 result copy_edge_image(edge_image *dst, edge_image *src);
 
 /**
- * Calculates edge response using box filters and deviation
- * Accepts S32 image as integral, F64 image as integral2, S32 image as dst
+ * Edgel strength measure using normal Fisher criterion.
+ * In this criterion, the difference of means is squared, and divided by the
+ * sum of variances. This is the 'normal' Fisher criterion for distance
+ * between classes; in this case, we measure the separation of image regions by
+ * the difference of mean intensity values and the variance of the values.
  */
-
-result edgel_response_x(integral_image *src, pixel_image *dst, long hsize, long vsize);
+long edgel_fisher_unsigned(long N, long sum1, long sum2, double sumsqr1, double sumsqr2);
 
 /**
- *
+ * Edgel strength measure using Fisher-like criterion with sqrt of variance.
+ * In this criterion, the difference of means is not squared, so the direction
+ * of change is preserved. To compensate, the square root of the sum of
+ * variances is used below the line.
  */
+long edgel_fisher_signed(long N, long sum1, long sum2, double sumsqr1, double sumsqr2);
+
+/**
+ * Calculates edge response using box filters with given criterion
+ * Accepts integral image as src, S32 image as dst
+ * Box filter size is defined with hsize and vsize
+ * The criterion used for determining edgel strength using the box filter sums
+ * from integral images can be given as parameter.
+ */
+result edgel_response_x(integral_image *src, pixel_image *dst, long hsize, long vsize, edgel_criterion_calculator criterion);
+
+/**
+ * Calculates edge response using box filters and fisher criterion
+ * Accepts integral image as src, S32 image as dst
+ * Box filter size is defined with hsize and vsize
+ */
+result edgel_response_x_fisher(integral_image *src, pixel_image *dst, long hsize, long vsize);
+
+/**
+ * Finds edges in horizontal direction using deviation of box filters
+ * Calculates first the integral images
+ * Uses integral images to calculate efficiently edge responses
+ * Finds extrema of edge responses
+ * Normalizes to 8-bit greyscale image
+ *
+ * @param src Initialized integral image containing source image
+ * @param temp 32-bit integer (S32) image for temporary data
+ * @param dst 8-bit (U8) image for final result
+ * @param hsize Horizontal size of the box filter
+ * @param vsize Vertical size of the box filter
+*/
 
 result edges_x_box_deviation(integral_image *src, pixel_image *temp, pixel_image *dst, long hsize, long vsize);
 
 /**
- *
+ * Calculates edge image using the integral images and signed Fisher criterion
  */
 
 result calculate_edges(edge_image *edge);
