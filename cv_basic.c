@@ -67,6 +67,13 @@ result create_image(pixel_image *dst, void *data, pixel_type type, long dx, long
     dst->stride = stride;
     dst->size = size;
 
+    if (dst->step == 1) {
+        dst->format = GREY;
+    }
+    else if (dst->step == 3) {
+        dst->format = RGB3;
+    }
+
     return SUCCESS;
 }
 
@@ -109,6 +116,8 @@ result clone_image(pixel_image *dst, pixel_image *src)
     default:
         return BAD_TYPE;
     }
+
+    dst->format = src->format;
 
     return SUCCESS;
 }
