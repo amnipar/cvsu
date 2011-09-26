@@ -1,8 +1,8 @@
 /**
- * @file types.h
- * @author Matti J. Eskelinen (matti dot j dot eskelinen at jyu dot fi)
- * @brief Generic type definitions for use in many modules.
- * 
+ * @file cvsu_output.c
+ * @author Matti Eskelinen (matti dot j dot eskelinen at jyu dot fi)
+ * @brief Output methods for the cvsu module.
+ *
  * Copyright (c) 2011, Matti Johannes Eskelinen
  * All Rights Reserved.
  *
@@ -27,42 +27,31 @@
  * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
  */
 
-#ifndef TYPES_H
-#   define TYPES_H
+#include "cvsu_config.h"
+#include "cvsu_output.h"
 
-#include <stddef.h>
-#include <stdbool.h>
+/******************************************************************************/
 
-typedef unsigned char byte;
-typedef unsigned short word;
-typedef unsigned long dword;
-typedef void * pointer;
+void report_result(
+    result r,
+    string func
+    )
+{
+    if (r == SUCCESS) {
+#if (OUTPUT_LEVEL >= OUTPUT_LEVEL_INFO)
+        PRINT1("++Function %s successful\n", func);
+#endif
+        return;
+    }
+#if (OUTPUT_LEVEL >= OUTPUT_LEVEL_ERRORS)
+    if (r == CAUGHT_ERROR) {
+        PRINT1("!!Function %s caught error\n", func);
+        return;
+    }
+    PRINT2("!!Function %s encountered error %d\n", func, (int)r);
+#endif
+}
 
-typedef struct point_t {
-    long x;
-    long y;
-} point;
-
-typedef struct line_t {
-    point start;
-    point end;
-} line;
-
-typedef struct rect_t {
-    point top_left;
-    point bottom_right;
-} rect;
-
-typedef enum result_t {
-    SUCCESS = 0,
-    BAD_POINTER,
-    BAD_TYPE,
-    BAD_SIZE,
-    BAD_PARAM,
-    NOT_FOUND
-} result;
-
-#endif // TYPES_H
+/******************************************************************************/

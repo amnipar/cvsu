@@ -1,7 +1,7 @@
 /**
- * @file cv_edges.h
+ * @file cvsu_edges.h
  * @author Matti Eskelinen (matti dot j dot eskelinen at jyu dot fi)
- * @brief Edge detection and handling for the cv module.
+ * @brief Edge detection and handling for the cvsu module.
  *
  * Copyright (c) 2011, Matti Johannes Eskelinen
  * All Rights Reserved.
@@ -29,14 +29,15 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef CV_EDGES_H
-#   define CV_EDGES_H
+#ifndef CVSU_EDGES_H
+#   define CVSU_EDGES_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include "cv_basic.h"
+#include "cvsu_types.h"
+#include "cvsu_basic.h"
 
 /**
  * Stores an edge image.
@@ -44,39 +45,69 @@ extern "C" {
  * along horizontal and vertical scanlines.
  */
 typedef struct edge_image_t {
-    integral_image integral;
+    integral_image I;
     pixel_image hedges;
     pixel_image vedges;
-    long width;
-    long height;
-    long hstep;
-    long vstep;
-    long hmargin;
-    long vmargin;
-    long box_width;
-    long box_length;
-    long dx;
-    long dy;
+    uint32 width;
+    uint32 height;
+    uint32 hstep;
+    uint32 vstep;
+    uint32 hmargin;
+    uint32 vmargin;
+    uint32 box_width;
+    uint32 box_length;
+    uint32 dx;
+    uint32 dy;
 } edge_image;
+
+/**
+ * Stores an edge element.
+ */
+typedef struct edge_elem_t {
+    short pos_x;
+    short pos_y;
+    short mean_a;
+    short mean_b;
+    short dev_a;
+    short dev_b;
+    char profile[4];
+} edge_elem;
 
 /**
  * Pointer to a function that calculates edgel strength based on sums acquired
  * from integral images.
  */
-typedef long (*edgel_criterion_calculator)(long N, long sum1, long sum2, double sumsqr1, double sumsqr2);
+typedef long (*edgel_criterion_calculator)(
+    uint32 N,
+    uint32 sum1,
+    uint32 sum2,
+    double sumsqr1,
+    double sumsqr2
+);
 
 /**
  * Creates an edge image by using the source image to create an integral image.
  * Then creates the edge images and initializes the variables.
  */
 
-result create_edge_image(edge_image *dst, pixel_image *src, long width, long height, long hmargin, long vmargin, long box_width, long box_length);
+result edge_image_create(
+    edge_image *target,
+    pixel_image *source,
+    uint32 width,
+    uint32 height,
+    uint32 hmargin,
+    uint32 vmargin,
+    uint32 box_width,
+    uint32 box_length
+);
 
 /**
  * Destroys the edge image and deallocates all memory.
  */
 
-result destroy_edge_image(edge_image *dst);
+result edge_image_destroy(
+    edge_image *dst
+);
 
 /**
  * Transform the dst edge_image into a clone of src edge_image.
@@ -84,7 +115,10 @@ result destroy_edge_image(edge_image *dst);
  * @see copy_edge_image
  */
 
-result clone_edge_image(edge_image *dst, edge_image *src);
+result edge_image_clone(
+    edge_image *dst,
+    edge_image *src
+);
 
 /**
  * Copy the content of src edge_image into dst edge_image.
@@ -92,7 +126,35 @@ result clone_edge_image(edge_image *dst, edge_image *src);
  * @see clone_edge_image
  */
 
-result copy_edge_image(edge_image *dst, edge_image *src);
+result edge_image_copy(
+    edge_image *dst,
+    edge_image *src
+);
+
+/**
+ * Calculates edge image using the integral images and signed Fisher criterion
+ */
+
+result edge_image_update(
+    edge_image *target
+);
+
+/**
+ * Generates an 8-bit greyscale image from the edge image
+ */
+result edge_image_convert_to_grey8(
+    edge_image *source,
+    pixel_image *temp,
+    pixel_image *target
+);
+
+/**
+ * Overlays the edge values over an 8-bit greyscale image.
+ */
+result edge_image_overlay_to_grey8(
+    edge_image *source,
+    pixel_image *target
+);
 
 /**
  * Edgel strength measure using normal Fisher criterion.
@@ -101,7 +163,14 @@ result copy_edge_image(edge_image *dst, edge_image *src);
  * between classes; in this case, we measure the separation of image regions by
  * the difference of mean intensity values and the variance of the values.
  */
-long edgel_fisher_unsigned(long N, long sum1, long sum2, double sumsqr1, double sumsqr2);
+
+long edgel_fisher_unsigned(
+    uint32 N,
+    uint32 sum1,
+    uint32 sum2,
+    double sumsqr1,
+    double sumsqr2
+);
 
 /**
  * Edgel strength measure using Fisher-like criterion with sqrt of variance.
@@ -109,7 +178,14 @@ long edgel_fisher_unsigned(long N, long sum1, long sum2, double sumsqr1, double 
  * of change is preserved. To compensate, the square root of the sum of
  * variances is used below the line.
  */
-long edgel_fisher_signed(long N, long sum1, long sum2, double sumsqr1, double sumsqr2);
+
+long edgel_fisher_signed(
+    uint32 N,
+    uint32 sum1,
+    uint32 sum2,
+    double sumsqr1,
+    double sumsqr2
+);
 
 /**
  * Calculates edge response using box filters with given criterion
@@ -118,14 +194,13 @@ long edgel_fisher_signed(long N, long sum1, long sum2, double sumsqr1, double su
  * The criterion used for determining edgel strength using the box filter sums
  * from integral images can be given as parameter.
  */
-result edgel_response_x(integral_image *src, pixel_image *dst, long hsize, long vsize, edgel_criterion_calculator criterion);
-
-/**
- * Calculates edge response using box filters and fisher criterion
- * Accepts integral image as src, S32 image as dst
- * Box filter size is defined with hsize and vsize
- */
-result edgel_response_x_fisher(integral_image *src, pixel_image *dst, long hsize, long vsize);
+result edgel_response_x(
+    integral_image *I,
+    pixel_image *target,
+    uint32 hsize,
+    uint32 vsize,
+    edgel_criterion_calculator criterion
+);
 
 /**
  * Finds edges in horizontal direction using deviation of box filters
@@ -135,22 +210,22 @@ result edgel_response_x_fisher(integral_image *src, pixel_image *dst, long hsize
  * Normalizes to 8-bit greyscale image
  *
  * @param src Initialized integral image containing source image
- * @param temp 32-bit integer (S32) image for temporary data
- * @param dst 8-bit (U8) image for final result
+ * @param temp 32-bit integer (p_S32) image for temporary data
+ * @param dst 8-bit (p_U8) image for final result
  * @param hsize Horizontal size of the box filter
  * @param vsize Vertical size of the box filter
 */
 
-result edges_x_box_deviation(integral_image *src, pixel_image *temp, pixel_image *dst, long hsize, long vsize);
-
-/**
- * Calculates edge image using the integral images and signed Fisher criterion
- */
-
-result calculate_edges(edge_image *edge);
+result edges_x_box_deviation(
+    integral_image *I,
+    pixel_image *temp,
+    pixel_image *target,
+    uint32 hsize,
+    uint32 vsize
+);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif // CV_EDGES_H
+#endif /* CVSU_EDGES_H */

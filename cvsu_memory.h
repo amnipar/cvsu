@@ -1,7 +1,7 @@
 /**
- * @file cv_scale.h
+ * @file cvsu_memory.h
  * @author Matti Eskelinen (matti dot j dot eskelinen at jyu dot fi)
- * @brief Scale-space handling and operations for the cv module.
+ * @brief Memory handling routines for the cvsu module.
  *
  * Copyright (c) 2011, Matti Johannes Eskelinen
  * All Rights Reserved.
@@ -29,48 +29,52 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef CV_SCALE_H
-#   define CV_SCALE_H
+#ifndef CVSU_MEMORY_H
+#   define CVSU_MEMORY_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include "cv_basic.h"
+#include "cvsu_types.h"
 
-typedef enum pyramid_state_t {
-    INIT = 0,
-    DOWN,
-    UP,
-    INVALID
-} pyramid_state;
+/**
+ * A generic function for allocating an array of bytes.
+ */
+result memory_allocate(
+    data_pointer *target,
+    size_t target_size,
+    size_t element_size
+);
 
-typedef struct image_pyramid_t {
-    pixel_image *original;
-    pixel_image *levels;
-    long level_count;
-    long width;
-    long height;
-    long step;
-    pyramid_state state;
-} image_pyramid;
+/**
+ * A generic function for deallocating an array of bytes.
+ */
+result memory_deallocate(
+    data_pointer *target
+);
 
-result create_image_pyramid(image_pyramid *dst, pixel_image *src, long levels);
-result destroy_image_pyramid(image_pyramid *dst);
+/**
+ * A generic function for resetting an array of bytes.
+ */
+result memory_clear(
+    data_pointer target,
+    size_t target_size,
+    size_t element_size
+);
 
-result clone_image_pyramid(image_pyramid *dst, image_pyramid *src);
-result copy_image_pyramid(image_pyramid *dst, image_pyramid *src);
-
-result pyramid_down(image_pyramid *dst);
-result pyramid_up(image_pyramid *dst);
-
-result pyramid_max(image_pyramid *pyramid, pixel_image *dst);
-result pyramid_min(image_pyramid *pyramid, pixel_image *dst);
-
-result edges_x_sobel_scale(image_pyramid *pyramid, pixel_image *temp, pixel_image *dst, byte t);
+/**
+ * A generic function for copying an array of bytes.
+ */
+result memory_copy(
+    data_pointer target,
+    const data_pointer source,
+    size_t copy_size,
+    size_t element_size
+);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif // CV_SCALE_H
+#endif  /* CVSU_MEMORY_H */

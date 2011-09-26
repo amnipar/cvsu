@@ -1,7 +1,7 @@
 /**
- * @file alloc.c
+ * @file cvsu_uyvy.h
  * @author Matti Eskelinen (matti dot j dot eskelinen at jyu dot fi)
- * @brief Memory allocation routines.
+ * @brief Support for uyvy images in cvsu module.
  *
  * Copyright (c) 2011, Matti Johannes Eskelinen
  * All Rights Reserved.
@@ -29,48 +29,40 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "alloc.h"
+#ifndef CVSU_UYVY_H
+#   define CVSU_UYVY_H
 
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
-
-result allocate(byte **dst, size_t dst_size, size_t element_size)
-{
-    //printf("allocate dst=0x%x dst_size=%d element_size=%d", (unsigned long)dst, (int)dst_size, (int)element_size);
-    if (dst == NULL) {
-        return BAD_POINTER;
-    }
-#ifdef USE_MALLOC
-    *dst = (byte *)malloc(dst_size * element_size);
-#else
-    *dst = NULL;
+#ifdef __cplusplus
+extern "C" {
 #endif
-    if (*dst == NULL) {
-        return BAD_POINTER;
-    }
-    return SUCCESS;
-}
 
-result deallocate(byte **dst)
-{
-    if (dst == NULL) {
-        return BAD_POINTER;
-    }
-#ifdef USE_MALLOC
-    if (*dst != NULL) {
-        free(*dst);
-        *dst = NULL;
-    }
+/**
+ * Turns a two-channel uyvy image into a one-channel greyscale image by taking
+ * the values from second channel (y channel) and discarding the first channel.
+ */
+result convert_uyvy16_to_grey8(
+    const pixel_image *source,
+    pixel_image *target
+);
+
+/**
+ * Scales up a uyvy image by a factor of 2.
+ */
+result scale_uyvy16_2_uyvy16_x2(
+    const pixel_image *source,
+    pixel_image *target
+);
+
+/**
+ * Turns a grayscale image to a uyvy image, scaling up by a factor of n.
+ */
+result scale_gray8_2_uyvy16_xn(
+    pixel_image *source,
+    pixel_image *target, int scale
+);
+
+#ifdef __cplusplus
+}
 #endif
-    return SUCCESS;
-}
 
-result reset(byte *dst, size_t dst_size, size_t element_size)
-{
-    if (dst == NULL) {
-        return BAD_POINTER;
-    }
-    memset(dst, 0, dst_size * element_size);
-    return SUCCESS;
-}
+#endif /* CVSU_UYVY_H */

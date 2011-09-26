@@ -1,5 +1,5 @@
 /**
- * @file list.h
+ * @file cvsu_list.h
  * @author Matti Eskelinen (matti dot j dot eskelinen at jyu dot fi)
  * @brief A double-linked list that stores any object as void pointer.
  *
@@ -29,14 +29,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef LIST_H
-#   define LIST_H
+#ifndef CVSU_LIST_H
+#   define CVSU_LIST_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include "types.h"
+#include "cvsu_types.h"
 
 /**
  * The item stored in the list.
@@ -69,6 +69,7 @@ typedef int (*list_item_comparator)(const void *a, const void *b);
  * @param b A pointer to list item data
  * @return true if elements match, false otherwise
  */
+
 typedef bool (*list_item_indicator)(const void *a, const void *b);
 
 /**
@@ -78,6 +79,7 @@ typedef bool (*list_item_indicator)(const void *a, const void *b);
  * @param item A const pointer to a list item, given by iterator
  * @return SUCCESS is operation was succesful
  */
+
 typedef result (*list_item_handler)(const list_item *item);
 
 /**
@@ -96,6 +98,7 @@ typedef result (*list_item_handler)(const list_item *item);
   first_free : start of the list of freed items
   last_free  : end of the list of freed items
 */
+
 typedef struct chunk_t {
     /** Size of one item in the array in bytes. */
     size_t item_size;
@@ -116,13 +119,17 @@ typedef struct list_t {
     /** Parent list for sub-lists; NULL for the master list. */
     struct list_t *parent;
     /** Placeholder item for accessing the first item, not for storing data */
-    list_item *first;
+    list_item first;
     /** Placeholder item for accessing the last item, not for storing data */
-    list_item *last;
+    list_item last;
     /** Start of the list of freed items. */
-    list_item *first_free;
+    list_item first_free;
     /** End of the list of freed items. */
-    list_item *last_free;
+    list_item last_free;
+    /** Number of items in the list */
+    size_t count;
+    /** Maximum number of items in the list */
+    size_t max_size;
     /** Chunk for allocating the list items */
     chunk item_chunk;
     /** Chunk for allocating the data for list items */
@@ -130,132 +137,314 @@ typedef struct list_t {
 } list;
 
 /**
+ * Stores a double-linked list of pointers to data.
+ * The pointer array is sparse by design, meaning that the pointers are stored
+ * in an array, that has intentional empty slots, indicated by NULL pointers.
+ */
+
+typedef struct pointer_list_t {
+    struct pointer_list_t *parent;
+    list data_list;
+    chunk pointer_chunk;
+    data_pointer *ptr;
+    size_t size;
+    size_t count;
+} pointer_list;
+
+typedef unsigned long list_index;
+
+/**
  * Allocates the data arrays for the chunk and initializes its structure.
  */
-result chunk_allocate(chunk *dst, size_t max_size, size_t item_size);
+
+result chunk_create(
+    chunk *target,
+    size_t max_size,
+    size_t item_size
+);
+
 
 /**
  * Deallocates the memory that was allocated for the chunk.
  */
-result chunk_destroy(chunk *dst);
+
+result chunk_destroy(
+    chunk *target
+);
 
 /**
  * Clears the memory contained by the chunk
  */
-result chunk_clear(chunk *dst);
+
+result chunk_clear(
+    chunk *target
+);
 
 /**
  * Allocates items from the chunk, providing a simulated dynamic heap.
  */
-result chunk_allocate_item(byte **dst, chunk *src);
+
+result chunk_allocate_item(
+    data_pointer *target,
+    chunk *source
+);
 
 /**
- * Deallocates an item from the chunk, adding it to list of free items.
+ * Gets an item from the chunk by index, and stores it in target.
  */
-result chunk_deallocate_item(byte *dst, chunk *src);
+
+result chunk_get_item(
+    data_pointer *target,
+    chunk *source,
+    list_index index
+);
 
 /**
- * Creates a master list and allocates the chunks for it
- *
+ * Checks if a chunk contains an item or not.
+ */
+
+bool chunk_contains_item(
+    chunk *source,
+    data_pointer item
+);
+
+/**
+ * Returns an existing item from the chunk, referenced by index.
+ * Returns NULL if the index is invalid.
+ */
+
+data_pointer chunk_return_item(
+    chunk *source,
+    list_index index
+);
+
+/**
+ * Creates a master list and allocates the chunks for it.
+ * Allows to specify, how many links are reserved for each data item.
  * TODO: should allow optionally completely dynamic lists without using chunks
+ *
+ * @param dst List structure to be initialized.
+ * @param max_size Maximum number of data items contained, size of data chunk.
+ * @param item_size Size of data items stored in the list and data chunk.
+ * @param link_rate Multiplier determining the size of list item chunk.
+ * @returns SUCCESS if successful, BAD_POINTER if dst is NULL, BAD_PARAM if
+ *          link_rate is 0.
  */
 
-result list_allocate(list *dst, size_t max_size, size_t item_size);
+result list_create(
+    list *target,
+    size_t max_size,
+    size_t item_size,
+    size_t link_rate
+);
+
+/**
+ * Creates a master list, using a pre-allocated array for data.
+ * Items can be created only by linking to data items by array index.
+ * Allows to specify, how many links are reserved for each data item.
+ * This enables creating multiple sublists, that reference the same data items.
+ */
+
+result list_create_from_data(
+    list *target,
+    data_pointer data,
+    size_t max_size,
+    size_t item_size,
+    size_t link_rate
+);
 
 /**
  * Destroys the list, deallocates the chunks if it is the master
-*/
+ */
 
-result list_destroy(list *dst);
+result list_destroy(
+    list *target
+);
 
 /**
  * Clears the list and the contained data
  */
-result list_clear(list *dst);
+
+result list_clear(
+    list *target
+);
 
 /**
  * Packs the list items in order into the chunk, so the list can be handled
  * like a normal array.
  */
-result list_pack(list *dst);
+
+result list_pack(
+    list *target
+);
 
 /**
  * Creates a sublist, which uses the chunks from the master list.
  */
-result sublist_create(list *dst, list *src);
 
-/**
- * Creates a new item for the list, takes it from the chunk or free item list
- */
-result list_create_item(list *dst, list_item **item, void *data);
-
-/**
- * Creates a new item for a sublist, does not allocate data, uses the same
- */
-result list_create_sublist_item(list *dst, list_item **item, void *data);
-
-/**
- * Removes an item from list, and adds it to the free item list
- */
-result list_remove_item(list *dst, list_item *item);
-
-/**
- * Inserts 'prev' before 'item' in the list.
- * This cannot be done if 'prev' pointer of 'item' is not set; usually this is
- * the case if 'item' is the 'first' item of the list.
- */
-result item_insert_before(list_item *item, list_item *prev);
-
-/**
- * Inserts 'next' after 'item' in the list.
- * This cannot be done if 'next' pointer of 'item' is not set; usually this is
- * the case if 'item' is the 'last' item of the list.
- */
-result item_insert_after(list_item *item, list_item *next);
-
-/**
- * Removes 'item' from the list.
- * This cannot be done if 'prev' or 'next' pointer of 'item' is not set; usually
- * this is the case if 'item' is the 'first' or 'last' item of the list.
- */
-result item_remove(list_item *item);
+result sublist_create(
+    list *target,
+    list *source
+);
 
 /**
  * Appends data to the end of the list.
- * Allocates the data for the item from the list data chunk if *data == NULL.
+ * Copies the data to newly allocated item if list is a master list.
+ * For sublists, uses the same item if data is within the data chunk.
  */
-result list_append(list *dst, void *data);
+
+result list_append(
+    list *target,
+    pointer data
+);
+
+/**
+ * Appends data to the end of the list.
+ * Uses the item pointed to by list index.
+ */
+
+result list_append_index(
+    list *target,
+    list_index index
+);
 
 /**
  * Prepends data to the beginning of the list.
- * Allocates the data for the item from the list data chunk if *data == NULL.
+ * Copies the data to newly allocated item if list is a master list.
+ * For sublists, uses the same item if data is within the data chunk.
  */
-result list_prepend(list *dst, void *data);
+
+result list_prepend(
+    list *target,
+    pointer data
+);
+
+/**
+ * Prepends data to the beginning of the list.
+ * Uses the item pointed to by list index.
+ */
+
+result list_prepend_index(
+    list *target,
+    list_index index
+);
+
+/**
+ * Inserts data to list in correct sorted order, determined by comparator.
+ */
+
+result list_insert_sorted(
+    list *target,
+    pointer data,
+    list_item_comparator comparator
+);
+
+/**
+ * Inserts data to list in correct sorted order, determined by comparator.
+ * Uses the item pointed to by list index.
+ */
+
+result list_insert_sorted_index(
+    list *target,
+    list_index index,
+    list_item_comparator comparator
+);
 
 /**
  * Finds and removes a data item from the list
  */
-result list_remove(list *dst, void *data, list_item_indicator indicator);
+
+result list_remove(
+    list *target,
+    pointer data,
+    list_item_indicator indicator
+);
+
+/**
+ * Removes an item from the list
+ */
+
+result list_remove_item(
+    list *target,
+    list_item *item
+);
 
 /**
  * Iterates through the list from begin to end in forward direction.
  * For each item, calls the operation provided as a function pointer.
  */
-result list_iterate_forward(list_item *begin, list_item *end, list_item_handler operation);
+
+result list_iterate_forward(
+    const list_item *begin,
+    const list_item *end,
+    list_item_handler operation
+);
 
 /**
  * Iterates through the list from begin to end in backward direction.
  * For each item, calls the operation provided as a function pointer.
  */
-result list_iterate_backward(list_item *begin, list_item *end, list_item_handler operation);
+
+result list_iterate_backward(
+    const list_item *begin,
+    const list_item *end,
+    list_item_handler operation
+);
 
 /**
- * Appends to sublist data already contained in master list.
+ * Allocates a pointer list, which encloses a normal list and puts pointers
+ * between list items and data.
  */
-result sublist_append(list *dst, list_item *src);
+
+result pointer_list_create(
+    pointer_list *target,
+    size_t max_size,
+    size_t item_size,
+    size_t link_rate,
+    size_t sparsity
+);
+
+/**
+ * Creates a sublist to a pointer list.
+ */
+
+result pointer_sublist_create(
+    pointer_list *target,
+    pointer_list *source,
+    list_index index,
+    size_t max_size
+);
+
+/**
+ * Destroys a pointer list and deallocates the memory.
+ */
+
+result pointer_list_destroy(
+    pointer_list *target
+);
+
+/**
+ * Appends data to the end of a pointer list.
+ */
+
+result pointer_list_append(
+    pointer_list *target,
+    list_index index,
+    pointer data
+);
+
+/**
+ * Prepends data to the beginning of a pointer list.
+ */
+
+result pointer_list_prepend(
+    pointer_list *target,
+    list_index index,
+    pointer data
+);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif // LIST_H
+#endif /* CVSU_LIST_H */

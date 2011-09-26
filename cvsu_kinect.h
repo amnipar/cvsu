@@ -1,7 +1,7 @@
 /**
- * @file cv_kinect.h
+ * @file cvsu_kinect.h
  * @author Matti Eskelinen (matti dot j dot eskelinen at jyu dot fi)
- * @brief Operations for handling kinect data.
+ * @brief Operations for handling kinect data with the cvsu module.
  *
  * Copyright (c) 2011, Matti Johannes Eskelinen
  * All Rights Reserved.
@@ -29,14 +29,16 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef CV_KINECT_H
-#   define CV_KINECT_H
+#ifndef CVSU_KINECT_H
+#   define CVSU_KINECT_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include "cv_basic.h"
+#include "cvsu_basic.h"
+
+result convert_grey8_to_radar(const pixel_image *source, pixel_image *target);
 
 /**
  * Transforms a 2D kinect depth image into a 3D pointcloud.
@@ -57,4 +59,4 @@ result pointcloud_to_radar_top(pixel_image *src, pixel_image *dst);
 }
 #endif
 
-#endif // CV_KINECT_H
+#endif /* CVSU_KINECT_H */

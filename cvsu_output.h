@@ -1,7 +1,7 @@
 /**
- * @file alloc.h
+ * @file cvsu_output.h
  * @author Matti Eskelinen (matti dot j dot eskelinen at jyu dot fi)
- * @brief Memory allocation routines.
+ * @brief Output methods for the cvsu module.
  *
  * Copyright (c) 2011, Matti Johannes Eskelinen
  * All Rights Reserved.
@@ -29,39 +29,40 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ALLOC_H
-#   define ALLOC_H
+#ifndef CVSU_OUTPUT_H
+#   define CVSU_OUTPUT_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include "types.h"
+#include "cvsu_config.h"
+#include "cvsu_types.h"
 
-/**
- * @note If some other allocation method than malloc is used, USE_MALLOC should
- *       be #undef'ed. In this case, the deallocation method should be defined
- *       as well, since free is used only when USE_MALLOC is defined.
- */
-#define USE_MALLOC 1
+#if (OUTPUT_METHOD == OUTPUT_WITH_STDIO)
+#include <stdio.h>
+#endif
 
-/**
- * A generic function for allocating an array of bytes.
- */
-result allocate(byte **dst, size_t dst_size, size_t element_size);
+void report_result(result r, string func);
 
-/**
- * A generic function for deallocating an array of bytes.
- */
-result deallocate(byte **dst);
+#if (OUTPUT_METHOD == OUTPUT_DISABLED)
 
-/**
- * A generic function for resetting an array of bytes.
- */
-result reset(byte *dst, size_t dst_size, size_t element_size);
+#define PRINT0(f)
+#define PRINT1(f,a)
+#define PRINT2(f,a,b)
+
+#elif (OUTPUT_METHOD == OUTPUT_WITH_STDIO)
+
+#define PRINT0(f)       printf(f)
+#define PRINT1(f, a)    printf(f, a)
+#define PRINT2(f, a, b) printf(f, a, b)
+
+#else
+#error "Output method not specified"
+#endif
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif  /* ALLOC_H */
+#endif  /* CVSU_OUTPUT_H */

@@ -1,7 +1,7 @@
 /**
- * @file cv_kinect.c
+ * @file cvsu_kinect.c
  * @author Matti Eskelinen (matti dot j dot eskelinen at jyu dot fi)
- * @brief Operations for handling kinect data.
+ * @brief Operations for handling kinect data in the cvsu module.
  *
  * Copyright (c) 2011, Matti Johannes Eskelinen
  * All Rights Reserved.
@@ -29,10 +29,63 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "cv_kinect.h"
+#include "cvsu_kinect.h"
 
 /* for memset */
 #include <string.h>
+
+result convert_grey8_to_radar(const pixel_image *src, pixel_image *dst)
+{
+    byte *src_data;
+    byte *dst_data;
+    byte value;
+    long row, col, srcIndex, dstIndex, width, height, size;
+
+    if (src == NULL || dst == NULL) {
+        return BAD_POINTER;
+    }
+    if (src->data == NULL || dst->data == NULL) {
+        return BAD_POINTER;
+    }
+    /* src and dst must be byte images */
+    if (src->type != U8 || dst->type != U8) {
+        return BAD_TYPE;
+    }
+    /* src and dst must have 1 channel */
+    if (src->step != 1 || dst->step != 1) {
+        return BAD_TYPE;
+    }
+    /* src and dst must be in greyscale */
+    if (src->format != GREY || dst->format != GREY) {
+        return BAD_TYPE;
+    }
+    /* src and dst must have same width and dst must have height of 256 */
+    if (src->width != dst->width || dst->height != 256) {
+        return BAD_SIZE;
+    }
+
+    src_data = (byte *)src->data;
+    dst_data = (byte *)dst->data;
+
+    width = src->width;
+    height = src->height;
+    size = src->size;
+
+    memset(dst_data, 0, dst->size);
+    for (col = 0; col < width; col++) {
+        srcIndex = col;
+        for (row = 0; row < height; row++) {
+            value = src_data[srcIndex];
+            dstIndex = (255 - value) * width + col;
+            if (dst_data[dstIndex] < 255) dst_data[dstIndex]++;
+            srcIndex += width;
+        }
+    }
+
+    return SUCCESS;
+}
+
+/******************************************************************************/
 
 /* x, y, z coordinates will be in cm */
 

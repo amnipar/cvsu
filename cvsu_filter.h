@@ -1,7 +1,7 @@
 /**
- * @file cv_filter.h
+ * @file cvsu_filter.h
  * @author Matti Eskelinen (matti dot j dot eskelinen at jyu dot fi)
- * @brief Basic image filters for the cv module.
+ * @brief Basic image filters for the cvsu module.
  *
  * Copyright (c) 2011, Matti Johannes Eskelinen
  * All Rights Reserved.
@@ -29,39 +29,89 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef CV_FILTER_H
-#   define CV_FILTER_H
+#ifndef CVSU_FILTER_H
+#   define CVSU_FILTER_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include "cv_basic.h"
+#include "cvsu_basic.h"
 
-result threshold(pixel_image *src, pixel_image *dst, byte t);
+/**
+ * Thresholds an 8-bit grayscale image by changing all values smaller than t to
+ * 0 and all values larger than t to 255.
+ */
+result threshold(
+    const pixel_image *source,
+    pixel_image *target,
+    byte t
+);
 
-result smooth_binomial(const pixel_image *src, pixel_image *dst, int passes);
+/**
+ * Smoothes an 8-bit grayscale image by applying binomial filter multiple times.
+ */
+result smooth_binomial(
+    const pixel_image *source,
+    pixel_image *target,
+    uint32 passes
+);
 
-/*
-sobel_x filters image with horizontal sobel operator
-abs_sobel_x does the same using absolute values
+/**
+ * Filters image with a 3x3 horizontal sobel operator.
+ */
 
-accepts U8 image as src and S32 image as dst
-images must have same dimensions
-*/
-result sobel_x(const pixel_image *src, pixel_image *dst);
-result abs_sobel_x(const pixel_image *src, pixel_image *dst);
+result sobel_x(
+    const pixel_image *source,
+    pixel_image *target
+);
 
-/*
-extrema_x calculates the extremal values along horizontal scanlines
+/**
+ * Filters image with a 3x3 horizontal sobel operator, using absolute values.
+ */
 
-accepts S32 image as src and S32 image as dst
-*/
-result extrema_x(const pixel_image *src, pixel_image *dst);
-result extrema_y(const pixel_image *src, pixel_image *dst);
+result abs_sobel_x(
+    const pixel_image *source,
+    pixel_image *target
+);
+
+/**
+ * Filters image with a 3x3 vertical sobel operator.
+ */
+result sobel_y(
+    const pixel_image *source,
+    pixel_image *target
+);
+
+/**
+ * Filters image with a 3x3 vertical sobel operator, using absolute values.
+ */
+
+result abs_sobel_y(
+    const pixel_image *source,
+    pixel_image *target
+);
+
+/**
+ * Calculates the extremal values along horizontal scanlines
+ */
+
+result extrema_x(
+    const pixel_image *source,
+    pixel_image *target
+);
+
+/**
+ * Calculates the extremal values along vertical scanlines
+ */
+
+result extrema_y(
+    const pixel_image *source,
+    pixel_image *target
+);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif // CV_FILTER_H
+#endif /* CVSU_FILTER_H */
