@@ -1,6 +1,6 @@
 /**
  * @file cvsu_macros.h
- * @author Matti Eskelinen (matti dot j dot eskelinen at jyu dot fi)
+ * @author Matti J. Eskelinen <matti.j.eskelinen@gmail.com>
  * @brief Macros for the cvsu module.
  *
  * Copyright (c) 2011, Matti Johannes Eskelinen
@@ -37,12 +37,6 @@
 #include "cvsu_output.h"
 
 #define TRY(func) result r
-
-/* r.code = SUCCESS;\ */
-
-/* r.function = func##_name;\*/
-
-/* { SUCCESS, func##_name }\*/
 
 #define ERROR(e) do {\
     r = e;\
@@ -440,31 +434,31 @@ finally:
 #endif
 
 #define INTEGRAL_IMAGE_1BOX_VARIABLES()\
-    const long *I_1_data, *iA;\
-    const double *I_2_data, *i2A;\
-    uint32 B_inc, C_inc, D_inc;\
-    double sumsqr;\
-    uint32 N, sum
+    const I_1_t *I_1_data, *iA;\
+    const I_2_t *I_2_data, *i2A;\
+    uint32 N, B_inc, C_inc, D_inc;\
+    I_2_t sumsqr;\
+    I_1_t sum
 
 #define INTEGRAL_IMAGE_2BOX_VARIABLES()\
-    const long *I_1_data, *iA1;\
-    const double *I_2_data, *i2A1;\
-    uint32 B1_inc, C1_inc, D1_inc, A2_inc, B2_inc, C2_inc, D2_inc;\
-    double sumsqr1, sumsqr2;\
-    uint32 N, sum1, sum2;\
+    const I_1_t *I_1_data, *iA1;\
+    const I_2_t *I_2_data, *i2A1;\
+    uint32 N, B1_inc, C1_inc, D1_inc, A2_inc, B2_inc, C2_inc, D2_inc;\
+    I_2_t sumsqr1, sumsqr2;\
+    I_1_t sum1, sum2;\
     long g
 
 #define INTEGRAL_IMAGE_INIT_1BOX(I, box_length, box_width)\
-    I_1_data = (long *)(I)->I_1.data;\
-    I_2_data = (double *)(I)->I_2.data;\
+    I_1_data = (I_1_t *)(I)->I_1.data;\
+    I_2_data = (I_2_t *)(I)->I_2.data;\
     B_inc = (box_length);\
     C_inc = (box_width) * (I)->width + (box_length);\
     D_inc = (box_width) * (I)->width;\
     N = ((box_length) * (box_width))
 
 #define INTEGRAL_IMAGE_INIT_HBOX(I, box_length, box_width)\
-    I_1_data = (long *)(I)->I_1.data;\
-    I_2_data = (double *)(I)->I_2.data;\
+    I_1_data = (I_1_t *)(I)->I_1.data;\
+    I_2_data = (I_2_t *)(I)->I_2.data;\
     B1_inc = (box_length);\
     C1_inc = (box_width) * (I)->width + (box_length);\
     D1_inc = (box_width) * (I)->width;\
@@ -475,8 +469,8 @@ finally:
     N = ((box_length) * (box_width))
 
 #define INTEGRAL_IMAGE_INIT_VBOX(I, box_length, box_width)\
-    I_1_data = (long *)(I)->I_1.data;\
-    I_2_data = (double *)(I)->I_2.data;\
+    I_1_data = (I_1_t *)(I)->I_1.data;\
+    I_2_data = (I_2_t *)(I)->I_2.data;\
     B1_inc = (box_width);\
     C1_inc = (box_length) * (I)->width + (box_width);\
     D1_inc = (box_length) * (I)->width;\

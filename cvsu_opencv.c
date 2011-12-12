@@ -1,7 +1,7 @@
 /**
- * @file cvsu_output.c
+ * @file cvsu_opencv.c
  * @author Matti J. Eskelinen <matti.j.eskelinen@gmail.com>
- * @brief Output methods for the cvsu module.
+ * @brief Interfaces for OpenCV and IplImage type.
  *
  * Copyright (c) 2011, Matti Johannes Eskelinen
  * All Rights Reserved.
@@ -30,28 +30,73 @@
  */
 
 #include "cvsu_config.h"
-#include "cvsu_output.h"
+#include "cvsu_macros.h"
+#include "cvsu_opencv.h"
+#include <stdio.h>
+
+string pixel_image_create_from_ipl_image_name = "pixel_image_create_from_ipl_image";
 
 /******************************************************************************/
 
-void report_result(
-    result r,
-    string func
-    )
+result pixel_image_create_from_ipl_image(pixel_image *target, IplImage *source, pixel_format format)
 {
-    if (r == SUCCESS) {
-#if (OUTPUT_LEVEL >= OUTPUT_LEVEL_INFO)
-        PRINT1("++Function %s successful\n", func);
-#endif
-        return;
+    TRY();
+    int depth;
+    int channels;
+    pixel_type type;
+
+    CHECK_POINTER(target);
+    CHECK_POINTER(source);
+    CHECK_PARAM(format == RGB || format == GREY);
+
+    channels = source->nChannels;
+
+    if (format == RGB) {
+        CHECK_PARAM(channels == 3);
     }
-#if (OUTPUT_LEVEL >= OUTPUT_LEVEL_ERRORS)
-    if (r == CAUGHT_ERROR) {
-        PRINT1("!!Function %s caught error\n", func);
-        return;
+    else {
+        CHECK_PARAM(channels == 1);
     }
-    PRINT2("!!Function %s encountered error %d\n", func, (int)r);
-#endif
+
+    depth = source->depth;
+    switch (depth) {
+        case IPL_DEPTH_8U:
+            type = p_U8;
+            printf("U8\n");
+            break;
+        case IPL_DEPTH_8S:
+            type = p_S8;
+            printf("S8\n");
+            break;
+        case IPL_DEPTH_16U:
+            type = p_U16;
+            printf("U16\n");
+            break;
+        case IPL_DEPTH_16S:
+            type = p_S16;
+            printf("S16\n");
+            break;
+        case IPL_DEPTH_32S:
+            type = p_S32;
+            printf("U32\n");
+            break;
+        case IPL_DEPTH_32F:
+            type = p_F32;
+            printf("F32\n");
+            break;
+        case IPL_DEPTH_64F:
+            type = p_F64;
+            printf("F64\n");
+            break;
+        default:
+            ERROR(BAD_TYPE);
+    }
+
+    CHECK(pixel_image_create_from_data(target, source->imageData, type, format,
+            source->width, source->height, channels, source->widthStep));
+
+    FINALLY(pixel_image_create_from_ipl_image);
+    RETURN();
 }
 
 /******************************************************************************/

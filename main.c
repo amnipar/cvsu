@@ -39,11 +39,13 @@
 #include "cvsu_macros.h"
 #include "cvsu_memory.h"
 #include "cvsu_basic.h"
+#include "cvsu_integral.h"
 #include "cvsu_filter.h"
 #include "cvsu_scale.h"
 #include "cvsu_edges.h"
 #include "cvsu_list.h"
 #include "cvsu_simple_scene.h"
+#include "cvsu_image_tree.h"
 
 const uint32 ImageWidth = 320;
 const uint32 ImageHeight = 320;
@@ -71,8 +73,9 @@ int main (int argc, char *argv[])
     image_pyramid pyramid;
     integral_image integral;
     simple_scene scene;
-    line scene_lines[100];
-    uint32 line_count;
+    image_tree_forest forest;
+    /*line scene_lines[100];*/
+    /*uint32 line_count;*/
     FILE* ifh;
     FILE* ofh;
     bool use_scene = false;
@@ -103,6 +106,7 @@ int main (int argc, char *argv[])
     CHECK(image_pyramid_create(&pyramid, &input_image, 5));
     CHECK(integral_image_create(&integral, &input_image));
     CHECK(simple_scene_create(&scene, &input_image));
+    CHECK(image_tree_forest_create(&forest, &input_image, 32, 32));
 
     ifh = fopen(ifn, "rb");
     ofh = fopen(ofn, "wb");
@@ -110,10 +114,12 @@ int main (int argc, char *argv[])
     if (ifh != NULL && ofh != NULL) {
         size_t readcount = fread(input_image.data, sizeof(byte), size, ifh);
         if (readcount == size) {
-            uint32 i;
+            /*uint32 i;*/
             struct timeval start;
             struct timeval finish;
             double timediff;
+
+            /*
             gettimeofday(&start, NULL);
             if (use_pyramid) {
                 for (i = 0; i < 1000; i++) {
@@ -138,6 +144,17 @@ int main (int argc, char *argv[])
             gettimeofday(&finish, NULL);
             timediff = (double)(finish.tv_sec - start.tv_sec) + (double)(finish.tv_usec - start.tv_usec) / 1000000.0;
             printf("Time taken: %f\n", timediff);
+            */
+            gettimeofday(&start, NULL);
+            CHECK(simple_scene_update(&scene));
+            gettimeofday(&finish, NULL);
+            timediff = (double)(finish.tv_sec - start.tv_sec) + (double)(finish.tv_usec - start.tv_usec) / 1000000.0;
+            printf("Scene, time taken: %f\n", timediff);
+            gettimeofday(&start, NULL);
+            CHECK(image_tree_forest_update(&forest));
+            gettimeofday(&finish, NULL);
+            timediff = (double)(finish.tv_sec - start.tv_sec) + (double)(finish.tv_usec - start.tv_usec) / 1000000.0;
+            printf("Forest, time taken: %f\n", timediff);
 
             if (show_scale) {
                 fwrite(pyramid.levels[scale_to_show].data, sizeof(byte), size, ofh);

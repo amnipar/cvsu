@@ -1,6 +1,6 @@
 /**
  * @file cvsu_kinect.c
- * @author Matti Eskelinen (matti dot j dot eskelinen at jyu dot fi)
+ * @author Matti J. Eskelinen <matti.j.eskelinen@gmail.com>
  * @brief Operations for handling kinect data in the cvsu module.
  *
  * Copyright (c) 2011, Matti Johannes Eskelinen
@@ -48,7 +48,7 @@ result convert_grey8_to_radar(const pixel_image *src, pixel_image *dst)
         return BAD_POINTER;
     }
     /* src and dst must be byte images */
-    if (src->type != U8 || dst->type != U8) {
+    if (src->type != p_U8 || dst->type != p_U8) {
         return BAD_TYPE;
     }
     /* src and dst must have 1 channel */
@@ -104,7 +104,7 @@ result depth16_to_pointcloud(pixel_image *src, pixel_image *dst)
     if (src->data == NULL || dst->data == NULL) {
         return BAD_POINTER;
     }
-    if (src->type != U16 || dst->type != F64) {
+    if (src->type != p_U16 || dst->type != p_F64) {
         return BAD_TYPE;
     }
     if (src->step != 1 || dst->step != 3) {
@@ -160,7 +160,7 @@ result pointcloud_to_radar_top(pixel_image *src, pixel_image *dst)
     if (src->data == NULL || dst->data == NULL) {
         return BAD_POINTER;
     }
-    if (src->type != F64 || dst->type != U8) {
+    if (src->type != p_F64 || dst->type != p_U8) {
         return BAD_TYPE;
     }
     if (src->step != 3 || dst->step != 1) {

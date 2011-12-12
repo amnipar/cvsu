@@ -1,5 +1,39 @@
+/**
+ * @file cvsu_uyvy.c
+ * @author Matti J. Eskelinen <matti.j.eskelinen@gmail.com>
+ * @brief Support for uyvy images in cvsu module.
+ *
+ * Copyright (c) 2011, Matti Johannes Eskelinen
+ * All Rights Reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *   * Redistributions of source code must retain the above copyright
+ *     notice, this list of conditions and the following disclaimer.
+ *   * Redistributions in binary form must reproduce the above copyright
+ *     notice, this list of conditions and the following disclaimer in the
+ *     documentation and/or other materials provided with the distribution.
+ *   * Neither the name of the copyright holder nor the
+ *     names of its contributors may be used to endorse or promote products
+ *     derived from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL COPYRIGHT HOLDER BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 
+#include "cvsu_config.h"
+#include "cvsu_macros.h"
 #include "cvsu_uyvy.h"
+
+#include <string.h>
 
 string convert_uyvy16_to_grey8_name = "convert_uyvy16_to_grey8";
 string scale_uyvy16_2_uyvy16_x2_name = "scale_uyvy16_2_uyvy16_x2";
@@ -15,8 +49,8 @@ result convert_uyvy16_to_grey8(
     CHECK_POINTER(target);
     CHECK_POINTER(source->data);
     CHECK_POINTER(target->data);
-    CHECK_PARAM(source->type == U8);
-    CHECK_PARAM(target->type == U8);
+    CHECK_PARAM(source->type == p_U8);
+    CHECK_PARAM(target->type == p_U8);
     CHECK_PARAM(source->step == 2);
     CHECK_PARAM(target->step == 1);
     CHECK_PARAM(source->format == UYVY);
@@ -35,10 +69,57 @@ result convert_uyvy16_to_grey8(
     }
     else {
         DISCONTINUOUS_IMAGE_VARIABLES(byte, byte);
-        uint32 offset;
+        uint32 offset, x, y;
         /* for discontinuous images offset is applied to row table */
         /* therefore must correct the offset in case it's other than 0 */
         offset = 1 - source->offset;
+        FOR_2_DISCONTINUOUS_IMAGES_WITH_OFFSET(offset, 0)
+        {
+            PIXEL_VALUE(target) = PIXEL_VALUE(source);
+        }
+    }
+
+    FINALLY(convert_uyvy16_to_grey8);
+    RETURN();
+}
+
+/******************************************************************************/
+
+result convert_yuyv16_to_grey8(
+    const pixel_image *source,
+    pixel_image *target
+    )
+{
+    TRY();
+
+    CHECK_POINTER(source);
+    CHECK_POINTER(target);
+    CHECK_POINTER(source->data);
+    CHECK_POINTER(target->data);
+    CHECK_PARAM(source->type == p_U8);
+    CHECK_PARAM(target->type == p_U8);
+    CHECK_PARAM(source->step == 2);
+    CHECK_PARAM(target->step == 1);
+    CHECK_PARAM(source->format == UYVY);
+    CHECK_PARAM(target->format == GREY);
+    CHECK_PARAM(source->width == target->width);
+    CHECK_PARAM(source->height == target->height);
+
+    /* simply copy y values from uyvy image to greyscale image */
+    if (pixel_image_is_continuous(source) && pixel_image_is_continuous(target)) {
+        CONTINUOUS_IMAGE_VARIABLES(byte, byte);
+        /* y values are in first channel, so must apply offset 0 to source */
+        FOR_2_CONTINUOUS_IMAGES_WITH_OFFSET(0, 0)
+        {
+            PIXEL_VALUE(target) = PIXEL_VALUE(source);
+        }
+    }
+    else {
+        DISCONTINUOUS_IMAGE_VARIABLES(byte, byte);
+        uint32 offset, x, y;
+        /* for discontinuous images offset is applied to row table */
+        /* therefore must correct the offset in case it's other than 0 */
+        offset = 0 - source->offset;
         FOR_2_DISCONTINUOUS_IMAGES_WITH_OFFSET(offset, 0)
         {
             PIXEL_VALUE(target) = PIXEL_VALUE(source);
@@ -62,8 +143,8 @@ result scale_uyvy16_2_uyvy16_x2(
     CHECK_POINTER(target);
     CHECK_POINTER(source->data);
     CHECK_POINTER(target->data);
-    CHECK_PARAM(source->type == U8);
-    CHECK_PARAM(target->type == U8);
+    CHECK_PARAM(source->type == p_U8);
+    CHECK_PARAM(target->type == p_U8);
     CHECK_PARAM(source->step == 2);
     CHECK_PARAM(target->step == 2);
     CHECK_PARAM(source->format == UYVY);
@@ -74,7 +155,7 @@ result scale_uyvy16_2_uyvy16_x2(
     /* read image in 4 byte chunks (unsigned long) and write out 4 times */
     {
         IMAGE_WITH_STEP_VARIABLES(uint32, uint32);
-        uint32 offset_1, offset_2, offset_3;
+        uint32 x, y, offset_1, offset_2, offset_3;
         offset_1 = 1;
         offset_2 = target->stride / 2;
         offset_3 = offset_2 + 1;
@@ -134,7 +215,7 @@ result scale_gray8_2_uyvy16_xn(pixel_image *src, pixel_image *dst, int scale)
     if (src->data == NULL || dst->data == NULL) {
         return BAD_POINTER;
     }
-    if (src->type != U8 || dst->type != U8) {
+    if (src->type != p_U8 || dst->type != p_U8) {
         return BAD_TYPE;
     }
     if (src->step != 1 || dst->step != 2) {

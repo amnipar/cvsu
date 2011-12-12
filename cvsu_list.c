@@ -1,6 +1,6 @@
 /**
  * @file cvsu_list.c
- * @author Matti Eskelinen (matti dot j dot eskelinen at jyu dot fi)
+ * @author Matti J. Eskelinen <matti.j.eskelinen@gmail.com>
  * @brief A double-linked list that stores any object as void pointer.
  *
  * Copyright (c) 2011, Matti Johannes Eskelinen
@@ -39,13 +39,17 @@
 
 string chunk_create_name = "chunk_create";
 string chunk_destroy_name = "chunk_destroy";
+string chunk_nullify_name = "chunk_nullify";
 string chunk_clear_name = "chunk_clear";
 string chunk_allocate_item_name = "chunk_allocate_item";
 string chunk_get_item_name = "chunk_get_item";
 
+string list_item_nullify_name = "list_item_nullify";
+
 string list_create_name = "list_create";
 string list_create_from_data_name = "list_create_from_data";
 string list_destroy_name = "list_destroy";
+string list_nullify_name = "list_nullify";
 string list_clear_name = "list_clear";
 string list_pack_name = "list_pack";
 string sublist_create_name = "sublist_create";
@@ -58,12 +62,17 @@ string item_insert_after_name = "item_insert_after";
 string item_remove_name = "item_remove";
 
 string list_append_name = "list_append";
+string list_append_reveal_data_name = "list_append_reveal_data";
 string list_append_index_name = "list_append_index";
+string sublist_append_name = "sublist_append";
 string list_prepend_name = "list_prepend";
 string list_prepend_index_name = "list_prepend_index";
+string list_insert_at_name = "list_insert_at";
 string list_insert_sorted_name = "list_insert_sorted";
 string list_insert_sorted_index_name = "list_insert_sorted_index";
 string list_remove_name = "list_remove";
+string list_remove_between_name = "list_remove_between";
+string list_remove_rest_name = "list_remove_rest";
 string list_iterate_forward_name = "list_iterate_forward";
 string list_iterate_backward_name = "list_iterate_backward";
 
@@ -113,6 +122,25 @@ result chunk_destroy(
     CHECK(memory_deallocate(&target->chunk));
 
     FINALLY(chunk_destroy);
+    RETURN();
+}
+
+/******************************************************************************/
+
+result chunk_nullify(
+    chunk *target
+    )
+{
+    TRY();
+
+    CHECK_POINTER(target);
+
+    target->item_size = 0;
+    target->size = 0;
+    target->count = 0;
+    target->chunk = NULL;
+
+    FINALLY(chunk_nullify);
     RETURN();
 }
 
@@ -222,6 +250,24 @@ data_pointer chunk_return_item(
 }
 
 /******************************************************************************/
+
+result list_item_nullify(
+    list_item *target
+    )
+{
+    TRY();
+
+    CHECK_POINTER(target);
+
+    target->prev = NULL;
+    target->next = NULL;
+    target->data = NULL;
+
+    FINALLY(list_item_nullify);
+    RETURN();
+}
+
+/******************************************************************************/
 /* private function for inserting an item before another item                 */
 
 result item_insert_before(
@@ -325,18 +371,12 @@ result list_create_item(
         CHECK(item_remove(*item));
     }
     else {
-        if (target->count < target->max_size &&
-                (!is_master || target->data_chunk.count < target->data_chunk.size)) {
-            CHECK(chunk_allocate_item((data_pointer *)item, &master->item_chunk));
-            if (is_master) {
-                /* if this is a master list, allocate data for item as well */
-                CHECK(chunk_allocate_item((data_pointer *)&(*item)->data, &target->data_chunk));
-            }
-            target->count++;
+        CHECK(chunk_allocate_item((data_pointer *)item, &master->item_chunk));
+        /* if this is a master list, allocate data for item as well */
+        if (is_master) {
+            CHECK(chunk_allocate_item((data_pointer *)&(*item)->data, &target->data_chunk));
         }
-        else {
-            ERROR(BAD_SIZE);
-        }
+        target->count++;
     }
 
     /* for master lists, copy the object to allocated memory */
@@ -525,6 +565,30 @@ result list_destroy(
 
 /******************************************************************************/
 
+result list_nullify(
+    list *target
+    )
+{
+    TRY();
+
+    CHECK_POINTER(target);
+
+    target->parent = NULL;
+    CHECK(list_item_nullify(&target->first));
+    CHECK(list_item_nullify(&target->last));
+    CHECK(list_item_nullify(&target->first_free));
+    CHECK(list_item_nullify(&target->last_free));
+    target->count = 0;
+    target->max_size = 0;
+    CHECK(chunk_nullify(&target->item_chunk));
+    CHECK(chunk_nullify(&target->data_chunk));
+
+    FINALLY(list_nullify);
+    RETURN();
+}
+
+/******************************************************************************/
+
 result list_clear(
     list *target
     )
@@ -641,6 +705,27 @@ result list_append(
 
 /******************************************************************************/
 
+result list_append_reveal_data(
+    list *target,
+    pointer data,
+    pointer *list_data
+    )
+{
+    TRY();
+    list_item *item;
+
+    *list_data = NULL;
+    /* no need to check pointers, list_create_item does that */
+    CHECK(list_create_item(target, &item, data));
+    CHECK(item_insert_before(&target->last, item));
+    *list_data = item->data;
+
+    FINALLY(list_append_reveal_data);
+    RETURN();
+}
+
+/******************************************************************************/
+
 result list_append_index(
     list *target,
     list_index index
@@ -654,6 +739,32 @@ result list_append_index(
     CHECK(item_insert_before(&target->last, item));
 
     FINALLY(list_append_index);
+    RETURN();
+}
+
+/******************************************************************************/
+
+result sublist_append(
+    list *target,
+    pointer data
+    )
+{
+    TRY();
+    list_item *item;
+
+    CHECK_POINTER(target);
+
+    /* for sublists, append first to the parent list */
+    if (target->parent != NULL) {
+        CHECK(list_create_item(target->parent, &item, data));
+        CHECK(item_insert_before(&target->last, item));
+    }
+    /* for master lists, append directly to the list itself */
+    else {
+        CHECK(list_append(target, data));
+    }
+
+    FINALLY(sublist_append);
     RETURN();
 }
 
@@ -690,6 +801,53 @@ result list_prepend_index(
     CHECK(item_insert_after(&target->first, item));
 
     FINALLY(list_prepend_index);
+    RETURN();
+}
+
+/******************************************************************************/
+
+result list_insert_at(
+    list *target,
+    list_item *at,
+    pointer data
+    )
+{
+    TRY();
+    list_item *item;
+
+    /* no need to check pointers, list_create_item does that */
+    CHECK(list_create_item(target, &item, data));
+    CHECK(item_insert_after(at, item));
+
+    FINALLY(list_insert_at);
+    RETURN();
+}
+
+
+/******************************************************************************/
+
+result sublist_insert_at(
+    list *target,
+    list_item *at,
+    pointer data
+    )
+{
+    TRY();
+    pointer new_data;
+
+    CHECK_POINTER(target);
+
+    /* for sublists, append first to the parent list */
+    if (target->parent != NULL) {
+        CHECK(list_append_reveal_data(target->parent, data, (pointer)&new_data));
+        CHECK(list_insert_at(target, at, new_data));
+    }
+    /* for master lists, append directly to the list itself */
+    else {
+        CHECK(list_insert_at(target, at, data));
+    }
+
+    FINALLY(list_insert_at);
     RETURN();
 }
 
@@ -821,6 +979,67 @@ result list_remove_item(
     CHECK(item_insert_before(&master->last_free, item));
 
     FINALLY(list_remove_item);
+    RETURN();
+}
+
+/******************************************************************************/
+
+result list_remove_between(
+    list *target,
+    list_item *start,
+    list_item *end
+    )
+{
+    TRY();
+    list_item *item;
+
+    CHECK_POINTER(start);
+    CHECK_POINTER(end);
+
+    item = start->next;
+    while (item != end) {
+        if (item == NULL) {
+            /* end item not found in sequence, starting from start item */
+            ERROR(BAD_PARAM);
+        }
+        item = item->next;
+    }
+
+    while (start->next != end) {
+        list_remove_item(target, start->next);
+    }
+
+    FINALLY(list_remove_between);
+    RETURN();
+}
+
+/******************************************************************************/
+
+result list_remove_rest(
+    list *target,
+    list_item *last
+    )
+{
+    TRY();
+    list_item *item;
+
+    CHECK_POINTER(target);
+    CHECK_POINTER(last);
+
+    item = last;
+    while (item != &target->last) {
+        if (item == NULL) {
+            /* end item not found in sequence, starting from given item */
+            ERROR(BAD_PARAM);
+        }
+        item = item->next;
+    }
+
+    while (last->next != &target->last) {
+        list_remove_item(target, last->next);
+    }
+
+    FINALLY(list_remove_rest);
     RETURN();
 }
 

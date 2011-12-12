@@ -1,6 +1,6 @@
 /**
  * @file cvsu_edges.h
- * @author Matti Eskelinen (matti dot j dot eskelinen at jyu dot fi)
+ * @author Matti J. Eskelinen <matti.j.eskelinen@gmail.com>
  * @brief Edge detection and handling for the cvsu module.
  *
  * Copyright (c) 2011, Matti Johannes Eskelinen
@@ -38,6 +38,8 @@ extern "C" {
 
 #include "cvsu_types.h"
 #include "cvsu_basic.h"
+#include "cvsu_integral.h"
+#include "cvsu_list.h"
 
 /**
  * Stores an edge image.
@@ -60,6 +62,27 @@ typedef struct edge_image_t {
     uint32 dy;
 } edge_image;
 
+typedef struct edge_block_t {
+    uint16 x;
+    uint16 y;
+    uint16 w;
+    uint16 h;
+    SI_1_t sum_top;
+    SI_1_t sum_bottom;
+    SI_1_t sum_left;
+    SI_1_t sum_right;
+    SI_1_t *sum_h;
+    SI_1_t *sum_v;
+    SI_2_t sumsqr_top;
+    SI_2_t sumsqr_bottom;
+    SI_2_t sumsqr_left;
+    SI_2_t sumsqr_right;
+    SI_2_t *sumsqr_h;
+    SI_2_t *sumsqr_v;
+    edge_strength *edge_h;
+    edge_strength *edge_v;
+} edge_block;
+
 /**
  * Stores an edge element.
  */
@@ -72,6 +95,42 @@ typedef struct edge_elem_t {
     short dev_b;
     char profile[4];
 } edge_elem;
+
+typedef struct edge_block_image_t {
+    SI_1_t *sum_h;
+    SI_1_t *sum_v;
+    SI_2_t *sumsqr_h;
+    SI_2_t *sumsqr_v;
+    edge_strength *edge_h;
+    edge_strength *edge_v;
+    uint32 array_size;
+    uint32 array_index;
+    list edge_blocks;
+    list edge_elems;
+} edge_block_image;
+
+result edge_block_nullify(
+    edge_block *target
+);
+
+result edge_block_image_create(
+    edge_block_image *target,
+    uint32 max_blocks,
+    uint32 max_elems,
+    uint32 max_array_size
+);
+
+result edge_block_image_destroy(
+    edge_block_image *target
+);
+
+result edge_block_image_nullify(
+    edge_block_image *target
+);
+
+result edge_block_image_new_block(
+    edge_block **target, edge_block_image *source, uint32 size
+);
 
 /**
  * Pointer to a function that calculates edgel strength based on sums acquired
@@ -93,8 +152,8 @@ typedef long (*edgel_criterion_calculator)(
 result edge_image_create(
     edge_image *target,
     pixel_image *source,
-    uint32 width,
-    uint32 height,
+    uint32 hstep,
+    uint32 vstep,
     uint32 hmargin,
     uint32 vmargin,
     uint32 box_width,

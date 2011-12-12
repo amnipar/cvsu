@@ -1,6 +1,6 @@
 /**
  * @file cvsu_list.h
- * @author Matti Eskelinen (matti dot j dot eskelinen at jyu dot fi)
+ * @author Matti J. Eskelinen <matti.j.eskelinen@gmail.com>
  * @brief A double-linked list that stores any object as void pointer.
  *
  * Copyright (c) 2011, Matti Johannes Eskelinen
@@ -173,6 +173,14 @@ result chunk_destroy(
 );
 
 /**
+ * Sets all variables to NULL, does not deallocate memory
+ */
+
+result chunk_nullify(
+    chunk *target
+);
+
+/**
  * Clears the memory contained by the chunk
  */
 
@@ -219,6 +227,14 @@ data_pointer chunk_return_item(
 );
 
 /**
+ * Sets all variables to NULL, does not deallocate memory.
+ */
+
+result list_item_nullify(
+    list_item *target
+);
+
+/**
  * Creates a master list and allocates the chunks for it.
  * Allows to specify, how many links are reserved for each data item.
  * TODO: should allow optionally completely dynamic lists without using chunks
@@ -262,6 +278,14 @@ result list_destroy(
 );
 
 /**
+ * Sets all variables to null, does not deallocate memory.
+ */
+
+result list_nullify(
+    list *target
+);
+
+/**
  * Clears the list and the contained data
  */
 
@@ -298,6 +322,17 @@ result list_append(
     pointer data
 );
 
+result list_append_reveal_data(
+    list *target,
+    pointer data,
+    pointer *list_data
+);
+
+result sublist_append(
+    list *target,
+    pointer data
+);
+
 /**
  * Appends data to the end of the list.
  * Uses the item pointed to by list index.
@@ -327,6 +362,18 @@ result list_prepend(
 result list_prepend_index(
     list *target,
     list_index index
+);
+
+result list_insert_at(
+    list *target,
+    list_item *at,
+    pointer data
+);
+
+result sublist_insert_at(
+    list *target,
+    list_item *at,
+    pointer data
 );
 
 /**
@@ -367,6 +414,17 @@ result list_remove(
 result list_remove_item(
     list *target,
     list_item *item
+);
+
+result list_remove_between(
+    list *target,
+    list_item *start,
+    list_item *end
+);
+
+result list_remove_rest(
+    list *target,
+    list_item *last
 );
 
 /**

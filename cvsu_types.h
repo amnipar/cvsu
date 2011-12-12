@@ -1,6 +1,6 @@
 /**
  * @file cvsu_types.h
- * @author Matti J. Eskelinen (matti dot j dot eskelinen at jyu dot fi)
+ * @author Matti J. Eskelinen <matti.j.eskelinen@gmail.com>
  * @brief Generic type definitions for the cvsu module.
  *
  * Copyright (c) 2011, Matti Johannes Eskelinen
@@ -27,23 +27,37 @@
  * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
  */
 
 #ifndef CVSUTYPES_H
 #   define CVSUTYPES_H
 
-/*#include <stddef.h>*/
-/*#include <stdbool.h>*/
-
-typedef long unsigned int size_t;
-
-#ifndef __cplusplus
-#ifndef __bool_true_false_are_defined
-typedef long unsigned int bool;
-#define true	1
-#define false	0
+#ifdef __cplusplus
+extern "C" {
 #endif
+
+#include "cvsu_config.h"
+
+#if (HAVE_STDDEF_H)
+#include <stddef.h>
+#else
+typedef long unsigned int size_t;
+#endif
+
+#ifdef HAVE_STDBOOL_H
+# include <stdbool.h>
+#else
+# ifndef HAVE__BOOL
+#  ifdef __cplusplus
+typedef bool _Bool;
+#  else
+#   define _Bool signed char
+#  endif
+# endif
+# define bool _Bool
+# define false 0
+# define true 1
+# define __bool_true_false_are_defined 1
 #endif
 
 #ifndef NULL
@@ -70,12 +84,23 @@ typedef unsigned long  uint32;
 typedef float          real32;
 typedef double         real64;
 
-typedef uint32 I_1_t;
-typedef real64 I_2_t;
+typedef enum direction_t {
+    d_NULL = 0,
+    d_N,
+    d_NE,
+    d_E,
+    d_SE,
+    d_S,
+    d_SW,
+    d_W,
+    d_NW
+} direction;
+
+typedef sint16 coord;
 
 typedef struct point_t {
-    uint16 x;
-    uint16 y;
+    coord x;
+    coord y;
 } point;
 
 typedef struct line_t {
@@ -84,14 +109,23 @@ typedef struct line_t {
 } line;
 
 typedef struct rect_t {
-    point top_left;
-    point bottom_right;
+    coord left;
+    coord right;
+    coord top;
+    coord bottom;
 } rect;
 
 typedef struct statistics_t {
     sint16 mean;
     sint16 dev;
 } statistics;
+
+typedef struct stat_with_dir_t {
+    sint16 mean;
+    sint16 dev;
+    sint16 dir_h;
+    sint16 dir_v;
+} stat_with_dir;
 
 typedef struct fstatistics_t {
     double mean;
@@ -106,6 +140,7 @@ typedef enum result_t {
     BAD_SIZE,
     BAD_PARAM,
     NOT_FOUND,
+    INPUT_ERROR,
     NOT_IMPLEMENTED
 } result;
 /*
@@ -129,8 +164,9 @@ typedef struct fresult_t {
  * Different types used for storing pixel values.
  */
 typedef enum pixel_type_t {
+    p_NONE = 0,
     /** unsigned char (byte) values */
-    p_U8 = 0,
+    p_U8,
     /** signed char values */
     p_S8,
     /** unsigned 16-bit integer (short) values */
@@ -159,12 +195,27 @@ typedef enum pixel_type_t {
 #define FLOAT_IMAGE p_F32
 #define DOUBLE_IMAGE p_F64
 
+/* convenience definitions for integral images */
+
+typedef uint32 I_1_t;
+typedef real64 I_2_t;
+#define p_I_1 p_U32
+#define p_I_2 p_F64
+
+typedef uint32 SI_1_t;
+typedef uint32 SI_2_t;
+#define p_SI_1 p_U32
+#define p_SI_2 p_U32
+
+typedef sint8 edge_strength;
+
 /**
  * Different one-channel and multi-channel pixel formats.
  */
 typedef enum pixel_format_t {
+    NONE = 0,
     /** one-channel greyscale image */
-    GREY = 0,
+    GREY,
     /** three-channel image with RGB values */
     RGB,
     /** four-channel image with RGBA values */
@@ -176,5 +227,40 @@ typedef enum pixel_format_t {
     /** two-channel image with UYVY values */
     UYVY
 } pixel_format;
+
+typedef enum image_block_type_t {
+    b_NONE = 0,
+    b_INT,
+    b_REAL,
+    b_STAT,
+    b_STAT_WITH_DIR
+} image_block_type;
+
+/**
+ * Stores an image block with position, width, height, and arbitrary value.
+ */
+typedef struct image_block_t {
+    uint16 x;
+    uint16 y;
+    uint16 w;
+    uint16 h;
+    /*statistics value;*/
+    /*byte *value;*/
+    stat_with_dir value;
+} image_block;
+
+void point_create(point *target, coord x, coord y);
+void point_add(point *target, coord x, coord y);
+void point_subtract(point *target, coord x, coord y);
+
+void line_create(line *target, coord start_x, coord start_y, coord end_x, coord end_y);
+void line_create_from_points(line *target, point start, point end);
+
+void rect_create(rect *target, coord left, coord right, coord top, coord bottom);
+void rect_create_from_points(rect *target, point first, point second);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* CVSU_TYPES_H */

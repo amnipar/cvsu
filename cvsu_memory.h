@@ -1,6 +1,6 @@
 /**
  * @file cvsu_memory.h
- * @author Matti Eskelinen (matti dot j dot eskelinen at jyu dot fi)
+ * @author Matti J. Eskelinen <matti.j.eskelinen@gmail.com>
  * @brief Memory handling routines for the cvsu module.
  *
  * Copyright (c) 2011, Matti Johannes Eskelinen

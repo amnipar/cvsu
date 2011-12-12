@@ -1,6 +1,6 @@
 /**
  * @file cvsu_config.h
- * @author Matti Eskelinen (matti dot j dot eskelinen at jyu dot fi)
+ * @author Matti J. Eskelinen <matti.j.eskelinen@gmail.com>
  * @brief Configuration flags for the cvsu module.
  *
  * Copyright (c) 2011, Matti Johannes Eskelinen
@@ -33,6 +33,32 @@
 #   define CVSU_CONFIG_H
 
 /**
+ * Check that we have stddef.h
+ * If not, we need our own size_t definition.
+ */
+#undef HAVE_STDDEF_H
+
+/**
+ * Check that we have stdbool.h
+ * If not, we need our own bool definition.
+ */
+#undef HAVE_STDBOOL_H
+
+/**
+ * Check that we have limits.h
+ * If not, we need our own MAX definitions.
+ */
+#undef HAVE_LIMITS_H
+
+/* later, these will be handled by autoconf... */
+
+/* define this if stddef.h is available */
+#define HAVE_STDDEF_H 1
+
+/* define this if stdbool.h is available */
+#define HAVE_STDBOOL_H 1
+
+/**
  * Define memory allocation method.
  * @note If some other allocation method than malloc is used, a flag should be
  * defined here. Then the method should be added to cvsu_alloc.c. The
@@ -42,7 +68,7 @@
 #define MEMORY_ALLOCATION_WITH_MALLOC 0
 #define MEMORY_ALLOCATION_WITH_VC 1
 #define MEMORY_ALLOCATION_METHOD MEMORY_ALLOCATION_WITH_MALLOC
-/* #define MEMORY_ALLOCATION_METHOD MEMORY_ALLOCATION_WITH_XXX */
+/* #define MEMORY_ALLOCATION_METHOD MEMORY_ALLOCATION_WITH_VC1 */
 
 /**
  * Define memory copy method.

@@ -1,6 +1,6 @@
 /**
  * @file cvsu_edges.c
- * @author Matti Eskelinen (matti dot j dot eskelinen at jyu dot fi)
+ * @author Matti J. Eskelinen <matti.j.eskelinen@gmail.com>
  * @brief Edge detection and handling for the cvsu module.
  *
  * Copyright (c) 2011, Matti Johannes Eskelinen
@@ -49,6 +49,12 @@ string edgel_response_x_name = "edgel_response_x";
 string edges_x_box_deviation_name = "edges_x_box_deviation";
 string edge_image_update_name = "edge_image_update";
 string edge_image_convert_to_grey8_name = "edge_image_convert_to_grey8";
+
+string edge_block_nullify_name = "edge_block_nullify";
+string edge_block_image_create_name = "edge_block_image_create";
+string edge_block_image_destroy_name = "edge_block_image_destroy";
+string edge_block_image_nullify_name = "edge_block_image_nullify";
+string edge_block_image_new_block_name = "edge_block_image_new_block";
 
 /******************************************************************************/
 
@@ -564,11 +570,157 @@ result edges_x_box_deviation(
     TRY();
 
     CHECK(integral_image_update(I));
-    CHECK(edgel_response_x(I, temp, hsize, vsize, &edgel_fisher_signed));
+    CHECK(edgel_response_x(I, temp, hsize, vsize, &edgel_fisher_unsigned));
     CHECK(extrema_x(temp, temp));
     CHECK(normalize(temp, target));
 
     FINALLY(edges_x_box_deviation);
+    RETURN();
+}
+
+/******************************************************************************/
+
+result edge_block_nullify(
+    edge_block *target
+    )
+{
+    TRY();
+
+    CHECK_POINTER(target);
+
+    target->x = 0;
+    target->y = 0;
+    target->w = 0;
+    target->h = 0;
+    target->sum_top = 0;
+    target->sum_bottom = 0;
+    target->sum_left = 0;
+    target->sum_right = 0;
+    target->sum_h = NULL;
+    target->sum_v = NULL;
+    target->sumsqr_top = 0;
+    target->sumsqr_bottom = 0;
+    target->sumsqr_left = 0;
+    target->sumsqr_right = 0;
+    target->sumsqr_h = NULL;
+    target->sumsqr_v = NULL;
+    target->edge_h = NULL;
+    target->edge_v = NULL;
+
+    FINALLY(edge_block_nullify);
+    RETURN();
+}
+
+/******************************************************************************/
+
+result edge_block_image_create(
+    edge_block_image *target,
+    uint32 max_blocks,
+    uint32 max_elems,
+    uint32 max_array_size
+    )
+{
+    TRY();
+
+    CHECK_POINTER(target);
+
+    CHECK(list_create(&target->edge_blocks, max_blocks, sizeof(edge_block), 3));
+    CHECK(list_create(&target->edge_elems, max_elems, sizeof(edge_elem), 3));
+    CHECK(memory_allocate((data_pointer*)&target->sum_h, max_array_size, sizeof(SI_1_t)));
+    CHECK(memory_allocate((data_pointer*)&target->sum_v, max_array_size, sizeof(SI_1_t)));
+    CHECK(memory_allocate((data_pointer*)&target->sumsqr_h, max_array_size, sizeof(SI_2_t)));
+    CHECK(memory_allocate((data_pointer*)&target->sumsqr_v, max_array_size, sizeof(SI_2_t)));
+    CHECK(memory_allocate((data_pointer*)&target->edge_h, max_array_size, sizeof(edge_strength)));
+    CHECK(memory_allocate((data_pointer*)&target->edge_v, max_array_size, sizeof(edge_strength)));
+
+    target->array_index = 0;
+    target->array_size = max_array_size;
+
+    FINALLY(edge_block_image_create);
+    RETURN();
+}
+
+/******************************************************************************/
+
+result edge_block_image_destroy(
+    edge_block_image *target
+    )
+{
+    TRY();
+
+    CHECK_POINTER(target);
+
+    CHECK(list_destroy(&target->edge_blocks));
+    CHECK(list_destroy(&target->edge_elems));
+    CHECK(memory_deallocate((data_pointer*)&target->sum_h));
+    CHECK(memory_deallocate((data_pointer*)&target->sum_v));
+    CHECK(memory_deallocate((data_pointer*)&target->sumsqr_h));
+    CHECK(memory_deallocate((data_pointer*)&target->sumsqr_v));
+    CHECK(memory_deallocate((data_pointer*)&target->edge_h));
+    CHECK(memory_deallocate((data_pointer*)&target->edge_v));
+
+    CHECK(edge_block_image_nullify(target));
+
+    FINALLY(edge_block_image_destroy);
+    RETURN();
+}
+
+/******************************************************************************/
+
+result edge_block_image_nullify(
+    edge_block_image *target
+    )
+{
+    TRY();
+
+    CHECK_POINTER(target);
+
+    target->sum_h = NULL;
+    target->sum_v = NULL;
+    target->sumsqr_h = NULL;
+    target->sumsqr_v = NULL;
+    target->edge_h = NULL;
+    target->edge_v = NULL;
+    target->array_index = 0;
+    target->array_size = 0;
+    CHECK(list_nullify(&target->edge_blocks));
+    CHECK(list_nullify(&target->edge_elems));
+
+    FINALLY(edge_block_image_nullify);
+    RETURN();
+}
+
+/******************************************************************************/
+
+result edge_block_image_new_block(
+    edge_block **target, edge_block_image *source, uint32 size
+    )
+{
+    TRY();
+    edge_block temp, *new_block;
+
+    CHECK_POINTER(target);
+    CHECK_POINTER(source);
+
+    if (source->array_index + size < source->array_size) {
+        CHECK(edge_block_nullify(&temp));
+        CHECK(list_append_reveal_data(&source->edge_blocks, (pointer)&temp, (pointer*)target));
+        new_block = *target;
+        new_block->w = size;
+        new_block->h = size;
+        new_block->sum_h = source->sum_h + source->array_index;
+        new_block->sum_v = source->sum_v + source->array_index;
+        new_block->sumsqr_h = source->sumsqr_h + source->array_index;
+        new_block->sumsqr_v = source->sumsqr_v + source->array_index;
+        new_block->edge_h = source->edge_h + source->array_index;
+        new_block->edge_v = source->edge_v + source->array_index;
+        source->array_index += size;
+    }
+    else {
+        ERROR(BAD_SIZE);
+    }
+
+    FINALLY(edge_block_image_new_block);
     RETURN();
 }
 

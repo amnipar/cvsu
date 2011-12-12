@@ -1,6 +1,6 @@
 /**
  * @file cvsu_basic.h
- * @author Matti Eskelinen (matti dot j dot eskelinen at jyu dot fi)
+ * @author Matti J. Eskelinen <matti.j.eskelinen@gmail.com>
  * @brief Basic types and operations for the cvsu module.
  *
  * Copyright (c) 2011, Matti Johannes Eskelinen
@@ -54,6 +54,7 @@ typedef struct pixel_image_t {
 #elif (IMAGE_ACCESS_METHOD == IMAGE_ACCESS_BY_POINTER)
     data_pointer *rows;
 #endif
+    uint32 own_data;
     /** Data type used to store pixel values in the @see data array. */
     pixel_type type;
     /** Format used to store data for one pixel. */
@@ -77,19 +78,16 @@ typedef struct pixel_image_t {
 } pixel_image;
 
 /**
- * Stores an integral and squared integral representation of a pixel image.
- * Refers to the original image but does not own it.
+ * Allocates a pixel image structure.
  */
 
-typedef struct integral_image_t {
-    pixel_image *original;
-    pixel_image I_1;
-    pixel_image I_2;
-    uint32 width;
-    uint32 height;
-    uint32 step;
-    uint32 stride;
-} integral_image;
+pixel_image *pixel_image_alloc();
+
+/**
+ * Frees a pixel image structure allocated with @see pixel_image_alloc.
+ */
+
+void pixel_image_free(pixel_image *ptr);
 
 /**
  * Allocates data for a pixel image.
@@ -114,11 +112,46 @@ result pixel_image_create(
 );
 
 /**
+ * Creates a pixel image from existing data.
+ * Make sure the data is of correct type, as defined in parameters.
+ * Also check whether the image data has to be deallocated or not.
+ * @see pixel_image_destroy
+ */
+
+result pixel_image_create_from_data(
+    /** Pointer to target struct where image is stored */
+    pixel_image *target,
+    /** Pointer to existing image data */
+    data_pointer data,
+    /** Data type used for storing the pixel values */
+    pixel_type type,
+    /** Pixel format for multi-channel images or GREY for greyscale */
+    pixel_format format,
+    /** Width of image in pixels */
+    uint32 width,
+    /** Height of image in pixels */
+    uint32 height,
+    /** Step between columns of pixels (amount of channels per pixel) */
+    uint32 step,
+    /** Stride between rows of pixels (distance to same column on next row) */
+    uint32 stride
+);
+
+/**
  * Deallocates the pixel image data.
  * @see pixel_image_create
  */
 
 result pixel_image_destroy(
+    pixel_image *target
+);
+
+/**
+ * Sets the image fields to null values.
+ * @note Does not deallocate memory, use @see pixel_image_destroy first
+ */
+
+result pixel_image_nullify(
     pixel_image *target
 );
 
@@ -173,58 +206,6 @@ result pixel_image_clear(
 bool pixel_image_is_continuous(const pixel_image *image);
 
 /**
- * Initializes the structure for an integral image and allocates the memory.
- * Does not calculate the integrals.
- * @see integral_image_update
- * @see integral_image_destroy
- */
-
-result integral_image_create(
-    integral_image *target,
-    pixel_image *source
-);
-
-/**
- * Deallocates the memory allocated for the integral image.
- * @see integral_image_create
- */
-
-result integral_image_destroy(
-    integral_image *target
-);
-
-/**
- * Transform the target integral_image into a clone of source integral_image.
- * Only the structure is cloned, for copying content, use the copy function.
- * @see copy_integral_image
- */
-
-result integral_image_clone(
-    integral_image *target,
-    integral_image *source
-);
-
-/**
- * Copy the contents of the source integral_image into the target integral_image.
- * The two images must have the same structure.
- * @see clone_integral_image
- */
-
-result integral_image_copy(
-    integral_image *target,
-    integral_image *source
-);
-
-/**
- * Updates integral image by calculating the integral and squared integral
- * of the source image
- */
-
-result integral_image_update(
-    integral_image *target
-);
-
-/**
  * Normalizes and scales image values to byte value range (0-255).
  * Generic function that calls specific functions depending on pixel type.
  * Specific functions are provided in the public interface because they
@@ -268,6 +249,14 @@ result normalize_long(
     long min,
     long max,
     long mean
+);
+
+result normalize_float(
+    pixel_image *source,
+    pixel_image *target,
+    float min,
+    float max,
+    float mean
 );
 
 result normalize_double(

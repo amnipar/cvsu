@@ -1,6 +1,6 @@
 /**
  * @file cvsu_simple_scene.c
- * @author Matti Eskelinen (matti dot j dot eskelinen at jyu dot fi)
+ * @author Matti J. Eskelinen <matti.j.eskelinen@gmail.com>
  * @brief Simple scene geometry handling for the cvsu module.
  *
  * Copyright (c) 2011, Matti Johannes Eskelinen
@@ -41,6 +41,7 @@
 
 string simple_scene_create_name = "simple_scene_create";
 string simple_scene_destroy_name = "simple_scene_destroy";
+string simple_scene_nullify_name = "simple_scene_nullify";
 string simple_scene_update_name = "simple_scene_update";
 string simple_scene_pack_lines_to_array_name = "simple_scene_pack_lines_to_array";
 
@@ -57,7 +58,8 @@ result simple_scene_create(
     CHECK_POINTER(target);
     CHECK_POINTER(source);
 
-    CHECK(edge_image_create(&target->curr_edges, source, 16, 16, 16, 16, 16, 8));
+    CHECK(edge_image_create(&target->curr_edges, source, 32, 32, 0, 0, 32, 32));
+    /*CHECK(edge_image_create(&target->curr_edges, source, 16, 16, 16, 16, 16, 8));*/
 
     /*edge_image_clone(&target->prev_edges, &target->curr_edges);*/
 
@@ -80,10 +82,10 @@ result simple_scene_create(
     pos = 0;
     for (row = 0; row < target->rows; row++) {
         for (col = 0; col < target->cols; col++) {
-            target->blocks[pos].grid_pos.y = row;
-            target->blocks[pos].grid_pos.x = col;
-            target->blocks[pos].pixel_pos.x = (uint16)(col * target->hstep + target->hmargin);
-            target->blocks[pos].pixel_pos.y = (uint16)(row * target->vstep + target->vmargin);
+            target->blocks[pos].grid_pos.y = (sint16)row;
+            target->blocks[pos].grid_pos.x = (sint16)col;
+            target->blocks[pos].pixel_pos.x = (sint16)(col * target->hstep + target->hmargin);
+            target->blocks[pos].pixel_pos.y = (sint16)(row * target->vstep + target->vmargin);
             target->blocks[pos].width = (uint16)target->hstep;
             target->blocks[pos].height = (uint16)target->vstep;
             target->blocks[pos].stat.mean = 0;
@@ -182,7 +184,35 @@ result simple_scene_destroy(
     /* list takes ownership of the block array, don't deallocate that */
     CHECK(list_destroy(&target->all_blocks));
 
+    CHECK(simple_scene_nullify(target));
+
     FINALLY(simple_scene_destroy);
+    RETURN();
+}
+
+/******************************************************************************/
+
+result simple_scene_nullify(
+    simple_scene *target
+    )
+{
+    TRY();
+
+    CHECK_POINTER(target);
+
+    target->rows = 0;
+    target->cols = 0;
+    target->hstep = 0;
+    target->vstep = 0;
+    target->hmargin = 0;
+    target->vmargin = 0;
+    target->width = 0;
+    target->height = 0;
+    target->mid_line = NULL;
+    target->mid_boundary = NULL;
+    target->blocks = NULL;
+
+    FINALLY(simple_scene_nullify);
     RETURN();
 }
 
@@ -201,31 +231,34 @@ result simple_scene_update(
     )
 {
     TRY();
-    INTEGRAL_IMAGE_1BOX_VARIABLES();
     char *edge_data;
+    integral_image_box box;
     sint32 i, match, delta;
-    uint32 width, height, row, rows, col, cols, margin, pos, row_height, col_width, dx, dy;
+    uint32 x, y, row, col, pos;
+    uint32 width, height, rows, cols, margin, row_height, col_width, dx, dy;
     double mean, dev;
 
     CHECK_POINTER(target);
+
     CHECK(edge_image_update(&target->curr_edges));
 
-    INTEGRAL_IMAGE_INIT_1BOX(&target->curr_edges.I, target->vstep, target->hstep);
+    /*for (i = 0; i < 100; i++) {
+        CHECK(integral_image_update(&target->curr_edges.I));
+    }*/
 
-    CHECK_POINTER(I_1_data);
-    CHECK_POINTER(I_2_data);
+    integral_image_box_create(&box, &target->curr_edges.I, target->vstep, target->hstep, 0, 0);
 
     CHECK(list_clear(&target->blocks_by_deviation));
     pos = 0;
     for (row = 0; row < target->rows; row++) {
-        iA = I_1_data + (row * target->vstep + target->vmargin - 1) * target->width + target->hmargin - 1;
-        i2A = I_2_data + (row * target->vstep + target->vmargin - 1) * target->width + target->hmargin - 1;
+        x = target->hmargin;
+        y = row * target->vstep + target->vmargin;
 
-        for (col = 0; col < target->cols; col++, pos++, iA += target->hstep, i2A += target->hstep) {
-            sum = INTEGRAL_IMAGE_SUM();
-            sumsqr = INTEGRAL_IMAGE_SUMSQR();
-            mean = (double)sum / (double)N;
-            dev = (sumsqr / (double)N) - (mean * mean);
+        for (col = 0; col < target->cols; col++, pos++, /*iA*/x += target->hstep /*,i2A += target->vstep*/) {
+            integral_image_box_update(&box, x, y);
+
+            mean = ((double)box.sum / (double)box.N);
+            dev = (double)((box.sumsqr / (double)box.N) - (mean * mean));
             if (dev < 1) dev = 1;
 
             target->blocks[pos].stat.mean = (sint16)((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
@@ -247,10 +280,10 @@ result simple_scene_update(
                 pos++;
             }
         }
-        /*
+/*
         pos = 0;
-        for (row = 0; row < dst->rows; row++) {
-            for (col = 0; col < dst->cols; col++) {
+        for (row = 0; row < target->rows; row++) {
+            for (col = 0; col < target->cols; col++) {
                 if (dst->blocks[pos].check_count < 1) {
                     for (i = 0; i < dst->hstep; i++) {
                         if (dst->blocks[pos].vedges[i] != 0) {
@@ -262,7 +295,7 @@ result simple_scene_update(
                 pos++;
             }
         }
-        */
+*/
         edge_data = (char *)target->curr_edges.vedges.data;
         /* always investigate the row below if edge is found, so skip last row */
         rows = target->curr_edges.vedges.height - 1;
@@ -429,7 +462,7 @@ result simple_scene_update(
         };
     }
 
-    /* CHECK(edge_image_copy(&dst->prev_edges, &dst->curr_edges));*/
+    /*CHECK(edge_image_copy(&dst->prev_edges, &dst->curr_edges));*/
 
     FINALLY(simple_scene_update);
     RETURN();

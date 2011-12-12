@@ -1,7 +1,7 @@
 /**
- * @file cvsu_output.h
+ * @file cvsu_opencv.h
  * @author Matti J. Eskelinen <matti.j.eskelinen@gmail.com>
- * @brief Output methods for the cvsu module.
+ * @brief Interfaces for OpenCV and IplImage type.
  *
  * Copyright (c) 2011, Matti Johannes Eskelinen
  * All Rights Reserved.
@@ -29,40 +29,24 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef CVSU_OUTPUT_H
-#   define CVSU_OUTPUT_H
+#ifndef CVSU_OPENCV_H
+#   define CVSU_OPENCV_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include "cvsu_config.h"
-#include "cvsu_types.h"
+#include "cv.h"
+#include "cvsu_basic.h"
 
-#if (OUTPUT_METHOD == OUTPUT_WITH_STDIO)
-#include <stdio.h>
-#endif
-
-void report_result(result r, string func);
-
-#if (OUTPUT_METHOD == OUTPUT_DISABLED)
-
-#define PRINT0(f)
-#define PRINT1(f,a)
-#define PRINT2(f,a,b)
-
-#elif (OUTPUT_METHOD == OUTPUT_WITH_STDIO)
-
-#define PRINT0(f)       printf(f)
-#define PRINT1(f, a)    printf(f, a)
-#define PRINT2(f, a, b) printf(f, a, b)
-
-#else
-#error "Output method not specified"
-#endif
+result pixel_image_create_from_ipl_image(
+    pixel_image *target,
+    IplImage *source,
+    pixel_format format
+);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif  /* CVSU_OUTPUT_H */
+#endif  /* CVSU_OPENCV_H */

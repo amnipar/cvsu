@@ -1,7 +1,7 @@
 /**
- * @file cvsu_simple_scene.h
+ * @file cvsu_block.h
  * @author Matti J. Eskelinen <matti.j.eskelinen@gmail.com>
- * @brief Simple scene geometry handling for the cvsu module.
+ * @brief Image block handling for the cvsu module.
  *
  * Copyright (c) 2011, Matti Johannes Eskelinen
  * All Rights Reserved.
@@ -29,64 +29,85 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef CVSU_SIMPLE_SCENE_H
-#   define CVSU_SIMPLE_SCENE_H
+#ifndef CVSU_BLOCK_H
+#   define CVSU_BLOCK_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 #include "cvsu_basic.h"
-#include "cvsu_edges.h"
+#include "cvsu_integral.h"
 #include "cvsu_list.h"
 
-/**
- * Stores a boundary between image regions as a list of lines.
- */
+#define dev_threshold 10
+#define dev_diff 10
+
+#define region_undefined    0
+#define region_low_dev      1
+#define region_uniform_dev  2
 
 typedef struct boundary_t {
     line *first;
     line *last;
     line best_fit;
-    uint32 count;
+    long count;
     list lines;
 } boundary;
 
-/**
- * Stores an image block's relationship to its neighbors.
- */
-
 typedef struct neighbor_relation_t {
-    struct block_t *b;
+    struct grid_item_t *item;
     long strength;
     long pass_count;
 } neighbor_relation;
 
-/**
- * Stores an image block with links to its neighbors.
- */
-
 typedef struct block_t {
-    /** block position in grid (col, row) */
-    point grid_pos;
-    /** block position in pixels (top left corner) */
-    point pixel_pos;
-    /** width of block in pixels */
+    point pos;
     uint16 width;
-    /** height of block in pixels */
     uint16 height;
-    /** block statistics (intensity mean and deviation) */
     statistics stat;
+    struct block_t *nw;
+    struct block_t *ne;
+    struct block_t *sw;
+    struct block_t *se;
+    uint16 pass_count;
+    struct region_t *region_ptr;
+    //uint16 region_id;
+} block;
+
+typedef struct grid_item_t {
+    /** position in grid (col, row) */
+    point pos;
+    /** main level block item */
+    block *main_block;
     /** count of horizontal lines (weighted with line strength?) */
-    short hlines;
+    uint16 hlines;
+    /** strength of vertical motion estimation */
+    uint16 vweight;
+    /** estimated vertical motion */
+    sint16 vmotion;
     /** count of vertical lines (weighted with line strength?) */
-    short vlines;
+    uint16 vlines;
+    /** Strength of horizontal motion estimation */
+    uint16 hweight;
+    /** Estimated horizontal motion. */
+    sint16 hmotion;
     /** Pointer to the relevant section of the vertical edge image */
     char *vedges;
     /** Pointer to the relevant section of the horizontal edge image */
     char *hedges;
     /** Keeps track of processing passes this block has been subject to */
-    long pass_count;
+    uint16 pass_count;
+    /** total strength / salience of block */
+    uint16 strength;
+    /** horizontal strength for reliability of horizontal motion estimation */
+    uint16 hstrength;
+    /** vertical strength for reliability of vertical motion estimation */
+    uint16 vstrength;
+
+    pointer_list vedge_list;
+    pointer_list hedge_list;
+
     /** Neighboring block in the north-west direction */
     struct neighbor_relation_t neighbor_nw;
     /** Neighboring block in the north direction */
@@ -103,77 +124,63 @@ typedef struct block_t {
     struct neighbor_relation_t neighbor_sw;
     /** Neighboring block in the west direction */
     struct neighbor_relation_t neighbor_w;
-} block;
+} grid_item;
+
+typedef struct region_t {
+    uint16 id;
+    uint16 type;
+    float block_count;
+    float mean;
+    float dev;
+    statistics stat;
+    rect bounding_box;
+    list borders;
+    list blocks;
+    //list lines;
+    list points;
+} region;
+
+typedef struct region_border_item_t {
+    region *region_ptr;
+    grid_item *grid_ptr;
+    /* direction from the item that added this item to border */
+    /* in which direction this item is the neighbor of the other item... */
+    direction dir;
+} region_border_item;
+
+int compare_blocks_by_deviation(const void *a, const void *b);
+
+result block_update(block *target, integral_image *I);
+
+result block_divide(block *target, integral_image *I, list *block_list);
 
 /**
- * Stores a simple scene, based on edge images.
+ * Initialize the region structure and the lists.
+ * Add the given item to the beginning of the border item list.
+ * Item's block is not added to the block list yet, and this would complicate
+ * the region expansion phase. Instead, the first item is handled in the
+ * @see region_expand function.
  */
-
-typedef struct simple_scene_t {
-    edge_image curr_edges;
-    edge_image prev_edges;
-    uint32 rows;
-    uint32 cols;
-    uint32 hstep;
-    uint32 vstep;
-    uint32 hmargin;
-    uint32 vmargin;
-    uint32 width;
-    uint32 height;
-    list_item *mid_line;
-    list_item *mid_boundary;
-    list lines;
-    list boundaries;
-    list all_blocks;
-    list blocks_by_deviation;
-    block *blocks;
-} simple_scene;
-
-/**
- * Creates a simple scene based on a pixel image.
- * Only initializes the structure, does not update the scene.
- * The same image will be used for updating the scene in future.
- * @see simple_scene_update
- */
-
-result simple_scene_create(
-    simple_scene *target,
-    pixel_image *source
+result region_init(
+    region *target,
+    grid_item *item,
+    list *border_list,
+    list *point_list,
+    list *block_list
 );
 
 /**
- * Destroys the scene and deallocates the memory.
+ * Expand the region from the given border item.
+ * If the item is suitable for adding to the region, its main block is added to
+ * the block list, and its neighbors are added to the border item list.
+ * Boundary points are added only when the border item chain is ready.
  */
-
-result simple_scene_destroy(
-    simple_scene *target
-);
-
-result simple_scene_nullify(
-    simple_scene *target
-);
-
-/**
- * Updates the scene data structures based on the data in the source image.
- */
-
-result simple_scene_update(
-    simple_scene *target
-);
-
-/**
- *
- */
-
-result simple_scene_pack_lines_to_array(
-    simple_scene *source,
-    line *target,
-    uint32 size,
-    uint32 *count
+result region_expand(
+    region_border_item *item
 );
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* CVSU_SIMPLE_SCENE_H */
+#endif /* CVSU_BLOCK_H */
