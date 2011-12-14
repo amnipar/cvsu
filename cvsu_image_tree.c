@@ -91,7 +91,6 @@ result image_tree_forest_create(
     )
 {
     TRY();
-    pixel_image *temp;
     uint32 row, col, pos, size;
     image_tree new_tree, *tree_ptr;
     image_block new_block, *block_ptr;
@@ -100,36 +99,18 @@ result image_tree_forest_create(
     CHECK_POINTER(source);
     CHECK_PARAM(tree_width <= source->width);
     CHECK_PARAM(tree_height <= source->height);
-    /*CHECK_PARAM(source->type == p_U8);*/
-    CHECK_PARAM(source->format == GREY || source->format == RGB);
-
-    temp = NULL;
-    if (source->type != p_U8) {
-        temp = pixel_image_alloc();
-        CHECK(pixel_image_create(temp, p_U8, source->format, source->width, source->height, source->step, source->stride));
-        CHECK(normalize(source, temp));
-    }
+    CHECK_PARAM(source->type == p_U8);
+    CHECK_PARAM(source->format == GREY || source->format == YUV || source->format == RGB);
 
     if (source->format == RGB) {
         target->original = pixel_image_alloc();
         target->own_original = 1;
-        CHECK(pixel_image_create(target->original, p_U8, GREY, source->width, source->height, 1, source->width));
-        if (temp != NULL) {
-            CHECK(convert_rgb24_to_grey8(temp, target->original));
-        }
-        else {
-            CHECK(convert_rgb24_to_grey8(source, target->original));
-        }
+        CHECK(pixel_image_create(target->original, p_U8, YUV, source->width, source->height, 3, 3 * source->width));
+        CHECK(convert_rgb24_to_yuv24(source, target->original));
     }
     else {
-        if (temp != NULL) {
-            target->original = temp;
-            target->own_original = 1;
-        }
-        else {
-            target->original = source;
-            target->own_original = 0;
-        }
+        target->original = source;
+        target->own_original = 0;
     }
 
     target->tree_width = tree_width;
@@ -138,7 +119,7 @@ result image_tree_forest_create(
     target->rows = (uint16)(source->height / target->tree_height);
     target->dx = (uint16)((source->width - (target->cols * target->tree_width)) / 2);
     target->dy = (uint16)((source->height - (target->rows * target->tree_height)) / 2);
-    target->type = b_STAT_WITH_DIR;
+    target->type = b_STAT_COLOR;
 
     size = target->rows * target->cols;
 
@@ -155,10 +136,12 @@ result image_tree_forest_create(
             new_block.w = (uint16)(target->tree_width);
             new_block.h = (uint16)(target->tree_height);
             /*new_block.value = NULL;*/
-            new_block.value.mean = 0;
-            new_block.value.dev = 0;
-            new_block.value.dir_h = 0;
-            new_block.value.dir_v = 0;
+            new_block.value.mean_i = 0;
+            new_block.value.dev_i = 0;
+            new_block.value.mean_c1 = 0;
+            new_block.value.dev_c1 = 0;
+            new_block.value.mean_c2 = 0;
+            new_block.value.dev_c2 = 0;
             CHECK(list_append_reveal_data(&target->blocks, (pointer)&new_block, (pointer*)&block_ptr));
             new_tree.block = block_ptr;
             new_tree.root = &target->roots[pos];
@@ -205,9 +188,6 @@ result image_tree_forest_create(
     }
 
     FINALLY(image_tree_forest_create);
-    if (temp != NULL && target->original != temp) {
-        pixel_image_free(temp);
-    }
     RETURN();
 }
 
@@ -345,7 +325,7 @@ result image_tree_forest_divide_with_dev(
     trees = target->trees.first.next;
     while (trees != &target->trees.last) {
         current_tree = (image_tree *)trees->data;
-        if (current_tree->block->value.dev > threshold) {
+        if (current_tree->block->value.dev_i > threshold) {
             CHECK(image_tree_divide(current_tree));
         }
         trees = trees->next;
@@ -471,17 +451,6 @@ result image_tree_root_update(
  * calculate the integrals. Updates the statistics based on the integrals.
  */
 
-sint16 signum(sint16 v)
-{
-    if (v < 0) {
-        return -1;
-    }
-    if (v > 0) {
-        return 1;
-    }
-    return 0;
-}
-
 result image_tree_update(
     image_tree *tree
     )
@@ -497,62 +466,31 @@ result image_tree_update(
 
     block = tree->block;
     box = &tree->root->box;
+
+    box->channel = 0;
     small_integral_image_box_update(box, block->x, block->y);
-
     mean = ((real64)box->sum / (real64)box->N);
-    /*mean = box->sum / box->N;*/
     dev = (((real64)box->sumsqr / (real64)box->N) - (mean * mean));
-    /*dev = (box->sumsqr / box->N) - (mean * mean);*/
     if (dev < 1) dev = 1;
+    block->value.mean_i = (sint16)((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
+    block->value.dev_i = (sint16)sqrt(dev);
 
-    block->value.mean = (sint16)((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
-    block->value.dev = (sint16)sqrt(dev);
-    block->value.dir_h = 0;
-    block->value.dir_v = 0;
+    if (box->step == 3) {
+        box->channel = 1;
+        small_integral_image_box_update(box, block->x, block->y);
+        mean = ((real64)box->sum / (real64)box->N);
+        dev = (((real64)box->sumsqr / (real64)box->N) - (mean * mean));
+        if (dev < 1) dev = 1;
+        block->value.mean_c1 = (sint16)((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
+        block->value.dev_c1 = (sint16)sqrt(dev);
 
-    if (block->value.dev > 10 && tree->parent == NULL) {
-        sint16 mean_nw, mean_ne, mean_sw, mean_se, mag_h, mag_v;
-
-        CHECK(image_tree_divide(tree));
-        if (tree->nw != NULL && tree->ne != NULL && tree->sw != NULL && tree->se != NULL) {
-            mean_nw = tree->nw->block->value.mean;
-            mean_ne = tree->ne->block->value.mean;
-            mean_sw = tree->sw->block->value.mean;
-            mean_se = tree->se->block->value.mean;
-
-            mag_v = (mean_nw + mean_sw) - (mean_ne + mean_se);
-            if (mag_v > block->value.dev) {
-                block->value.dir_v = mag_v;
-            }
-            else
-            if (mag_v < -block->value.dev) {
-                block->value.dir_v = mag_v;
-            }
-            else {
-                block->value.dir_v = 0;
-            }
-
-            mag_h = (mean_nw + mean_ne) - (mean_sw + mean_se);
-            if (mag_h > block->value.dev) {
-                block->value.dir_h = mag_h;
-            }
-            else
-            if (mag_h < -block->value.dev) {
-                block->value.dir_h = mag_h;
-            }
-            else {
-                block->value.dir_h = 0;
-            }
-
-            if (block->value.dir_h != 0 && block->value.dir_v != 0) {
-                if (2 * signum(block->value.dir_h) * block->value.dir_h < block->value.dir_v) {
-                    block->value.dir_h = 0;
-                }
-                if (2 * signum(block->value.dir_v) * block->value.dir_v < block->value.dir_h) {
-                    block->value.dir_v = 0;
-                }
-            }
-        }
+        box->channel = 2;
+        small_integral_image_box_update(box, block->x, block->y);
+        mean = ((real64)box->sum / (real64)box->N);
+        dev = (((real64)box->sumsqr / (real64)box->N) - (mean * mean));
+        if (dev < 1) dev = 1;
+        block->value.mean_c2 = (sint16)((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
+        block->value.dev_c2 = (sint16)sqrt(dev);
     }
 
     /*gettimeofday(&now, NULL);*/
@@ -633,5 +571,133 @@ result image_tree_divide(
     FINALLY(image_tree_divide);
     RETURN();
 }
+
+/******************************************************************************/
+
+sint16 signum(sint16 v)
+{
+    if (v < 0) {
+        return -1;
+    }
+    if (v > 0) {
+        return 1;
+    }
+    return 0;
+}
+
+dir image_tree_dir_i(image_tree *tree)
+{
+    dir result;
+    sint16 mean_nw, mean_ne, mean_sw, mean_se;
+
+    result.h = 0;
+    result.v = 0;
+
+    if (tree == NULL) {
+        return result;
+    }
+
+    if (tree->nw == NULL || tree->ne == NULL || tree->sw == NULL || tree->se == NULL) {
+        return result;
+    }
+
+    mean_nw = tree->nw->block->value.mean_i;
+    mean_ne = tree->ne->block->value.mean_i;
+    mean_sw = tree->sw->block->value.mean_i;
+    mean_se = tree->se->block->value.mean_i;
+
+    result.v = (mean_nw + mean_sw) - (mean_ne + mean_se);
+    result.h = (mean_nw + mean_ne) - (mean_sw + mean_se);
+
+    return result;
+}
+
+dir image_tree_dir_c1(image_tree *tree)
+{
+    dir result;
+    sint16 mean_nw, mean_ne, mean_sw, mean_se;
+
+    result.h = 0;
+    result.v = 0;
+
+    if (tree == NULL) {
+        return result;
+    }
+
+    if (tree->nw == NULL || tree->ne == NULL || tree->sw == NULL || tree->se == NULL) {
+        return result;
+    }
+
+    mean_nw = tree->nw->block->value.mean_c1;
+    mean_ne = tree->ne->block->value.mean_c1;
+    mean_sw = tree->sw->block->value.mean_c1;
+    mean_se = tree->se->block->value.mean_c1;
+
+    result.v = (mean_nw + mean_sw) - (mean_ne + mean_se);
+    result.h = (mean_nw + mean_ne) - (mean_sw + mean_se);
+
+    return result;
+}
+
+dir image_tree_dir_c2(image_tree *tree)
+{
+    dir result;
+    sint16 mean_nw, mean_ne, mean_sw, mean_se;
+
+    result.h = 0;
+    result.v = 0;
+
+    if (tree == NULL) {
+        return result;
+    }
+
+    if (tree->nw == NULL || tree->ne == NULL || tree->sw == NULL || tree->se == NULL) {
+        return result;
+    }
+
+    mean_nw = tree->nw->block->value.mean_c2;
+    mean_ne = tree->ne->block->value.mean_c2;
+    mean_sw = tree->sw->block->value.mean_c2;
+    mean_se = tree->se->block->value.mean_c2;
+
+    result.v = (mean_nw + mean_sw) - (mean_ne + mean_se);
+    result.h = (mean_nw + mean_ne) - (mean_sw + mean_se);
+
+    return result;
+}
+    /*
+    mag_v = (mean_nw + mean_sw) - (mean_ne + mean_se);
+    if (mag_v > block->value.dev) {
+        block->value.dir_v = mag_v;
+    }
+    else
+    if (mag_v < -block->value.dev) {
+        block->value.dir_v = mag_v;
+    }
+    else {
+        block->value.dir_v = 0;
+    }
+
+    mag_h = (mean_nw + mean_ne) - (mean_sw + mean_se);
+    if (mag_h > block->value.dev) {
+        block->value.dir_h = mag_h;
+    }
+    else
+    if (mag_h < -block->value.dev) {
+        block->value.dir_h = mag_h;
+    }
+    else {
+        block->value.dir_h = 0;
+    }
+
+    if (block->value.dir_h != 0 && block->value.dir_v != 0) {
+        if (2 * signum(block->value.dir_h) * block->value.dir_h < block->value.dir_v) {
+            block->value.dir_h = 0;
+        }
+        if (2 * signum(block->value.dir_v) * block->value.dir_v < block->value.dir_h) {
+            block->value.dir_v = 0;
+        }
+    }
+    */
 
 /******************************************************************************/

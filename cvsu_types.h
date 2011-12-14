@@ -115,10 +115,24 @@ typedef struct rect_t {
     coord bottom;
 } rect;
 
-typedef struct statistics_t {
+typedef struct dir_t {
+    sint16 h;
+    sint16 v;
+} dir;
+
+typedef struct stat_grey_t {
     sint16 mean;
     sint16 dev;
-} statistics;
+} stat_grey;
+
+typedef struct stat_color_t {
+    sint16 mean_i;
+    sint16 dev_i;
+    sint16 mean_c1;
+    sint16 dev_c1;
+    sint16 mean_c2;
+    sint16 dev_c2;
+} stat_color;
 
 typedef struct stat_with_dir_t {
     sint16 mean;
@@ -126,6 +140,36 @@ typedef struct stat_with_dir_t {
     sint16 dir_h;
     sint16 dir_v;
 } stat_with_dir;
+
+typedef struct hstat_grey_t {
+    sint16 mean;
+    sint16 dev;
+    sint16 mean_nw;
+    sint16 mean_ne;
+    sint16 mean_se;
+    sint16 mean_sw;
+} hstat_grey;
+
+typedef struct hstat_color_t {
+    sint16 mean_i;
+    sint16 dev_i;
+    sint16 mean_c1;
+    sint16 dev_c1;
+    sint16 mean_c2;
+    sint16 dev_c2;
+    sint16 mean_i_nw;
+    sint16 mean_c1_nw;
+    sint16 mean_c2_nw;
+    sint16 mean_i_ne;
+    sint16 mean_c1_ne;
+    sint16 mean_c2_ne;
+    sint16 mean_i_se;
+    sint16 mean_c1_se;
+    sint16 mean_c2_se;
+    sint16 mean_i_sw;
+    sint16 mean_c1_sw;
+    sint16 mean_c2_sw;
+} hstat_color;
 
 typedef struct fstatistics_t {
     double mean;
@@ -216,24 +260,29 @@ typedef enum pixel_format_t {
     NONE = 0,
     /** one-channel greyscale image */
     GREY,
+    /** two-channel image with UYVY values */
+    UYVY,
     /** three-channel image with RGB values */
     RGB,
-    /** four-channel image with RGBA values */
-    RGBA,
     /** three-channel image with HSV values */
     HSV,
+    /** three-channel image with YUV values */
+    YUV,
     /** three-channel image with LAB values */
     LAB,
-    /** two-channel image with UYVY values */
-    UYVY
+    /** four-channel image with RGBA values */
+    RGBA
 } pixel_format;
 
 typedef enum image_block_type_t {
     b_NONE = 0,
     b_INT,
     b_REAL,
-    b_STAT,
-    b_STAT_WITH_DIR
+    b_STAT_GREY,
+    b_STAT_COLOR,
+    b_STAT_WITH_DIR,
+    b_HSTAT_GREY,
+    b_HSTAT_COLOR
 } image_block_type;
 
 /**
@@ -246,7 +295,9 @@ typedef struct image_block_t {
     uint16 h;
     /*statistics value;*/
     /*byte *value;*/
-    stat_with_dir value;
+    stat_color value;
+    /*stat_with_dir value;*/
+    /*hstat_color value;*/
 } image_block;
 
 void point_create(point *target, coord x, coord y);

@@ -63,6 +63,8 @@ string scale_down_name = "scale_down";
 string scale_up_name = "scale_up";
 string convert_grey8_to_grey24_name = "convert_grey8_to_grey24";
 string convert_rgb24_to_grey8_name = "convert_rgb24_to_grey8";
+string convert_rgb24_to_yuv24_name = "convert_rgb24_to_yuv24";
+string pick_1_channel_from_3_channels_name = "pick_1_channel_from_3_channels";
 
 /******************************************************************************/
 /* private function for initializing the pixel_image structure                */
@@ -1128,6 +1130,118 @@ result convert_rgb24_to_grey8(
     }
 
     FINALLY(convert_rgb24_to_grey8);
+    RETURN();
+}
+
+/******************************************************************************/
+
+result convert_rgb24_to_yuv24(
+    const pixel_image *source,
+    pixel_image *target
+    )
+{
+    TRY();
+    byte R, G, B;
+    sint32 Y, U, V;
+
+    CHECK_POINTER(source);
+    CHECK_POINTER(target);
+    CHECK_POINTER(source->data);
+    CHECK_POINTER(target->data);
+    CHECK_PARAM(source->type == p_U8);
+    CHECK_PARAM(target->type == p_U8);
+    CHECK_PARAM(source->step == 3);
+    CHECK_PARAM(target->step == 3);
+    CHECK_PARAM(source->format == RGB);
+    CHECK_PARAM(target->format == YUV);
+    CHECK_PARAM(source->width == target->width);
+    CHECK_PARAM(source->height == target->height);
+
+    if (pixel_image_is_continuous(source) && pixel_image_is_continuous(target)) {
+        CONTINUOUS_IMAGE_VARIABLES(byte, byte);
+        FOR_2_CONTINUOUS_IMAGES()
+        {
+            R = PIXEL_VALUE(source);
+            G = PIXEL_VALUE_PLUS(source, 1);
+            B = PIXEL_VALUE_PLUS(source, 2);
+            Y = ( 77 * R) + (150 * G) + ( 29 * B) + 128;
+            U = (-38 * R) + (-74 * G) + (112 * B) + 128;
+            V = (112 * R) + (-94 * G) + (-18 * B) + 128;
+            Y >>= 8;
+            U >>= 8;
+            V >>= 8;
+
+            PIXEL_VALUE(target)         = (byte)Y;
+            PIXEL_VALUE_PLUS(target, 1) = (byte)U;
+            PIXEL_VALUE_PLUS(target, 2) = (byte)V;
+        }
+    }
+    else {
+        uint32 x, y;
+        DISCONTINUOUS_IMAGE_VARIABLES(byte, byte);
+        FOR_2_DISCONTINUOUS_IMAGES()
+        {
+            R = PIXEL_VALUE(source);
+            G = PIXEL_VALUE_PLUS(source, 1);
+            B = PIXEL_VALUE_PLUS(source, 2);
+            Y = ( 77 * R) + (150 * G) + ( 29 * B) + 128;
+            U = (-38 * R) + (-74 * G) + (112 * B) + 128;
+            V = (112 * R) + (-94 * G) + (-18 * B) + 128;
+            Y >>= 8;
+            U >>= 8;
+            V >>= 8;
+
+            PIXEL_VALUE(target)         = (byte)Y;
+            PIXEL_VALUE_PLUS(target, 1) = (byte)U;
+            PIXEL_VALUE_PLUS(target, 2) = (byte)V;
+        }
+    }
+
+    FINALLY(convert_rgb24_to_yuv24);
+    RETURN();
+}
+
+/******************************************************************************/
+
+result pick_1_channel_from_3_channels(
+    const pixel_image *source,
+    pixel_image *target,
+    uint32 channel
+    )
+{
+    TRY();
+    sint32 value;
+
+    CHECK_POINTER(source);
+    CHECK_POINTER(target);
+    CHECK_POINTER(source->data);
+    CHECK_POINTER(target->data);
+    CHECK_PARAM(source->type == p_U8);
+    CHECK_PARAM(target->type == p_U8);
+    CHECK_PARAM(source->step == 3);
+    CHECK_PARAM(target->step == 1);
+    CHECK_PARAM(target->format == GREY);
+    CHECK_PARAM(source->width == target->width);
+    CHECK_PARAM(source->height == target->height);
+    CHECK_PARAM(channel < 3);
+
+    if (pixel_image_is_continuous(source) && pixel_image_is_continuous(target)) {
+        CONTINUOUS_IMAGE_VARIABLES(byte, byte);
+        FOR_2_CONTINUOUS_IMAGES()
+        {
+            PIXEL_VALUE(target) = PIXEL_VALUE_PLUS(source, channel);
+        }
+    }
+    else {
+        uint32 x, y;
+        DISCONTINUOUS_IMAGE_VARIABLES(byte, byte);
+        FOR_2_DISCONTINUOUS_IMAGES()
+        {
+            PIXEL_VALUE(target) = PIXEL_VALUE_PLUS(source, channel);
+        }
+    }
+
+    FINALLY(pick_1_channel_from_3_channels);
     RETURN();
 }
 

@@ -288,6 +288,26 @@ result convert_rgb24_to_grey8(
 );
 
 /**
+ * Transforms RGB color values in a three-channel RGB image to YUV color space.
+ */
+result convert_rgb24_to_yuv24(
+    const pixel_image *source,
+    pixel_image *target
+);
+
+/**
+ * Takes a 3-channel image and makes a 1-channel image selecting one channel.
+ */
+result pick_1_channel_from_3_channels(
+/** source image */
+    const pixel_image *source,
+/** target image */
+    pixel_image *target,
+/** channel as offset 0-2 */
+    uint32 channel
+);
+
+/**
  * Scales the image down by factor of two without smoothing.
  * Takes every other pixel on every other row.
  * Supports using the same image for both source and target.

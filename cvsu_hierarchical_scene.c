@@ -284,7 +284,7 @@ result hierarchical_scene_nullify(
 long rate_neighbor(grid_item *current, neighbor_relation *relation)
 {
     grid_item *neighbor;
-    double diff, dev, dist;
+    double diff;/*, dev, dist;*/
     neighbor = relation->item;
     if (neighbor != NULL) {
         diff = current->main_block->stat.mean - neighbor->main_block->stat.mean;

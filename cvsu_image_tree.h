@@ -78,6 +78,9 @@ typedef struct image_tree_root_t {
 
 typedef struct image_tree_forest_t {
     pixel_image *original;
+    /*pixel_image *i;*/
+    /*pixel_image *c1;*/
+    /*pixel_image *c2;*/
     /*edge_block_image edge_image;*/
     uint32 own_original;
     uint32 rows;
@@ -195,6 +198,10 @@ result image_tree_update(
 result image_tree_divide(
     image_tree *target
 );
+
+dir image_tree_dir_i(image_tree *tree);
+dir image_tree_dir_c1(image_tree *tree);
+dir image_tree_dir_c2(image_tree *tree);
 
 #ifdef __cplusplus
 }

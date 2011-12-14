@@ -374,10 +374,10 @@ result small_integral_image_create(
     /* integral image requires one extra row and column at top and left side */
     target->stride = (target->width + 1) * target->step;
 
-    CHECK(pixel_image_create(&target->I_1, p_SI_1, GREY,
+    CHECK(pixel_image_create(&target->I_1, p_SI_1, source->format,
             target->width+1, target->height+1, target->step, target->stride));
 
-    CHECK(pixel_image_create(&target->I_2, p_SI_2, GREY,
+    CHECK(pixel_image_create(&target->I_2, p_SI_2, source->format,
             target->width+1, target->height+1, target->step, target->stride));
 
     init_tables();
@@ -388,20 +388,12 @@ result small_integral_image_create(
 
 /******************************************************************************/
 
-result small_integral_image_update(
-    integral_image *target
+void small_integral_image_update_channel(
+    integral_image *target,
+    uint32 channel
     )
 {
-    TRY();
-
     pixel_image *source;
-
-    CHECK_POINTER(target);
-    CHECK_POINTER(target->original);
-    CHECK_POINTER(target->I_1.data);
-    CHECK_POINTER(target->I_2.data);
-    CHECK_PARAM(target->I_1.type == p_SI_1);
-    CHECK_PARAM(target->I_2.type == p_SI_2);
 
     source = target->original;
     {
@@ -409,31 +401,25 @@ result small_integral_image_update(
         uint32 intensity, width, height, x, y, h, v, d;
         SINGLE_DISCONTINUOUS_IMAGE_VARIABLES(source, byte);
 
-        /* set the image content to 0's */
-        /* the first row and column must contain only 0's */
-        /* otherwise the algorithm doesn't work correctly */
-        CHECK(pixel_image_clear(&target->I_1));
-        CHECK(pixel_image_clear(&target->I_2));
-
         width = target->width;
         height = target->height;
         I_1_data = (SI_1_t *)target->I_1.data;
         I_2_data = (SI_2_t *)target->I_2.data;
 
         /* horizontal offset for integral images */
-        h = 1;
+        h = target->step;
         /* vertical offset for integral images */
         v = target->stride;
         /* diagonal offset for integral images */
-        d = target->stride + 1;
+        d = target->stride + target->step;
 
         /* initialize rest of integral images */
         /* add value of this pixel and integrals from top and left */
         /* subtract integral from top left diagonal */
         {
-            INTEGRAL_IMAGE_SET_POS(d);
+            INTEGRAL_IMAGE_SET_POS(d + channel);
             for (y = 0; y < height; y++) {
-                for (x = width, source_pos = source_rows[y]; x--; source_pos += source_step) {
+                for (x = width, source_pos = source_rows[y] + channel; x--; source_pos += source_step) {
                     intensity = PIXEL_VALUE(source);
                     I_1_SET_VALUE((I_1_GET_VALUE_WITH_OFFSET(v) -
                                    I_1_GET_VALUE_WITH_OFFSET(d)) +
@@ -449,6 +435,33 @@ result small_integral_image_update(
                 INTEGRAL_IMAGE_ADVANCE_POS(h);
             }
         }
+    }
+}
+
+/******************************************************************************/
+
+result small_integral_image_update(
+    integral_image *target
+    )
+{
+    TRY();
+    uint32 i;
+
+    CHECK_POINTER(target);
+    CHECK_POINTER(target->original);
+    CHECK_POINTER(target->I_1.data);
+    CHECK_POINTER(target->I_2.data);
+    CHECK_PARAM(target->I_1.type == p_SI_1);
+    CHECK_PARAM(target->I_2.type == p_SI_2);
+
+    /* set the image content to 0's */
+    /* the first row and column must contain only 0's */
+    /* otherwise the algorithm doesn't work correctly */
+    CHECK(pixel_image_clear(&target->I_1));
+    CHECK(pixel_image_clear(&target->I_2));
+
+    for (i = 0; i < target->original->step; i++) {
+        small_integral_image_update_channel(target, i);
     }
 
     FINALLY(small_integral_image_update);
@@ -473,13 +486,13 @@ void small_integral_image_box_create(
     target->sum = 0;
     target->sumsqr = 0;
     target->offset = 0;
+    target->step = source->step;
     target->stride = source->stride;
-    target->B_inc = width;
-    target->C_inc = height * target->stride + width;
-    target->D_inc = height * target->stride;
-    target->N = width * height;
     target->dx = dx;
     target->dy = dy;
+    target->channel = 0;
+
+    small_integral_image_box_resize(target, width, height);
 }
 
 /******************************************************************************/
@@ -490,8 +503,8 @@ void small_integral_image_box_resize(
     uint32 height
     )
 {
-    target->B_inc = width;
-    target->C_inc = height * target->stride + width;
+    target->B_inc = width * target->step;
+    target->C_inc = height * target->stride + width * target->step;
     target->D_inc = height * target->stride;
     target->N = width * height;
 }
@@ -504,7 +517,7 @@ void small_integral_image_box_update(
     uint32 y
     )
 {
-    target->offset = (y - target->dy) * target->stride + (x - target->dx);
+    target->offset = (y - target->dy) * target->stride + (x - target->dx) * target->step + target->channel;
     target->iA = target->I_1_data + target->offset;
     target->i2A = target->I_2_data + target->offset;
     target->sum =    (SI_1_t)(*(target->iA + target->C_inc) + *target->iA - *(target->iA + target->B_inc) - *(target->iA + target->D_inc));

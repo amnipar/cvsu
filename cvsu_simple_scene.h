@@ -76,7 +76,7 @@ typedef struct block_t {
     /** height of block in pixels */
     uint16 height;
     /** block statistics (intensity mean and deviation) */
-    statistics stat;
+    stat_grey stat;
     /** count of horizontal lines (weighted with line strength?) */
     short hlines;
     /** count of vertical lines (weighted with line strength?) */

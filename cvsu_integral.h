@@ -84,9 +84,11 @@ typedef struct small_integral_image_box_t {
     uint32 C_inc;       /* offset from top left corner to bottom right corner */
     uint32 D_inc;       /* offset from top left corner to bottom left corner */
     uint32 N;           /* number of pixels contained in the box */
+    uint32 step;        /* distance between integral image pixels */
     uint32 stride;      /* distance between integral image rows */
     uint32 dx;          /* x offset of integral image relative to original */
     uint32 dy;          /* y offset of integral image relative to original */
+    uint32 channel;     /* x offset from start of pixel to selected channel */
 } small_integral_image_box;
 
 /**

@@ -65,7 +65,7 @@ typedef struct block_t {
     point pos;
     uint16 width;
     uint16 height;
-    statistics stat;
+    stat_grey stat;
     struct block_t *nw;
     struct block_t *ne;
     struct block_t *sw;
@@ -132,7 +132,7 @@ typedef struct region_t {
     float block_count;
     float mean;
     float dev;
-    statistics stat;
+    stat_grey stat;
     rect bounding_box;
     list borders;
     list blocks;
