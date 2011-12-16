@@ -1142,7 +1142,8 @@ result convert_rgb24_to_yuv24(
 {
     TRY();
     byte R, G, B;
-    sint32 Y, U, V;
+    /*sint32 Y, U, V;*/
+    double  Y, U, V;
 
     CHECK_POINTER(source);
     CHECK_POINTER(target);
@@ -1164,16 +1165,20 @@ result convert_rgb24_to_yuv24(
             R = PIXEL_VALUE(source);
             G = PIXEL_VALUE_PLUS(source, 1);
             B = PIXEL_VALUE_PLUS(source, 2);
+            Y = ( 0.29900 * ((double)R / 255.0)) + ( 0.58700 * ((double)G / 255.0)) + ( 0.11400 * ((double)B / 255.0));
+            U = (-0.14713 * ((double)R / 255.0)) + (-0.28886 * ((double)G / 255.0)) + ( 0.43600 * ((double)B / 255.0));
+            V = ( 0.61500 * ((double)R / 255.0)) + (-0.51499 * ((double)G / 255.0)) + (-0.10001 * ((double)B / 255.0));
+            /*
             Y = ( 77 * R) + (150 * G) + ( 29 * B) + 128;
             U = (-38 * R) + (-74 * G) + (112 * B) + 128;
             V = (112 * R) + (-94 * G) + (-18 * B) + 128;
             Y >>= 8;
             U >>= 8;
             V >>= 8;
-
-            PIXEL_VALUE(target)         = (byte)Y;
-            PIXEL_VALUE_PLUS(target, 1) = (byte)U;
-            PIXEL_VALUE_PLUS(target, 2) = (byte)V;
+            */
+            PIXEL_VALUE(target)         = (byte)(Y * 255);
+            PIXEL_VALUE_PLUS(target, 1) = (byte)(((U + 0.436) / (2 * 0.436)) * 255);
+            PIXEL_VALUE_PLUS(target, 2) = (byte)(((V + 0.615) / (2 * 0.615)) * 255);
         }
     }
     else {
@@ -1184,16 +1189,20 @@ result convert_rgb24_to_yuv24(
             R = PIXEL_VALUE(source);
             G = PIXEL_VALUE_PLUS(source, 1);
             B = PIXEL_VALUE_PLUS(source, 2);
+            Y = ( 0.29900 * ((double)R / 255.0)) + ( 0.58700 * ((double)G / 255.0)) + ( 0.11400 * ((double)B / 255.0));
+            U = (-0.14713 * ((double)R / 255.0)) + (-0.28886 * ((double)G / 255.0)) + ( 0.43600 * ((double)B / 255.0));
+            V = ( 0.61500 * ((double)R / 255.0)) + (-0.51499 * ((double)G / 255.0)) + (-0.10001 * ((double)B / 255.0));
+            /*
             Y = ( 77 * R) + (150 * G) + ( 29 * B) + 128;
             U = (-38 * R) + (-74 * G) + (112 * B) + 128;
             V = (112 * R) + (-94 * G) + (-18 * B) + 128;
             Y >>= 8;
             U >>= 8;
             V >>= 8;
-
-            PIXEL_VALUE(target)         = (byte)Y;
-            PIXEL_VALUE_PLUS(target, 1) = (byte)U;
-            PIXEL_VALUE_PLUS(target, 2) = (byte)V;
+            */
+            PIXEL_VALUE(target)         = (byte)(Y * 255);
+            PIXEL_VALUE_PLUS(target, 1) = (byte)(((U + 0.436) / (2 * 0.436)) * 255);
+            PIXEL_VALUE_PLUS(target, 2) = (byte)(((V + 0.615) / (2 * 0.615)) * 255);
         }
     }
 
@@ -1210,7 +1219,6 @@ result pick_1_channel_from_3_channels(
     )
 {
     TRY();
-    sint32 value;
 
     CHECK_POINTER(source);
     CHECK_POINTER(target);
