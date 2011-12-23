@@ -34,7 +34,7 @@
 #include "cvsu_memory.h"
 
 #include <stdlib.h>
-#include <stdio.h>
+/*#include <stdio.h>*/
 #include <sys/time.h>
 #include <math.h>
 
@@ -73,10 +73,8 @@ void image_tree_forest_free(image_tree_forest *ptr)
     TRY();
     r = SUCCESS;
     if (ptr != NULL) {
-        printf("Trying to free image_tree_forest...\n");
         CHECK(image_tree_forest_destroy(ptr));
         CHECK(memory_deallocate((data_pointer *)&ptr));
-        printf("...done.\n");
     }
     FINALLY(image_tree_forest_free);
 }
@@ -356,16 +354,16 @@ result image_tree_forest_read(
 
     new_image = NULL;
 
-    printf("Starting to read image '%s'...\n", source);
+    /*printf("Starting to read image '%s'...\n", source);*/
     ifh = fopen(source, "rb");
     if (ifh == NULL) {
-        printf("Error: opening file failed\n");
+        /*printf("Error: opening file failed\n");*/
         ERROR(INPUT_ERROR);
     }
     /* read the image header - supposed to be PPM image */
     read_result = fscanf(ifh, "P%c %lu %lu %lu%c", &type, &width, &height, &maxval, &endl);
     if (read_result < 5) {
-        printf("Error: reading image header failed\n");
+        /*printf("Error: reading image header failed\n");*/
         ERROR(INPUT_ERROR);
     }
     /* only support PPM (P6) and PGM (P5) images at this stage... */
@@ -375,7 +373,7 @@ result image_tree_forest_read(
         CHECK(pixel_image_create(new_image, p_U8, GREY, width, height, 1, width));
         read_size = fread(new_image->data, sizeof(byte), new_image->size, ifh);
         if (read_size != new_image->size) {
-            printf("Reading image data failed");
+            /*printf("Reading image data failed");*/
             ERROR(INPUT_ERROR);
         }
     }
@@ -388,21 +386,21 @@ result image_tree_forest_read(
         /*CHECK(pixel_image_create(grey_image, p_U8, GREY, width, height, 1, width));*/
         read_size = fread(new_image->data, sizeof(byte), new_image->size, ifh);
         if (read_size != new_image->size) {
-            printf("Reading image data failed");
+            /*printf("Reading image data failed");*/
             ERROR(INPUT_ERROR);
         }
         /*CHECK(convert_rgb24_to_grey8(rgb_image, grey_image));*/
     }
     else {
-        printf("Error: image type not supported\n");
+        /*printf("Error: image type not supported\n");*/
         ERROR(BAD_PARAM);
     }
 
-    printf("Successfully read image of size (%lu x %lu)\n", width, height);
+    /*printf("Successfully read image of size (%lu x %lu)\n", width, height);*/
 
     CHECK(image_tree_forest_create(target, new_image, tree_width, tree_height));
 
-    printf("Created image forest with trees (%u x %u)\n", tree_width, tree_height);
+    /*printf("Created image forest with trees (%u x %u)\n", tree_width, tree_height);*/
     /*CHECK(image_tree_forest_update(target));*/
 
     FINALLY(image_tree_forest_read);

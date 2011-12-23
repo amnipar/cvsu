@@ -62,31 +62,24 @@ result pixel_image_create_from_ipl_image(pixel_image *target, IplImage *source, 
     switch (depth) {
         case IPL_DEPTH_8U:
             type = p_U8;
-            printf("U8\n");
             break;
         case IPL_DEPTH_8S:
             type = p_S8;
-            printf("S8\n");
             break;
         case IPL_DEPTH_16U:
             type = p_U16;
-            printf("U16\n");
             break;
         case IPL_DEPTH_16S:
             type = p_S16;
-            printf("S16\n");
             break;
         case IPL_DEPTH_32S:
             type = p_S32;
-            printf("U32\n");
             break;
         case IPL_DEPTH_32F:
             type = p_F32;
-            printf("F32\n");
             break;
         case IPL_DEPTH_64F:
             type = p_F64;
-            printf("F64\n");
             break;
         default:
             ERROR(BAD_TYPE);

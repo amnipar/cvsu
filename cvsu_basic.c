@@ -181,10 +181,8 @@ void pixel_image_free(
     r = SUCCESS;
 
     if (ptr != NULL) {
-        printf("Trying to free pixel image...\n");
         CHECK(pixel_image_destroy(ptr));
         CHECK(memory_deallocate((data_pointer *)&ptr));
-        printf("...done.\n");
     }
 
     FINALLY(pixel_image_free);
