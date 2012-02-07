@@ -48,6 +48,7 @@ string pixel_image_create_name = "pixel_image_create";
 string pixel_image_create_from_data_name = "pixel_image_create_from_data";
 string pixel_image_destroy_name = "pixel_image_destroy";
 string pixel_image_nullify_name = "pixel_image_nullify";
+string pixel_image_convert_name = "pixel_image_convert";
 string pixel_image_create_roi_name = "pixel_image_create_roi";
 string pixel_image_clone_name = "pixel_image_clone";
 string pixel_image_copy_name = "pixel_image_copy";
@@ -64,6 +65,8 @@ string scale_up_name = "scale_up";
 string convert_grey8_to_grey24_name = "convert_grey8_to_grey24";
 string convert_rgb24_to_grey8_name = "convert_rgb24_to_grey8";
 string convert_rgb24_to_yuv24_name = "convert_rgb24_to_yuv24";
+string convert_yuv24_to_rgb24_name = "convert_yuv24_to_rgb24";
+string convert_yuv24_to_grey8_name = "convert_yuv24_to_grey8";
 string pick_1_channel_from_3_channels_name = "pick_1_channel_from_3_channels";
 
 /******************************************************************************/
@@ -318,6 +321,78 @@ result pixel_image_nullify(
     target->size = 0;
 
     FINALLY(pixel_image_nullify);
+    RETURN();
+}
+
+/******************************************************************************/
+
+result pixel_image_convert(
+    pixel_image *source,
+    pixel_image *target
+    )
+{
+    pixel_image *temp;
+    TRY();
+
+    temp = NULL;
+
+    CHECK_POINTER(source);
+    CHECK_POINTER(target);
+
+    CHECK_PARAM(source->width == target->width);
+    CHECK_PARAM(source->height == target->height);
+
+    if (source->type == target->type && source->format == target->format) {
+        CHECK(pixel_image_copy(target, source));
+    }
+    else {
+        /* first convert the pixel type of the source image */
+        if (source->type != target->type) {
+            ERROR(NOT_IMPLEMENTED);
+        }
+        /* then convert the format */
+        switch (source->format) {
+        case GREY:
+            if (target->format == RGB) {
+                CHECK(convert_grey8_to_grey24(source, target));
+            }
+            else {
+                ERROR(NOT_IMPLEMENTED);
+            }
+            break;
+        case RGB:
+          if (target->format == GREY) {
+              CHECK(convert_rgb24_to_grey8(source, target));
+          }
+          else
+          if (target->format == YUV) {
+              CHECK(convert_rgb24_to_yuv24(source, target));
+          }
+          else {
+              ERROR(NOT_IMPLEMENTED);
+          }
+          break;
+        case YUV:
+          if (target->format == GREY) {
+              CHECK(convert_yuv24_to_grey8(source, target));
+          }
+          else
+          if (target->format == RGB) {
+              CHECK(convert_yuv24_to_rgb24(source, target));
+          }
+          else {
+              ERROR(NOT_IMPLEMENTED);
+          }
+          break;
+        default:
+            ERROR(NOT_IMPLEMENTED);
+        }
+    }
+
+    FINALLY(pixel_image_convert);
+    if (temp != NULL) {
+        pixel_image_free(temp);
+    }
     RETURN();
 }
 
@@ -1205,6 +1280,134 @@ result convert_rgb24_to_yuv24(
     }
 
     FINALLY(convert_rgb24_to_yuv24);
+    RETURN();
+}
+
+/******************************************************************************/
+
+result convert_yuv24_to_rgb24(
+    const pixel_image *source,
+    pixel_image *target
+    )
+{
+    TRY();
+    byte Yb, Ub, Vb;
+    /*sint32 Y, U, V;*/
+    double Y, U, V, R, G, B;
+
+    CHECK_POINTER(source);
+    CHECK_POINTER(target);
+    CHECK_POINTER(source->data);
+    CHECK_POINTER(target->data);
+    CHECK_PARAM(source->type == p_U8);
+    CHECK_PARAM(target->type == p_U8);
+    CHECK_PARAM(source->step == 3);
+    CHECK_PARAM(target->step == 3);
+    CHECK_PARAM(source->format == YUV);
+    CHECK_PARAM(target->format == RGB);
+    CHECK_PARAM(source->width == target->width);
+    CHECK_PARAM(source->height == target->height);
+
+    if (pixel_image_is_continuous(source) && pixel_image_is_continuous(target)) {
+        CONTINUOUS_IMAGE_VARIABLES(byte, byte);
+        FOR_2_CONTINUOUS_IMAGES()
+        {
+            Yb = PIXEL_VALUE(source);
+            Ub = PIXEL_VALUE_PLUS(source, 1);
+            Vb = PIXEL_VALUE_PLUS(source, 2);
+            Y = ((double)Yb / 255.0);
+            U = (((double)Ub / 255.0) * 2.0 * 0.436) - 0.436;
+            V = (((double)Vb / 255.0) * 2.0 * 0.615) - 0.615;
+            R = ( Y + 0.00000 * U + 1.13983 * V);
+            G = ( Y - 0.39465 * U - 0.58060 * V);
+            B = ( Y + 2.03211 * U + 0.00000 * V);
+            /*
+            Y = ( 77 * R) + (150 * G) + ( 29 * B) + 128;
+            U = (-38 * R) + (-74 * G) + (112 * B) + 128;
+            V = (112 * R) + (-94 * G) + (-18 * B) + 128;
+            Y >>= 8;
+            U >>= 8;
+            V >>= 8;
+            */
+            PIXEL_VALUE(target)         = (byte)(R * 255);
+            PIXEL_VALUE_PLUS(target, 1) = (byte)(G * 255);
+            PIXEL_VALUE_PLUS(target, 2) = (byte)(B * 255);
+        }
+    }
+    else {
+        uint32 x, y;
+        DISCONTINUOUS_IMAGE_VARIABLES(byte, byte);
+        FOR_2_DISCONTINUOUS_IMAGES()
+        {
+            Yb = PIXEL_VALUE(source);
+            Ub = PIXEL_VALUE_PLUS(source, 1);
+            Vb = PIXEL_VALUE_PLUS(source, 2);
+            Y = ((double)Yb / 255.0);
+            U = (((double)Ub / 255.0) * 2.0 * 0.436) - 0.436;
+            V = (((double)Vb / 255.0) * 2.0 * 0.615) - 0.615;
+            R = ( Y + 0.00000 * U + 1.13983 * V);
+            G = ( Y - 0.39465 * U - 0.58060 * V);
+            B = ( Y + 2.03211 * U + 0.00000 * V);
+            /*
+            Y = ( 77 * R) + (150 * G) + ( 29 * B) + 128;
+            U = (-38 * R) + (-74 * G) + (112 * B) + 128;
+            V = (112 * R) + (-94 * G) + (-18 * B) + 128;
+            Y >>= 8;
+            U >>= 8;
+            V >>= 8;
+            */
+            PIXEL_VALUE(target)         = (byte)(R * 255);
+            PIXEL_VALUE_PLUS(target, 1) = (byte)(G * 255);
+            PIXEL_VALUE_PLUS(target, 2) = (byte)(B * 255);
+        }
+    }
+
+    FINALLY(convert_yuv24_to_rgb24);
+    RETURN();
+}
+
+/******************************************************************************/
+
+result convert_yuv24_to_grey8(
+    const pixel_image *source,
+    pixel_image *target
+    )
+{
+    TRY();
+    byte Y;
+
+    CHECK_POINTER(source);
+    CHECK_POINTER(target);
+    CHECK_POINTER(source->data);
+    CHECK_POINTER(target->data);
+    CHECK_PARAM(source->type == p_U8);
+    CHECK_PARAM(target->type == p_U8);
+    CHECK_PARAM(source->step == 3);
+    CHECK_PARAM(target->step == 1);
+    CHECK_PARAM(source->format == YUV);
+    CHECK_PARAM(target->format == GREY);
+    CHECK_PARAM(source->width == target->width);
+    CHECK_PARAM(source->height == target->height);
+
+    if (pixel_image_is_continuous(source) && pixel_image_is_continuous(target)) {
+        CONTINUOUS_IMAGE_VARIABLES(byte, byte);
+        FOR_2_CONTINUOUS_IMAGES()
+        {
+            Y = PIXEL_VALUE(source);
+            PIXEL_VALUE(target) = Y;
+        }
+    }
+    else {
+        uint32 x, y;
+        DISCONTINUOUS_IMAGE_VARIABLES(byte, byte);
+        FOR_2_DISCONTINUOUS_IMAGES()
+        {
+            Y = PIXEL_VALUE(source);
+            PIXEL_VALUE(target) = Y;
+        }
+    }
+
+    FINALLY(convert_yuv24_to_grey8);
     RETURN();
 }
 

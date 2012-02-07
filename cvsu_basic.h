@@ -268,6 +268,15 @@ result normalize_double(
 );
 
 /**
+ * Generic function for converting between different image types and copying the data
+ */
+
+result pixel_image_convert(
+    pixel_image *target,
+    pixel_image *source
+);
+
+/**
  * Turns a one-channel greyscale image into a three-channel greyscale image
  * by cloning the channel; this way the image can be used as an RGB image.
  */
@@ -291,6 +300,22 @@ result convert_rgb24_to_grey8(
  * Transforms RGB color values in a three-channel RGB image to YUV color space.
  */
 result convert_rgb24_to_yuv24(
+    const pixel_image *source,
+    pixel_image *target
+);
+
+/**
+ * Transforms YUV color values in a three-channel YUV image to RGB color space.
+ */
+result convert_yuv24_to_rgb24(
+    const pixel_image *source,
+    pixel_image *target
+);
+
+/**
+ * Transforms YUV color values in a three-channel YUV image to RGB color space.
+ */
+result convert_yuv24_to_grey8(
     const pixel_image *source,
     pixel_image *target
 );
