@@ -451,33 +451,33 @@ finally:
 #define INTEGRAL_IMAGE_INIT_1BOX(I, box_length, box_width)\
     I_1_data = (I_1_t *)(I)->I_1.data;\
     I_2_data = (I_2_t *)(I)->I_2.data;\
-    B_inc = (box_length);\
-    C_inc = (box_width) * (I)->width + (box_length);\
-    D_inc = (box_width) * (I)->width;\
+    B_inc = (box_length) * (I)->step;\
+    C_inc = (box_width) * (I)->stride + (box_length) * (I)->step;\
+    D_inc = (box_width) * (I)->stride;\
     N = ((box_length) * (box_width))
 
 #define INTEGRAL_IMAGE_INIT_HBOX(I, box_length, box_width)\
     I_1_data = (I_1_t *)(I)->I_1.data;\
     I_2_data = (I_2_t *)(I)->I_2.data;\
-    B1_inc = (box_length);\
-    C1_inc = (box_width) * (I)->width + (box_length);\
-    D1_inc = (box_width) * (I)->width;\
-    A2_inc = (box_length) + 1;\
-    B2_inc = 2 * (box_length) + 1;\
-    C2_inc = 2 * (box_length) + (box_width) * (I)->width + 1;\
-    D2_inc = (box_length) + (box_width) * (I)->width + 1;\
+    B1_inc = (box_length) * (I)->step;\
+    C1_inc = (box_width) * (I)->stride + (box_length) * (I)->step;\
+    D1_inc = (box_width) * (I)->stride;\
+    A2_inc = ((box_length) + 1) * (I)->step;\
+    B2_inc = (2 * (box_length) + 1) * (I)->step;\
+    C2_inc = (box_width) * (I)->stride + (2 * (box_length) + 1) * (I)->step;\
+    D2_inc = (box_width) * (I)->stride + ((box_length) + 1) * (I)->step;\
     N = ((box_length) * (box_width))
 
 #define INTEGRAL_IMAGE_INIT_VBOX(I, box_length, box_width)\
     I_1_data = (I_1_t *)(I)->I_1.data;\
     I_2_data = (I_2_t *)(I)->I_2.data;\
-    B1_inc = (box_width);\
-    C1_inc = (box_length) * (I)->width + (box_width);\
-    D1_inc = (box_length) * (I)->width;\
-    A2_inc = ((box_length) + 1) * (I)->width;\
-    B2_inc = ((box_length) + 1) * (I)->width + (box_width);\
-    C2_inc = (2 * (box_length) + 1) * (I)->width + (box_width);\
-    D2_inc = (2 * (box_length) + 1) * (I)->width;\
+    B1_inc = (box_width) * (I)->step;\
+    C1_inc = (box_length) * (I)->stride + (box_width) * (I)->step;\
+    D1_inc = (box_length) * (I)->stride;\
+    A2_inc = ((box_length) + 1) * (I)->stride;\
+    B2_inc = ((box_length) + 1) * (I)->stride + (box_width) * (I)->step;\
+    C2_inc = (2 * (box_length) + 1) * (I)->stride + (box_width) * (I)->step;\
+    D2_inc = (2 * (box_length) + 1) * (I)->stride;\
     N = ((box_width) * (box_length))
 
 #define INTEGRAL_IMAGE_SUM() (uint32)(*(iA + C_inc) - *(iA + B_inc) - *(iA + D_inc) + *iA)

@@ -70,7 +70,7 @@ result block_update(block *target, integral_image *I)
     CHECK_POINTER(I_1_data);
     CHECK_POINTER(I_2_data);
 
-    offset = (target->pos.y) * I->width + target->pos.x;
+    offset = (target->pos.y) * I->stride + target->pos.x * I->step;
     iA = I_1_data + offset;
     i2A = I_2_data + offset;
 

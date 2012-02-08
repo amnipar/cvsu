@@ -182,7 +182,7 @@ result edge_image_update(
 {
     TRY();
     bool rising, falling;
-    uint32 width, height, target_stride;
+    uint32 width, height, stride, target_stride;
     pixel_image *edges;
 
     CHECK_POINTER(target);
@@ -195,6 +195,7 @@ result edge_image_update(
 
     width = target->I.width;
     height = target->I.height;
+    stride = target->I.stride;
 
     /* calculate vertical edges */
     edges = &target->vedges;
@@ -211,8 +212,8 @@ result edge_image_update(
         endcol = width - target->box_length;
         pixel_image_clear(edges);
         for (y = 0; y < rows; y++ ) {
-            iA1 = I_1_data + ((target->vmargin + target->dy + y * target->vstep) * width);
-            i2A1 = I_2_data + ((target->vmargin + target->dy + y * target->vstep) * width);
+            iA1 = I_1_data + ((target->vmargin + target->dy + y * target->vstep) * stride);
+            i2A1 = I_2_data + ((target->vmargin + target->dy + y * target->vstep) * stride);
 
             rising = false;
             falling = false;
@@ -271,7 +272,7 @@ result edge_image_update(
             falling = false;
             edges_pos = edges_rows[startrow] + x * edges_step;
             for (y = startrow; y < endrow; y++,
-                 iA1 += width, i2A1 += width, edges_pos += edges_stride) {
+                 iA1 += stride, i2A1 += stride, edges_pos += edges_stride) {
                 sum1 = INTEGRAL_IMAGE_SUM_1();
                 sum2 = INTEGRAL_IMAGE_SUM_2();
                 sumsqr1 = INTEGRAL_IMAGE_SUMSQR_1();
