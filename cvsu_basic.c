@@ -341,6 +341,7 @@ result pixel_image_convert(
 
     CHECK_PARAM(source->width == target->width);
     CHECK_PARAM(source->height == target->height);
+    /*printf("t:%d->%d,f:%d->%d\n",source->type, target->type, source->format, target->format);*/
 
     if (source->type == target->type && source->format == target->format) {
         CHECK(pixel_image_copy(target, source));

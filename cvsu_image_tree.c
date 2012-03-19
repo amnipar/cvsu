@@ -44,6 +44,7 @@
 string image_tree_forest_alloc_name = "image_tree_forest_alloc";
 string image_tree_forest_free_name = "image_tree_forest_free";
 string image_tree_forest_create_name = "image_tree_forest_create";
+string image_tree_forest_reload_name = "image_tree_forest_reload";
 string image_tree_forest_destroy_name = "image_tree_forest_destroy";
 string image_tree_forest_nullify_name = "image_tree_forest_nullify";
 string image_tree_forest_update_prepare_name = "image_tree_forest_update_prepare";
@@ -186,6 +187,46 @@ result image_tree_forest_create(
     }
 
     FINALLY(image_tree_forest_create);
+    RETURN();
+}
+
+/******************************************************************************/
+
+result image_tree_forest_reload(
+    image_tree_forest *target,
+    uint16 tree_width,
+    uint16 tree_height
+    )
+{
+    TRY();
+    /*printf("w:%d,h:%d\n", tree_width, tree_height);*/
+    pixel_image *img;
+    uint32 own_original = 0;
+    
+    CHECK_POINTER(target);
+    CHECK_POINTER(target->original);
+    
+    if (tree_width != target->tree_width || tree_height != target->tree_height) {
+        img = target->original;
+        if (target->own_original != 0) {
+            own_original = 1;
+            target->own_original = 0;
+        }
+        
+        CHECK(image_tree_forest_destroy(target));
+        CHECK(image_tree_forest_create(target, img, tree_width, tree_height));
+        
+        if (own_original != 0) {
+            target->own_original = 1;
+        }
+    }
+    FINALLY(image_tree_forest_reload);
+    if (r != SUCCESS) {
+        if (own_original != 0) {
+            pixel_image_destroy(img);
+            memory_deallocate((data_pointer*)img);
+        }
+    }
     RETURN();
 }
 

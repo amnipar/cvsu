@@ -42,18 +42,40 @@ extern "C" {
 #include "cvsu_list.h"
 
 /**
+ * Stores information about a tree neighbor.
+ * Possible purposes:
+ * Is the neighbor on same level? (alternative: store level in each tree)
+ * Have I checked this neighbor already?
+ * What is my relation to this neghbor? What is the strength of our relation?
+ * Downside of using a struct is that it uses more memory even if no neighbor.
+ */
+typedef struct image_tree_neighbor_t {
+    struct image_tree_t *tree;
+    real32 strength;
+} image_tree_neighbor;
+
+/**
  * Stores a quad tree holding image data.
  */
 
 typedef struct image_tree_t {
     struct image_tree_root_t *root;
     struct image_tree_t *parent;
+    /* subtrees, NULL if the tree has not beed divided */
     struct image_tree_t *nw;
     struct image_tree_t *ne;
     struct image_tree_t *sw;
     struct image_tree_t *se;
+    
     image_block *block;
+    /* cache neighbors in each tree as they are determined */
+    image_tree_neighbor n;
+    image_tree_neighbor e;
+    image_tree_neighbor s;
+    image_tree_neighbor w;
+    
     /*edge_block *edge;*/
+    uint32 level;
 } image_tree;
 
 /**
@@ -118,6 +140,16 @@ void image_tree_forest_free(image_tree_forest *ptr);
 result image_tree_forest_create(
     image_tree_forest *target,
     pixel_image *source,
+    uint16 tree_width,
+    uint16 tree_height
+);
+
+/**
+ * Reloads the forest using the same image, but possible different box size
+ */
+
+result image_tree_forest_reload(
+    image_tree_forest *target,
     uint16 tree_width,
     uint16 tree_height
 );
