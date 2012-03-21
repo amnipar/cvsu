@@ -235,6 +235,18 @@ result list_item_nullify(
 );
 
 /**
+ * Allocates a list structure.
+ */
+
+list *list_alloc();
+
+/**
+ * Frees a list structure allocated with @see list_alloc
+ */
+
+void list_free(list *ptr);
+
+/**
  * Creates a master list and allocates the chunks for it.
  * Allows to specify, how many links are reserved for each data item.
  * TODO: should allow optionally completely dynamic lists without using chunks
@@ -425,6 +437,16 @@ result list_remove_between(
 result list_remove_rest(
     list *target,
     list_item *last
+);
+
+result list_remove_first(
+    list *target,
+    list_item *item
+);
+
+result list_remove_last(
+    list *target,
+    list_item *item
 );
 
 /**

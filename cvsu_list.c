@@ -46,6 +46,8 @@ string chunk_get_item_name = "chunk_get_item";
 
 string list_item_nullify_name = "list_item_nullify";
 
+string list_alloc_name = "list_alloc";
+string list_free_name = "list_free";
 string list_create_name = "list_create";
 string list_create_from_data_name = "list_create_from_data";
 string list_destroy_name = "list_destroy";
@@ -442,6 +444,33 @@ result list_link_item(
 
     FINALLY(list_link_item);
     RETURN();
+}
+
+/******************************************************************************/
+
+list *list_alloc()
+{
+    TRY();
+    list *ptr;
+    CHECK(memory_allocate((data_pointer *)&ptr, 1, sizeof(list)));
+    CHECK(list_nullify(ptr));
+    FINALLY(list_alloc);
+    return ptr;
+}
+
+/******************************************************************************/
+
+void list_free(
+    list *ptr
+    )
+{
+    TRY();
+    r = SUCCESS;
+    if (ptr != NULL) {
+        CHECK(list_destroy(ptr));
+        CHECK(memory_deallocate((data_pointer *)&ptr));
+    }
+    FINALLY(list_free);
 }
 
 /******************************************************************************/

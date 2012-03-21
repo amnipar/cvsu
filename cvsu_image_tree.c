@@ -54,6 +54,14 @@ string image_tree_forest_read_name = "image_tree_forest_read";
 string image_tree_root_update_name = "image_tree_root_update";
 string image_tree_update_name = "image_tree_update";
 string image_tree_divide_name = "image_tree_divide";
+string image_tree_create_neighbor_list_name = "image_tree_create_neighbor_list";
+string image_tree_get_direct_neighbor_name = "image_tree_get_direct_neighbor";
+string image_tree_get_direct_neighbor_n_name = "image_tree_get_direct_neighbor_n";
+string image_tree_get_direct_neighbor_e_name = "image_tree_get_direct_neighbor_e";
+string image_tree_get_direct_neighbor_s_name = "image_tree_get_direct_neighbor_s";
+string image_tree_get_direct_neighbor_w_name = "image_tree_get_direct_neighbor_w";
+string image_tree_add_children_as_immediate_neighbors_name = "image_tree_add_children_as_immediate_neighbors";
+string image_tree_find_all_immediate_neighbors_name = "image_tree_find_all_immediate_neighbors";
 
 /******************************************************************************/
 
@@ -738,5 +746,433 @@ dir image_tree_dir_c2(image_tree *tree)
         }
     }
     */
+
+/******************************************************************************/
+
+result image_tree_create_neighbor_list(
+    list *target
+    )
+{
+    TRY();
+    
+    CHECK_POINTER(target);
+    
+    CHECK(list_create(target, 100, sizeof(image_tree*), 1));
+    
+    FINALLY(image_tree_create_neighbor_list);
+    RETURN();
+}
+
+/******************************************************************************/
+
+result image_tree_get_direct_neighbor(
+    image_tree *tree,
+    image_tree **neighbor,
+    direction dir
+    )
+{
+    TRY();
+    
+    switch (dir) {
+        case d_N:
+            CHECK(image_tree_get_direct_neighbor_n(tree, neighbor));
+            break;
+        case d_E:
+            CHECK(image_tree_get_direct_neighbor_e(tree, neighbor));
+            break;
+        case d_S:
+            CHECK(image_tree_get_direct_neighbor_s(tree, neighbor));
+            break;
+        case d_W:
+            CHECK(image_tree_get_direct_neighbor_w(tree, neighbor));
+            break;
+        default:
+            ERROR(BAD_PARAM);
+    }
+    
+    FINALLY(image_tree_get_direct_neighbor);
+    RETURN();
+}
+
+/******************************************************************************/
+
+result image_tree_get_direct_neighbor_n(
+    image_tree *tree,
+    image_tree **neighbor
+    )
+{
+    TRY();
+    image_tree *parent_neighbor;
+    
+    CHECK_POINTER(tree);
+    CHECK_POINTER(neighbor);
+    
+    /* check if the neighbor has been cached in the tree already */
+    if (tree->n != NULL) {
+        *neighbor = tree->n;
+    }
+    else {
+        /* either parent or neighbor should be set */
+        /* if not, the tree is on the edge */
+        if (tree->parent == NULL) {
+            *neighbor = NULL;
+        }
+        else {
+            /* neighbor n of sw is nw */
+            if (tree->parent->sw == tree) {
+                *neighbor = tree->parent->nw;
+            }
+            else
+            /* neighbor n of se is ne */
+            if (tree->parent->se == tree) {
+                *neighbor = tree->parent->ne;
+            }
+            else {
+                /* neighbor not on the same parent, get neighbor of parent */
+                CHECK(image_tree_get_direct_neighbor_n(tree->parent, &parent_neighbor));
+                if (parent_neighbor != NULL) {
+                    if (tree->parent->nw == tree) {
+                        /* neighbor of nw is parent's neighbor's sw */
+                        if (parent_neighbor->sw != NULL) {
+                            *neighbor = parent_neighbor->sw;
+                        }
+                        /* if no children, use parent's neighbor itself */
+                        else {
+                            *neighbor = parent_neighbor;
+                        }
+                    }
+                    else
+                    if (tree->parent->ne == tree) {
+                        /* neighbor of ne is parent's neighbor's se */
+                        if (parent_neighbor->se != NULL) {
+                            *neighbor = parent_neighbor->se;
+                        }
+                        /* if no children, use parent's neighbor itself */
+                        else {
+                            *neighbor = parent_neighbor;
+                        }
+                    }
+                    else {
+                        /* something wrong with tree structure... */
+                        PRINT0("FATAL: tree structure incorrect");
+                        ERROR(FATAL);
+                    }
+                }
+                else {
+                    /* if parent neighbor is not found, tree is at edge */
+                    *neighbor = NULL;
+                }
+            }
+            /* cache the found neighbor to speed up future queries */
+            tree->n = *neighbor;
+        }
+    }
+    
+    FINALLY(image_tree_get_direct_neighbor_n);
+    RETURN();
+}
+
+/******************************************************************************/
+
+result image_tree_get_direct_neighbor_e(
+    image_tree *tree,
+    image_tree **neighbor
+    )
+{
+    TRY();
+    image_tree *parent_neighbor;
+    
+    CHECK_POINTER(tree);
+    CHECK_POINTER(neighbor);
+    
+    /* check if the neighbor has been cached in the tree already */
+    if (tree->e != NULL) {
+        *neighbor = tree->e;
+    }
+    else {
+        /* either parent or neighbor should be set */
+        /* if not, the tree is on the edge */
+        if (tree->parent == NULL) {
+            *neighbor = NULL;
+        }
+        else {
+            /* neighbor e of nw is ne */
+            if (tree->parent->nw == tree) {
+                *neighbor = tree->parent->ne;
+            }
+            else
+            /* neighbor e of sw is se */
+            if (tree->parent->sw == tree) {
+                *neighbor = tree->parent->se;
+            }
+            else {
+                /* neighbor not on the same parent, get neighbor of parent */
+                CHECK(image_tree_get_direct_neighbor_e(tree->parent, &parent_neighbor));
+                if (parent_neighbor != NULL) {
+                    if (tree->parent->ne == tree) {
+                        /* neighbor of ne is parent's neighbor's nw */
+                        if (parent_neighbor->nw != NULL) {
+                            *neighbor = parent_neighbor->nw;
+                        }
+                        /* if no children, use parent's neighbor itself */
+                        else {
+                            *neighbor = parent_neighbor;
+                        }
+                    }
+                    else
+                    if (tree->parent->se == tree) {
+                        /* neighbor of se is parent's neighbor's sw */
+                        if (parent_neighbor->sw != NULL) {
+                            *neighbor = parent_neighbor->sw;
+                        }
+                        /* if no children, use parent's neighbor itself */
+                        else {
+                            *neighbor = parent_neighbor;
+                        }
+                    }
+                    else {
+                        /* something wrong with tree structure... */
+                        PRINT0("FATAL: tree structure incorrect");
+                        ERROR(FATAL);
+                    }
+                }
+                else {
+                    /* if parent neighbor is not found, tree is at edge */
+                    *neighbor = NULL;
+                }
+            }
+            /* cache the found neighbor to speed up future queries */
+            tree->e = *neighbor;
+        }
+    }
+    
+    FINALLY(image_tree_get_direct_neighbor_e);
+    RETURN();
+}
+
+/******************************************************************************/
+
+result image_tree_get_direct_neighbor_s(
+    image_tree *tree,
+    image_tree **neighbor
+    )
+{
+    TRY();
+    image_tree *parent_neighbor;
+    
+    CHECK_POINTER(tree);
+    CHECK_POINTER(neighbor);
+    
+    /* check if the neighbor has been cached in the tree already */
+    if (tree->s != NULL) {
+        *neighbor = tree->s;
+    }
+    else {
+        /* either parent or neighbor should be set */
+        /* if not, the tree is on the edge */
+        if (tree->parent == NULL) {
+            *neighbor = NULL;
+        }
+        else {
+            /* neighbor s of nw is sw */
+            if (tree->parent->nw == tree) {
+                *neighbor = tree->parent->sw;
+            }
+            else
+            /* neighbor s of ne is se */
+            if (tree->parent->ne == tree) {
+                *neighbor = tree->parent->se;
+            }
+            else {
+                /* neighbor not on the same parent, get neighbor of parent */
+                CHECK(image_tree_get_direct_neighbor_s(tree->parent, &parent_neighbor));
+                if (parent_neighbor != NULL) {
+                    if (tree->parent->sw == tree) {
+                        /* neighbor of sw is parent's neighbor's nw */
+                        if (parent_neighbor->nw != NULL) {
+                            *neighbor = parent_neighbor->nw;
+                        }
+                        /* if no children, use parent's neighbor itself */
+                        else {
+                            *neighbor = parent_neighbor;
+                        }
+                    }
+                    else
+                    if (tree->parent->se == tree) {
+                        /* neighbor of se is parent's neighbor's ne */
+                        if (parent_neighbor->ne != NULL) {
+                            *neighbor = parent_neighbor->ne;
+                        }
+                        /* if no children, use parent's neighbor itself */
+                        else {
+                            *neighbor = parent_neighbor;
+                        }
+                    }
+                    else {
+                        /* something wrong with tree structure... */
+                        PRINT0("FATAL: tree structure incorrect");
+                        ERROR(FATAL);
+                    }
+                }
+                else {
+                    /* if parent neighbor is not found, tree is at edge */
+                    *neighbor = NULL;
+                }
+            }
+            /* cache the found neighbor to speed up future queries */
+            tree->s = *neighbor;
+        }
+    }
+    
+    FINALLY(image_tree_get_direct_neighbor_s);
+    RETURN();
+}
+
+/******************************************************************************/
+
+result image_tree_get_direct_neighbor_w(
+    image_tree *tree,
+    image_tree **neighbor
+    )
+{
+    TRY();
+    image_tree *parent_neighbor;
+    
+    CHECK_POINTER(tree);
+    CHECK_POINTER(neighbor);
+    
+    /* check if the neighbor has been cached in the tree already */
+    if (tree->w != NULL) {
+        *neighbor = tree->w;
+    }
+    else {
+        /* either parent or neighbor should be set */
+        /* if not, the tree is on the edge */
+        if (tree->parent == NULL) {
+            *neighbor = NULL;
+        }
+        else {
+            /* neighbor w of ne is nw */
+            if (tree->parent->ne == tree) {
+                *neighbor = tree->parent->nw;
+            }
+            else
+            /* neighbor w of se is sw */
+            if (tree->parent->se == tree) {
+                *neighbor = tree->parent->sw;
+            }
+            else {
+                /* neighbor not on the same parent, get neighbor of parent */
+                CHECK(image_tree_get_direct_neighbor_w(tree->parent, &parent_neighbor));
+                if (parent_neighbor != NULL) {
+                    if (tree->parent->nw == tree) {
+                        /* neighbor of nw is parent's neighbor's ne */
+                        if (parent_neighbor->ne != NULL) {
+                            *neighbor = parent_neighbor->ne;
+                        }
+                        /* if no children, use parent's neighbor itself */
+                        else {
+                            *neighbor = parent_neighbor;
+                        }
+                    }
+                    else
+                    if (tree->parent->sw == tree) {
+                        /* neighbor of sw is parent's neighbor's se */
+                        if (parent_neighbor->se != NULL) {
+                            *neighbor = parent_neighbor->se;
+                        }
+                        /* if no children, use parent's neighbor itself */
+                        else {
+                            *neighbor = parent_neighbor;
+                        }
+                    }
+                    else {
+                        /* something wrong with tree structure... */
+                        PRINT0("FATAL: tree structure incorrect");
+                        ERROR(FATAL);
+                    }
+                }
+                else {
+                    /* if parent neighbor is not found, tree is at edge */
+                    *neighbor = NULL;
+                }
+            }
+            /* cache the found neighbor to speed up future queries */
+            tree->w = *neighbor;
+        }
+    }
+    
+    FINALLY(image_tree_get_direct_neighbor_w);
+    RETURN();
+}
+
+/******************************************************************************/
+
+/**
+ * Recursive function for adding child trees from the highest level as 
+ * immediate neighbors to another tree
+ * 
+ * 1. If tree has no childen, add it to list and return
+ * 2. If tree has chilren, call recursively for the two children in the proper
+ *    direction
+ */
+
+result image_tree_add_children_as_immediate_neighbors(
+    list *target,
+    image_tree *tree,
+    direction dir
+    )
+{
+    TRY();
+    
+    FINALLY(image_tree_add_children_as_immediate_neighbors);
+    RETURN();
+}
+
+/******************************************************************************/
+
+/**
+ * Finds all immediate neighbors (directly adjacent neighbors on the highest
+ * level) of a tree in the given direction and stores them in the list.
+ * 
+ * 1. Find the direct neighbor; if it has children, call recursively for the 
+ *    two children adjacent to this tree
+ * 
+ * 2. Peek the item at the top of stack; if it has children, pop it and push the
+ *    two children adjacent to this tree into the stack; if not, add it to the
+ *    end of the list
+ * 3. 
+ */
+result image_tree_find_all_immediate_neighbors(
+    list *target,
+    image_tree *tree
+    )
+{
+    TRY();
+    image_tree *new_neighbor;
+    
+    CHECK_POINTER(target);
+    CHECK_POINTER(tree);
+    
+    CHECK(image_tree_get_direct_neighbor_n(tree, &new_neighbor));
+    if (new_neighbor != NULL) {
+        CHECK(list_append(target, (pointer)&new_neighbor));
+    }
+    CHECK(image_tree_get_direct_neighbor_e(tree, &new_neighbor));
+    if (new_neighbor != NULL) {
+        CHECK(list_append(target, (pointer)&new_neighbor));
+    }
+    CHECK(image_tree_get_direct_neighbor_s(tree, &new_neighbor));
+    if (new_neighbor != NULL) {
+        CHECK(list_append(target, (pointer)&new_neighbor));
+    }
+    CHECK(image_tree_get_direct_neighbor_w(tree, &new_neighbor));
+    if (new_neighbor != NULL) {
+        CHECK(list_append(target, (pointer)&new_neighbor));
+    }
+    
+    FINALLY(image_tree_find_all_immediate_neighbors);
+    RETURN();
+}
 
 /******************************************************************************/

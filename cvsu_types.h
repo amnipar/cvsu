@@ -178,6 +178,7 @@ typedef struct fstatistics_t {
 
 typedef enum result_t {
     SUCCESS = 0,
+    FATAL,
     CAUGHT_ERROR,
     BAD_POINTER,
     BAD_TYPE,
@@ -190,6 +191,7 @@ typedef enum result_t {
 /*
 typedef enum error_code_t {
     SUCCESS = 0,
+    FATAL,
     CAUGHT_ERROR,
     BAD_POINTER,
     BAD_TYPE,

@@ -46,13 +46,20 @@ extern "C" {
  * Possible purposes:
  * Is the neighbor on same level? (alternative: store level in each tree)
  * Have I checked this neighbor already?
- * What is my relation to this neghbor? What is the strength of our relation?
+ * What is my relation to this neighbor? What is the strength of our relation?
  * Downside of using a struct is that it uses more memory even if no neighbor.
+ * It is a possibility to re-calculate the strength each time it is needed, to
+ * allow storing only a pointer to neighbor in the tree.
+ * It is also possible to create a 'relation pointer' type that can store
+ * information about a relation to another tree, in addition to pointer...
+ * These relations would have to be stored in a list within the forest.
  */
+/*
 typedef struct image_tree_neighbor_t {
     struct image_tree_t *tree;
     real32 strength;
 } image_tree_neighbor;
+*/
 
 /**
  * Stores a quad tree holding image data.
@@ -61,6 +68,7 @@ typedef struct image_tree_neighbor_t {
 typedef struct image_tree_t {
     struct image_tree_root_t *root;
     struct image_tree_t *parent;
+    
     /* subtrees, NULL if the tree has not beed divided */
     struct image_tree_t *nw;
     struct image_tree_t *ne;
@@ -68,11 +76,12 @@ typedef struct image_tree_t {
     struct image_tree_t *se;
     
     image_block *block;
+    
     /* cache neighbors in each tree as they are determined */
-    image_tree_neighbor n;
-    image_tree_neighbor e;
-    image_tree_neighbor s;
-    image_tree_neighbor w;
+    struct image_tree_t *n;
+    struct image_tree_t *e;
+    struct image_tree_t *s;
+    struct image_tree_t *w;
     
     /*edge_block *edge;*/
     uint32 level;
@@ -134,7 +143,7 @@ image_tree_forest *image_tree_forest_alloc();
 void image_tree_forest_free(image_tree_forest *ptr);
 
 /**
- * Creates an image forest from and image.
+ * Creates an image forest from a pixel image.
  */
 
 result image_tree_forest_create(
@@ -145,7 +154,7 @@ result image_tree_forest_create(
 );
 
 /**
- * Reloads the forest using the same image, but possible different box size
+ * Reloads the forest using the same image, but possibly different box size
  */
 
 result image_tree_forest_reload(
@@ -229,6 +238,89 @@ result image_tree_update(
 
 result image_tree_divide(
     image_tree *target
+);
+
+/**
+ * Creates and initializes a neighbor list
+ */
+result image_tree_create_neighbor_list(
+    list *target
+);
+
+/**
+ * Finds the direct neighbor (directly adjacent on the same level) of a tree
+ * and returns it in the neighbor reference. If the tree does not have a
+ * neighbor on the same level, the direct neighbor on the highest level is
+ * returned.
+ * 
+ * 1. Check if the direct neighbor has already been cached.
+ * 2. If not, go to parent and check if the neighbor is in the same parent.
+ * 3. If not, recursively get the neighbor of the parent.
+ * 4. Check if the neighbor of the parent has children; if yes, choose the
+ *    correct one as neighbor, if not, return the parent as neighbor
+ * 5. It is possible that there is no neighbor (tree is on the edge); in this
+ *    case, the neighbor is set to NULL
+ * 
+ * This requires that the neighbors of top level trees have been set properly.
+ */
+
+result image_tree_get_direct_neighbor(
+    image_tree *tree,
+    image_tree **neighbor,
+    direction dir
+);
+
+result image_tree_get_direct_neighbor_n(
+    image_tree *tree,
+    image_tree **neighbor
+);
+
+result image_tree_get_direct_neighbor_e(
+    image_tree *tree,
+    image_tree **neighbor
+);
+
+result image_tree_get_direct_neighbor_s(
+    image_tree *tree,
+    image_tree **neighbor
+);
+
+result image_tree_get_direct_neighbor_w(
+    image_tree *tree,
+    image_tree **neighbor
+);
+
+/**
+ * Recursive function for adding child trees from the highest level as 
+ * immediate neighbors to another tree
+ * 
+ * 1. If tree has no childen, add it to list and return
+ * 2. If tree has chilren, call recursively for the two children in the proper
+ *    direction
+ */
+
+result image_tree_add_children_as_immediate_neighbors(
+    list *target,
+    image_tree *tree,
+    direction dir
+);
+
+/**
+ * Finds all immediate neighbors (directly adjacent neighbors on the highest
+ * level) of a tree in the given direction and stores them in the list.
+ * 
+ * 1. Find the direct neighbor; if it has children, call recursively for the 
+ *    two children adjacent to this tree
+ * 
+ * 2. Peek the item at the top of stack; if it has children, pop it and push the
+ *    two children adjacent to this tree into the stack; if not, add it to the
+ *    end of the listn
+ * 3. 
+ */
+
+result image_tree_find_all_immediate_neighbors(
+  list *target,
+  image_tree *tree
 );
 
 dir image_tree_dir_i(image_tree *tree);
