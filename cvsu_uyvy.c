@@ -36,6 +36,8 @@
 #include <string.h>
 
 string convert_uyvy16_to_grey8_name = "convert_uyvy16_to_grey8";
+string convert_uyvy16_to_yuv24_name = "convert_uyvy16_to_yuv24";
+string convert_yuyv16_to_grey8_name = "convert_yuyv16_to_grey8";
 string scale_uyvy16_2_uyvy16_x2_name = "scale_uyvy16_2_uyvy16_x2";
 
 result convert_uyvy16_to_grey8(
@@ -85,6 +87,76 @@ result convert_uyvy16_to_grey8(
 
 /******************************************************************************/
 
+result convert_uyvy16_to_yuv24(
+    const pixel_image *source,
+    pixel_image *target
+    )
+{
+    byte y1,y2,u,v;
+    TRY();
+
+    CHECK_POINTER(source);
+    CHECK_POINTER(target);
+    CHECK_POINTER(source->data);
+    CHECK_POINTER(target->data);
+    CHECK_PARAM(source->type == p_U8);
+    CHECK_PARAM(target->type == p_U8);
+    CHECK_PARAM(source->step == 2);
+    CHECK_PARAM(target->step == 3);
+    CHECK_PARAM(source->format == UYVY);
+    CHECK_PARAM(target->format == YUV);
+    CHECK_PARAM(source->width == target->width);
+    CHECK_PARAM(source->height == target->height);
+
+    /* simply copy y value from second channel */
+    /* u and v values are stored only once for two columnes */
+    /* therefore, must read two columns at once */
+    if (pixel_image_is_continuous(source) && pixel_image_is_continuous(target)) {
+        CONTINUOUS_IMAGE_VARIABLES(byte, byte);
+        FOR_2_CONTINUOUS_IMAGES()
+        {
+            u  = PIXEL_VALUE(source);
+            y1 = PIXEL_VALUE_PLUS(source,1);
+            source_pos += source_step;
+            v  = PIXEL_VALUE(source);
+            y2 = PIXEL_VALUE_PLUS(source,1);
+
+            PIXEL_VALUE(target)        = y1;
+            PIXEL_VALUE_PLUS(target,1) = u;
+            PIXEL_VALUE_PLUS(target,2) = v;
+            target_pos += target_step;
+            PIXEL_VALUE(target)        = y2;
+            PIXEL_VALUE_PLUS(target,1) = u;
+            PIXEL_VALUE_PLUS(target,2) = v;
+        }
+    }
+    else {
+        DISCONTINUOUS_IMAGE_VARIABLES(byte, byte);
+        uint32 x, y;
+        FOR_2_DISCONTINUOUS_IMAGES()
+        {
+            u  = PIXEL_VALUE(source);
+            y1 = PIXEL_VALUE_PLUS(source,1);
+            source_pos += source_step;
+            v  = PIXEL_VALUE(source);
+            y2 = PIXEL_VALUE_PLUS(source,1);
+
+            PIXEL_VALUE(target)        = y1;
+            PIXEL_VALUE_PLUS(target,1) = u;
+            PIXEL_VALUE_PLUS(target,2) = v;
+            target_pos += target_step;
+            PIXEL_VALUE(target)        = y2;
+            PIXEL_VALUE_PLUS(target,1) = u;
+            PIXEL_VALUE_PLUS(target,2) = v;
+        }
+    }
+
+    FINALLY(convert_uyvy16_to_yuv24);
+    RETURN();
+}
+
+/******************************************************************************/
+
 result convert_yuyv16_to_grey8(
     const pixel_image *source,
     pixel_image *target
@@ -126,7 +198,7 @@ result convert_yuyv16_to_grey8(
         }
     }
 
-    FINALLY(convert_uyvy16_to_grey8);
+    FINALLY(convert_yuyv16_to_grey8);
     RETURN();
 }
 

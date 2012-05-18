@@ -287,6 +287,16 @@ result convert_grey8_to_grey24(
 );
 
 /**
+ * Turns a one-channel greyscale image into a three-channel yuv image
+ * by setting the color channels to value 128.
+ */
+result convert_grey8_to_yuv24(
+    const pixel_image *source,
+    pixel_image *target
+);
+
+
+/**
  * Turns a three-channel RGB image into a one-channel greyscale image by
  * combining the color channels with formula 0.3 * R + 0.59 * G + 0.11 * B.
  */

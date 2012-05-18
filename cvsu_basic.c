@@ -63,6 +63,7 @@ string normalize_double_name = "normalize_double";
 string scale_down_name = "scale_down";
 string scale_up_name = "scale_up";
 string convert_grey8_to_grey24_name = "convert_grey8_to_grey24";
+string convert_grey8_to_yuv24_name = "convert_grey8_to_yuv24";
 string convert_rgb24_to_grey8_name = "convert_rgb24_to_grey8";
 string convert_rgb24_to_yuv24_name = "convert_rgb24_to_yuv24";
 string convert_yuv24_to_rgb24_name = "convert_yuv24_to_rgb24";
@@ -356,6 +357,10 @@ result pixel_image_convert(
         case GREY:
             if (target->format == RGB) {
                 CHECK(convert_grey8_to_grey24(source, target));
+            }
+            else
+            if (target->format == YUV) {
+                CHECK(convert_grey8_to_yuv24(source, target));
             }
             else {
                 ERROR(NOT_IMPLEMENTED);
@@ -1153,6 +1158,52 @@ result convert_grey8_to_grey24(
     }
 
     FINALLY(convert_grey8_to_grey24);
+    RETURN();
+}
+
+/******************************************************************************/
+
+result convert_grey8_to_yuv24(
+    const pixel_image *source,
+    pixel_image *target
+    )
+{
+    TRY();
+
+    CHECK_POINTER(source);
+    CHECK_POINTER(target);
+    CHECK_POINTER(source->data);
+    CHECK_POINTER(target->data);
+    CHECK_PARAM(source->type == p_U8);
+    CHECK_PARAM(target->type == p_U8);
+    CHECK_PARAM(source->step == 1);
+    CHECK_PARAM(target->step == 3);
+    CHECK_PARAM(source->format == GREY);
+    CHECK_PARAM(target->format == YUV);
+    CHECK_PARAM(source->width == target->width);
+    CHECK_PARAM(source->height == target->height);
+
+    if (pixel_image_is_continuous(source) && pixel_image_is_continuous(target)) {
+        CONTINUOUS_IMAGE_VARIABLES(byte, byte);
+        FOR_2_CONTINUOUS_IMAGES()
+        {
+            PIXEL_VALUE(target) = PIXEL_VALUE(source);
+            PIXEL_VALUE_PLUS(target, 1) = 128;
+            PIXEL_VALUE_PLUS(target, 2) = 128;
+        }
+    }
+    else {
+        uint32 x, y;
+        DISCONTINUOUS_IMAGE_VARIABLES(byte, byte);
+        FOR_2_DISCONTINUOUS_IMAGES()
+        {
+            PIXEL_VALUE(target) = PIXEL_VALUE(source);
+            PIXEL_VALUE_PLUS(target, 1) = 128;
+            PIXEL_VALUE_PLUS(target, 2) = 128;
+        }
+    }
+
+    FINALLY(convert_grey8_to_yuv24);
     RETURN();
 }
 

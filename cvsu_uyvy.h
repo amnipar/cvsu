@@ -49,6 +49,17 @@ result convert_uyvy16_to_grey8(
 );
 
 /**
+ * Turns a two-channel uyvy image into a three-channel yuv image by taking
+ * the values from second channel (y channel) and copying the values from
+ * first channel in even and odd columns to second and third channels of
+ * the target image.
+ */
+result convert_uyvy16_to_yuv24(
+    const pixel_image *source,
+    pixel_image *target
+);
+
+/**
  * Turns a two-channel yuyv image into a one-channel greyscale image by taking
  * the values from first channel (y channel) and discarding the second channel.
  */
