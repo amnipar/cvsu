@@ -32,9 +32,12 @@
 #include "cvsu_config.h"
 #include "cvsu_macros.h"
 #include "cvsu_opencv.h"
+#include <opencv2/highgui/highgui_c.h>
 #include <stdio.h>
 
 string pixel_image_create_from_ipl_image_name = "pixel_image_create_from_ipl_image";
+string pixel_image_create_from_file_name = "pixel_image_create_from_file";
+string pixel_image_write_to_file_name = "pixel_image_write_to_file";
 
 /******************************************************************************/
 
@@ -93,3 +96,96 @@ result pixel_image_create_from_ipl_image(pixel_image *target, IplImage *source, 
 }
 
 /******************************************************************************/
+
+result pixel_image_create_from_file(pixel_image *target, const char *filename, pixel_format format, pixel_type type)
+{
+  TRY();
+  int depth;
+  int channels;
+  IplImage *src, *dst;
+
+  CHECK_POINTER(target);
+  CHECK_PARAM(format == RGB || format == GREY);
+  CHECK_PARAM(type == p_U8);
+
+  if (format == RGB) {
+    src = cvLoadImage(filename, CV_LOAD_IMAGE_COLOR);
+    channels = 3;
+  }
+  else {
+    src = cvLoadImage(filename, CV_LOAD_IMAGE_GRAYSCALE);
+    channels = 1;
+  }
+  CHECK_POINTER(src);
+  CHECK_POINTER(src->imageData);
+
+  /*
+  switch (type) {
+    case p_U8:
+      depth = IPL_DEPTH_8U;
+      break;
+    case p_S8:
+      depth = IPL_DEPTH_8S;
+      break;
+    case p_U16:
+      depth = IPL_DEPTH_16U;
+      break;
+    case p_S16:
+      depth = IPL_DEPTH_16S;
+      break;
+    case p_S32:
+      depth = IPL_DEPTH_32S;
+      break;
+    case p_F32:
+      depth = IPL_DEPTH_32F;
+      break;
+    case p_F64:
+      depth = IPL_DEPTH_64F;
+      break;
+    default:
+      ERROR(BAD_TYPE);
+  }
+
+  dst = cvCreateImage(cvGetSize(src),depth,channels);
+  */
+  printf("width=%d,height=%d,step=%d\n",src->width,src->height,src->widthStep);
+  CHECK(pixel_image_create_from_data(target, src->imageData, type, format,
+                                     src->width, src->height, channels, src->widthStep));
+
+  FINALLY(pixel_image_create_from_file);
+  cvReleaseImageHeader(&src);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result pixel_image_write_to_file(pixel_image *source, const char *filename)
+{
+  TRY();
+  IplImage *dst;
+  CvSize size;
+  
+  CHECK_POINTER(source);
+  CHECK_PARAM(source->type == p_U8);
+  CHECK_PARAM(source->format == RGB || source->format == GREY);
+  
+  size.width = (signed)source->width;
+  size.height = (signed)source->height;
+  switch (source->format) {
+    case RGB:
+      dst = cvCreateImageHeader(size, IPL_DEPTH_8U, 3);
+      break;
+    case GREY:
+      dst = cvCreateImageHeader(size, IPL_DEPTH_8U, 1);
+      break;
+    default:
+      dst = NULL;
+  }
+  
+  printf("width=%d,height=%d,step=%d\n",source->width,source->height,source->stride);
+  cvSetData(dst, source->data, (signed)source->stride);
+  cvSaveImage(filename, dst, 0);
+  
+  FINALLY(pixel_image_write_to_file);
+  RETURN();
+}

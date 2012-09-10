@@ -36,13 +36,25 @@
 extern "C" {
 #endif
 
-#include "cv.h"
+#include <opencv2/core/core_c.h>
 #include "cvsu_basic.h"
 
 result pixel_image_create_from_ipl_image(
     pixel_image *target,
     IplImage *source,
     pixel_format format
+);
+
+result pixel_image_create_from_file(
+    pixel_image *target,
+    const char *filename,
+    pixel_format format,
+    pixel_type type
+);
+
+result pixel_image_write_to_file(
+    pixel_image *source,
+    const char *filename
 );
 
 #ifdef __cplusplus
