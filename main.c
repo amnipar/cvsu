@@ -39,6 +39,7 @@
 #include "cvsu_macros.h"
 #include "cvsu_memory.h"
 #include "cvsu_basic.h"
+#include "cvsu_opencv.h"
 #include "cvsu_integral.h"
 #include "cvsu_filter.h"
 #include "cvsu_scale.h"
@@ -47,12 +48,7 @@
 #include "cvsu_simple_scene.h"
 #include "cvsu_image_tree.h"
 
-const uint32 ImageWidth = 320;
-const uint32 ImageHeight = 320;
-
 string main_name = "main";
-string ifn = "if.bin";
-string ofn = "of.bin";
 
 /*
 Usage: cv-sks [p #]
@@ -66,120 +62,33 @@ with that number
 int main (int argc, char *argv[])
 {
     TRY();
-    size_t size;
-    pixel_image input_image;
-    pixel_image output_image;
-    pixel_image temp_image;
-    image_pyramid pyramid;
-    integral_image integral;
-    simple_scene scene;
-    image_tree_forest forest;
-    /*line scene_lines[100];*/
-    /*uint32 line_count;*/
-    FILE* ifh;
-    FILE* ofh;
-    bool use_scene = false;
-    bool use_pyramid = false;
-    bool show_scale = false;
-    long scale_to_show = 0;
-
-    if (argc > 1) {
-        if (*argv[1] == 'p') {
-            use_pyramid = true;
-            if (argc > 2) {
-                show_scale = true;
-                scale_to_show = atoi(argv[2]);
-                if (scale_to_show < 0) scale_to_show = 0;
-                if (scale_to_show > 4) scale_to_show = 4;
-            }
-        }
-        else if (*argv[1] == 's') {
-            use_scene = true;
-        }
-    }
-
-    size = (ImageWidth * ImageHeight);
-
-    CHECK(pixel_image_create(&input_image, p_U8, GREY, ImageWidth, ImageHeight, 1, ImageWidth));
-    CHECK(pixel_image_create(&output_image, p_U8, GREY, ImageWidth, ImageHeight, 1, ImageWidth));
-    CHECK(pixel_image_create(&temp_image, p_S32, GREY, ImageWidth, ImageHeight, 1, ImageWidth));
-    CHECK(image_pyramid_create(&pyramid, &input_image, 5));
-    CHECK(integral_image_create(&integral, &input_image));
-    CHECK(simple_scene_create(&scene, &input_image));
-    CHECK(image_tree_forest_create(&forest, &input_image, 32, 32));
-
-    ifh = fopen(ifn, "rb");
-    ofh = fopen(ofn, "wb");
-
-    if (ifh != NULL && ofh != NULL) {
-        size_t readcount = fread(input_image.data, sizeof(byte), size, ifh);
-        if (readcount == size) {
-            /*uint32 i;*/
-            struct timeval start;
-            struct timeval finish;
-            double timediff;
-
-            /*
-            gettimeofday(&start, NULL);
-            if (use_pyramid) {
-                for (i = 0; i < 1000; i++) {
-                    CHECK(edges_x_sobel_scale(&pyramid, &temp_image, &output_image, 12));
-                }
-            }
-            else if (use_scene) {
-                pixel_image_copy(&output_image, &input_image);
-                for (i = 0; i < 1000; i++) {
-                    CHECK(simple_scene_update(&scene));
-                    CHECK(edge_image_overlay_to_grey8(&scene.curr_edges, &output_image));
-                }
-                line_count = 0;
-                CHECK(simple_scene_pack_lines_to_array(&scene, scene_lines, 100, &line_count));
-                printf("Lines found: %lu\n", line_count);
-            }
-            else {
-                for (i = 0; i < 1000; i++) {
-                    CHECK(edges_x_box_deviation(&integral, &temp_image, &output_image, 8, 16));
-                }
-            }
-            gettimeofday(&finish, NULL);
-            timediff = (double)(finish.tv_sec - start.tv_sec) + (double)(finish.tv_usec - start.tv_usec) / 1000000.0;
-            printf("Time taken: %f\n", timediff);
-            */
-            gettimeofday(&start, NULL);
-            CHECK(simple_scene_update(&scene));
-            gettimeofday(&finish, NULL);
-            timediff = (double)(finish.tv_sec - start.tv_sec) + (double)(finish.tv_usec - start.tv_usec) / 1000000.0;
-            printf("Scene, time taken: %f\n", timediff);
-            gettimeofday(&start, NULL);
-            CHECK(image_tree_forest_update(&forest));
-            gettimeofday(&finish, NULL);
-            timediff = (double)(finish.tv_sec - start.tv_sec) + (double)(finish.tv_usec - start.tv_usec) / 1000000.0;
-            printf("Forest, time taken: %f\n", timediff);
-
-            if (show_scale) {
-                fwrite(pyramid.levels[scale_to_show].data, sizeof(byte), size, ofh);
-            }
-            else {
-                fwrite(output_image.data, sizeof(byte), size, ofh);
-            }
-        }
-        else {
-            printf("Read error\n");
-        }
-        fclose(ifh);
-        fclose(ofh);
-    }
-    else {
-        printf("File open error\n");
-    }
+    pixel_image src_image;
+    pixel_image tmp_image;
+    edge_image edges;
+    
+    printf("load image...\n");
+    CHECK(pixel_image_create_from_file(&src_image, "rengas.jpg", p_U8, GREY));
+    printf("...done\n");
+    
+    printf("smooth image..\n");
+    CHECK(pixel_image_clone(&tmp_image, &src_image));
+    CHECK(smooth_binomial(&src_image, &tmp_image, 5));
+    printf("...done\n");
+    
+    printf("create edge image...\n");
+    CHECK(edge_image_create(&edges, &tmp_image, 12, 12, 12, 12, 12, 12));
+    printf("...done\n");
+    
+    CHECK(edge_image_update(&edges));
+    CHECK(edge_image_overlay_to_grey8(&edges, &tmp_image));
+    printf("write image...\n");
+    CHECK(pixel_image_write_to_file(&tmp_image, "result.png"));
+    printf("...done\n");
 
     FINALLY(main);
-    pixel_image_destroy(&input_image);
-    pixel_image_destroy(&output_image);
-    pixel_image_destroy(&temp_image);
-    image_pyramid_destroy(&pyramid);
-    integral_image_destroy(&integral);
-    simple_scene_destroy(&scene);
+    pixel_image_destroy(&src_image);
+    pixel_image_destroy(&tmp_image);
+    edge_image_destroy(&edges);
 
     return 0;
 }
