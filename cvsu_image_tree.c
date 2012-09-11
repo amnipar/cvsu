@@ -150,20 +150,29 @@ result image_tree_forest_create(
             new_block.value.mean_c2 = 0;
             new_block.value.dev_c2 = 0;
             CHECK(list_append_reveal_data(&target->blocks, (pointer)&new_block, (pointer*)&block_ptr));
-            new_tree.block = block_ptr;
+            
             new_tree.root = &target->roots[pos];
             new_tree.parent = NULL;
             new_tree.nw = NULL;
             new_tree.ne = NULL;
             new_tree.sw = NULL;
             new_tree.se = NULL;
+            new_tree.block = block_ptr;
+            new_tree.n = NULL;
+            new_tree.e = NULL;
+            new_tree.s = NULL;
+            new_tree.w = NULL;
+            new_tree.level = 1;
             CHECK(list_append_reveal_data(&target->trees, (pointer)&new_tree, (pointer*)&tree_ptr));
+            
             target->roots[pos].forest = target;
             target->roots[pos].tree = tree_ptr;
+            /*
             target->roots[pos].n = NULL;
             target->roots[pos].e = NULL;
             target->roots[pos].s = NULL;
             target->roots[pos].w = NULL;
+            */
             CHECK(pixel_image_create_roi(&target->roots[pos].ROI, target->original, block_ptr->x, block_ptr->y, block_ptr->w, block_ptr->h));
             CHECK(small_integral_image_create(&target->roots[pos].I, &target->roots[pos].ROI));
         }
@@ -177,19 +186,19 @@ result image_tree_forest_create(
         for (col = 0; col < target->cols; col++, pos++) {
             /* add neighbor to west */
             if (col > 0) {
-                target->roots[pos].w = target->roots[pos - 1].tree;
+                target->roots[pos].tree->w = target->roots[pos - 1].tree;
             }
             /* add neighbor to north */
             if (row > 0) {
-                target->roots[pos].n = target->roots[pos - target->cols].tree;
+                target->roots[pos].tree->n = target->roots[pos - target->cols].tree;
             }
             /* add neighbor to east */
             if (col < (unsigned)(target->cols - 1)) {
-                target->roots[pos].e = target->roots[pos + 1].tree;
+                target->roots[pos].tree->e = target->roots[pos + 1].tree;
             }
             /* add neighbor to south */
             if (row < (unsigned)(target->rows - 1)) {
-                target->roots[pos].s = target->roots[pos + target->cols].tree;
+                target->roots[pos].tree->s = target->roots[pos + target->cols].tree;
             }
         }
     }
@@ -571,6 +580,11 @@ result image_tree_divide(
             new_tree.ne = NULL;
             new_tree.sw = NULL;
             new_tree.se = NULL;
+            new_tree.n = NULL;
+            new_tree.e = NULL;
+            new_tree.s = NULL;
+            new_tree.w = NULL;
+            new_tree.level = target->level + 1;
             new_block.w = (uint16)(target->block->w / 2);
             new_block.h = (uint16)(target->block->h / 2);
 
@@ -754,6 +768,7 @@ result image_tree_create_neighbor_list(
     )
 {
     TRY();
+    /*printf("create neighbor list\n");*/
     
     CHECK_POINTER(target);
     
@@ -806,6 +821,8 @@ result image_tree_get_direct_neighbor_n(
     
     CHECK_POINTER(tree);
     CHECK_POINTER(neighbor);
+    
+    *neighbor = NULL;
     
     /* check if the neighbor has been cached in the tree already */
     if (tree->n != NULL) {
@@ -885,6 +902,8 @@ result image_tree_get_direct_neighbor_e(
     CHECK_POINTER(tree);
     CHECK_POINTER(neighbor);
     
+    *neighbor = NULL;
+    
     /* check if the neighbor has been cached in the tree already */
     if (tree->e != NULL) {
         *neighbor = tree->e;
@@ -963,6 +982,8 @@ result image_tree_get_direct_neighbor_s(
     CHECK_POINTER(tree);
     CHECK_POINTER(neighbor);
     
+    *neighbor = NULL;
+    
     /* check if the neighbor has been cached in the tree already */
     if (tree->s != NULL) {
         *neighbor = tree->s;
@@ -1040,6 +1061,8 @@ result image_tree_get_direct_neighbor_w(
     
     CHECK_POINTER(tree);
     CHECK_POINTER(neighbor);
+    
+    *neighbor = NULL;
     
     /* check if the neighbor has been cached in the tree already */
     if (tree->w != NULL) {
@@ -1150,27 +1173,50 @@ result image_tree_find_all_immediate_neighbors(
 {
     TRY();
     image_tree *new_neighbor;
+    image_tree **temp_ptr;
     
+    /*printf("find all neighbors\n");*/
     CHECK_POINTER(target);
     CHECK_POINTER(tree);
     
     CHECK(image_tree_get_direct_neighbor_n(tree, &new_neighbor));
     if (new_neighbor != NULL) {
-        CHECK(list_append(target, (pointer)&new_neighbor));
+        /*CHECK(list_append(target, (pointer)&new_neighbor));*/
+        CHECK(list_append_reveal_data(target, (pointer)&new_neighbor, (pointer*)&temp_ptr));
+        /*printf("0x%x 0x%x 0x%x\n", new_neighbor, temp_ptr, *temp_ptr);*/
+        if (new_neighbor != *temp_ptr) {
+            printf("error copying tree ptr to list\n");
+        }
     }
     CHECK(image_tree_get_direct_neighbor_e(tree, &new_neighbor));
     if (new_neighbor != NULL) {
-        CHECK(list_append(target, (pointer)&new_neighbor));
+        /*CHECK(list_append(target, (pointer)&new_neighbor));*/
+        CHECK(list_append_reveal_data(target, (pointer)&new_neighbor, (pointer*)&temp_ptr));
+        /*printf("0x%x 0x%x 0x%x\n", new_neighbor, temp_ptr, *temp_ptr);*/
+        if (new_neighbor != *temp_ptr) {
+            printf("error copying tree ptr to list\n");
+        }
     }
     CHECK(image_tree_get_direct_neighbor_s(tree, &new_neighbor));
     if (new_neighbor != NULL) {
-        CHECK(list_append(target, (pointer)&new_neighbor));
+        /*CHECK(list_append(target, (pointer)&new_neighbor));*/
+        CHECK(list_append_reveal_data(target, (pointer)&new_neighbor, (pointer*)&temp_ptr));
+        /*printf("0x%x 0x%x 0x%x\n", new_neighbor, temp_ptr, *temp_ptr);*/
+        if (new_neighbor != *temp_ptr) {
+            printf("error copying tree ptr to list");
+        }
     }
     CHECK(image_tree_get_direct_neighbor_w(tree, &new_neighbor));
     if (new_neighbor != NULL) {
-        CHECK(list_append(target, (pointer)&new_neighbor));
+        /*CHECK(list_append(target, (pointer)&new_neighbor));*/
+        CHECK(list_append_reveal_data(target, (pointer)&new_neighbor, (pointer*)&temp_ptr));
+        /*printf("0x%x 0x%x 0x%x\n", new_neighbor, temp_ptr, *temp_ptr);*/
+        if (new_neighbor != *temp_ptr) {
+            printf("error copying tree ptr to list");
+        }
     }
     
+    /*printf("neighbors found: %d\n", target->count);*/
     FINALLY(image_tree_find_all_immediate_neighbors);
     RETURN();
 }

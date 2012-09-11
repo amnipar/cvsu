@@ -97,10 +97,12 @@ typedef struct image_tree_root_t {
     small_integral_image_box box;
     struct image_tree_forest_t *forest;
     struct image_tree_t *tree;
+    /*
     struct image_tree_t *n;
     struct image_tree_t *e;
     struct image_tree_t *s;
     struct image_tree_t *w;
+    */
 } image_tree_root;
 
 /**
