@@ -42,6 +42,7 @@
 
 string integral_image_create_name = "integral_image_create";
 string integral_image_destroy_name = "integral_image_destroy";
+string integral_image_nullify_name = "integral_image_nullify";
 string integral_image_clone_name = "integral_image_clone";
 string integral_image_copy_name = "integral_image_copy";
 string integral_image_update_name = "integral_image_update";
@@ -121,6 +122,27 @@ result integral_image_destroy(
     CHECK(memory_deallocate((data_pointer *)&target->I_2.data));
 
     FINALLY(integral_image_destroy);
+    RETURN();
+}
+
+/******************************************************************************/
+
+result integral_image_nullify(
+    integral_image *target
+    )
+{
+    TRY();
+
+    CHECK_POINTER(target);
+    target->original = NULL;
+    CHECK(pixel_image_nullify(&target->I_1));
+    CHECK(pixel_image_nullify(&target->I_2));
+    target->width = 0;
+    target->height = 0;
+    target->step = 0;
+    target->stride = 0;
+
+    FINALLY(integral_image_nullify);
     RETURN();
 }
 

@@ -112,6 +112,10 @@ result integral_image_destroy(
     integral_image *target
 );
 
+result integral_image_nullify(
+    integral_image *target
+);
+
 /**
  * Transform the target integral_image into a clone of source integral_image.
  * Only the structure is cloned, for copying content, use the copy function.
