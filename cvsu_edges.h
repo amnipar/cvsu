@@ -45,6 +45,14 @@ extern "C" {
  * Stores an edge image.
  * Is based on an integral image, which is used to calculate edge responses
  * along horizontal and vertical scanlines.
+ *
+ * hedges stores horizontal edge responses from the image; the image has the
+ * same height as the original image.
+ * the results are stored column-wise in the image, with box_length margin on cols.
+ *
+ * vedges stores vertical edge responses from the image; the image has the
+ * same width as the original image.
+ * the results are stored row-wise in the image, with box_length margin on rows.
  */
 typedef struct edge_image_t {
     integral_image I;
@@ -109,6 +117,12 @@ typedef struct edge_block_image_t {
     list edge_elems;
 } edge_block_image;
 
+edge_image *edge_image_alloc();
+
+void edge_image_free(
+    edge_image *ptr
+);
+
 result edge_block_nullify(
     edge_block *target
 );
@@ -166,6 +180,10 @@ result edge_image_create(
 
 result edge_image_destroy(
     edge_image *dst
+);
+
+result edge_image_nullify(
+edge_image *target
 );
 
 /**

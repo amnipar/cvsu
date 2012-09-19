@@ -41,8 +41,11 @@
 /******************************************************************************/
 /* constants for reporting function names in error messages                   */
 
+string edge_image_alloc_name = "edge_image_alloc";
+string edge_image_free_name = "edge_image_free";
 string edge_image_create_name = "edge_image_create";
 string edge_image_destroy_name = "edge_image_destroy";
+string edge_image_nullify_name = "edge_image_nullify";
 string edge_image_clone_name = "edge_image_clone";
 string edge_image_copy_name = "edge_image_copy";
 string edgel_response_x_name = "edgel_response_x";
@@ -55,6 +58,38 @@ string edge_block_image_create_name = "edge_block_image_create";
 string edge_block_image_destroy_name = "edge_block_image_destroy";
 string edge_block_image_nullify_name = "edge_block_image_nullify";
 string edge_block_image_new_block_name = "edge_block_image_new_block";
+
+/******************************************************************************/
+
+edge_image *edge_image_alloc()
+{
+    TRY();
+    edge_image *ptr;
+
+    CHECK(memory_allocate((data_pointer *)&ptr, 1, sizeof(edge_image)));
+    CHECK(edge_image_nullify(ptr));
+
+    FINALLY(edge_image_alloc);
+    return ptr;
+}
+
+/******************************************************************************/
+
+void edge_image_free(
+    edge_image *ptr
+    )
+{
+    TRY();
+
+    r = SUCCESS;
+
+    if (ptr != NULL) {
+      CHECK(edge_image_destroy(ptr));
+      CHECK(memory_deallocate((data_pointer *)&ptr));
+    }
+
+    FINALLY(edge_image_free);
+}
 
 /******************************************************************************/
 
@@ -118,6 +153,32 @@ result edge_image_destroy(
     }
 
     FINALLY(edge_image_destroy);
+    RETURN();
+}
+
+result edge_image_nullify(
+    edge_image *target
+    )
+{
+    TRY();
+
+    CHECK_POINTER(target);
+
+    CHECK(integral_image_nullify(&target->I));
+    CHECK(pixel_image_nullify(&target->hedges));
+    CHECK(pixel_image_nullify(&target->vedges));
+    target->width = 0;
+    target->height = 0;
+    target->hstep = 0;
+    target->vstep = 0;
+    target->hmargin = 0;
+    target->vmargin = 0;
+    target->box_width = 0;
+    target->box_length = 0;
+    target->dx = 0;
+    target->dy = 0;
+
+    FINALLY(edge_image_nullify);
     RETURN();
 }
 
