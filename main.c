@@ -65,20 +65,20 @@ int main (int argc, char *argv[])
     pixel_image src_image;
     pixel_image tmp_image;
     edge_image edges;
-    
+
     printf("load image...\n");
-    CHECK(pixel_image_create_from_file(&src_image, "rengas.jpg", p_U8, GREY));
+    CHECK(pixel_image_create_from_file(&src_image, "smallLena.jpg", p_U8, GREY));
     printf("...done\n");
-    
+
     printf("smooth image..\n");
     CHECK(pixel_image_clone(&tmp_image, &src_image));
-    CHECK(smooth_binomial(&src_image, &tmp_image, 5));
+    CHECK(smooth_binomial(&src_image, &tmp_image, 2));
     printf("...done\n");
-    
+
     printf("create edge image...\n");
-    CHECK(edge_image_create(&edges, &tmp_image, 12, 12, 12, 12, 12, 12));
+    CHECK(edge_image_create(&edges, &tmp_image, 12, 12, 12, 12, 12, 6));
     printf("...done\n");
-    
+
     CHECK(edge_image_update(&edges));
     CHECK(edge_image_overlay_to_grey8(&edges, &tmp_image));
     printf("write image...\n");
