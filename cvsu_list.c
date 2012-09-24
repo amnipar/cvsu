@@ -148,6 +148,21 @@ result chunk_nullify(
 
 /******************************************************************************/
 
+bool chunk_is_null
+(
+  chunk *target
+)
+{
+  if (target != NULL) {
+    if (target->chunk == NULL) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/******************************************************************************/
+
 result chunk_clear(
     chunk *target
     )
@@ -267,6 +282,21 @@ result list_item_nullify(
 
     FINALLY(list_item_nullify);
     RETURN();
+}
+
+/******************************************************************************/
+
+bool list_item_is_null
+(
+  list_item *target
+)
+{
+  if (target != NULL) {
+    if (target->data == NULL) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /******************************************************************************/
@@ -614,6 +644,21 @@ result list_nullify(
 
     FINALLY(list_nullify);
     RETURN();
+}
+
+/******************************************************************************/
+
+bool list_is_null
+(
+  list *target
+)
+{
+  if (target != NULL) {
+    if (chunk_is_null(&target->item_chunk) && chunk_is_null(&target->data_chunk)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /******************************************************************************/

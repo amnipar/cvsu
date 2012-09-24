@@ -297,7 +297,7 @@ typedef struct image_block_t {
     uint16 h;
     /*statistics value;*/
     /*byte *value;*/
-    stat_color value;
+    pointer value;
     /*stat_with_dir value;*/
     /*hstat_color value;*/
 } image_block;

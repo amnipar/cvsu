@@ -68,21 +68,21 @@ typedef struct image_tree_neighbor_t {
 typedef struct image_tree_t {
     struct image_tree_root_t *root;
     struct image_tree_t *parent;
-    
+
     /* subtrees, NULL if the tree has not beed divided */
     struct image_tree_t *nw;
     struct image_tree_t *ne;
     struct image_tree_t *sw;
     struct image_tree_t *se;
-    
+
     image_block *block;
-    
+
     /* cache neighbors in each tree as they are determined */
     struct image_tree_t *n;
     struct image_tree_t *e;
     struct image_tree_t *s;
     struct image_tree_t *w;
-    
+
     /*edge_block *edge;*/
     uint32 level;
 } image_tree;
@@ -97,12 +97,6 @@ typedef struct image_tree_root_t {
     small_integral_image_box box;
     struct image_tree_forest_t *forest;
     struct image_tree_t *tree;
-    /*
-    struct image_tree_t *n;
-    struct image_tree_t *e;
-    struct image_tree_t *s;
-    struct image_tree_t *w;
-    */
 } image_tree_root;
 
 /**
@@ -111,11 +105,8 @@ typedef struct image_tree_root_t {
 
 typedef struct image_tree_forest_t {
     pixel_image *original;
-    /*pixel_image *i;*/
-    /*pixel_image *c1;*/
-    /*pixel_image *c2;*/
+    pixel_image *source;
     /*edge_block_image edge_image;*/
-    uint32 own_original;
     uint32 rows;
     uint32 cols;
     uint32 tree_width;
@@ -126,9 +117,11 @@ typedef struct image_tree_forest_t {
     /* also add max levels by looking at how many times tree can be divided? */
     list trees;
     list blocks;
+    list values;
     /*list edges;*/
     list_item *last_base_tree;
     list_item *last_base_block;
+    list_item *last_base_value;
     image_tree_root *roots;
 } image_tree_forest;
 
@@ -152,17 +145,20 @@ result image_tree_forest_create(
     image_tree_forest *target,
     pixel_image *source,
     uint16 tree_width,
-    uint16 tree_height
+    uint16 tree_height,
+    image_block_type type
 );
 
 /**
- * Reloads the forest using the same image, but possibly different box size
+ * Reloads the forest using the same image, but possibly different box size.
+ * Also used in create function, to create the structures the first time.
  */
 
 result image_tree_forest_reload(
     image_tree_forest *target,
     uint16 tree_width,
-    uint16 tree_height
+    uint16 tree_height,
+    image_block_type type
 );
 
 /**
@@ -182,7 +178,21 @@ result image_tree_forest_nullify(
 );
 
 /**
+* Everything that can be nullified should be able to tell if it's null
+*/
+
+bool image_tree_forest_is_null(
+  image_tree_forest *target
+);
+
+/**
  * Prepares an image forest for the update stage.
+ * This is separate from the actual update to allow easier parallelization.
+ * All root trees are separate from each other, so arbitrary tree collections
+ * can be handled in parallel.
+ * In this stage new image content is copied from the source
+ * (possibly converting the format) and data structures cleaned for a new
+ * iteration.
  */
 
 result image_tree_forest_update_prepare(
@@ -254,7 +264,7 @@ result image_tree_create_neighbor_list(
  * and returns it in the neighbor reference. If the tree does not have a
  * neighbor on the same level, the direct neighbor on the highest level is
  * returned.
- * 
+ *
  * 1. Check if the direct neighbor has already been cached.
  * 2. If not, go to parent and check if the neighbor is in the same parent.
  * 3. If not, recursively get the neighbor of the parent.
@@ -262,7 +272,7 @@ result image_tree_create_neighbor_list(
  *    correct one as neighbor, if not, return the parent as neighbor
  * 5. It is possible that there is no neighbor (tree is on the edge); in this
  *    case, the neighbor is set to NULL
- * 
+ *
  * This requires that the neighbors of top level trees have been set properly.
  */
 
@@ -293,9 +303,9 @@ result image_tree_get_direct_neighbor_w(
 );
 
 /**
- * Recursive function for adding child trees from the highest level as 
+ * Recursive function for adding child trees from the highest level as
  * immediate neighbors to another tree
- * 
+ *
  * 1. If tree has no childen, add it to list and return
  * 2. If tree has chilren, call recursively for the two children in the proper
  *    direction
@@ -310,14 +320,14 @@ result image_tree_add_children_as_immediate_neighbors(
 /**
  * Finds all immediate neighbors (directly adjacent neighbors on the highest
  * level) of a tree in the given direction and stores them in the list.
- * 
- * 1. Find the direct neighbor; if it has children, call recursively for the 
+ *
+ * 1. Find the direct neighbor; if it has children, call recursively for the
  *    two children adjacent to this tree
- * 
+ *
  * 2. Peek the item at the top of stack; if it has children, pop it and push the
  *    two children adjacent to this tree into the stack; if not, add it to the
  *    end of the listn
- * 3. 
+ * 3.
  */
 
 result image_tree_find_all_immediate_neighbors(

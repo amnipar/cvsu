@@ -181,6 +181,14 @@ result chunk_nullify(
 );
 
 /**
+ * Everything that can be nullified should be able to tell if it's null
+ */
+
+bool chunk_is_null(
+  chunk *target
+);
+
+/**
  * Clears the memory contained by the chunk
  */
 
@@ -231,7 +239,15 @@ data_pointer chunk_return_item(
  */
 
 result list_item_nullify(
-    list_item *target
+  list_item *target
+);
+
+/**
+ * Everything that can be nullified should be able to tell if it's null
+ */
+
+bool list_item_is_null(
+  list_item *target
 );
 
 /**
@@ -295,6 +311,14 @@ result list_destroy(
 
 result list_nullify(
     list *target
+);
+
+/**
+ * Everything that can be nullified should be able to tell if it's null
+ */
+
+bool list_is_null(
+  list *target
 );
 
 /**

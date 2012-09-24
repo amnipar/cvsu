@@ -41,6 +41,7 @@
 /******************************************************************************/
 /* constants for reporting function names in error messages                   */
 
+string image_tree_forest_init_name = "image_tree_forest_init";
 string image_tree_forest_alloc_name = "image_tree_forest_alloc";
 string image_tree_forest_free_name = "image_tree_forest_free";
 string image_tree_forest_create_name = "image_tree_forest_create";
@@ -64,187 +65,261 @@ string image_tree_add_children_as_immediate_neighbors_name = "image_tree_add_chi
 string image_tree_find_all_immediate_neighbors_name = "image_tree_find_all_immediate_neighbors";
 
 /******************************************************************************/
+/* private function for initializing tree structure                           */
+/* used in create and in reload                                               */
+
+result image_tree_forest_init
+(
+  image_tree_forest *target,
+  uint16 tree_width,
+  uint16 tree_height,
+  image_block_type type
+)
+{
+  TRY();
+  uint32 row, col, pos, size, width, height;
+  image_tree new_tree, *tree_ptr;
+  image_block new_block, *block_ptr;
+
+  /* not necessary to check target pointer, calling function should handle that */
+
+  width = target->original->width;
+  height = target->original->height;
+  
+  CHECK_PARAM(tree_width <= width);
+  CHECK_PARAM(tree_height <= height);
+
+  /* for now, support grey and color stat types only */
+  CHECK_PARAM(type == b_STAT_GREY || type == b_STAT_COLOR);
+
+  if (target->tree_width != tree_width || target->tree_height != tree_height) {
+    /* initialize values */
+    target->tree_width = tree_width;
+    target->tree_height = tree_height;
+    target->cols = (uint16)(width / target->tree_width);
+    target->rows = (uint16)(height / target->tree_height);
+    target->dx = (uint16)((width - (target->cols * target->tree_width)) / 2);
+    target->dy = (uint16)((height - (target->rows * target->tree_height)) / 2);
+    size = target->rows * target->cols;
+
+    if (target->roots != NULL) {
+      CHECK(memory_deallocate((data_pointer*)&target->roots));
+    }
+    CHECK(memory_allocate((data_pointer *)&target->roots, size, sizeof(image_tree_root)));
+
+    if (!list_is_null(&target->trees)) {
+      CHECK(list_destroy(&target->trees));
+    }
+    CHECK(list_create(&target->trees, 100 * size, sizeof(image_tree), 10));
+
+    if (!list_is_null(&target->blocks)) {
+      CHECK(list_destroy(&target->blocks));
+    }
+    CHECK(list_create(&target->blocks, 100 * size, sizeof(image_block), 10));
+  }
+  else {
+    size = target->rows * target->cols;
+    /* TODO: need to determine also max tree depth -> max number of tree nodes */
+  }
+
+  /* source image may need to be (re-)created if it doesn't exist or type has changed */
+  /* in create, type is set to b_NONE, so this is done also in the first init */
+  if (target->type != type) {
+    if (target->source != NULL) {
+      CHECK(pixel_image_destroy(target->source));
+    }
+    else {
+      target->source = pixel_image_alloc();
+      CHECK_POINTER(target->source);
+    }
+    if (!list_is_null(&target->values)) {
+      CHECK(list_destroy(&target->values));
+    }
+    /* grey image required for grey statistics */
+    if (type == b_STAT_GREY) {
+      CHECK(pixel_image_create(target->source, p_U8, GREY, width, height, 1, 
+                               1 * width));
+      CHECK(list_create(&target->values, 100 * size, sizeof(stat_grey), 1));
+    }
+    else
+    /* yuv image required for color statistics */
+    /* TODO: need a mechanism to enable using Lab or similar (maybe use a macro?) */
+    if (type == b_STAT_COLOR) {
+      CHECK(pixel_image_create(target->source, p_U8, YUV, width, height, 3, 
+                               3 * width));
+      CHECK(list_create(&target->values, 100 * size, sizeof(stat_color), 1));
+    }
+    else {
+      /* should never reach here actually */
+      ERROR(BAD_PARAM);
+    }
+
+    /* image is only created here, content is copied/converted in update stage */
+    target->type = type;
+  }
+
+  CHECK(list_clear(&target->trees));
+  CHECK(list_clear(&target->blocks));
+  CHECK(list_clear(&target->values));
+
+  /* create tree roots and their trees and blocks */
+  for (row = 0, pos = 0; row < target->rows; row++) {
+    for (col = 0; col < target->cols; col++, pos++) {
+      new_block.x = (uint16)(target->dx + col * target->tree_width);
+      new_block.y = (uint16)(target->dy + row * target->tree_height);
+      new_block.w = (uint16)(target->tree_width);
+      new_block.h = (uint16)(target->tree_height);
+      if (target->type == b_STAT_GREY) {
+        stat_grey new_value, *value_ptr;
+        new_value.mean = 0;
+        new_value.dev = 0;
+        CHECK(list_append_reveal_data(&target->values, (pointer)&new_value, (pointer*)&value_ptr));
+        new_block.value = (pointer)value_ptr;
+      }
+      else
+      if (target->type == b_STAT_COLOR) {
+        stat_color new_value, *value_ptr;
+        new_value.mean_i = 0;
+        new_value.dev_i = 0;
+        new_value.mean_c1 = 0;
+        new_value.dev_c1 = 0;
+        new_value.mean_c2 = 0;
+        CHECK(list_append_reveal_data(&target->values, (pointer)&new_value, (pointer*)&value_ptr));
+        new_block.value = (pointer)value_ptr;
+      }
+      CHECK(list_append_reveal_data(&target->blocks, (pointer)&new_block, (pointer*)&block_ptr));
+
+      new_tree.root = &target->roots[pos];
+      new_tree.parent = NULL;
+      new_tree.nw = NULL;
+      new_tree.ne = NULL;
+      new_tree.sw = NULL;
+      new_tree.se = NULL;
+      new_tree.block = block_ptr;
+      new_tree.n = NULL;
+      new_tree.e = NULL;
+      new_tree.s = NULL;
+      new_tree.w = NULL;
+      new_tree.level = 1;
+      CHECK(list_append_reveal_data(&target->trees, (pointer)&new_tree, (pointer*)&tree_ptr));
+
+      target->roots[pos].forest = target;
+      target->roots[pos].tree = tree_ptr;
+      CHECK(pixel_image_create_roi(&target->roots[pos].ROI, target->original, block_ptr->x, block_ptr->y, block_ptr->w, block_ptr->h));
+      CHECK(small_integral_image_create(&target->roots[pos].I, &target->roots[pos].ROI));
+    }
+  }
+
+  target->last_base_block = target->blocks.last.prev;
+  target->last_base_tree = target->trees.last.prev;
+  target->last_base_value = target->values.last.prev;
+
+  /* add neighbors to roots */
+  for (row = 0, pos = 0; row < target->rows; row++) {
+    for (col = 0; col < target->cols; col++, pos++) {
+      /* add neighbor to west */
+      if (col > 0) {
+        target->roots[pos].tree->w = target->roots[pos - 1].tree;
+      }
+      /* add neighbor to north */
+      if (row > 0) {
+        target->roots[pos].tree->n = target->roots[pos - target->cols].tree;
+      }
+      /* add neighbor to east */
+      if (col < (unsigned)(target->cols - 1)) {
+        target->roots[pos].tree->e = target->roots[pos + 1].tree;
+      }
+      /* add neighbor to south */
+      if (row < (unsigned)(target->rows - 1)) {
+        target->roots[pos].tree->s = target->roots[pos + target->cols].tree;
+      }
+    }
+  }
+
+  FINALLY(image_tree_forest_init);
+  RETURN();
+}
+
+/******************************************************************************/
 
 image_tree_forest *image_tree_forest_alloc()
 {
-    TRY();
-    image_tree_forest *ptr;
-    CHECK(memory_allocate((data_pointer *)&ptr, 1, sizeof(image_tree_forest)));
-    CHECK(image_tree_forest_nullify(ptr));
-    FINALLY(image_tree_forest_alloc);
-    return ptr;
+  TRY();
+  image_tree_forest *ptr;
+  CHECK(memory_allocate((data_pointer *)&ptr, 1, sizeof(image_tree_forest)));
+  CHECK(image_tree_forest_nullify(ptr));
+  FINALLY(image_tree_forest_alloc);
+  return ptr;
 }
 
 /******************************************************************************/
 
 void image_tree_forest_free(image_tree_forest *ptr)
 {
-    TRY();
-    r = SUCCESS;
-    if (ptr != NULL) {
-        CHECK(image_tree_forest_destroy(ptr));
-        CHECK(memory_deallocate((data_pointer *)&ptr));
-    }
-    FINALLY(image_tree_forest_free);
+  TRY();
+  r = SUCCESS;
+  if (ptr != NULL) {
+      CHECK(image_tree_forest_destroy(ptr));
+      CHECK(memory_deallocate((data_pointer *)&ptr));
+  }
+  FINALLY(image_tree_forest_free);
 }
 
 /******************************************************************************/
 
-result image_tree_forest_create(
-    image_tree_forest *target,
-    pixel_image *source,
-    uint16 tree_width,
-    uint16 tree_height
-    )
+result image_tree_forest_create
+(
+  image_tree_forest *target,
+  pixel_image *source,
+  uint16 tree_width,
+  uint16 tree_height,
+  image_block_type type
+)
 {
-    TRY();
-    uint32 row, col, pos, size;
-    image_tree new_tree, *tree_ptr;
-    image_block new_block, *block_ptr;
+  TRY();
 
-    CHECK_POINTER(target);
-    CHECK_POINTER(source);
-    CHECK_PARAM(tree_width <= source->width);
-    CHECK_PARAM(tree_height <= source->height);
-    CHECK_PARAM(source->type == p_U8);
-    CHECK_PARAM(source->format == GREY || source->format == YUV || source->format == RGB);
+  CHECK_POINTER(target);
+  CHECK_POINTER(source);
 
-    if (source->format == RGB) {
-        target->original = pixel_image_alloc();
-        target->own_original = 1;
-        CHECK(pixel_image_create(target->original, p_U8, YUV, source->width, source->height, 3, 3 * source->width));
-        CHECK(convert_rgb24_to_yuv24(source, target->original));
-    }
-    else {
-        target->original = source;
-        target->own_original = 0;
-    }
+  CHECK_PARAM(source->type == p_U8);
+  CHECK_PARAM(source->format == GREY || source->format == YUV || source->format == RGB);
 
-    target->tree_width = tree_width;
-    target->tree_height = tree_height;
-    target->cols = (uint16)(source->width / target->tree_width);
-    target->rows = (uint16)(source->height / target->tree_height);
-    target->dx = (uint16)((source->width - (target->cols * target->tree_width)) / 2);
-    target->dy = (uint16)((source->height - (target->rows * target->tree_height)) / 2);
-    target->type = b_STAT_COLOR;
+  /* set to NULL so the values can be checked and set in the init function */
+  CHECK(image_tree_forest_nullify(target));
 
-    size = target->rows * target->cols;
+  target->original = source;
 
-    /*CHECK(edge_block_image_create(&target->edge_image, 10 * size, 10 * size, 100 * size));*/
-    CHECK(memory_allocate((data_pointer *)&target->roots, size, sizeof(image_tree_root)));
-    CHECK(list_create(&target->trees, 100 * size, sizeof(image_tree), 10));
-    CHECK(list_create(&target->blocks, 100 * size, sizeof(image_block), 10));
+  CHECK(image_tree_forest_init(target, tree_width, tree_height, type));
 
-    /* create tree roots and their trees and blocks */
-    for (row = 0, pos = 0; row < target->rows; row++) {
-        for (col = 0; col < target->cols; col++, pos++) {
-            new_block.x = (uint16)(target->dx + col * target->tree_width);
-            new_block.y = (uint16)(target->dy + row * target->tree_height);
-            new_block.w = (uint16)(target->tree_width);
-            new_block.h = (uint16)(target->tree_height);
-            /*new_block.value = NULL;*/
-            new_block.value.mean_i = 0;
-            new_block.value.dev_i = 0;
-            new_block.value.mean_c1 = 0;
-            new_block.value.dev_c1 = 0;
-            new_block.value.mean_c2 = 0;
-            new_block.value.dev_c2 = 0;
-            CHECK(list_append_reveal_data(&target->blocks, (pointer)&new_block, (pointer*)&block_ptr));
-            
-            new_tree.root = &target->roots[pos];
-            new_tree.parent = NULL;
-            new_tree.nw = NULL;
-            new_tree.ne = NULL;
-            new_tree.sw = NULL;
-            new_tree.se = NULL;
-            new_tree.block = block_ptr;
-            new_tree.n = NULL;
-            new_tree.e = NULL;
-            new_tree.s = NULL;
-            new_tree.w = NULL;
-            new_tree.level = 1;
-            CHECK(list_append_reveal_data(&target->trees, (pointer)&new_tree, (pointer*)&tree_ptr));
-            
-            target->roots[pos].forest = target;
-            target->roots[pos].tree = tree_ptr;
-            /*
-            target->roots[pos].n = NULL;
-            target->roots[pos].e = NULL;
-            target->roots[pos].s = NULL;
-            target->roots[pos].w = NULL;
-            */
-            CHECK(pixel_image_create_roi(&target->roots[pos].ROI, target->original, block_ptr->x, block_ptr->y, block_ptr->w, block_ptr->h));
-            CHECK(small_integral_image_create(&target->roots[pos].I, &target->roots[pos].ROI));
-        }
-    }
-
-    target->last_base_block = target->blocks.last.prev;
-    target->last_base_tree = target->trees.last.prev;
-
-    /* add neighbors to roots */
-    for (row = 0, pos = 0; row < target->rows; row++) {
-        for (col = 0; col < target->cols; col++, pos++) {
-            /* add neighbor to west */
-            if (col > 0) {
-                target->roots[pos].tree->w = target->roots[pos - 1].tree;
-            }
-            /* add neighbor to north */
-            if (row > 0) {
-                target->roots[pos].tree->n = target->roots[pos - target->cols].tree;
-            }
-            /* add neighbor to east */
-            if (col < (unsigned)(target->cols - 1)) {
-                target->roots[pos].tree->e = target->roots[pos + 1].tree;
-            }
-            /* add neighbor to south */
-            if (row < (unsigned)(target->rows - 1)) {
-                target->roots[pos].tree->s = target->roots[pos + target->cols].tree;
-            }
-        }
-    }
-
-    FINALLY(image_tree_forest_create);
-    RETURN();
+  FINALLY(image_tree_forest_create);
+  RETURN();
 }
 
 /******************************************************************************/
 
-result image_tree_forest_reload(
-    image_tree_forest *target,
-    uint16 tree_width,
-    uint16 tree_height
-    )
+result image_tree_forest_reload
+(
+  image_tree_forest *target,
+  uint16 tree_width,
+  uint16 tree_height,
+  image_block_type type
+)
 {
-    TRY();
-    /*printf("w:%d,h:%d\n", tree_width, tree_height);*/
-    pixel_image *img;
-    uint32 own_original = 0;
-    
-    CHECK_POINTER(target);
-    CHECK_POINTER(target->original);
-    
-    if (tree_width != target->tree_width || tree_height != target->tree_height) {
-        img = target->original;
-        if (target->own_original != 0) {
-            own_original = 1;
-            target->own_original = 0;
-        }
-        
-        CHECK(image_tree_forest_destroy(target));
-        CHECK(image_tree_forest_create(target, img, tree_width, tree_height));
-        
-        if (own_original != 0) {
-            target->own_original = 1;
-        }
-    }
-    FINALLY(image_tree_forest_reload);
-    if (r != SUCCESS) {
-        if (own_original != 0) {
-            pixel_image_destroy(img);
-            memory_deallocate((data_pointer*)img);
-        }
-    }
-    RETURN();
+  TRY();
+
+  CHECK_POINTER(target);
+  CHECK_POINTER(target->original);
+
+  if (target->tree_width != tree_width ||
+      target->tree_height != tree_height ||
+      target->type != type
+      )
+  {
+    image_tree_forest_init(target, tree_width, tree_height, type);
+  }
+
+  FINALLY(image_tree_forest_reload);
+  RETURN();
 }
 
 /******************************************************************************/
@@ -260,6 +335,7 @@ result image_tree_forest_destroy(
 
     CHECK(list_destroy(&target->blocks));
     CHECK(list_destroy(&target->trees));
+    CHECK(list_destroy(&target->values));
 
     size = target->rows * target->cols;
     for (pos = 0; pos < size; pos++) {
@@ -268,10 +344,8 @@ result image_tree_forest_destroy(
     }
     CHECK(memory_deallocate((data_pointer*)&target->roots));
 
-    if (target->own_original != 0) {
-        CHECK(pixel_image_destroy(target->original));
-        CHECK(memory_deallocate((data_pointer*)&target->original));
-    }
+    CHECK(pixel_image_destroy(target->source));
+    CHECK(memory_deallocate((data_pointer*)&target->source));
 
     /*CHECK(edge_block_image_destroy(&target->edge_image));*/
 
@@ -292,8 +366,8 @@ result image_tree_forest_nullify(
     CHECK_POINTER(target);
 
     target->original = NULL;
+    target->source = NULL;
     /*CHECK(edge_block_image_nullify(&target->edge_image));*/
-    target->own_original = 0;
     target->rows = 0;
     target->cols = 0;
     target->tree_width = 0;
@@ -301,8 +375,12 @@ result image_tree_forest_nullify(
     target->dx = 0;
     target->dy = 0;
     target->type = b_NONE;
+    CHECK(list_nullify(&target->trees));
+    CHECK(list_nullify(&target->blocks));
+    CHECK(list_nullify(&target->values));
     target->last_base_tree = NULL;
     target->last_base_block = NULL;
+    target->last_base_value = NULL;
     target->roots = NULL;
 
     FINALLY(image_tree_forest_nullify);
@@ -311,84 +389,160 @@ result image_tree_forest_nullify(
 
 /******************************************************************************/
 
-/*
- * prepare stage is separated from update stage, to allow
- * easier parallelization of forest update; each image tree root
- * is completely separate from the rest, so they can be handled in parallel.
- */
-result image_tree_forest_update_prepare(
-    image_tree_forest *target
-    )
+bool image_tree_forest_is_null
+(
+  image_tree_forest *target
+)
 {
-    TRY();
-    uint32 pos, size;
-    image_tree *tree;
-
-    CHECK_POINTER(target);
-
-    CHECK(list_remove_rest(&target->blocks, target->last_base_block));
-    CHECK(list_remove_rest(&target->trees, target->last_base_tree));
-
-    /* must also set child nodes of root level trees to NULL... */
-    /* TODO: find out a better way */
-    size = target->rows * target->cols;
-    for (pos = 0; pos < size; pos++) {
-        tree = target->roots[pos].tree;
-        tree->nw = NULL;
-        tree->ne = NULL;
-        tree->sw = NULL;
-        tree->se = NULL;
+  if (target != NULL) {
+    if (target->original == NULL && target->source == NULL) {
+      return true;
     }
-
-    FINALLY(image_tree_forest_update_prepare);
-    RETURN();
+  }
+  return false;
 }
 
 /******************************************************************************/
 
-result image_tree_forest_update(
-    image_tree_forest *target
-    )
+result image_tree_forest_update_prepare
+(
+  image_tree_forest *target
+)
 {
-    TRY();
-    uint32 pos, size;
+  TRY();
+  uint32 pos, size;
+  image_tree *tree;
 
-    CHECK(image_tree_forest_update_prepare(target));
+  CHECK_POINTER(target);
 
-    size = target->rows * target->cols;
-    for (pos = 0; pos < size; pos++) {
-        CHECK(image_tree_root_update(&target->roots[pos]));
+  /* create a fresh copy of the source image in case it has changed */
+  /* image format may be converted */
+  if (target->type == b_STAT_GREY) {
+    /* grey image can be used as is */
+    if (target->original->format == GREY) {
+      CHECK(pixel_image_copy(target->source, target->original));
     }
+    else
+    /* from yuv image, take the y channel */
+    if (target->original->format == YUV) {
+      CHECK(pick_1_channel_from_3_channels(target->original, target->source, 0));
+    }
+    else
+    /* rgb image must be converted to gray */
+    if (target->original->format == RGB) {
+      CHECK(convert_rgb24_to_grey8(target->original, target->source));
+    }
+    /* otherwise indicate error */
+    else {
+      ERROR(BAD_TYPE);
+    }
+  }
+  else
+  if (target->type == b_STAT_COLOR) {
+    /* grey image must be converted to yuv */
+    if (target->original->format == GREY) {
+      CHECK(convert_grey8_to_yuv24(target->original, target->source));
+    }
+    else
+    /* yuv image can be used as is */
+    if (target->original->format == YUV) {
+      CHECK(pixel_image_copy(target->source, target->original));
+    }
+    else
+    /* rgb image must be converted to yuv */
+    if (target->original->format == RGB) {
+      CHECK(convert_rgb24_to_yuv24(target->original, target->source));
+    }
+    /* otherwise indicate error */
+    else {
+      ERROR(BAD_TYPE);
+    }
+  }
 
-    FINALLY(image_tree_forest_update);
-    RETURN();
+  /* if there are existing child nodes and blocks, remove them */
+  CHECK(list_remove_rest(&target->blocks, target->last_base_block));
+  CHECK(list_remove_rest(&target->trees, target->last_base_tree));
+  CHECK(list_remove_rest(&target->values, target->last_base_value));
+
+  /* must also set child nodes of root level trees to NULL... */
+  /* TODO: find out a better way */
+  size = target->rows * target->cols;
+  for (pos = 0; pos < size; pos++) {
+    tree = target->roots[pos].tree;
+    tree->nw = NULL;
+    tree->ne = NULL;
+    tree->sw = NULL;
+    tree->se = NULL;
+  }
+
+  FINALLY(image_tree_forest_update_prepare);
+  RETURN();
 }
 
 /******************************************************************************/
 
-result image_tree_forest_divide_with_dev(
-    image_tree_forest *target,
-    sint16 threshold
-    )
+result image_tree_forest_update
+(
+  image_tree_forest *target
+)
 {
-    TRY();
-    list_item *trees;
-    image_tree *current_tree;
+  TRY();
+  uint32 pos, size;
 
-    CHECK_POINTER(target);
-    CHECK_PARAM(threshold > 1);
+  CHECK(image_tree_forest_update_prepare(target));
 
+  size = target->rows * target->cols;
+  for (pos = 0; pos < size; pos++) {
+      CHECK(image_tree_root_update(&target->roots[pos]));
+  }
+
+  FINALLY(image_tree_forest_update);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result image_tree_forest_divide_with_dev
+(
+  image_tree_forest *target,
+  sint16 threshold
+)
+{
+  TRY();
+  list_item *trees;
+  image_tree *current_tree;
+
+  CHECK_POINTER(target);
+  CHECK_PARAM(threshold > 1);
+  
+  if (target->type == b_STAT_GREY) {
     trees = target->trees.first.next;
     while (trees != &target->trees.last) {
-        current_tree = (image_tree *)trees->data;
-        if (current_tree->block->value.dev_i > threshold) {
-            CHECK(image_tree_divide(current_tree));
-        }
-        trees = trees->next;
+      current_tree = (image_tree *)trees->data;
+      if (((stat_grey *)current_tree->block->value)->dev > threshold) {
+        CHECK(image_tree_divide(current_tree));
+      }
+      trees = trees->next;
     }
+  }
+  else
+  if (target->type == b_STAT_COLOR) {
+    trees = target->trees.first.next;
+    while (trees != &target->trees.last) {
+      current_tree = (image_tree *)trees->data;
+      if (((stat_color *)current_tree->block->value)->dev_i > threshold) {
+        CHECK(image_tree_divide(current_tree));
+      }
+      trees = trees->next;
+    }
+  }
+  else {
+    /* should never come here... */
+    ERROR(BAD_TYPE);
+  }
 
-    FINALLY(image_tree_forest_divide_with_dev);
-    RETURN();
+  FINALLY(image_tree_forest_divide_with_dev);
+  RETURN();
 }
 
 /******************************************************************************/
@@ -406,6 +560,7 @@ result image_tree_forest_read(
     char type, endl;
     int read_result;
     uint32 read_size, width, height, maxval;
+    image_block_type btype;
 
     CHECK_POINTER(target);
     CHECK_POINTER(source);
@@ -434,6 +589,7 @@ result image_tree_forest_read(
             /*printf("Reading image data failed");*/
             ERROR(INPUT_ERROR);
         }
+        btype = b_STAT_GREY;
     }
     else
     if (type == '6') {
@@ -447,6 +603,7 @@ result image_tree_forest_read(
             /*printf("Reading image data failed");*/
             ERROR(INPUT_ERROR);
         }
+        btype = b_STAT_COLOR;
         /*CHECK(convert_rgb24_to_grey8(rgb_image, grey_image));*/
     }
     else {
@@ -456,44 +613,36 @@ result image_tree_forest_read(
 
     /*printf("Successfully read image of size (%lu x %lu)\n", width, height);*/
 
-    CHECK(image_tree_forest_create(target, new_image, tree_width, tree_height));
+    CHECK(image_tree_forest_create(target, new_image, tree_width, tree_height, btype));
 
     /*printf("Created image forest with trees (%u x %u)\n", tree_width, tree_height);*/
-    /*CHECK(image_tree_forest_update(target));*/
+    CHECK(image_tree_forest_update(target));
 
     FINALLY(image_tree_forest_read);
-
-    if (target->own_original != 0) {
-        pixel_image_free(new_image);
-    }
-    /*
-    if (r != SUCCESS) {
-        pixel_image_destroy(grey_image);
-        memory_deallocate((data_pointer*)&grey_image);
-    }
-    target->own_original = 1;
-    */
+    /* NOTE: original image is deleted, cannot reload or update after this method */
+    pixel_image_free(new_image);
     RETURN();
 }
 
 /******************************************************************************/
 
-result image_tree_root_update(
-    image_tree_root *target
-    )
+result image_tree_root_update
+(
+  image_tree_root *target
+)
 {
-    TRY();
-    /*uint32 i;*/
+  TRY();
+  /*uint32 i;*/
 
-    CHECK_POINTER(target);
-    /*for (i = 0; i < 100; i++) {*/
-        CHECK(small_integral_image_update(&target->I));
-    /*}*/
+  CHECK_POINTER(target);
+  /*for (i = 0; i < 100; i++) {*/
+      CHECK(small_integral_image_update(&target->I));
+  /*}*/
 
-    small_integral_image_box_create(&target->box, &target->I, target->ROI.width, target->ROI.height, target->ROI.dx, target->ROI.dy);
-    CHECK(image_tree_update(target->tree));
+  small_integral_image_box_create(&target->box, &target->I, target->ROI.width, target->ROI.height, target->ROI.dx, target->ROI.dy);
+  CHECK(image_tree_update(target->tree));
 
-    FINALLY(image_tree_root_update);
+  FINALLY(image_tree_root_update);
     RETURN();
 }
 
@@ -507,53 +656,67 @@ result image_tree_root_update(
  * calculate the integrals. Updates the statistics based on the integrals.
  */
 
-result image_tree_update(
-    image_tree *tree
-    )
+result image_tree_update
+(
+  image_tree *tree
+)
 {
-    TRY();
-    real64 mean, dev;
-    /*uint32 mean, dev;*/
-    small_integral_image_box *box;
-    image_block *block;
-    /*struct timeval now;*/
+  TRY();
+  real64 mean, dev;
+  /*uint32 mean, dev;*/
+  small_integral_image_box *box;
+  image_block *block;
+  image_block_type type;
+  /*struct timeval now;*/
 
-    CHECK_POINTER(tree);
+  CHECK_POINTER(tree);
 
-    block = tree->block;
-    box = &tree->root->box;
+  block = tree->block;
+  box = &tree->root->box;
+  type = tree->root->forest->type;
 
-    box->channel = 0;
+  box->channel = 0;
+  small_integral_image_box_update(box, block->x, block->y);
+  mean = ((real64)box->sum / (real64)box->N);
+  dev = (((real64)box->sumsqr / (real64)box->N) - (mean * mean));
+  if (dev < 1) dev = 1;
+  if (type == b_STAT_GREY) {
+    ((stat_grey *)block->value)->mean = (sint16)((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
+    ((stat_grey *)block->value)->dev = (sint16)sqrt(dev);
+  }
+  else
+  if (type == b_STAT_COLOR) {
+    stat_color *value = (stat_color *)block->value;
+    
+    value->mean_i = (sint16)((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
+    value->dev_i = (sint16)sqrt(dev);
+    
+    box->channel = 1;
     small_integral_image_box_update(box, block->x, block->y);
     mean = ((real64)box->sum / (real64)box->N);
     dev = (((real64)box->sumsqr / (real64)box->N) - (mean * mean));
     if (dev < 1) dev = 1;
-    block->value.mean_i = (sint16)((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
-    block->value.dev_i = (sint16)sqrt(dev);
+    value->mean_c1 = (sint16)((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
+    value->dev_c1 = (sint16)sqrt(dev);
 
-    if (box->step == 3) {
-        box->channel = 1;
-        small_integral_image_box_update(box, block->x, block->y);
-        mean = ((real64)box->sum / (real64)box->N);
-        dev = (((real64)box->sumsqr / (real64)box->N) - (mean * mean));
-        if (dev < 1) dev = 1;
-        block->value.mean_c1 = (sint16)((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
-        block->value.dev_c1 = (sint16)sqrt(dev);
+    box->channel = 2;
+    small_integral_image_box_update(box, block->x, block->y);
+    mean = ((real64)box->sum / (real64)box->N);
+    dev = (((real64)box->sumsqr / (real64)box->N) - (mean * mean));
+    if (dev < 1) dev = 1;
+    value->mean_c2 = (sint16)((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
+    value->dev_c2 = (sint16)sqrt(dev);
+  }
+  else {
+    /* should never get here... */
+    ERROR(BAD_TYPE);
+  }
 
-        box->channel = 2;
-        small_integral_image_box_update(box, block->x, block->y);
-        mean = ((real64)box->sum / (real64)box->N);
-        dev = (((real64)box->sumsqr / (real64)box->N) - (mean * mean));
-        if (dev < 1) dev = 1;
-        block->value.mean_c2 = (sint16)((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
-        block->value.dev_c2 = (sint16)sqrt(dev);
-    }
+  /*gettimeofday(&now, NULL);*/
+  /*printf("%d.%d update tree (%d,%d)=%d\n", now.tv_sec, now.tv_usec, block->x, block->y, block->value.mean);*/
 
-    /*gettimeofday(&now, NULL);*/
-    /*printf("%d.%d update tree (%d,%d)=%d\n", now.tv_sec, now.tv_usec, block->x, block->y, block->value.mean);*/
-
-    FINALLY(image_tree_update);
-    RETURN();
+  FINALLY(image_tree_update);
+  RETURN();
 }
 
 /******************************************************************************/
@@ -563,74 +726,75 @@ result image_tree_update(
  * allowing paraller division of each root.
  */
 
-result image_tree_divide(
-    image_tree *target
-    )
+result image_tree_divide
+(
+  image_tree *target
+)
 {
-    TRY();
-    image_block new_block, *child_block;
-    image_tree new_tree, *child_tree;
+  TRY();
+  image_block new_block, *child_block;
+  image_tree new_tree, *child_tree;
 
-    CHECK_POINTER(target);
-    if (target->nw == NULL && target->ne == NULL && target->sw == NULL && target->se == NULL) {
-        if (target->block->w > 1 && target->block->h > 1) {
-            new_tree.root = target->root;
-            new_tree.parent = target;
-            new_tree.nw = NULL;
-            new_tree.ne = NULL;
-            new_tree.sw = NULL;
-            new_tree.se = NULL;
-            new_tree.n = NULL;
-            new_tree.e = NULL;
-            new_tree.s = NULL;
-            new_tree.w = NULL;
-            new_tree.level = target->level + 1;
-            new_block.w = (uint16)(target->block->w / 2);
-            new_block.h = (uint16)(target->block->h / 2);
+  CHECK_POINTER(target);
+  if (target->nw == NULL && target->ne == NULL && target->sw == NULL && target->se == NULL) {
+    if (target->block->w > 1 && target->block->h > 1) {
+      new_tree.root = target->root;
+      new_tree.parent = target;
+      new_tree.nw = NULL;
+      new_tree.ne = NULL;
+      new_tree.sw = NULL;
+      new_tree.se = NULL;
+      new_tree.n = NULL;
+      new_tree.e = NULL;
+      new_tree.s = NULL;
+      new_tree.w = NULL;
+      new_tree.level = target->level + 1;
+      new_block.w = (uint16)(target->block->w / 2);
+      new_block.h = (uint16)(target->block->h / 2);
 
-            small_integral_image_box_resize(&target->root->box, new_block.w, new_block.h);
+      small_integral_image_box_resize(&target->root->box, new_block.w, new_block.h);
 
-            /* nw block */
-            new_block.x = target->block->x;
-            new_block.y = target->block->y;
-            CHECK(list_append_reveal_data(&target->root->forest->blocks, (pointer)&new_block, (pointer*)&child_block));
-            new_tree.block = child_block;
-            CHECK(list_append_reveal_data(&target->root->forest->trees, (pointer)&new_tree, (pointer*)&child_tree));
-            target->nw = child_tree;
+      /* nw block */
+      new_block.x = target->block->x;
+      new_block.y = target->block->y;
+      CHECK(list_append_reveal_data(&target->root->forest->blocks, (pointer)&new_block, (pointer*)&child_block));
+      new_tree.block = child_block;
+      CHECK(list_append_reveal_data(&target->root->forest->trees, (pointer)&new_tree, (pointer*)&child_tree));
+      target->nw = child_tree;
 
-            CHECK(image_tree_update(child_tree));
+      CHECK(image_tree_update(child_tree));
 
-            /* ne block */
-            new_block.x = (uint16)(target->block->x + new_block.w);
-            CHECK(list_append_reveal_data(&target->root->forest->blocks, (pointer)&new_block, (pointer*)&child_block));
-            new_tree.block = child_block;
-            CHECK(list_append_reveal_data(&target->root->forest->trees, (pointer)&new_tree, (pointer*)&child_tree));
-            target->ne = child_tree;
+      /* ne block */
+      new_block.x = (uint16)(target->block->x + new_block.w);
+      CHECK(list_append_reveal_data(&target->root->forest->blocks, (pointer)&new_block, (pointer*)&child_block));
+      new_tree.block = child_block;
+      CHECK(list_append_reveal_data(&target->root->forest->trees, (pointer)&new_tree, (pointer*)&child_tree));
+      target->ne = child_tree;
 
-            CHECK(image_tree_update(child_tree));
+      CHECK(image_tree_update(child_tree));
 
-            /* se block */
-            new_block.y = (uint16)(target->block->y + new_block.h);
-            CHECK(list_append_reveal_data(&target->root->forest->blocks, (pointer)&new_block, (pointer*)&child_block));
-            new_tree.block = child_block;
-            CHECK(list_append_reveal_data(&target->root->forest->trees, (pointer)&new_tree, (pointer*)&child_tree));
-            target->se = child_tree;
+      /* se block */
+      new_block.y = (uint16)(target->block->y + new_block.h);
+      CHECK(list_append_reveal_data(&target->root->forest->blocks, (pointer)&new_block, (pointer*)&child_block));
+      new_tree.block = child_block;
+      CHECK(list_append_reveal_data(&target->root->forest->trees, (pointer)&new_tree, (pointer*)&child_tree));
+      target->se = child_tree;
 
-            CHECK(image_tree_update(child_tree));
+      CHECK(image_tree_update(child_tree));
 
-            /* sw block */
-            new_block.x = target->block->x;
-            CHECK(list_append_reveal_data(&target->root->forest->blocks, (pointer)&new_block, (pointer*)&child_block));
-            new_tree.block = child_block;
-            CHECK(list_append_reveal_data(&target->root->forest->trees, (pointer)&new_tree, (pointer*)&child_tree));
-            target->sw = child_tree;
+      /* sw block */
+      new_block.x = target->block->x;
+      CHECK(list_append_reveal_data(&target->root->forest->blocks, (pointer)&new_block, (pointer*)&child_block));
+      new_tree.block = child_block;
+      CHECK(list_append_reveal_data(&target->root->forest->trees, (pointer)&new_tree, (pointer*)&child_tree));
+      target->sw = child_tree;
 
-            CHECK(image_tree_update(child_tree));
-        }
+      CHECK(image_tree_update(child_tree));
     }
+  }
 
-    FINALLY(image_tree_divide);
-    RETURN();
+  FINALLY(image_tree_divide);
+  RETURN();
 }
 
 /******************************************************************************/
@@ -648,83 +812,95 @@ sint16 signum(sint16 v)
 
 dir image_tree_dir_i(image_tree *tree)
 {
-    dir result;
-    sint16 mean_nw, mean_ne, mean_sw, mean_se;
+  dir res;
+  sint16 mean_nw, mean_ne, mean_sw, mean_se;
 
-    result.h = 0;
-    result.v = 0;
+  res.h = 0;
+  res.v = 0;
 
-    if (tree == NULL) {
-        return result;
-    }
+  if (tree == NULL) {
+    return res;
+  }
 
-    if (tree->nw == NULL || tree->ne == NULL || tree->sw == NULL || tree->se == NULL) {
-        return result;
-    }
+  if (tree->nw == NULL || tree->ne == NULL || tree->sw == NULL || tree->se == NULL) {
+    return res;
+  }
+  
+  if (tree->root->forest->type != b_STAT_COLOR) {
+    return res;
+  }
 
-    mean_nw = tree->nw->block->value.mean_i;
-    mean_ne = tree->ne->block->value.mean_i;
-    mean_sw = tree->sw->block->value.mean_i;
-    mean_se = tree->se->block->value.mean_i;
+  mean_nw = ((stat_color *)tree->nw->block->value)->mean_i;
+  mean_ne = ((stat_color *)tree->ne->block->value)->mean_i;
+  mean_sw = ((stat_color *)tree->sw->block->value)->mean_i;
+  mean_se = ((stat_color *)tree->se->block->value)->mean_i;
 
-    result.v = (mean_nw + mean_sw) - (mean_ne + mean_se);
-    result.h = (mean_nw + mean_ne) - (mean_sw + mean_se);
+  res.v = (sint16)((mean_nw + mean_sw) - (mean_ne + mean_se));
+  res.h = (sint16)((mean_nw + mean_ne) - (mean_sw + mean_se));
 
-    return result;
+  return res;
 }
 
 dir image_tree_dir_c1(image_tree *tree)
 {
-    dir result;
-    sint16 mean_nw, mean_ne, mean_sw, mean_se;
+  dir res;
+  sint16 mean_nw, mean_ne, mean_sw, mean_se;
 
-    result.h = 0;
-    result.v = 0;
+  res.h = 0;
+  res.v = 0;
 
-    if (tree == NULL) {
-        return result;
-    }
+  if (tree == NULL) {
+    return res;
+  }
 
-    if (tree->nw == NULL || tree->ne == NULL || tree->sw == NULL || tree->se == NULL) {
-        return result;
-    }
+  if (tree->nw == NULL || tree->ne == NULL || tree->sw == NULL || tree->se == NULL) {
+    return res;
+  }
+  
+  if (tree->root->forest->type != b_STAT_COLOR) {
+    return res;
+  }
 
-    mean_nw = tree->nw->block->value.mean_c1;
-    mean_ne = tree->ne->block->value.mean_c1;
-    mean_sw = tree->sw->block->value.mean_c1;
-    mean_se = tree->se->block->value.mean_c1;
+  mean_nw = ((stat_color *)tree->nw->block->value)->mean_c1;
+  mean_ne = ((stat_color *)tree->ne->block->value)->mean_c1;
+  mean_sw = ((stat_color *)tree->sw->block->value)->mean_c1;
+  mean_se = ((stat_color *)tree->se->block->value)->mean_c1;
 
-    result.v = (mean_nw + mean_sw) - (mean_ne + mean_se);
-    result.h = (mean_nw + mean_ne) - (mean_sw + mean_se);
+  res.v = (sint16)((mean_nw + mean_sw) - (mean_ne + mean_se));
+  res.h = (sint16)((mean_nw + mean_ne) - (mean_sw + mean_se));
 
-    return result;
+  return res;
 }
 
 dir image_tree_dir_c2(image_tree *tree)
 {
-    dir result;
-    sint16 mean_nw, mean_ne, mean_sw, mean_se;
+  dir res;
+  sint16 mean_nw, mean_ne, mean_sw, mean_se;
 
-    result.h = 0;
-    result.v = 0;
+  res.h = 0;
+  res.v = 0;
 
-    if (tree == NULL) {
-        return result;
-    }
+  if (tree == NULL) {
+    return res;
+  }
 
-    if (tree->nw == NULL || tree->ne == NULL || tree->sw == NULL || tree->se == NULL) {
-        return result;
-    }
+  if (tree->nw == NULL || tree->ne == NULL || tree->sw == NULL || tree->se == NULL) {
+    return res;
+  }
 
-    mean_nw = tree->nw->block->value.mean_c2;
-    mean_ne = tree->ne->block->value.mean_c2;
-    mean_sw = tree->sw->block->value.mean_c2;
-    mean_se = tree->se->block->value.mean_c2;
+  if (tree->root->forest->type != b_STAT_COLOR) {
+    return res;
+  }
 
-    result.v = (mean_nw + mean_sw) - (mean_ne + mean_se);
-    result.h = (mean_nw + mean_ne) - (mean_sw + mean_se);
+  mean_nw = ((stat_color *)tree->nw->block->value)->mean_c2;
+  mean_ne = ((stat_color *)tree->ne->block->value)->mean_c2;
+  mean_sw = ((stat_color *)tree->sw->block->value)->mean_c2;
+  mean_se = ((stat_color *)tree->se->block->value)->mean_c2;
 
-    return result;
+  res.v = (sint16)((mean_nw + mean_sw) - (mean_ne + mean_se));
+  res.h = (sint16)((mean_nw + mean_ne) - (mean_sw + mean_se));
+
+  return res;
 }
     /*
     mag_v = (mean_nw + mean_sw) - (mean_ne + mean_se);
@@ -769,11 +945,11 @@ result image_tree_create_neighbor_list(
 {
     TRY();
     /*printf("create neighbor list\n");*/
-    
+
     CHECK_POINTER(target);
-    
+
     CHECK(list_create(target, 100, sizeof(image_tree*), 1));
-    
+
     FINALLY(image_tree_create_neighbor_list);
     RETURN();
 }
@@ -783,12 +959,12 @@ result image_tree_create_neighbor_list(
 result image_tree_get_direct_neighbor(
     image_tree *tree,
     image_tree **neighbor,
-    direction dir
+    direction ndir
     )
 {
     TRY();
-    
-    switch (dir) {
+
+    switch (ndir) {
         case d_N:
             CHECK(image_tree_get_direct_neighbor_n(tree, neighbor));
             break;
@@ -804,7 +980,7 @@ result image_tree_get_direct_neighbor(
         default:
             ERROR(BAD_PARAM);
     }
-    
+
     FINALLY(image_tree_get_direct_neighbor);
     RETURN();
 }
@@ -818,12 +994,12 @@ result image_tree_get_direct_neighbor_n(
 {
     TRY();
     image_tree *parent_neighbor;
-    
+
     CHECK_POINTER(tree);
     CHECK_POINTER(neighbor);
-    
+
     *neighbor = NULL;
-    
+
     /* check if the neighbor has been cached in the tree already */
     if (tree->n != NULL) {
         *neighbor = tree->n;
@@ -884,7 +1060,7 @@ result image_tree_get_direct_neighbor_n(
             tree->n = *neighbor;
         }
     }
-    
+
     FINALLY(image_tree_get_direct_neighbor_n);
     RETURN();
 }
@@ -898,12 +1074,12 @@ result image_tree_get_direct_neighbor_e(
 {
     TRY();
     image_tree *parent_neighbor;
-    
+
     CHECK_POINTER(tree);
     CHECK_POINTER(neighbor);
-    
+
     *neighbor = NULL;
-    
+
     /* check if the neighbor has been cached in the tree already */
     if (tree->e != NULL) {
         *neighbor = tree->e;
@@ -964,7 +1140,7 @@ result image_tree_get_direct_neighbor_e(
             tree->e = *neighbor;
         }
     }
-    
+
     FINALLY(image_tree_get_direct_neighbor_e);
     RETURN();
 }
@@ -978,12 +1154,12 @@ result image_tree_get_direct_neighbor_s(
 {
     TRY();
     image_tree *parent_neighbor;
-    
+
     CHECK_POINTER(tree);
     CHECK_POINTER(neighbor);
-    
+
     *neighbor = NULL;
-    
+
     /* check if the neighbor has been cached in the tree already */
     if (tree->s != NULL) {
         *neighbor = tree->s;
@@ -1044,7 +1220,7 @@ result image_tree_get_direct_neighbor_s(
             tree->s = *neighbor;
         }
     }
-    
+
     FINALLY(image_tree_get_direct_neighbor_s);
     RETURN();
 }
@@ -1058,12 +1234,12 @@ result image_tree_get_direct_neighbor_w(
 {
     TRY();
     image_tree *parent_neighbor;
-    
+
     CHECK_POINTER(tree);
     CHECK_POINTER(neighbor);
-    
+
     *neighbor = NULL;
-    
+
     /* check if the neighbor has been cached in the tree already */
     if (tree->w != NULL) {
         *neighbor = tree->w;
@@ -1124,7 +1300,7 @@ result image_tree_get_direct_neighbor_w(
             tree->w = *neighbor;
         }
     }
-    
+
     FINALLY(image_tree_get_direct_neighbor_w);
     RETURN();
 }
@@ -1132,9 +1308,9 @@ result image_tree_get_direct_neighbor_w(
 /******************************************************************************/
 
 /**
- * Recursive function for adding child trees from the highest level as 
+ * Recursive function for adding child trees from the highest level as
  * immediate neighbors to another tree
- * 
+ *
  * 1. If tree has no childen, add it to list and return
  * 2. If tree has chilren, call recursively for the two children in the proper
  *    direction
@@ -1147,7 +1323,7 @@ result image_tree_add_children_as_immediate_neighbors(
     )
 {
     TRY();
-    
+
     FINALLY(image_tree_add_children_as_immediate_neighbors);
     RETURN();
 }
@@ -1157,14 +1333,14 @@ result image_tree_add_children_as_immediate_neighbors(
 /**
  * Finds all immediate neighbors (directly adjacent neighbors on the highest
  * level) of a tree in the given direction and stores them in the list.
- * 
- * 1. Find the direct neighbor; if it has children, call recursively for the 
+ *
+ * 1. Find the direct neighbor; if it has children, call recursively for the
  *    two children adjacent to this tree
- * 
+ *
  * 2. Peek the item at the top of stack; if it has children, pop it and push the
  *    two children adjacent to this tree into the stack; if not, add it to the
  *    end of the list
- * 3. 
+ * 3.
  */
 result image_tree_find_all_immediate_neighbors(
     list *target,
@@ -1174,11 +1350,11 @@ result image_tree_find_all_immediate_neighbors(
     TRY();
     image_tree *new_neighbor;
     image_tree **temp_ptr;
-    
+
     /*printf("find all neighbors\n");*/
     CHECK_POINTER(target);
     CHECK_POINTER(tree);
-    
+
     CHECK(image_tree_get_direct_neighbor_n(tree, &new_neighbor));
     if (new_neighbor != NULL) {
         /*CHECK(list_append(target, (pointer)&new_neighbor));*/
@@ -1215,7 +1391,7 @@ result image_tree_find_all_immediate_neighbors(
             printf("error copying tree ptr to list");
         }
     }
-    
+
     /*printf("neighbors found: %d\n", target->count);*/
     FINALLY(image_tree_find_all_immediate_neighbors);
     RETURN();

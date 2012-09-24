@@ -188,7 +188,6 @@ void pixel_image_free(
         CHECK(pixel_image_destroy(ptr));
         CHECK(memory_deallocate((data_pointer *)&ptr));
     }
-    printf("free\n");
     FINALLY(pixel_image_free);
 }
 
