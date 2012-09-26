@@ -80,6 +80,7 @@ result image_tree_forest_init
   uint32 row, col, pos, size, width, height;
   image_tree new_tree, *tree_ptr;
   image_block new_block, *block_ptr;
+  /*printf("init w=%u h=%u t=%d\n", tree_width, tree_height, type);*/
 
   /* not necessary to check target pointer, calling function should handle that */
 
@@ -93,6 +94,7 @@ result image_tree_forest_init
   CHECK_PARAM(type == b_STAT_GREY || type == b_STAT_COLOR);
 
   if (target->tree_width != tree_width || target->tree_height != tree_height) {
+    /*printf("initialize values\n");*/
     /* initialize values */
     target->tree_width = tree_width;
     target->tree_height = tree_height;
@@ -125,6 +127,7 @@ result image_tree_forest_init
   /* source image may need to be (re-)created if it doesn't exist or type has changed */
   /* in create, type is set to b_NONE, so this is done also in the first init */
   if (target->type != type) {
+    /*printf("create source image\n");*/
     if (target->source != NULL) {
       CHECK(pixel_image_destroy(target->source));
     }
@@ -257,6 +260,7 @@ image_tree_forest *image_tree_forest_alloc()
 void image_tree_forest_free(image_tree_forest *ptr)
 {
   TRY();
+  /*printf("free\n");*/
   r = SUCCESS;
   if (ptr != NULL) {
       CHECK(image_tree_forest_destroy(ptr));
@@ -277,6 +281,7 @@ result image_tree_forest_create
 )
 {
   TRY();
+  /*printf("create\n");*/
 
   CHECK_POINTER(target);
   CHECK_POINTER(source);
@@ -488,10 +493,12 @@ result image_tree_forest_update
 {
   TRY();
   uint32 pos, size;
+  /*printf("update\n");*/
 
   CHECK(image_tree_forest_update_prepare(target));
 
   size = target->rows * target->cols;
+  /*printf("size = %ul\n", size);*/
   for (pos = 0; pos < size; pos++) {
       CHECK(image_tree_root_update(&target->roots[pos]));
   }

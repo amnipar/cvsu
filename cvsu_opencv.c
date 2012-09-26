@@ -148,7 +148,7 @@ result pixel_image_create_from_file(pixel_image *target, const char *filename, p
 
   dst = cvCreateImage(cvGetSize(src),depth,channels);
   */
-  printf("width=%d,height=%d,step=%d\n",src->width,src->height,src->widthStep);
+  /*printf("width=%d,height=%d,step=%d\n",src->width,src->height,src->widthStep);*/
   CHECK(pixel_image_create_from_data(target, src->imageData, type, format,
                                      src->width, src->height, channels, src->widthStep));
 
@@ -182,7 +182,7 @@ result pixel_image_write_to_file(pixel_image *source, const char *filename)
       dst = NULL;
   }
   
-  printf("width=%d,height=%d,step=%d\n",source->width,source->height,source->stride);
+  /*printf("width=%ul,height=%ul,step=%ul\n",source->width,source->height,source->stride);*/
   cvSetData(dst, source->data, (signed)source->stride);
   cvSaveImage(filename, dst, 0);
   
