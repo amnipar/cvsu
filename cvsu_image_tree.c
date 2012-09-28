@@ -86,7 +86,7 @@ result image_tree_forest_init
 
   width = target->original->width;
   height = target->original->height;
-  
+
   CHECK_PARAM(tree_width <= width);
   CHECK_PARAM(tree_height <= height);
 
@@ -112,12 +112,12 @@ result image_tree_forest_init
     if (!list_is_null(&target->trees)) {
       CHECK(list_destroy(&target->trees));
     }
-    CHECK(list_create(&target->trees, 100 * size, sizeof(image_tree), 10));
+    CHECK(list_create(&target->trees, 10 * size, sizeof(image_tree), 1));
 
     if (!list_is_null(&target->blocks)) {
       CHECK(list_destroy(&target->blocks));
     }
-    CHECK(list_create(&target->blocks, 100 * size, sizeof(image_block), 10));
+    CHECK(list_create(&target->blocks, 10 * size, sizeof(image_block), 1));
   }
   else {
     size = target->rows * target->cols;
@@ -140,17 +140,17 @@ result image_tree_forest_init
     }
     /* grey image required for grey statistics */
     if (type == b_STAT_GREY) {
-      CHECK(pixel_image_create(target->source, p_U8, GREY, width, height, 1, 
+      CHECK(pixel_image_create(target->source, p_U8, GREY, width, height, 1,
                                1 * width));
-      CHECK(list_create(&target->values, 100 * size, sizeof(stat_grey), 1));
+      CHECK(list_create(&target->values, 10 * size, sizeof(stat_grey), 1));
     }
     else
     /* yuv image required for color statistics */
     /* TODO: need a mechanism to enable using Lab or similar (maybe use a macro?) */
     if (type == b_STAT_COLOR) {
-      CHECK(pixel_image_create(target->source, p_U8, YUV, width, height, 3, 
+      CHECK(pixel_image_create(target->source, p_U8, YUV, width, height, 3,
                                3 * width));
-      CHECK(list_create(&target->values, 100 * size, sizeof(stat_color), 1));
+      CHECK(list_create(&target->values, 10 * size, sizeof(stat_color), 1));
     }
     else {
       /* should never reach here actually */
@@ -521,7 +521,7 @@ result image_tree_forest_divide_with_dev
 
   CHECK_POINTER(target);
   CHECK_PARAM(threshold > 1);
-  
+
   if (target->type == b_STAT_GREY) {
     trees = target->trees.first.next;
     while (trees != &target->trees.last) {
@@ -694,10 +694,10 @@ result image_tree_update
   else
   if (type == b_STAT_COLOR) {
     stat_color *value = (stat_color *)block->value;
-    
+
     value->mean_i = (sint16)((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
     value->dev_i = (sint16)sqrt(dev);
-    
+
     box->channel = 1;
     small_integral_image_box_update(box, block->x, block->y);
     mean = ((real64)box->sum / (real64)box->N);
@@ -832,7 +832,7 @@ dir image_tree_dir_i(image_tree *tree)
   if (tree->nw == NULL || tree->ne == NULL || tree->sw == NULL || tree->se == NULL) {
     return res;
   }
-  
+
   if (tree->root->forest->type != b_STAT_COLOR) {
     return res;
   }
@@ -863,7 +863,7 @@ dir image_tree_dir_c1(image_tree *tree)
   if (tree->nw == NULL || tree->ne == NULL || tree->sw == NULL || tree->se == NULL) {
     return res;
   }
-  
+
   if (tree->root->forest->type != b_STAT_COLOR) {
     return res;
   }
