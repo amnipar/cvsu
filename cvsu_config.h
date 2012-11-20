@@ -118,4 +118,16 @@
 /* #define IMAGE_ACCESS_METHOD IMAGE_ACCESS_BY_POINTER */
 #define IMAGE_ACCESS_METHOD IMAGE_ACCESS_BY_POINTER
 
+/**
+ * Define integral image data type.
+ * Can use either single or double precision floating point numbers.
+ */
+
+#define INTEGRAL_IMAGE_USING_FLOAT  0
+#define INTEGRAL_IMAGE_USING_DOUBLE 1
+/* #define INTEGRAL_IMAGE_DATA_TYPE INTEGRAL_IMAGE_USING_FLOAT */
+#define INTEGRAL_IMAGE_DATA_TYPE INTEGRAL_IMAGE_USING_DOUBLE
+
+#undef INTEGRAL_IMAGE_HIGHER_ORDER_STATISTICS
+
 #endif /* CVSU_CONFIG_H */

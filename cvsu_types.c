@@ -31,6 +31,16 @@
 
 #include "cvsu_types.h"
 
+void statistics_init(statistics *stat)
+{
+  stat->mean = 0;
+  stat->variance = 0;
+#ifdef INTEGRAL_IMAGE_HIGHER_ORDER_STATISTICS
+  stat->skewness = 0;
+  stat->kurtosis = 0;
+#endif
+}
+
 void point_create(point *target, coord x, coord y)
 {
     if (target != NULL) {

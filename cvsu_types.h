@@ -171,11 +171,6 @@ typedef struct hstat_color_t {
     sint16 mean_c2_sw;
 } hstat_color;
 
-typedef struct fstatistics_t {
-    double mean;
-    double dev;
-} fstatistics;
-
 typedef enum result_t {
     SUCCESS = 0,
     FATAL,
@@ -243,10 +238,23 @@ typedef enum pixel_type_t {
 
 /* convenience definitions for integral images */
 
-typedef uint32 I_1_t;
+#if INTEGRAL_IMAGE_DATA_TYPE == INTEGRAL_IMAGE_USING_FLOAT
+
+typedef real32 I_value;
+typedef real32 I_1_t;
+typedef real32 I_2_t;
+#define p_I p_F32
+
+#elif INTEGRAL_IMAGE_DATA_TYPE == INTEGRAL_IMAGE_USING_DOUBLE
+
+typedef real64 I_value;
+typedef real64 I_1_t;
 typedef real64 I_2_t;
-#define p_I_1 p_U32
-#define p_I_2 p_F64
+#define p_I p_F64
+
+#else
+#error "Integral image data type not defined"
+#endif
 
 typedef uint32 SI_1_t;
 typedef uint32 SI_2_t;
@@ -301,6 +309,18 @@ typedef struct image_block_t {
     /*stat_with_dir value;*/
     /*hstat_color value;*/
 } image_block;
+
+typedef struct statistics_t
+{
+  I_value mean;
+  I_value variance;
+#ifdef INTEGRAL_IMAGE_HIGHER_ORDER_STATISTICS
+  I_value skewness;
+  I_value kurtosis;
+#endif
+} statistics;
+
+void statistics_init(statistics *stat);
 
 void point_create(point *target, coord x, coord y);
 void point_add(point *target, coord x, coord y);
