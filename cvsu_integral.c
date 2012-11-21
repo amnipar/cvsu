@@ -137,14 +137,14 @@ result integral_image_create
   /* integral image requires one extra row and column at top and left side */
   target->stride = (target->width + 1) * target->step;
 
-  CHECK(pixel_image_create(&target->I_1, p_I, GREY,
+  CHECK(pixel_image_create(&target->I_1, p_I, source->format,
           target->width+1, target->height+1, target->step, target->stride));
-  CHECK(pixel_image_create(&target->I_2, p_I, GREY,
+  CHECK(pixel_image_create(&target->I_2, p_I, source->format,
           target->width+1, target->height+1, target->step, target->stride));
 #ifdef INTEGRAL_IMAGE_HIGHER_ORDER_STATISTICS
-  CHECK(pixel_image_create(&target->I_3, p_I, GREY,
+  CHECK(pixel_image_create(&target->I_3, p_I, source->format,
           target->width+1, target->height+1, target->step, target->stride));
-  CHECK(pixel_image_create(&target->I_4, p_I, GREY,
+  CHECK(pixel_image_create(&target->I_4, p_I, source->format,
           target->width+1, target->height+1, target->step, target->stride));
 #endif
   init_tables();
@@ -329,7 +329,7 @@ result integral_image_update
   source = target->original;
   /* TODO: handle multiple channels, and higher powers */
   {
-    INTEGRAL_IMAGE_UPDATE_DEFINE_VARIABLES(I_1_t, I_2_t);
+    INTEGRAL_IMAGE_UPDATE_DEFINE_VARIABLES(I_value, I_value);
     uint32 intensity, width, height, x, y, h, v, d;
     SINGLE_DISCONTINUOUS_IMAGE_VARIABLES(source, byte);
 
@@ -341,15 +341,15 @@ result integral_image_update
 
     width = target->width;
     height = target->height;
-    I_1_data = (I_1_t *)target->I_1.data;
-    I_2_data = (I_2_t *)target->I_2.data;
+    I_1_data = (I_value *)target->I_1.data;
+    I_2_data = (I_value *)target->I_2.data;
 
     /* horizontal offset for integral images */
-    h = 1;
+    h = target->step;
     /* vertical offset for integral images */
     v = target->stride;
     /* diagonal offset for integral images */
-    d = target->stride + 1;
+    d = target->stride + target->step;
 
     /* initialize rest of integral images */
     /* add value of this pixel and integrals from top and left */
@@ -357,7 +357,6 @@ result integral_image_update
     {
       INTEGRAL_IMAGE_SET_POS(d);
       for (y = 0; y < height; y++) {
-        ; /* ?? TODO: check if something was removed accidentally */
         for (x = width, source_pos = source_rows[y]; x--; source_pos += source_step) {
           intensity = PIXEL_VALUE(source);
           I_1_SET_VALUE((I_1_GET_VALUE_WITH_OFFSET(v) -
@@ -458,7 +457,7 @@ I_value integral_image_calculate_mean
   }
   else {
     iA = ((I_value *)target->I_1.data) + roi.offset;
-    sum = *(iA + roi.vstep + roi.hstep) + *iA - *(iA - roi.hstep) - *(iA + roi.vstep);
+    sum = *(iA + roi.vstep + roi.hstep) + *iA - *(iA + roi.hstep) - *(iA + roi.vstep);
     return sum / ((I_value)roi.N);
   }
 }
