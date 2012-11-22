@@ -398,16 +398,15 @@ integral_image_roi integral_image_create_roi
   height = target->height;
 
   roi.valid = 0;
-  if (x < width && y < height) {
-    if (x < 0) {
-      dx = dx + x;
-      x = 0;
-    }
-    if (y < 0) {
-      dy = dy + y;
-      y = 0;
-    }
-
+  if (x < 0) {
+    dx = dx + x;
+    x = 0;
+  }
+  if (y < 0) {
+    dy = dy + y;
+    y = 0;
+  }
+  if ((unsigned)x < width && (unsigned)y < height) {
     if (dx > 0 && dy > 0) {
       if (x + dx > width) dx = width - x;
       if (y + dy > height) dy = height - y;
@@ -449,9 +448,20 @@ I_value integral_image_calculate_mean
 {
   integral_image_roi roi;
   I_value *iA, sum;
+  /*
+  int p;
 
+  p = 0;
+  if (x < 0) {
+    p = 1;
+  }
+  */
   roi = integral_image_create_roi(target, x, y, dx, dy, offset);
-
+  /*
+  if (p == 1) {
+    printf("X=%d offset=%d hstep=%d vstep=%d N=%d valid = %d\n", x, roi.offset, roi.hstep, roi.vstep, roi.N, roi.valid);
+  }
+  */
   if (roi.valid == 0) {
     return 0;
   }
@@ -475,54 +485,30 @@ double integral_image_calculate_variance
   uint32 offset
   )
 {
-  I_value *iA, mean;
-  I_value *i2A, sum2;
-  register uint32 image_offset, N, hstep, vstep, last_col, last_row;
+  integral_image_roi roi;
+  I_value *iA, *i2A, mean, sum2, var;
 
-  last_col = target->width;
-  last_row = target->height;
-
-  if (x >= last_col || y >= last_row || offset > target->step) {
+  roi = integral_image_create_roi(target, x, y, dx, dy, offset);
+  if (roi.valid == 0) {
     return 0;
   }
   else {
-    /* the coordinates can be negative, but they have to be adjusted to zero */
-    /* in this case also the size (dx,dy) must be adjusted */
-    if (x < 0) {
-      dx = dx + x;
-      x = 0;
-    }
-    if (y < 0) {
-      dy = dy + y;
-      y = 0;
-    }
-
-    if (dx <= 0 || dy <= 0) {
-      return 0;
-    }
-    else {
-      if (x + dx > last_col) dx = last_col - x;
-      if (y + dy > last_row) dy = last_row - y;
-
-      N = dx * dy;
-      hstep = (unsigned)dx * target->step;
-      vstep = (unsigned)dy * target->stride;
-      image_offset = y * target->stride + x * target->step + offset;
-
-      iA = ((I_value *)target->I_1.data) + image_offset;
-      i2A = ((I_value *)target->I_2.data) + image_offset;
-      mean = (*(iA + vstep + hstep) + *iA - *(iA - hstep) - *(iA + vstep)) / ((I_1_t)N);
-      sum2 = *(i2A + vstep + hstep) + *i2A - *(i2A - hstep) - *(i2A - vstep);
-      return (sum2 / ((I_value)N)) - mean*mean;
-    }
+    iA = ((I_value *)target->I_1.data) + roi.offset;
+    i2A = ((I_value *)target->I_2.data) + roi.offset;
+    mean = (*(iA + roi.vstep + roi.hstep) + *iA - *(iA + roi.hstep) - *(iA + roi.vstep)) / ((I_value)roi.N);
+    sum2 = *(i2A + roi.vstep + roi.hstep) + *i2A - *(i2A + roi.hstep) - *(i2A + roi.vstep);
+    var = (sum2 / ((I_value)roi.N)) - mean*mean;
+    if (var < 0) var = 0;
+    return var;
   }
 }
 
 /**
  * Use integral_image to calculate intensity statistics within the given area.
  */
-statistics integral_image_calculate_statistics(
+void integral_image_calculate_statistics(
   integral_image *target,
+  statistics *stat,
   sint32 x,
   sint32 y,
   sint32 dx,
@@ -530,53 +516,30 @@ statistics integral_image_calculate_statistics(
   uint32 offset
   )
 {
-  statistics stat;
-  I_value *iA, mean;
-  I_value *i2A, sum2;
-  register uint32 image_offset, N, hstep, vstep, last_col, last_row;
+  integral_image_roi roi;
+  I_value *iA, *i2A, N, sum, sum2, mean, var;
 
-  last_col = target->width;
-  last_row = target->height;
-
-  statistics_init(&stat);
-
-  if (x >= last_col || y >= last_row || offset > target->step) {
-    return stat;
+  statistics_init(stat);
+  roi = integral_image_create_roi(target, x, y, dx, dy, offset);
+  if (roi.valid == 0) {
+    return;
   }
   else {
-    /* the coordinates can be negative, but they have to be adjusted to zero */
-    /* in this case also the size (dx,dy) must be adjusted */
-    if (x < 0) {
-      dx = dx + x;
-      x = 0;
-    }
-    if (y < 0) {
-      dy = dy + y;
-      y = 0;
-    }
-
-    if (dx <= 0 || dy <= 0) {
-      return stat;
-    }
-    else {
-      if (x + dx > last_col) dx = last_col - x;
-      if (y + dy > last_row) dy = last_row - y;
-
-      N = dx * dy;
-      hstep = (unsigned)dx * target->step;
-      vstep = (unsigned)dy * target->stride;
-      image_offset = y * target->stride + x * target->step + offset;
-
-      iA = ((I_value *)target->I_1.data) + image_offset;
-      i2A = ((I_value *)target->I_2.data) + image_offset;
-
-      mean = (*(iA + vstep + hstep) + *iA - *(iA - hstep) - *(iA + vstep)) / ((I_1_t)N);
-      sum2 = *(i2A + vstep + hstep) + *i2A - *(i2A - hstep) - *(i2A - vstep);
-
-      stat.mean = mean;
-      stat.variance = (sum2 / ((I_value)N)) - mean*mean;
-      return stat;
-    }
+    iA = ((I_value *)target->I_1.data) + roi.offset;
+    i2A = ((I_value *)target->I_2.data) + roi.offset;
+    N = ((I_value)roi.N);
+    sum = *(iA + roi.vstep + roi.hstep) + *iA - *(iA + roi.hstep) - *(iA + roi.vstep);
+    sum2 = *(i2A + roi.vstep + roi.hstep) + *i2A - *(i2A + roi.hstep) - *(i2A + roi.vstep);
+    mean = sum / N;
+    var = (sum2 / N) - mean*mean;
+    if (var < 0) var = 0;
+    stat->N = N;
+    stat->sum = sum;
+    stat->sum2 = sum2;
+    stat->mean = mean;
+    stat->variance = var;
+    stat->deviation = sqrt(var);
+    return;
   }
 }
 

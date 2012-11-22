@@ -312,8 +312,12 @@ typedef struct image_block_t {
 
 typedef struct statistics_t
 {
+  I_value N;
+  I_value sum;
+  I_value sum2;
   I_value mean;
   I_value variance;
+  I_value deviation;
 #ifdef INTEGRAL_IMAGE_HIGHER_ORDER_STATISTICS
   I_value skewness;
   I_value kurtosis;

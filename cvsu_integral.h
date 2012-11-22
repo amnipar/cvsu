@@ -246,8 +246,9 @@ double integral_image_calculate_variance(
  * Uses the integral_image to calculate intensity statistics within the given
  * region.
  */
-statistics integral_image_calculate_statistics(
+void integral_image_calculate_statistics(
   integral_image *target,
+  statistics *stat,
   sint32 x,
   sint32 y,
   sint32 width,
