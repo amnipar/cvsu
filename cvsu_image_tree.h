@@ -68,7 +68,8 @@ typedef struct image_tree_neighbor_t {
 typedef struct image_tree_t {
     struct image_tree_root_t *root;
     struct image_tree_t *parent;
-
+    struct image_tree_t *class_id;
+    
     /* subtrees, NULL if the tree has not beed divided */
     struct image_tree_t *nw;
     struct image_tree_t *ne;
@@ -77,7 +78,7 @@ typedef struct image_tree_t {
 
     image_block *block;
 
-    /* cache neighbors in each tree as they are determined */
+    /* cache direct neighbors in each tree as they are determined */
     struct image_tree_t *n;
     struct image_tree_t *e;
     struct image_tree_t *s;
@@ -85,6 +86,7 @@ typedef struct image_tree_t {
 
     /*edge_block *edge;*/
     uint32 level;
+    uint32 class_rank;
 } image_tree;
 
 /**
@@ -326,7 +328,7 @@ result image_tree_add_children_as_immediate_neighbors(
  *
  * 2. Peek the item at the top of stack; if it has children, pop it and push the
  *    two children adjacent to this tree into the stack; if not, add it to the
- *    end of the listn
+ *    end of the list
  * 3.
  */
 
@@ -338,6 +340,30 @@ result image_tree_find_all_immediate_neighbors(
 dir image_tree_dir_i(image_tree *tree);
 dir image_tree_dir_c1(image_tree *tree);
 dir image_tree_dir_c2(image_tree *tree);
+
+/**
+ * Creates an equivalence class for this tree.
+ * Part of the Union-Find implementation for image trees.
+ */
+void image_tree_class_create(image_tree *tree);
+
+/**
+ * Creates a union of the two classes these two trees belong to.
+ * Part of the Union-Find implementation for image trees.
+ */
+void image_tree_class_union(image_tree *tree1, image_tree *tree2);
+
+/**
+ * Finds the representative item in the class this tree belongs to.
+ * Part of the Union-Find implementation for image trees.
+ */
+image_tree *image_tree_class_find(image_tree *tree);
+
+/**
+ * Gets the class label for this tree. Effectively the pointer cast into int.
+ * Helper function on top of the Union-Find implementation for image trees.
+ */
+uint32 image_tree_class_get(image_tree *tree);
 
 #ifdef __cplusplus
 }

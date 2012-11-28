@@ -495,6 +495,7 @@ void list_free(
     )
 {
     TRY();
+    /*printf("free list\n");*/
     r = SUCCESS;
     if (ptr != NULL) {
         CHECK(list_destroy(ptr));

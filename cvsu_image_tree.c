@@ -194,6 +194,7 @@ result image_tree_forest_init
 
       new_tree.root = &target->roots[pos];
       new_tree.parent = NULL;
+      new_tree.class_id = NULL;
       new_tree.nw = NULL;
       new_tree.ne = NULL;
       new_tree.sw = NULL;
@@ -474,6 +475,7 @@ result image_tree_forest_update_prepare
   size = target->rows * target->cols;
   for (pos = 0; pos < size; pos++) {
     tree = target->roots[pos].tree;
+    tree->class_id = NULL;
     tree->nw = NULL;
     tree->ne = NULL;
     tree->sw = NULL;
@@ -747,6 +749,7 @@ result image_tree_divide
     if (target->block->w > 1 && target->block->h > 1) {
       new_tree.root = target->root;
       new_tree.parent = target;
+      new_tree.class_id = NULL;
       new_tree.nw = NULL;
       new_tree.ne = NULL;
       new_tree.sw = NULL;
@@ -1402,6 +1405,81 @@ result image_tree_find_all_immediate_neighbors(
     /*printf("neighbors found: %d\n", target->count);*/
     FINALLY(image_tree_find_all_immediate_neighbors);
     RETURN();
+}
+
+/******************************************************************************/
+
+void image_tree_class_create(image_tree *tree)
+{
+  if (tree != NULL) {
+    /*printf("class create\n");*/
+    /* if tree already has a class, don't reset it */
+    if (tree->class_id == NULL) {
+      /* one-tree class is it's own id, and has the rank of 0 */
+      tree->class_id = tree;
+      tree->class_rank = 0;
+    }
+  }
+}
+
+/******************************************************************************/
+
+void image_tree_class_union(image_tree *tree1, image_tree *tree2)
+{
+  if (tree1 != NULL && tree2 != NULL) {
+    /*printf("class union\n");*/
+    image_tree *id1, *id2;
+    
+    id1 = image_tree_class_find(tree1);
+    id2 = image_tree_class_find(tree2);
+    if (id1 == NULL || id2 == NULL) {
+      return;
+    }
+    /* if the trees are already in the same class, no need for union */
+    if (id1 == id2) {
+      return;
+    }
+    /* otherwise set the tree with higher class rank as id of the union */
+    else {
+      if (id1->class_rank < id2->class_rank) {
+        id1->class_id = id2;
+      }
+      else
+      if (id1->class_rank > id2->class_rank) {
+        id2->class_id = id1;
+      }
+      /* when equal rank trees are combined, the root tree's rank is increased */
+      else {
+        id2->class_id = id1;
+        id1->class_rank += 1;
+      }
+    }
+  }
+}
+
+/******************************************************************************/
+
+image_tree *image_tree_class_find(image_tree *tree)
+{
+  if (tree != NULL) {
+    /*printf("class find\n");*/
+    if (tree->class_id != tree && tree->class_id != NULL) {
+      tree->class_id = image_tree_class_find(tree->class_id);
+    }
+    return tree->class_id;
+  }
+  return NULL;
+}
+
+/******************************************************************************/
+
+uint32 image_tree_class_get(image_tree *tree)
+{
+  if (tree != NULL) {
+    /*printf("class get\n");*/
+    return (uint32)tree->class_id;
+  }
+  return 0;
 }
 
 /******************************************************************************/
