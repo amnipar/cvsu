@@ -292,7 +292,8 @@ typedef enum image_block_type_t {
     b_STAT_COLOR,
     b_STAT_WITH_DIR,
     b_HSTAT_GREY,
-    b_HSTAT_COLOR
+    b_HSTAT_COLOR,
+    b_STATISTICS
 } image_block_type;
 
 /**

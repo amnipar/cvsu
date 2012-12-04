@@ -91,7 +91,7 @@ result image_tree_forest_init
   CHECK_PARAM(tree_height <= height);
 
   /* for now, support grey and color stat types only */
-  CHECK_PARAM(type == b_STAT_GREY || type == b_STAT_COLOR);
+  CHECK_PARAM(type == b_STAT_GREY || type == b_STAT_COLOR || type == b_STATISTICS);
 
   if (target->tree_width != tree_width || target->tree_height != tree_height) {
     /*printf("initialize values\n");*/
@@ -152,6 +152,12 @@ result image_tree_forest_init
                                3 * width));
       CHECK(list_create(&target->values, 10 * size, sizeof(stat_color), 1));
     }
+    else
+    if (type == b_STATISTICS) {
+      CHECK(pixel_image_create(target->source, p_U8, GREY, width, height, 1,
+                               1 * width));
+      CHECK(list_create(&target->values, 10 * size, sizeof(statistics), 1));
+    }
     else {
       /* should never reach here actually */
       ERROR(BAD_PARAM);
@@ -187,6 +193,18 @@ result image_tree_forest_init
         new_value.mean_c1 = 0;
         new_value.dev_c1 = 0;
         new_value.mean_c2 = 0;
+        CHECK(list_append_reveal_data(&target->values, (pointer)&new_value, (pointer*)&value_ptr));
+        new_block.value = (pointer)value_ptr;
+      }
+      else
+      if (target->type == b_STATISTICS) {
+        statistics new_value, *value_ptr;
+        new_value.N = 0;
+        new_value.sum = 0;
+        new_value.sum2 = 0;
+        new_value.mean = 0;
+        new_value.variance = 0;
+        new_value.deviation = 0;
         CHECK(list_append_reveal_data(&target->values, (pointer)&new_value, (pointer*)&value_ptr));
         new_block.value = (pointer)value_ptr;
       }
@@ -423,7 +441,7 @@ result image_tree_forest_update_prepare
 
   /* create a fresh copy of the source image in case it has changed */
   /* image format may be converted */
-  if (target->type == b_STAT_GREY) {
+  if (target->type == b_STAT_GREY || target->type == b_STATISTICS) {
     /* grey image can be used as is */
     if (target->original->format == GREY) {
       CHECK(pixel_image_copy(target->source, target->original));
@@ -540,6 +558,17 @@ result image_tree_forest_divide_with_dev
     while (trees != &target->trees.last) {
       current_tree = (image_tree *)trees->data;
       if (((stat_color *)current_tree->block->value)->dev_i > threshold) {
+        CHECK(image_tree_divide(current_tree));
+      }
+      trees = trees->next;
+    }
+  }
+  else
+  if (target->type == b_STATISTICS) {
+    trees = target->trees.first.next;
+    while (trees != &target->trees.last) {
+      current_tree = (image_tree *)trees->data;
+      if (((statistics *)current_tree->block->value)->deviation > (I_value)threshold) {
         CHECK(image_tree_divide(current_tree));
       }
       trees = trees->next;
@@ -671,7 +700,7 @@ result image_tree_update
 )
 {
   TRY();
-  real64 mean, dev;
+  I_value mean, dev;
   /*uint32 mean, dev;*/
   small_integral_image_box *box;
   image_block *block;
@@ -686,9 +715,9 @@ result image_tree_update
 
   box->channel = 0;
   small_integral_image_box_update(box, block->x, block->y);
-  mean = ((real64)box->sum / (real64)box->N);
-  dev = (((real64)box->sumsqr / (real64)box->N) - (mean * mean));
-  if (dev < 1) dev = 1;
+  mean = ((I_value)box->sum / (I_value)box->N);
+  dev = (((I_value)box->sumsqr / (I_value)box->N) - (mean * mean));
+  if (dev < 0) dev = 0;
   if (type == b_STAT_GREY) {
     ((stat_grey *)block->value)->mean = (sint16)((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
     ((stat_grey *)block->value)->dev = (sint16)sqrt(dev);
@@ -702,19 +731,31 @@ result image_tree_update
 
     box->channel = 1;
     small_integral_image_box_update(box, block->x, block->y);
-    mean = ((real64)box->sum / (real64)box->N);
-    dev = (((real64)box->sumsqr / (real64)box->N) - (mean * mean));
+    mean = ((I_value)box->sum / (I_value)box->N);
+    dev = (((I_value)box->sumsqr / (I_value)box->N) - (mean * mean));
     if (dev < 1) dev = 1;
     value->mean_c1 = (sint16)((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
     value->dev_c1 = (sint16)sqrt(dev);
 
     box->channel = 2;
     small_integral_image_box_update(box, block->x, block->y);
-    mean = ((real64)box->sum / (real64)box->N);
-    dev = (((real64)box->sumsqr / (real64)box->N) - (mean * mean));
+    mean = ((I_value)box->sum / (I_value)box->N);
+    dev = (((I_value)box->sumsqr / (I_value)box->N) - (mean * mean));
     if (dev < 1) dev = 1;
     value->mean_c2 = (sint16)((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
     value->dev_c2 = (sint16)sqrt(dev);
+  }
+  else
+  if (type == b_STATISTICS) {
+    statistics *value = (statistics *)block->value;
+    
+    value->N = (I_value)box->N;
+    value->sum = (I_value)box->sum;
+    value->sum2 = (I_value)box->sumsqr;
+    value->mean = ((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
+    value->variance = dev;
+    value->deviation = sqrt(dev);
+    /*printf("%.3f,%.3f ", value->mean, value->deviation);*/
   }
   else {
     /* should never get here... */
@@ -732,7 +773,7 @@ result image_tree_update
 
 /*
  * TODO: each image tree root should have its own sublist of blocks, for
- * allowing paraller division of each root.
+ * allowing parallel division of each root.
  */
 
 result image_tree_divide
