@@ -715,8 +715,10 @@ result image_tree_update
 
   box->channel = 0;
   small_integral_image_box_update(box, block->x, block->y);
+
   mean = ((I_value)box->sum / (I_value)box->N);
   dev = (((I_value)box->sumsqr / (I_value)box->N) - (mean * mean));
+
   if (dev < 0) dev = 0;
   if (type == b_STAT_GREY) {
     ((stat_grey *)block->value)->mean = (sint16)((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
@@ -748,7 +750,7 @@ result image_tree_update
   else
   if (type == b_STATISTICS) {
     statistics *value = (statistics *)block->value;
-    
+
     value->N = (I_value)box->N;
     value->sum = (I_value)box->sum;
     value->sum2 = (I_value)box->sumsqr;
@@ -782,12 +784,16 @@ result image_tree_divide
 )
 {
   TRY();
+  image_tree_forest *forest;
   image_block new_block, *child_block;
   image_tree new_tree, *child_tree;
+  image_block_type type;
 
   CHECK_POINTER(target);
   if (target->nw == NULL && target->ne == NULL && target->sw == NULL && target->se == NULL) {
     if (target->block->w > 1 && target->block->h > 1) {
+      forest = target->root->forest;
+      type = forest->type;
       new_tree.root = target->root;
       new_tree.parent = target;
       new_tree.class_id = NULL;
@@ -800,6 +806,7 @@ result image_tree_divide
       new_tree.s = NULL;
       new_tree.w = NULL;
       new_tree.level = target->level + 1;
+      new_tree.class_rank = 0;
       new_block.w = (uint16)(target->block->w / 2);
       new_block.h = (uint16)(target->block->h / 2);
 
@@ -808,36 +815,155 @@ result image_tree_divide
       /* nw block */
       new_block.x = target->block->x;
       new_block.y = target->block->y;
-      CHECK(list_append_reveal_data(&target->root->forest->blocks, (pointer)&new_block, (pointer*)&child_block));
+      if (type == b_STAT_GREY) {
+        stat_grey new_value, *value_ptr;
+        new_value.mean = 0;
+        new_value.dev = 0;
+        CHECK(list_append_reveal_data(&forest->values, (pointer)&new_value, (pointer*)&value_ptr));
+        new_block.value = (pointer)value_ptr;
+      }
+      else
+      if (type == b_STAT_COLOR) {
+        stat_color new_value, *value_ptr;
+        new_value.mean_i = 0;
+        new_value.dev_i = 0;
+        new_value.mean_c1 = 0;
+        new_value.dev_c1 = 0;
+        new_value.mean_c2 = 0;
+        CHECK(list_append_reveal_data(&forest->values, (pointer)&new_value, (pointer*)&value_ptr));
+        new_block.value = (pointer)value_ptr;
+      }
+      else
+      if (type == b_STATISTICS) {
+        statistics new_value, *value_ptr;
+        new_value.N = 0;
+        new_value.sum = 0;
+        new_value.sum2 = 0;
+        new_value.mean = 0;
+        new_value.variance = 0;
+        new_value.deviation = 0;
+        CHECK(list_append_reveal_data(&forest->values, (pointer)&new_value, (pointer*)&value_ptr));
+        new_block.value = (pointer)value_ptr;
+      }
+      CHECK(list_append_reveal_data(&forest->blocks, (pointer)&new_block, (pointer*)&child_block));
       new_tree.block = child_block;
-      CHECK(list_append_reveal_data(&target->root->forest->trees, (pointer)&new_tree, (pointer*)&child_tree));
+      CHECK(list_append_reveal_data(&forest->trees, (pointer)&new_tree, (pointer*)&child_tree));
       target->nw = child_tree;
 
       CHECK(image_tree_update(child_tree));
-
       /* ne block */
       new_block.x = (uint16)(target->block->x + new_block.w);
-      CHECK(list_append_reveal_data(&target->root->forest->blocks, (pointer)&new_block, (pointer*)&child_block));
+      if (type == b_STAT_GREY) {
+        stat_grey new_value, *value_ptr;
+        new_value.mean = 0;
+        new_value.dev = 0;
+        CHECK(list_append_reveal_data(&forest->values, (pointer)&new_value, (pointer*)&value_ptr));
+        new_block.value = (pointer)value_ptr;
+      }
+      else
+      if (type == b_STAT_COLOR) {
+        stat_color new_value, *value_ptr;
+        new_value.mean_i = 0;
+        new_value.dev_i = 0;
+        new_value.mean_c1 = 0;
+        new_value.dev_c1 = 0;
+        new_value.mean_c2 = 0;
+        CHECK(list_append_reveal_data(&forest->values, (pointer)&new_value, (pointer*)&value_ptr));
+        new_block.value = (pointer)value_ptr;
+      }
+      else
+      if (type == b_STATISTICS) {
+        statistics new_value, *value_ptr;
+        new_value.N = 0;
+        new_value.sum = 0;
+        new_value.sum2 = 0;
+        new_value.mean = 0;
+        new_value.variance = 0;
+        new_value.deviation = 0;
+        CHECK(list_append_reveal_data(&forest->values, (pointer)&new_value, (pointer*)&value_ptr));
+        new_block.value = (pointer)value_ptr;
+      }
+      CHECK(list_append_reveal_data(&forest->blocks, (pointer)&new_block, (pointer*)&child_block));
       new_tree.block = child_block;
-      CHECK(list_append_reveal_data(&target->root->forest->trees, (pointer)&new_tree, (pointer*)&child_tree));
+      CHECK(list_append_reveal_data(&forest->trees, (pointer)&new_tree, (pointer*)&child_tree));
       target->ne = child_tree;
 
       CHECK(image_tree_update(child_tree));
 
       /* se block */
       new_block.y = (uint16)(target->block->y + new_block.h);
-      CHECK(list_append_reveal_data(&target->root->forest->blocks, (pointer)&new_block, (pointer*)&child_block));
+      if (type == b_STAT_GREY) {
+        stat_grey new_value, *value_ptr;
+        new_value.mean = 0;
+        new_value.dev = 0;
+        CHECK(list_append_reveal_data(&forest->values, (pointer)&new_value, (pointer*)&value_ptr));
+        new_block.value = (pointer)value_ptr;
+      }
+      else
+      if (type == b_STAT_COLOR) {
+        stat_color new_value, *value_ptr;
+        new_value.mean_i = 0;
+        new_value.dev_i = 0;
+        new_value.mean_c1 = 0;
+        new_value.dev_c1 = 0;
+        new_value.mean_c2 = 0;
+        CHECK(list_append_reveal_data(&forest->values, (pointer)&new_value, (pointer*)&value_ptr));
+        new_block.value = (pointer)value_ptr;
+      }
+      else
+      if (type == b_STATISTICS) {
+        statistics new_value, *value_ptr;
+        new_value.N = 0;
+        new_value.sum = 0;
+        new_value.sum2 = 0;
+        new_value.mean = 0;
+        new_value.variance = 0;
+        new_value.deviation = 0;
+        CHECK(list_append_reveal_data(&forest->values, (pointer)&new_value, (pointer*)&value_ptr));
+        new_block.value = (pointer)value_ptr;
+      }
+      CHECK(list_append_reveal_data(&forest->blocks, (pointer)&new_block, (pointer*)&child_block));
       new_tree.block = child_block;
-      CHECK(list_append_reveal_data(&target->root->forest->trees, (pointer)&new_tree, (pointer*)&child_tree));
+      CHECK(list_append_reveal_data(&forest->trees, (pointer)&new_tree, (pointer*)&child_tree));
       target->se = child_tree;
 
       CHECK(image_tree_update(child_tree));
 
       /* sw block */
       new_block.x = target->block->x;
-      CHECK(list_append_reveal_data(&target->root->forest->blocks, (pointer)&new_block, (pointer*)&child_block));
+      if (type == b_STAT_GREY) {
+        stat_grey new_value, *value_ptr;
+        new_value.mean = 0;
+        new_value.dev = 0;
+        CHECK(list_append_reveal_data(&forest->values, (pointer)&new_value, (pointer*)&value_ptr));
+        new_block.value = (pointer)value_ptr;
+      }
+      else
+      if (type == b_STAT_COLOR) {
+        stat_color new_value, *value_ptr;
+        new_value.mean_i = 0;
+        new_value.dev_i = 0;
+        new_value.mean_c1 = 0;
+        new_value.dev_c1 = 0;
+        new_value.mean_c2 = 0;
+        CHECK(list_append_reveal_data(&forest->values, (pointer)&new_value, (pointer*)&value_ptr));
+        new_block.value = (pointer)value_ptr;
+      }
+      else
+      if (type == b_STATISTICS) {
+        statistics new_value, *value_ptr;
+        new_value.N = 0;
+        new_value.sum = 0;
+        new_value.sum2 = 0;
+        new_value.mean = 0;
+        new_value.variance = 0;
+        new_value.deviation = 0;
+        CHECK(list_append_reveal_data(&forest->values, (pointer)&new_value, (pointer*)&value_ptr));
+        new_block.value = (pointer)value_ptr;
+      }
+      CHECK(list_append_reveal_data(&forest->blocks, (pointer)&new_block, (pointer*)&child_block));
       new_tree.block = child_block;
-      CHECK(list_append_reveal_data(&target->root->forest->trees, (pointer)&new_tree, (pointer*)&child_tree));
+      CHECK(list_append_reveal_data(&forest->trees, (pointer)&new_tree, (pointer*)&child_tree));
       target->sw = child_tree;
 
       CHECK(image_tree_update(child_tree));
@@ -1470,7 +1596,7 @@ void image_tree_class_union(image_tree *tree1, image_tree *tree2)
   if (tree1 != NULL && tree2 != NULL) {
     /*printf("class union\n");*/
     image_tree *id1, *id2;
-    
+
     id1 = image_tree_class_find(tree1);
     id2 = image_tree_class_find(tree2);
     if (id1 == NULL || id2 == NULL) {
