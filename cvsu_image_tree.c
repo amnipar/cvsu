@@ -54,6 +54,7 @@ string image_tree_forest_divide_with_dev_name = "image_tree_forest_divide_with_d
 string image_tree_forest_read_name = "image_tree_forest_read";
 string image_tree_root_update_name = "image_tree_root_update";
 string image_tree_update_name = "image_tree_update";
+string image_tree_calculate_consistency_name = "image_tree_calculate_consistency";
 string image_tree_divide_name = "image_tree_divide";
 string image_tree_create_neighbor_list_name = "image_tree_create_neighbor_list";
 string image_tree_get_direct_neighbor_name = "image_tree_get_direct_neighbor";
@@ -768,6 +769,48 @@ result image_tree_update
   /*printf("%d.%d update tree (%d,%d)=%d\n", now.tv_sec, now.tv_usec, block->x, block->y, block->value.mean);*/
 
   FINALLY(image_tree_update);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result image_tree_calculate_consistency
+  (
+  image_tree *tree,
+  I_value *rows,
+  I_value *cols
+  /*consistency *target*/
+  )
+{
+  TRY();
+  uint32 row, col, width, height, offset, step, rinc, cinc;
+  SI_2_t *A, *B, *C, *D, N, sum, sum2, mean, dev;
+  small_integral_image_box *box;
+  
+  CHECK_POINTER(tree);
+  CHECK_POINTER(rows);
+  CHECK_POINTER(cols);
+  
+  box = &tree->root->box;
+  width = tree->block->w;
+  height = tree->block->h;
+  step = box->step;
+  offset = (tree->block->y - box->dy) * box->stride + (tree->block->x - box->dx) * box->step + box->channel;
+  rinc = width * box->step;
+  cinc = height * box->stride;
+  
+  A = box->I_2_data + offset;
+  B = A + 2 * step;
+  D = A + cinc;
+  C = D + 2 * step;
+  for (col = 0; col < width; col++) {
+    A += step;
+    B += step;
+    C += step;
+    D += step;
+  }
+  
+  FINALLY(image_tree_calculate_consistency);
   RETURN();
 }
 

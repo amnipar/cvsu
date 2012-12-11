@@ -255,6 +255,16 @@ result image_tree_divide(
 );
 
 /**
+ * Calculates the tree consistency measures for rows, cols, or both.
+ */
+result image_tree_calculate_consistency(
+  image_tree *tree,
+  I_value *rows,
+  I_value *cols
+  /*consistency *target*/
+);
+
+/**
  * Creates and initializes a neighbor list
  */
 result image_tree_create_neighbor_list(

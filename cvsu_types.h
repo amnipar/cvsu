@@ -325,6 +325,14 @@ typedef struct statistics_t
 #endif
 } statistics;
 
+typedef struct consistency_t
+{
+  I_value row_mean;
+  I_value row_deviation;
+  I_value col_mean;
+  I_value col_deviation;
+} consistency;
+
 void statistics_init(statistics *stat);
 
 void point_create(point *target, coord x, coord y);
