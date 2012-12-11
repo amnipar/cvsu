@@ -112,12 +112,12 @@ result image_tree_forest_init
     if (!list_is_null(&target->trees)) {
       CHECK(list_destroy(&target->trees));
     }
-    CHECK(list_create(&target->trees, 10 * size, sizeof(image_tree), 1));
+    CHECK(list_create(&target->trees, 24 * size, sizeof(image_tree), 1));
 
     if (!list_is_null(&target->blocks)) {
       CHECK(list_destroy(&target->blocks));
     }
-    CHECK(list_create(&target->blocks, 10 * size, sizeof(image_block), 1));
+    CHECK(list_create(&target->blocks, 24 * size, sizeof(image_block), 1));
   }
   else {
     size = target->rows * target->cols;
@@ -142,7 +142,7 @@ result image_tree_forest_init
     if (type == b_STAT_GREY) {
       CHECK(pixel_image_create(target->source, p_U8, GREY, width, height, 1,
                                1 * width));
-      CHECK(list_create(&target->values, 10 * size, sizeof(stat_grey), 1));
+      CHECK(list_create(&target->values, 24 * size, sizeof(stat_grey), 1));
     }
     else
     /* yuv image required for color statistics */
@@ -150,13 +150,13 @@ result image_tree_forest_init
     if (type == b_STAT_COLOR) {
       CHECK(pixel_image_create(target->source, p_U8, YUV, width, height, 3,
                                3 * width));
-      CHECK(list_create(&target->values, 10 * size, sizeof(stat_color), 1));
+      CHECK(list_create(&target->values, 24 * size, sizeof(stat_color), 1));
     }
     else
     if (type == b_STATISTICS) {
       CHECK(pixel_image_create(target->source, p_U8, GREY, width, height, 1,
                                1 * width));
-      CHECK(list_create(&target->values, 10 * size, sizeof(statistics), 1));
+      CHECK(list_create(&target->values, 24 * size, sizeof(statistics), 1));
     }
     else {
       /* should never reach here actually */
@@ -965,6 +965,79 @@ result image_tree_divide
       new_tree.block = child_block;
       CHECK(list_append_reveal_data(&forest->trees, (pointer)&new_tree, (pointer*)&child_tree));
       target->sw = child_tree;
+      
+      target->nw->e = target->ne;
+      target->nw->s = target->sw;
+      target->ne->w = target->nw;
+      target->ne->s = target->se;
+      target->sw->e = target->se;
+      target->sw->n = target->nw;
+      target->se->w = target->sw;
+      target->se->n = target->ne;
+      if (target->n != NULL) {
+        if (target->n->sw != NULL) {
+          target->nw->n = target->n->sw;
+          target->n->sw->s = target->nw;
+        }
+        else {
+          target->nw->n = target->n;
+        }
+        if (target->n->se != NULL) {
+          target->ne->n = target->n->se;
+          target->n->se->s = target->ne;
+        }
+        else {
+          target->ne->n = target->n;
+        }
+      }
+      if (target->e != NULL) {
+        if (target->e->nw != NULL) {
+          target->ne->e = target->e->nw;
+          target->e->nw->w = target->ne;
+        }
+        else {
+          target->ne->e = target->e;
+        }
+        if (target->e->sw != NULL) {
+          target->se->e = target->e->sw;
+          target->e->sw->w = target->se;
+        }
+        else {
+          target->se->e = target->e;
+        }
+      }
+      if (target->s != NULL) {
+        if (target->s->nw != NULL) {
+          target->sw->s = target->s->nw;
+          target->s->nw->n = target->sw;
+        }
+        else {
+          target->sw->s = target->s;
+        }
+        if (target->s->ne != NULL) {
+          target->se->s = target->s->ne;
+          target->s->ne->n = target->se;
+        }
+        else {
+          target->se->s = target->s;
+        }
+      }
+      if (target->w != NULL) {
+        if (target->w->ne != NULL) {
+          target->nw->w = target->w->ne;
+          target->w->ne->e = target->nw;
+        }
+        else {
+          target->nw->w = target->w;
+        }
+        if (target->w->se != NULL) {
+          target->sw->w = target->w->se;
+          target->w->se->e = target->sw;
+        }
+        else {
+          target->sw->w = target->w;
+        }
+      }
 
       CHECK(image_tree_update(child_tree));
     }
@@ -1519,59 +1592,38 @@ result image_tree_add_children_as_immediate_neighbors(
  *    end of the list
  * 3.
  */
-result image_tree_find_all_immediate_neighbors(
-    list *target,
-    image_tree *tree
-    )
+result image_tree_find_all_immediate_neighbors
+  (
+  list *target,
+  image_tree *tree
+  )
 {
-    TRY();
-    image_tree *new_neighbor;
-    image_tree **temp_ptr;
+  TRY();
+  image_tree *new_neighbor;
+  image_tree **temp_ptr;
 
-    /*printf("find all neighbors\n");*/
-    CHECK_POINTER(target);
-    CHECK_POINTER(tree);
+  CHECK_POINTER(target);
+  CHECK_POINTER(tree);
 
-    CHECK(image_tree_get_direct_neighbor_n(tree, &new_neighbor));
-    if (new_neighbor != NULL) {
-        /*CHECK(list_append(target, (pointer)&new_neighbor));*/
-        CHECK(list_append_reveal_data(target, (pointer)&new_neighbor, (pointer*)&temp_ptr));
-        /*printf("0x%x 0x%x 0x%x\n", new_neighbor, temp_ptr, *temp_ptr);*/
-        if (new_neighbor != *temp_ptr) {
-            printf("error copying tree ptr to list\n");
-        }
-    }
-    CHECK(image_tree_get_direct_neighbor_e(tree, &new_neighbor));
-    if (new_neighbor != NULL) {
-        /*CHECK(list_append(target, (pointer)&new_neighbor));*/
-        CHECK(list_append_reveal_data(target, (pointer)&new_neighbor, (pointer*)&temp_ptr));
-        /*printf("0x%x 0x%x 0x%x\n", new_neighbor, temp_ptr, *temp_ptr);*/
-        if (new_neighbor != *temp_ptr) {
-            printf("error copying tree ptr to list\n");
-        }
-    }
-    CHECK(image_tree_get_direct_neighbor_s(tree, &new_neighbor));
-    if (new_neighbor != NULL) {
-        /*CHECK(list_append(target, (pointer)&new_neighbor));*/
-        CHECK(list_append_reveal_data(target, (pointer)&new_neighbor, (pointer*)&temp_ptr));
-        /*printf("0x%x 0x%x 0x%x\n", new_neighbor, temp_ptr, *temp_ptr);*/
-        if (new_neighbor != *temp_ptr) {
-            printf("error copying tree ptr to list");
-        }
-    }
-    CHECK(image_tree_get_direct_neighbor_w(tree, &new_neighbor));
-    if (new_neighbor != NULL) {
-        /*CHECK(list_append(target, (pointer)&new_neighbor));*/
-        CHECK(list_append_reveal_data(target, (pointer)&new_neighbor, (pointer*)&temp_ptr));
-        /*printf("0x%x 0x%x 0x%x\n", new_neighbor, temp_ptr, *temp_ptr);*/
-        if (new_neighbor != *temp_ptr) {
-            printf("error copying tree ptr to list");
-        }
-    }
+  CHECK(image_tree_get_direct_neighbor_n(tree, &new_neighbor));
+  if (new_neighbor != NULL) {
+    CHECK(list_append(target, (pointer)&new_neighbor));
+  }
+  CHECK(image_tree_get_direct_neighbor_e(tree, &new_neighbor));
+  if (new_neighbor != NULL) {
+    CHECK(list_append(target, (pointer)&new_neighbor));
+  }
+  CHECK(image_tree_get_direct_neighbor_s(tree, &new_neighbor));
+  if (new_neighbor != NULL) {
+    CHECK(list_append(target, (pointer)&new_neighbor));
+  }
+  CHECK(image_tree_get_direct_neighbor_w(tree, &new_neighbor));
+  if (new_neighbor != NULL) {
+    CHECK(list_append(target, (pointer)&new_neighbor));
+  }
 
-    /*printf("neighbors found: %d\n", target->count);*/
-    FINALLY(image_tree_find_all_immediate_neighbors);
-    RETURN();
+  FINALLY(image_tree_find_all_immediate_neighbors);
+  RETURN();
 }
 
 /******************************************************************************/
@@ -1579,7 +1631,6 @@ result image_tree_find_all_immediate_neighbors(
 void image_tree_class_create(image_tree *tree)
 {
   if (tree != NULL) {
-    /*printf("class create\n");*/
     /* if tree already has a class, don't reset it */
     if (tree->class_id == NULL) {
       /* one-tree class is it's own id, and has the rank of 0 */
@@ -1594,7 +1645,6 @@ void image_tree_class_create(image_tree *tree)
 void image_tree_class_union(image_tree *tree1, image_tree *tree2)
 {
   if (tree1 != NULL && tree2 != NULL) {
-    /*printf("class union\n");*/
     image_tree *id1, *id2;
 
     id1 = image_tree_class_find(tree1);
@@ -1629,7 +1679,6 @@ void image_tree_class_union(image_tree *tree1, image_tree *tree2)
 image_tree *image_tree_class_find(image_tree *tree)
 {
   if (tree != NULL) {
-    /*printf("class find\n");*/
     if (tree->class_id != tree && tree->class_id != NULL) {
       tree->class_id = image_tree_class_find(tree->class_id);
     }
@@ -1642,11 +1691,7 @@ image_tree *image_tree_class_find(image_tree *tree)
 
 uint32 image_tree_class_get(image_tree *tree)
 {
-  if (tree != NULL) {
-    /*printf("class get\n");*/
-    return (uint32)tree->class_id;
-  }
-  return 0;
+  return (uint32)image_tree_class_find(tree);
 }
 
 /******************************************************************************/
