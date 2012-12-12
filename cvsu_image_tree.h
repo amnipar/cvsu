@@ -69,7 +69,7 @@ typedef struct image_tree_t {
     struct image_tree_root_t *root;
     struct image_tree_t *parent;
     struct image_tree_t *class_id;
-    
+
     /* subtrees, NULL if the tree has not beed divided */
     struct image_tree_t *nw;
     struct image_tree_t *ne;
@@ -128,6 +128,11 @@ typedef struct image_tree_forest_t {
 } image_tree_forest;
 
 /**
+ * Initializes the contents of the tree with null values.
+ */
+result image_tree_nullify(image_tree *target);
+
+/**
  * Allocates an image forest structure.
  */
 
@@ -174,7 +179,6 @@ result image_tree_forest_destroy(
 /**
  * Sets image forest to null. Does not deallocate data.
  */
-
 result image_tree_forest_nullify(
     image_tree_forest *target
 );
@@ -252,6 +256,26 @@ result image_tree_update(
 
 result image_tree_divide(
     image_tree *target
+);
+
+/**
+ * Generates the statistics of the four child trees without dividing the tree.
+ * Useful for determining consistency before deciding to divide.
+ * @param target must be an array of four statistics values.
+ */
+result image_tree_get_child_statistics(
+  image_tree *source,
+  statistics *target
+);
+
+/**
+ * Calculates the child tree statistics but divides the tree only if the
+ * Shannon entropy of the children is higher than the given threshold.
+ */
+result image_tree_divide_by_entropy(
+  image_tree *target,
+  I_value threshold,
+  uint32 *outcome
 );
 
 /**

@@ -41,6 +41,7 @@
 /******************************************************************************/
 /* constants for reporting function names in error messages                   */
 
+string image_tree_nullify_name = "image_tree_nullify";
 string image_tree_forest_init_name = "image_tree_forest_init";
 string image_tree_forest_alloc_name = "image_tree_forest_alloc";
 string image_tree_forest_free_name = "image_tree_forest_free";
@@ -56,6 +57,8 @@ string image_tree_root_update_name = "image_tree_root_update";
 string image_tree_update_name = "image_tree_update";
 string image_tree_calculate_consistency_name = "image_tree_calculate_consistency";
 string image_tree_divide_name = "image_tree_divide";
+string image_tree_get_child_statistics_name = "image_tree_get_child_statistics";
+string image_tree_divide_by_entropy_name = "image_tree_divide_by_entropy";
 string image_tree_create_neighbor_list_name = "image_tree_create_neighbor_list";
 string image_tree_get_direct_neighbor_name = "image_tree_get_direct_neighbor";
 string image_tree_get_direct_neighbor_n_name = "image_tree_get_direct_neighbor_n";
@@ -64,6 +67,29 @@ string image_tree_get_direct_neighbor_s_name = "image_tree_get_direct_neighbor_s
 string image_tree_get_direct_neighbor_w_name = "image_tree_get_direct_neighbor_w";
 string image_tree_add_children_as_immediate_neighbors_name = "image_tree_add_children_as_immediate_neighbors";
 string image_tree_find_all_immediate_neighbors_name = "image_tree_find_all_immediate_neighbors";
+
+result image_tree_nullify
+(
+  image_tree *target
+)
+{
+  TRY();
+  target->root = NULL;
+  target->parent = NULL;
+  target->class_id = NULL;
+  target->nw = NULL;
+  target->ne = NULL;
+  target->sw = NULL;
+  target->se = NULL;
+  target->n = NULL;
+  target->e = NULL;
+  target->s = NULL;
+  target->w = NULL;
+  target->level = 0;
+  target->class_rank = 0;
+  FINALLY(image_tree_nullify);
+  RETURN();
+}
 
 /******************************************************************************/
 /* private function for initializing tree structure                           */
@@ -113,12 +139,12 @@ result image_tree_forest_init
     if (!list_is_null(&target->trees)) {
       CHECK(list_destroy(&target->trees));
     }
-    CHECK(list_create(&target->trees, 24 * size, sizeof(image_tree), 1));
+    CHECK(list_create(&target->trees, 64 * size, sizeof(image_tree), 1));
 
     if (!list_is_null(&target->blocks)) {
       CHECK(list_destroy(&target->blocks));
     }
-    CHECK(list_create(&target->blocks, 24 * size, sizeof(image_block), 1));
+    CHECK(list_create(&target->blocks, 64 * size, sizeof(image_block), 1));
   }
   else {
     size = target->rows * target->cols;
@@ -143,7 +169,7 @@ result image_tree_forest_init
     if (type == b_STAT_GREY) {
       CHECK(pixel_image_create(target->source, p_U8, GREY, width, height, 1,
                                1 * width));
-      CHECK(list_create(&target->values, 24 * size, sizeof(stat_grey), 1));
+      CHECK(list_create(&target->values, 64 * size, sizeof(stat_grey), 1));
     }
     else
     /* yuv image required for color statistics */
@@ -151,13 +177,13 @@ result image_tree_forest_init
     if (type == b_STAT_COLOR) {
       CHECK(pixel_image_create(target->source, p_U8, YUV, width, height, 3,
                                3 * width));
-      CHECK(list_create(&target->values, 24 * size, sizeof(stat_color), 1));
+      CHECK(list_create(&target->values, 64 * size, sizeof(stat_color), 1));
     }
     else
     if (type == b_STATISTICS) {
       CHECK(pixel_image_create(target->source, p_U8, GREY, width, height, 1,
                                1 * width));
-      CHECK(list_create(&target->values, 24 * size, sizeof(statistics), 1));
+      CHECK(list_create(&target->values, 64 * size, sizeof(statistics), 1));
     }
     else {
       /* should never reach here actually */
@@ -786,11 +812,11 @@ result image_tree_calculate_consistency
   uint32 row, col, width, height, offset, step, rinc, cinc;
   SI_2_t *A, *B, *C, *D, N, sum, sum2, mean, dev;
   small_integral_image_box *box;
-  
+
   CHECK_POINTER(tree);
   CHECK_POINTER(rows);
   CHECK_POINTER(cols);
-  
+
   box = &tree->root->box;
   width = tree->block->w;
   height = tree->block->h;
@@ -798,7 +824,7 @@ result image_tree_calculate_consistency
   offset = (tree->block->y - box->dy) * box->stride + (tree->block->x - box->dx) * box->step + box->channel;
   rinc = width * box->step;
   cinc = height * box->stride;
-  
+
   A = box->I_2_data + offset;
   B = A + 2 * step;
   D = A + cinc;
@@ -809,7 +835,7 @@ result image_tree_calculate_consistency
     C += step;
     D += step;
   }
-  
+
   FINALLY(image_tree_calculate_consistency);
   RETURN();
 }
@@ -1008,7 +1034,7 @@ result image_tree_divide
       new_tree.block = child_block;
       CHECK(list_append_reveal_data(&forest->trees, (pointer)&new_tree, (pointer*)&child_tree));
       target->sw = child_tree;
-      
+
       target->nw->e = target->ne;
       target->nw->s = target->sw;
       target->ne->w = target->nw;
@@ -1087,6 +1113,157 @@ result image_tree_divide
   }
 
   FINALLY(image_tree_divide);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result image_tree_get_child_statistics
+  (
+  image_tree *source,
+  statistics *target
+  )
+{
+  TRY();
+  uint16 x, y, w, h;
+  I_value mean, var;
+  small_integral_image_box *box;
+  statistics *stat;
+
+  CHECK_POINTER(source);
+  CHECK_POINTER(target);
+
+  /* if the tree has already been divided, return the values from the children */
+  if (source->root->forest->type == b_STATISTICS && source->nw != NULL && source->ne != NULL && source->sw != NULL && source->se != NULL) {
+    /* nw child block */
+    CHECK(memory_copy((void*)&target[0], (void*)source->nw->block->value, 1, sizeof(statistics)));
+    /* ne child block */
+    CHECK(memory_copy((void*)&target[1], (void*)source->ne->block->value, 1, sizeof(statistics)));
+    /* sw child block */
+    CHECK(memory_copy((void*)&target[2], (void*)source->sw->block->value, 1, sizeof(statistics)));
+    /* se child block */
+    CHECK(memory_copy((void*)&target[3], (void*)source->se->block->value, 1, sizeof(statistics)));
+  }
+  /* otherwise have to calculate */
+  else {
+    if (source->block->w > 1 && source->block->h > 1) {
+      box = &source->root->box;
+
+      w = (uint16)(source->block->w / 2);
+      h = (uint16)(source->block->h / 2);
+
+      small_integral_image_box_resize(box, w, h);
+      box->channel = 0;
+
+      /* nw child block */
+      x = source->block->x;
+      y = source->block->y;
+
+      small_integral_image_box_update(box, x, y);
+      mean = ((I_value)box->sum / (I_value)box->N);
+      var = (((I_value)box->sumsqr / (I_value)box->N) - (mean * mean));
+      if (var < 0) var = 0;
+
+      stat = &target[0];
+      stat->N = (I_value)box->N;
+      stat->sum = (I_value)box->sum;
+      stat->sum2 = (I_value)box->sumsqr;
+      stat->mean = ((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
+      stat->variance = var;
+      stat->deviation = sqrt(var);
+
+      /* ne child block */
+      x = x + w;
+
+      small_integral_image_box_update(box, x, y);
+      mean = ((I_value)box->sum / (I_value)box->N);
+      var = (((I_value)box->sumsqr / (I_value)box->N) - (mean * mean));
+      if (var < 0) var = 0;
+
+      stat = &target[1];
+      stat->N = (I_value)box->N;
+      stat->sum = (I_value)box->sum;
+      stat->sum2 = (I_value)box->sumsqr;
+      stat->mean = ((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
+      stat->variance = var;
+      stat->deviation = sqrt(var);
+
+      /* se child block */
+      y = y + h;
+
+      small_integral_image_box_update(box, x, y);
+      mean = ((I_value)box->sum / (I_value)box->N);
+      var = (((I_value)box->sumsqr / (I_value)box->N) - (mean * mean));
+      if (var < 0) var = 0;
+
+      stat = &target[3];
+      stat->N = (I_value)box->N;
+      stat->sum = (I_value)box->sum;
+      stat->sum2 = (I_value)box->sumsqr;
+      stat->mean = ((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
+      stat->variance = var;
+      stat->deviation = sqrt(var);
+
+      /* sw child block */
+      x = x - w;
+
+      small_integral_image_box_update(box, x, y);
+      mean = ((I_value)box->sum / (I_value)box->N);
+      var = (((I_value)box->sumsqr / (I_value)box->N) - (mean * mean));
+      if (var < 0) var = 0;
+
+      stat = &target[2];
+      stat->N = (I_value)box->N;
+      stat->sum = (I_value)box->sum;
+      stat->sum2 = (I_value)box->sumsqr;
+      stat->mean = ((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
+      stat->variance = var;
+      stat->deviation = sqrt(var);
+    }
+  }
+
+  FINALLY(image_tree_get_child_statistics);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result image_tree_divide_by_entropy
+  (
+  image_tree *target,
+  I_value threshold,
+  uint32 *outcome
+  )
+{
+  TRY();
+  image_tree_forest *forest;
+  image_tree nw_tree, ne_tree, sw_tree, se_tree, *child_tree;
+  image_block nw_block, ne_block, sw_block, se_block, *child_block;
+  statistics nw_value, ne_value, sw_value, se_value, *child_value;
+  image_block_type type;
+
+  CHECK_POINTER(outcome);
+  *outcome = 0;
+  CHECK_POINTER(target);
+  CHECK(image_tree_nullify(&nw_tree));
+  CHECK(image_tree_nullify(&ne_tree));
+  CHECK(image_tree_nullify(&sw_tree));
+  CHECK(image_tree_nullify(&se_tree));
+
+  if (target->nw == NULL && target->ne == NULL && target->sw == NULL && target->se == NULL) {
+    if (target->block->w > 1 && target->block->h > 1) {
+
+    }
+    else {
+      *outcome = 3;
+    }
+  }
+  else {
+    *outcome = 2;
+  }
+  *outcome = 1;
+
+  FINALLY(image_tree_divide_by_entropy);
   RETURN();
 }
 
