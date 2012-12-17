@@ -84,6 +84,25 @@ typedef unsigned long  uint32;
 typedef float          real32;
 typedef double         real64;
 
+/**
+ * Stores a reference to a rectangular region within an image.
+ * Used for extracting statistical properties of image regions.
+ * Used both in @see pixel_image
+ * and in @see integral_image.
+ */
+typedef struct image_rect_t {
+  /** Is this a valid rect? */
+  uint32 valid;
+  /** Offset from the beginning of data array */
+  uint32 offset;
+  /** Horizontal step to the right edge of the rectangle */
+  uint32 hstep;
+  /** Vertical step to the bottom edge of the rectangle */
+  uint32 vstep;
+  /** Number of elements in roi */
+  uint32 N;
+} image_rect;
+
 typedef enum direction_t {
     d_NULL = 0,
     d_N,

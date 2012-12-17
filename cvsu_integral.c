@@ -381,7 +381,7 @@ result integral_image_update
 
 /******************************************************************************/
 
-integral_image_roi integral_image_create_roi
+image_rect integral_image_create_rect
   (
   integral_image *target,
   sint32 x,
@@ -391,13 +391,13 @@ integral_image_roi integral_image_create_roi
   uint32 offset
   )
 {
-  integral_image_roi roi;
+  image_rect rect;
   register uint32 width, height, step, stride;
 
   width = target->width;
   height = target->height;
 
-  roi.valid = 0;
+  rect.valid = 0;
   if (x < 0) {
     dx = dx + x;
     x = 0;
@@ -413,15 +413,15 @@ integral_image_roi integral_image_create_roi
 
       step = target->step;
       stride = target->stride;
-      roi.valid = 1;
-      roi.offset = ((unsigned)y) * stride + ((unsigned)x) * step + offset;
-      roi.hstep = ((unsigned)dx) * step;
-      roi.vstep = ((unsigned)dy) * stride;
-      roi.N = ((unsigned)dx) * ((unsigned)dy);
+      rect.valid = 1;
+      rect.offset = ((unsigned)y) * stride + ((unsigned)x) * step + offset;
+      rect.hstep = ((unsigned)dx) * step;
+      rect.vstep = ((unsigned)dy) * stride;
+      rect.N = ((unsigned)dx) * ((unsigned)dy);
     }
   }
 
-  return roi;
+  return rect;
 }
 
 
@@ -446,29 +446,17 @@ I_value integral_image_calculate_mean
   uint32 offset
   )
 {
-  integral_image_roi roi;
+  image_rect rect;
   I_value *iA, sum;
-  /*
-  int p;
 
-  p = 0;
-  if (x < 0) {
-    p = 1;
-  }
-  */
-  roi = integral_image_create_roi(target, x, y, dx, dy, offset);
-  /*
-  if (p == 1) {
-    printf("X=%d offset=%d hstep=%d vstep=%d N=%d valid = %d\n", x, roi.offset, roi.hstep, roi.vstep, roi.N, roi.valid);
-  }
-  */
-  if (roi.valid == 0) {
+  rect = integral_image_create_rect(target, x, y, dx, dy, offset);
+  if (rect.valid == 0) {
     return 0;
   }
   else {
-    iA = ((I_value *)target->I_1.data) + roi.offset;
-    sum = *(iA + roi.vstep + roi.hstep) + *iA - *(iA + roi.hstep) - *(iA + roi.vstep);
-    return sum / ((I_value)roi.N);
+    iA = ((I_value *)target->I_1.data) + rect.offset;
+    sum = *(iA + rect.vstep + rect.hstep) + *iA - *(iA + rect.hstep) - *(iA + rect.vstep);
+    return sum / ((I_value)rect.N);
   }
 }
 
@@ -485,19 +473,19 @@ double integral_image_calculate_variance
   uint32 offset
   )
 {
-  integral_image_roi roi;
+  image_rect rect;
   I_value *iA, *i2A, mean, sum2, var;
 
-  roi = integral_image_create_roi(target, x, y, dx, dy, offset);
-  if (roi.valid == 0) {
+  rect = integral_image_create_rect(target, x, y, dx, dy, offset);
+  if (rect.valid == 0) {
     return 0;
   }
   else {
-    iA = ((I_value *)target->I_1.data) + roi.offset;
-    i2A = ((I_value *)target->I_2.data) + roi.offset;
-    mean = (*(iA + roi.vstep + roi.hstep) + *iA - *(iA + roi.hstep) - *(iA + roi.vstep)) / ((I_value)roi.N);
-    sum2 = *(i2A + roi.vstep + roi.hstep) + *i2A - *(i2A + roi.hstep) - *(i2A + roi.vstep);
-    var = (sum2 / ((I_value)roi.N)) - mean*mean;
+    iA = ((I_value *)target->I_1.data) + rect.offset;
+    i2A = ((I_value *)target->I_2.data) + rect.offset;
+    mean = (*(iA + rect.vstep + rect.hstep) + *iA - *(iA + rect.hstep) - *(iA + rect.vstep)) / ((I_value)rect.N);
+    sum2 = *(i2A + rect.vstep + rect.hstep) + *i2A - *(i2A + rect.hstep) - *(i2A + rect.vstep);
+    var = (sum2 / ((I_value)rect.N)) - mean*mean;
     if (var < 0) var = 0;
     return var;
   }
@@ -516,20 +504,20 @@ void integral_image_calculate_statistics(
   uint32 offset
   )
 {
-  integral_image_roi roi;
+  image_rect rect;
   I_value *iA, *i2A, N, sum, sum2, mean, var;
 
   statistics_init(stat);
-  roi = integral_image_create_roi(target, x, y, dx, dy, offset);
-  if (roi.valid == 0) {
+  rect = integral_image_create_rect(target, x, y, dx, dy, offset);
+  if (rect.valid == 0) {
     return;
   }
   else {
-    iA = ((I_value *)target->I_1.data) + roi.offset;
-    i2A = ((I_value *)target->I_2.data) + roi.offset;
-    N = ((I_value)roi.N);
-    sum = *(iA + roi.vstep + roi.hstep) + *iA - *(iA + roi.hstep) - *(iA + roi.vstep);
-    sum2 = *(i2A + roi.vstep + roi.hstep) + *i2A - *(i2A + roi.hstep) - *(i2A + roi.vstep);
+    iA = ((I_value *)target->I_1.data) + rect.offset;
+    i2A = ((I_value *)target->I_2.data) + rect.offset;
+    N = ((I_value)rect.N);
+    sum = *(iA + rect.vstep + rect.hstep) + *iA - *(iA + rect.hstep) - *(iA + rect.vstep);
+    sum2 = *(i2A + rect.vstep + rect.hstep) + *i2A - *(i2A + rect.hstep) - *(i2A + rect.vstep);
     mean = sum / N;
     var = (sum2 / N) - mean*mean;
     if (var < 0) var = 0;

@@ -92,6 +92,14 @@ finally:
 /* macros for index access                                                    */
 #if (IMAGE_ACCESS_METHOD == IMAGE_ACCESS_BY_INDEX)
 
+#define IMAGE_RECT_VARIABLES(image, type, rect)\
+  const type *image##_data;\
+  uint32 image##_pos, image##_step, image##_stride;\
+  image##_data = (type *)image->data;\
+  image##_step = image->step;\
+  image##_stride = image->stride - (rect.hstep * image->step);\
+  image##_pos = rect.offset
+
 #define SINGLE_CONTINUOUS_IMAGE_VARIABLES(image, type)\
     const type *image##_data;\
     uint32 image##_pos, image##_step, image##_size;\
@@ -159,6 +167,10 @@ finally:
     target_rows = target->rows;\
     source_pos = source->offset;\
     target_pos = target->offset
+
+#define FOR_IMAGE_RECT(image, rect)\
+  for (y = rect.vstep, image##_pos = rect.offset; y--; image##_pos += image##_stride)\
+    for (x = rect.hstep; x-- ; image##_pos += image##_step)\
 
 #define FOR_CONTINUOUS_IMAGE(image)\
     for (image##_pos = image->offset;\
@@ -266,13 +278,21 @@ finally:
 /* macros for pointer access                                                  */
 #elif (IMAGE_ACCESS_METHOD == IMAGE_ACCESS_BY_POINTER)
 
+#define IMAGE_RECT_VARIABLES(image, type, rect)\
+  const type *image##_data, *image##_pos;\
+  uint32 image##_step, image##_stride;\
+  image##_data = (type *)image->data;\
+  image##_step = image->step;\
+  image##_stride = image->stride - (rect.hstep * image->step);\
+  image##_pos = image##_data + rect.offset
+
 #define SINGLE_CONTINUOUS_IMAGE_VARIABLES(image, type)\
     const type *image##_data, *image##_pos, *image_end;\
     uint32 image##_step;\
     image##_data = (type *)image->data;\
-    image##_end = image_data + image->size;\
+    image##_end = image##_data + image->size;\
     image##_step = image->step;\
-    image##_pos = image_data + image->offset
+    image##_pos = image##_data + image->offset
 
 #define CONTINUOUS_IMAGE_VARIABLES(source_type, target_type)\
     source_type *source_data, *source_pos, *source_end;\
@@ -328,6 +348,11 @@ finally:
     target_rows = (target_type **)target->rows;\
     source_pos = source_data + source->offset;\
     target_pos = target_data + target->offset
+
+#define FOR_IMAGE_RECT(image, rect)\
+  for (y = rect.vstep, image##_pos = image##_data + rect.offset; y--;\
+      image##_pos += image##_stride)\
+    for (x = rect.hstep; x--; image##_pos += image##_step)\
 
 #define FOR_CONTINUOUS_IMAGE(image)\
     for (image##_pos = image##_data + image->offset;\

@@ -69,23 +69,6 @@ typedef struct integral_image_t {
   uint32 stride;
 } integral_image;
 
-/**
- * Stores a reference to a rectangular region within an integral_image.
- * Used for extracting statistical properties of image regions.
- */
-typedef struct integral_image_rect_t {
-  /** Is this a valid rect? */
-  uint32 valid;
-  /** Offset from the beginning of data array */
-  uint32 offset;
-  /** Horizontal step to the right edge of the rectangle */
-  uint32 hstep;
-  /** Vertical step to the bottom edge of the rectangle */
-  uint32 vstep;
-  /** Number of elements in roi */
-  uint32 N;
-} integral_image_rect;
-
 typedef struct integral_image_box_t {
   I_1_t *I_1_data;
   I_1_t *iA;
@@ -196,7 +179,7 @@ result integral_image_update(
  * image dimensions and reduces the size of the region at the border. May
  * cause edge effects in some applications.
  */
-integral_image_rect integral_image_create_rect(
+image_rect integral_image_create_rect(
   /** the integral_image used for calculations */
   integral_image *target,
   /** left coordinate of the rectangle, can be negative */
