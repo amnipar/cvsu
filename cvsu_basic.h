@@ -78,6 +78,23 @@ typedef struct pixel_image_t {
 } pixel_image;
 
 /**
+ * Stores a reference to a rectangular region within a pixel image.
+ * Used for extracting statistical properties of image regions.
+ */
+typedef struct pixel_image_rect_t {
+  /** Is this a valid rect? */
+  uint32 valid;
+  /** Offset from the beginning of data array */
+  uint32 offset;
+  /** Horizontal step to the right edge of the rectangle */
+  uint32 hstep;
+  /** Vertical step to the bottom edge of the rectangle */
+  uint32 vstep;
+  /** Actual number of elements in the rect (area) */
+  uint32 N;
+}
+
+/**
  * Allocates a pixel image structure.
  */
 
@@ -196,6 +213,12 @@ result pixel_image_copy(
 result pixel_image_clear(
     pixel_image *target
 );
+
+/**
+ * Produces a valid rectangle for the given pixel_image. Takes into account
+ * image dimensions and reduces the size of the region at the border. May
+ * cause edge effects in some applications.
+ */
 
 /**
  * Checks if the image is stored in a continuous block of memory, meaning

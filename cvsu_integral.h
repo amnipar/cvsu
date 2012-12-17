@@ -70,11 +70,11 @@ typedef struct integral_image_t {
 } integral_image;
 
 /**
- * Stores a region of interest for integral_image.
- * Contains the values needed for calculating statistics in a given area.
+ * Stores a reference to a rectangular region within an integral_image.
+ * Used for extracting statistical properties of image regions.
  */
-typedef struct integral_image_roi_t {
-  /** Is this a valid roi? */
+typedef struct integral_image_rect_t {
+  /** Is this a valid rect? */
   uint32 valid;
   /** Offset from the beginning of data array */
   uint32 offset;
@@ -84,7 +84,7 @@ typedef struct integral_image_roi_t {
   uint32 vstep;
   /** Number of elements in roi */
   uint32 N;
-} integral_image_roi;
+} integral_image_rect;
 
 typedef struct integral_image_box_t {
   I_1_t *I_1_data;
@@ -192,11 +192,11 @@ result integral_image_update(
 );
 
 /**
- * Produces a valid region of interest for the given integral_image. Takes into
- * account image dimensions and reduces the size of the region at the border.
- * May cause edge effects for some purposes.
+ * Produces a valid rectangle for the given integral_image. Takes into account
+ * image dimensions and reduces the size of the region at the border. May
+ * cause edge effects in some applications.
  */
-integral_image_roi integral_image_create_roi(
+integral_image_rect integral_image_create_rect(
   /** the integral_image used for calculations */
   integral_image *target,
   /** left coordinate of the rectangle, can be negative */
