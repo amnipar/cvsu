@@ -618,7 +618,7 @@ result integral_image_threshold_feng
 {
   TRY();
   byte *source_data, *target_data, source_value, target_value, t;
-  I_value min, mean, dev1, dev2, as, a1, a2, a3, k1, k2, g;
+  I_value min, mean, dev1, dev2, as, a1, a2, a3, k1, k2, g, asg;
   uint32 x, y, width, height, step, stride, offset, radius2, size1, size2, pos;
   statistics stat;
 
@@ -654,10 +654,12 @@ result integral_image_threshold_feng
       integral_image_calculate_statistics(source, &stat, x-radius1, y-radius1, size1, size1, offset);
       mean = stat.mean;
       dev1 = stat.deviation;
-      integral_image_calculate_statistics(source, &stat, x-radius2, y-radius2, size2, size2, offset);
+      integral_image_calculate_statistics;
+      dev2 = sqrt(integral_image_calculate_variance(source, x-radius2, y-radius2, size2, size2, offset));
       as = dev1 / fmax(1,dev2);
-      a2 = k1 * pow(as, g);
-      a3 = k2 * pow(as, g);
+      asg = pow(as, g);
+      a2 = k1 * asg;
+      a3 = k2 * asg;
       t = (byte)floor((1 - a1) * mean + a2 * as * (mean - min) + a3 * min);
       if (source_value > t) {
         target_value = 255;
