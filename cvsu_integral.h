@@ -240,6 +240,28 @@ void integral_image_calculate_statistics(
 );
 
 /**
+ * Uses the integral_image to threshold the underlying pixel_image using the
+ * Sauvola method.
+ */
+result integral_image_threshold_sauvola(
+  integral_image *source,
+  pixel_image *target,
+  uint32 radius,
+  real64 k
+);
+
+/**
+ * Uses the integral_image to threshold the underlying pixel_image using the
+ * Feng method.
+ */
+result integral_image_threshold_feng(
+  integral_image *source,
+  pixel_image *target,
+  uint32 radius,
+  real64 k
+);
+
+/**
  * Creates a small integral image with dimensions less than 256. This allows
  * using unsigned long values for both images.
  */

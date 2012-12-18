@@ -198,27 +198,6 @@ result pixel_image_clear(
 );
 
 /**
- * Produces a valid rectangle for the given pixel_image. Takes into account
- * image dimensions and reduces the size of the region at the border. May
- * cause edge effects in some applications.
- */
-
-image_rect pixel_image_create_rect(
-  /** the pixel_image used for calculations */
-  pixel_image *target,
-  /** left coordinate of the rectangle, can be negative */
-  sint32 x,
-  /** top coordinate of the rectangle, can be negative */
-  sint32 y,
-  /** width of the rectangle, signed to allow adjustment using x */
-  sint32 dx,
-  /** height of the rectangle, signed to allow adjustment using y */
-  sint32 dy,
-  /** channel offset for multi-channel images */
-  uint32 offset
-);
-
-/**
  * Checks if the image is stored in a continuous block of memory, meaning
  * all pixels are stored one after another in memory. This information can be
  * used for optimizing some image operations.
@@ -385,6 +364,78 @@ result scale_down(
 result scale_up(
     const pixel_image *source,
     pixel_image *target
+);
+
+/**
+ * Produces a valid rectangle for the given pixel_image. Takes into account
+ * image dimensions and reduces the size of the region at the border. May
+ * cause edge effects in some applications.
+ */
+image_rect pixel_image_create_rect(
+  /** the pixel_image used for calculations */
+  pixel_image *target,
+  /** left coordinate of the rectangle, can be negative */
+  sint32 x,
+  /** top coordinate of the rectangle, can be negative */
+  sint32 y,
+  /** width of the rectangle, signed to allow adjustment using x */
+  sint32 dx,
+  /** height of the rectangle, signed to allow adjustment using y */
+  sint32 dy,
+  /** channel offset for multi-channel images */
+  uint32 offset
+);
+
+/**
+ * Finds the minimum intensity value in the given image region.
+ * The region may be adjusted near the border to ensure the region is valid.
+ */
+I_value pixel_image_find_min_byte(
+  pixel_image *target,
+  sint32 x,
+  sint32 y,
+  sint32 dx,
+  sint32 dy,
+  uint32 offset
+);
+
+/**
+* Finds the maximum intensity value in the given image region.
+* The region may be adjusted near the border to ensure the region is valid.
+*/
+I_value pixel_image_find_max_byte(
+  pixel_image *target,
+  sint32 x,
+  sint32 y,
+  sint32 dx,
+  sint32 dy,
+  uint32 offset
+);
+
+/**
+* Calculates the intensity mean in the given image region.
+* The region may be adjusted near the border to ensure the region is valid.
+*/
+I_value pixel_image_calculate_mean_byte(
+  pixel_image *target,
+  sint32 x,
+  sint32 y,
+  sint32 dx,
+  sint32 dy,
+  uint32 offset
+);
+
+/**
+* Calculates the intensity variance in the given image region.
+* The region may be adjusted near the border to ensure the region is valid.
+*/
+I_value pixel_image_calculate_variance_byte(
+  pixel_image *target,
+  sint32 x,
+  sint32 y,
+  sint32 dx,
+  sint32 dy,
+  uint32 offset
 );
 
 #ifdef __cplusplus

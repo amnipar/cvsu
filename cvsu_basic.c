@@ -701,80 +701,6 @@ result pixel_image_clear(
 
 /******************************************************************************/
 
-image_rect pixel_image_create_rect
-  (
-  pixel_image *target,
-  sint32 x,
-  sint32 y,
-  sint32 dx,
-  sint32 dy,
-  uint32 offset
-  )
-{
-  image_rect rect;
-  register uint32 width, height, step, stride;
-
-  width = target->width;
-  height = target->height;
-
-  rect.valid = 0;
-  if (x < 0) {
-    dx = dx + x;
-    x = 0;
-  }
-  if (y < 0) {
-    dy = dy + y;
-    y = 0;
-  }
-  if ((unsigned)x < width && (unsigned)y < height) {
-    if (dx > 0 && dy > 0) {
-      if (x + dx > width) dx = width - x;
-      if (y + dy > height) dy = height - y;
-
-      step = target->step;
-      stride = target->stride;
-      rect.valid = 1;
-      rect.offset = ((unsigned)y) * stride + ((unsigned)x) * step + offset;
-      rect.hstep = ((unsigned)dx) * step;
-      rect.vstep = ((unsigned)dy) * stride;
-      rect.N = ((unsigned)dx) * ((unsigned)dy);
-    }
-  }
-
-  return rect;
-}
-
-/******************************************************************************/
-
-I_value pixel_image_calculate_mean_byte
-(
-  pixel_image *target,
-  sint32 x,
-  sint32 y,
-  sint32 dx,
-  sint32 dy,
-  uint32 offset
-)
-{
-  image_rect rect;
-  I_value sum, mean;
-  
-  rect = pixel_image_create_rect(target, x, y, dx, dy, offset);
-  if (rect.valid == 0) {
-    return 0;
-  }
-  else {
-    IMAGE_RECT_VARIABLES(target, byte, rect);
-    sum = 0;
-    FOR_IMAGE_RECT(target, rect)
-      sum += (I_value)PIXEL_VALUE(target);
-    mean = sum / ((I_value)rect.N);
-    return mean;
-  }
-}
-
-/******************************************************************************/
-
 bool pixel_image_is_continuous(const pixel_image *image)
 {
     if (image == NULL) {
@@ -1646,6 +1572,176 @@ result scale_up(
 
     FINALLY(scale_up);
     RETURN();
+}
+
+/******************************************************************************/
+
+image_rect pixel_image_create_rect
+  (
+  pixel_image *target,
+  sint32 x,
+  sint32 y,
+  sint32 dx,
+  sint32 dy,
+  uint32 offset
+  )
+{
+  image_rect rect;
+  register uint32 width, height, step, stride;
+
+  width = target->width;
+  height = target->height;
+
+  rect.valid = 0;
+  if (x < 0) {
+    dx = dx + x;
+    x = 0;
+  }
+  if (y < 0) {
+    dy = dy + y;
+    y = 0;
+  }
+  if ((unsigned)x < width && (unsigned)y < height) {
+    if (dx > 0 && dy > 0) {
+      if (x + dx > width) dx = width - x;
+      if (y + dy > height) dy = height - y;
+
+      step = target->step;
+      stride = target->stride;
+      rect.valid = 1;
+      rect.offset = ((unsigned)y) * stride + ((unsigned)x) * step + offset;
+      rect.hstep = ((unsigned)dx);
+      rect.vstep = ((unsigned)dy);
+      rect.N = ((unsigned)dx) * ((unsigned)dy);
+    }
+  }
+
+  return rect;
+}
+
+/******************************************************************************/
+
+I_value pixel_image_find_min_byte
+(
+  pixel_image *target,
+  sint32 x,
+  sint32 y,
+  sint32 dx,
+  sint32 dy,
+  uint32 offset
+)
+{
+  image_rect rect;
+  I_value min, value;
+
+  rect = pixel_image_create_rect(target, x, y, dx, dy, offset);
+  if (rect.valid == 0) {
+    return 0;
+  }
+  else {
+    IMAGE_RECT_VARIABLES(target, byte, rect);
+    min = 255;
+    FOR_IMAGE_RECT_BEGIN(target, rect)
+      value = (I_value)PIXEL_VALUE(target);
+      if (value < min) min = value;
+    FOR_IMAGE_RECT_END(target);
+    return min;
+  }
+}
+
+/******************************************************************************/
+
+I_value pixel_image_find_max_byte
+(
+  pixel_image *target,
+  sint32 x,
+  sint32 y,
+  sint32 dx,
+  sint32 dy,
+  uint32 offset
+)
+{
+  image_rect rect;
+  I_value max, value;
+
+  rect = pixel_image_create_rect(target, x, y, dx, dy, offset);
+  if (rect.valid == 0) {
+    return 0;
+  }
+  else {
+    IMAGE_RECT_VARIABLES(target, byte, rect);
+    max = 0;
+    FOR_IMAGE_RECT_BEGIN(target, rect)
+      value = (I_value)PIXEL_VALUE(target);
+      if (value > max) max = value;
+    FOR_IMAGE_RECT_END(target);
+    return max;
+  }
+}
+
+/******************************************************************************/
+
+I_value pixel_image_calculate_mean_byte
+(
+  pixel_image *target,
+  sint32 x,
+  sint32 y,
+  sint32 dx,
+  sint32 dy,
+  uint32 offset
+)
+{
+  image_rect rect;
+  I_value sum, mean;
+
+  rect = pixel_image_create_rect(target, x, y, dx, dy, offset);
+  if (rect.valid == 0) {
+    return 0;
+  }
+  else {
+    IMAGE_RECT_VARIABLES(target, byte, rect);
+    sum = 0;
+    FOR_IMAGE_RECT_BEGIN(target, rect)
+      sum += (I_value)PIXEL_VALUE(target);
+    FOR_IMAGE_RECT_END(target);
+    mean = sum / ((I_value)rect.N);
+    return mean;
+  }
+}
+
+/******************************************************************************/
+
+I_value pixel_image_calculate_variance_byte
+(
+  pixel_image *target,
+  sint32 x,
+  sint32 y,
+  sint32 dx,
+  sint32 dy,
+  uint32 offset
+)
+{
+  image_rect rect;
+  I_value value, sum1, sum2, N, mean, variance;
+
+  rect = pixel_image_create_rect(target, x, y, dx, dy, offset);
+  if (rect.valid == 0) {
+    return 0;
+  }
+  else {
+    IMAGE_RECT_VARIABLES(target, byte, rect);
+    sum1 = 0;
+    sum2 = 0;
+    FOR_IMAGE_RECT_BEGIN(target, rect)
+      value = (I_value)PIXEL_VALUE(target);
+      sum1 += value;
+      sum2 += value*value;
+    FOR_IMAGE_RECT_END(target);
+    N = (I_value)rect.N;
+    mean = sum1 / N;
+    variance = sum2 / N - mean*mean;
+    return variance;
+  }
 }
 
 /******************************************************************************/

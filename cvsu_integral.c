@@ -48,6 +48,8 @@ string integral_image_nullify_name = "integral_image_nullify";
 string integral_image_clone_name = "integral_image_clone";
 string integral_image_copy_name = "integral_image_copy";
 string integral_image_update_name = "integral_image_update";
+string integral_image_threshold_sauvola_name = "integral_image_threshold_sauvola";
+string integral_image_threshold_feng_name = "integral_image_threshold_feng";
 string small_integral_image_create_name = "small_integral_image_create";
 string small_integral_image_update_name = "small_integral_image_update";
 string small_integral_image_box_create_name = "small_integral_image_box_create";
@@ -529,6 +531,146 @@ void integral_image_calculate_statistics(
     stat->deviation = sqrt(var);
     return;
   }
+}
+
+/******************************************************************************/
+
+result integral_image_threshold_sauvola
+(
+  integral_image *source,
+  pixel_image *target,
+  uint32 radius,
+  I_value k
+)
+{
+  TRY();
+  pixel_image temp_mean, temp_dev;
+  byte *source_data, *target_data, source_value, target_value, t;
+  I_value *mean_data, *dev_data, mean, dev, dev_max;
+  uint32 x, y, width, height, step, stride, offset, size, pos;
+  statistics stat;
+
+  CHECK_POINTER(source);
+  CHECK_POINTER(target);
+  CHECK_PARAM(source->original->type == p_U8);
+
+  CHECK(pixel_image_clone(target, source->original));
+
+  width = target->width;
+  height = target->height;
+  step = target->step;
+  stride = target->stride;
+  offset = target->offset;
+
+  CHECK(pixel_image_create(&temp_mean, p_I, target->format, width, height, step, stride));
+  CHECK(pixel_image_create(&temp_dev, p_I, target->format, width, height, step, stride));
+
+  source_data = (byte *)source->original->data;
+  target_data = (byte *)target->data;
+  mean_data = (I_value *)temp_mean.data;
+  dev_data = (I_value *)temp_dev.data;
+  size = 2 * radius + 1;
+
+  dev_max = 0;
+  for (y = 0; y < height; y++) {
+    pos = y * stride;
+    for (x = 0; x < width; x++, pos += step) {
+      integral_image_calculate_statistics(source, &stat, x-radius, y-radius, size, size, offset);
+      mean_data[pos] = stat.mean;
+      dev = stat.deviation;
+      dev_data[pos] = dev;
+      if (dev > dev_max) dev_max = dev;
+    }
+  }
+
+  for (y = 0; y < height; y++) {
+    pos = y * stride;
+    for (x = 0; x < width; x++, pos += step) {
+      source_value = source_data[pos];
+      mean = mean_data[pos];
+      dev = dev_data[pos];
+      t = (byte)floor(mean * (1.0 + k * ((dev / dev_max) - 1.0)));
+      if (source_value > t) {
+        target_value = 255;
+      }
+      else {
+        target_value = 0;
+      }
+      target_data[pos] = target_value;
+    }
+  }
+
+  FINALLY(integral_image_threshold_sauvola);
+  pixel_image_destroy(&temp_mean);
+  pixel_image_destroy(&temp_dev);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result integral_image_threshold_feng
+(
+  integral_image *source,
+  pixel_image *target,
+  uint32 radius1,
+  I_value k
+)
+{
+  TRY();
+  byte *source_data, *target_data, source_value, target_value, t;
+  I_value min, mean, dev1, dev2, as, a1, a2, a3, k1, k2, g;
+  uint32 x, y, width, height, step, stride, offset, radius2, size1, size2, pos;
+  statistics stat;
+
+  CHECK_POINTER(source);
+  CHECK_POINTER(target);
+  CHECK_PARAM(source->original->type == p_U8);
+
+  CHECK(pixel_image_clone(target, source->original));
+
+  width = target->width;
+  height = target->height;
+  step = target->step;
+  stride = target->stride;
+  offset = target->offset;
+
+  g = 2;
+  a1 = 0.12;
+  k1 = 0.25;
+  k2 = 0.04;
+
+
+  source_data = (byte *)source->original->data;
+  target_data = (byte *)target->data;
+  size1 = 2 * radius1 + 1;
+  radius2 = 3 * radius1;
+  size2 = 2 * radius2 + 1;
+
+  for (y = 0; y < height; y++) {
+    pos = y * stride;
+    for (x = 0; x < width; x++, pos += step) {
+      source_value = source_data[pos];
+      min = pixel_image_find_min_byte(source->original, x-radius1, y-radius1, size1, size1, offset);
+      integral_image_calculate_statistics(source, &stat, x-radius1, y-radius1, size1, size1, offset);
+      mean = stat.mean;
+      dev1 = stat.deviation;
+      integral_image_calculate_statistics(source, &stat, x-radius2, y-radius2, size2, size2, offset);
+      as = dev1 / fmax(1,dev2);
+      a2 = k1 * pow(as, g);
+      a3 = k2 * pow(as, g);
+      t = (byte)floor((1 - a1) * mean + a2 * as * (mean - min) + a3 * min);
+      if (source_value > t) {
+        target_value = 255;
+      }
+      else {
+        target_value = 0;
+      }
+      target_data[pos] = target_value;
+    }
+  }
+
+  FINALLY(integral_image_threshold_feng);
+  RETURN();
 }
 
 /******************************************************************************/

@@ -97,7 +97,7 @@ finally:
   uint32 image##_pos, image##_step, image##_stride;\
   image##_data = (type *)image->data;\
   image##_step = image->step;\
-  image##_stride = image->stride - (rect.hstep * image->step);\
+  image##_stride = image->stride - (rect.hstep * image->step) + 1;\
   image##_pos = rect.offset
 
 #define SINGLE_CONTINUOUS_IMAGE_VARIABLES(image, type)\
@@ -168,9 +168,14 @@ finally:
     source_pos = source->offset;\
     target_pos = target->offset
 
-#define FOR_IMAGE_RECT(image, rect)\
-  for (y = rect.vstep, image##_pos = rect.offset; y--; image##_pos += image##_stride)\
-    for (x = rect.hstep; x-- ; image##_pos += image##_step)\
+#define FOR_IMAGE_RECT_BEGIN(image, rect)\
+  for (y = rect.vstep, image##_pos = rect.offset; y--;) {\
+    for (x = rect.hstep; x--; image##_pos += image##_step) {
+
+#define FOR_IMAGE_RECT_END(image)\
+    }\
+    image##_pos += image##_stride;\
+  }
 
 #define FOR_CONTINUOUS_IMAGE(image)\
     for (image##_pos = image->offset;\
@@ -283,7 +288,7 @@ finally:
   uint32 image##_step, image##_stride;\
   image##_data = (type *)image->data;\
   image##_step = image->step;\
-  image##_stride = image->stride - (rect.hstep * image->step);\
+  image##_stride = image->stride - (rect.hstep * image->step) + 1;\
   image##_pos = image##_data + rect.offset
 
 #define SINGLE_CONTINUOUS_IMAGE_VARIABLES(image, type)\
@@ -349,10 +354,14 @@ finally:
     source_pos = source_data + source->offset;\
     target_pos = target_data + target->offset
 
-#define FOR_IMAGE_RECT(image, rect)\
-  for (y = rect.vstep, image##_pos = image##_data + rect.offset; y--;\
-      image##_pos += image##_stride)\
-    for (x = rect.hstep; x--; image##_pos += image##_step)\
+#define FOR_IMAGE_RECT_BEGIN(image, rect)\
+  for (y = rect.vstep, image##_pos = image##_data + rect.offset; y--;) {\
+    for (x = rect.hstep; x--; image##_pos += image##_step) {
+
+#define FOR_IMAGE_RECT_END(image)\
+    }\
+    image##_pos += image##_stride;\
+  }
 
 #define FOR_CONTINUOUS_IMAGE(image)\
     for (image##_pos = image##_data + image->offset;\
