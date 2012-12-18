@@ -344,6 +344,20 @@ typedef struct statistics_t
 #endif
 } statistics;
 
+/**
+ * Stores region information for connected component analysis and segmentation
+ * with union-find equivalence class approach.
+ */
+typedef struct region_t
+{
+  region *id;
+  uint32 rank;
+  uint32 x1;
+  uint32 y1;
+  uint32 x2;
+  uint32 y2;
+} region;
+
 typedef struct consistency_t
 {
   I_value row_mean;
