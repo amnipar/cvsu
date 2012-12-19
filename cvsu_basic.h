@@ -43,7 +43,6 @@ extern "C" {
  * Stores an image and its format description as an array of pixels.
  * Can be used also for referring to a region of interest (ROI) of an image.
  */
-
 typedef struct pixel_image_t {
     /** Parent image for ROIs. */
     struct pixel_image_t *parent;
@@ -80,22 +79,19 @@ typedef struct pixel_image_t {
 /**
  * Allocates a pixel image structure.
  */
-
 pixel_image *pixel_image_alloc();
 
 /**
  * Frees a pixel image structure allocated with @see pixel_image_alloc.
  */
-
 void pixel_image_free(pixel_image *ptr);
 
 /**
  * Allocates data for a pixel image.
  * @see pixel_image_destroy
  */
-
 result pixel_image_create(
-    /** Pointer to target struct where image is stored */
+    /** Pointer to the target struct where the image is stored */
     pixel_image *target,
     /** Data type used for storing the pixel values */
     pixel_type type,
@@ -117,7 +113,6 @@ result pixel_image_create(
  * Also check whether the image data has to be deallocated or not.
  * @see pixel_image_destroy
  */
-
 result pixel_image_create_from_data(
     /** Pointer to target struct where image is stored */
     pixel_image *target,
@@ -141,7 +136,6 @@ result pixel_image_create_from_data(
  * Deallocates the pixel image data.
  * @see pixel_image_create
  */
-
 result pixel_image_destroy(
     pixel_image *target
 );
@@ -150,7 +144,6 @@ result pixel_image_destroy(
  * Sets the image fields to null values.
  * @note Does not deallocate memory, use @see pixel_image_destroy first
  */
-
 result pixel_image_nullify(
     pixel_image *target
 );
@@ -160,7 +153,6 @@ result pixel_image_nullify(
  * Useful for processing only a part of an image.
  * Does not copy the data, no need to deallocate with @see pixel_image_destroy.
  */
-
 result pixel_image_create_roi(
     pixel_image *target,
     pixel_image *source,
@@ -175,15 +167,18 @@ result pixel_image_create_roi(
  * Only the structure is cloned, for copying content, use the copy function.
  * @see pixel_image_copy
  */
-
-result pixel_image_clone(pixel_image *target, pixel_image *source);
+result pixel_image_clone(
+  /** The target image, that will become a clone of the source image. */
+  pixel_image *target,
+  /** The source image, that will be cloned to the target image. */
+  const pixel_image *source
+);
 
 /**
  * Copy the content of source image into target image.
  * The two images must have the same structure.
  * @see pixel_image_clone
  */
-
 result pixel_image_copy(
     pixel_image *target,
     const pixel_image *source
@@ -192,9 +187,25 @@ result pixel_image_copy(
 /**
  * Resets the image contents to 0.
  */
-
 result pixel_image_clear(
     pixel_image *target
+);
+
+/**
+ * Reads the pixel image from a pnm file.
+ */
+result pixel_image_read(
+  pixel_image *target,
+  string source
+);
+
+/**
+ * Writes the pixel image to a pnm file.
+ */
+result pixel_image_write(
+  pixel_image *source,
+  string target,
+  uint32 ascii
 );
 
 /**

@@ -34,6 +34,7 @@
 #include "cvsu_memory.h"
 #include "cvsu_basic.h"
 
+#include <stdlib.h>
 #include <math.h>
 #include <limits.h>
 
@@ -53,6 +54,8 @@ string pixel_image_create_roi_name = "pixel_image_create_roi";
 string pixel_image_clone_name = "pixel_image_clone";
 string pixel_image_copy_name = "pixel_image_copy";
 string pixel_image_clear_name = "pixel_image_clear";
+string pixel_image_read_name = "pixel_image_read";
+string pixel_image_write_name = "pixel_image_write";
 string normalize_name = "normalize";
 string normalize_byte_name = "normalize_byte";
 string normalize_char_name = "normalize_char";
@@ -433,7 +436,7 @@ result pixel_image_create_roi(
 
 result pixel_image_clone(
     pixel_image *target,
-    pixel_image *source
+    const pixel_image *source
     )
 {
     TRY();
@@ -697,6 +700,362 @@ result pixel_image_clear(
 
     FINALLY(pixel_image_clear);
     RETURN();
+}
+
+/******************************************************************************/
+
+void skip_whitespace(FILE *file)
+{
+  char c;
+
+  c = getc(file);
+  while (c == ' ' || c == '\t' || c == '\v' || c == '\f' || c == '\n' || c == '\r') {
+    c = getc(file);
+  }
+  ungetc(c, file);
+}
+
+void skip_comment(FILE *file)
+{
+  char c;
+  c = getc(file);
+
+  if (c == '#') {
+    while (c != '\n' && c != '\r') {
+      c = getc(file);
+    }
+  }
+  ungetc(c, file);
+}
+
+uint32 read_format(FILE *file)
+{
+  int read_count;
+  char c;
+
+  read_count = fscanf(file, "P%c", &c);
+  if (read_count < 1) {
+    return 0;
+  }
+  switch (c) {
+    case '1': return 1;
+    case '2': return 2;
+    case '3': return 3;
+    case '4': return 4;
+    case '5': return 5;
+    case '6': return 6;
+    default: return NONE;
+  }
+}
+
+int read_number(FILE *file)
+{
+  int read_count, i;
+
+  read_count = fscanf(file, "%d", &i);
+  if (read_count != 1) {
+    return -1;
+  }
+  return i;
+}
+
+result pixel_image_read
+(
+  pixel_image *target,
+  string source
+)
+{
+  TRY();
+  FILE* file;
+  int read_count, value;
+  uint32 number, width, height, maxval;
+  pixel_format format;
+  pixel_type type;
+
+  CHECK_POINTER(target);
+  CHECK_POINTER(source);
+
+  printf("Starting to read image '%s'...\n", source);
+  file = fopen(source, "rb");
+  if (file == NULL) {
+    printf("Error: opening pnm file failed\n");
+    ERROR(INPUT_ERROR);
+  }
+
+  number = read_format(file);
+  if (number == 0) {
+    printf("Error: reading format of pnm failed\n");
+    ERROR(INPUT_ERROR);
+  }
+
+  if (number == 1 || number == 4) {
+    format = MONO;
+  }
+  else
+  if (number == 2 || number == 5) {
+    format = GREY;
+  }
+  else {
+    format = RGB;
+  }
+
+  skip_whitespace(file);
+  skip_comment(file);
+  skip_whitespace(file);
+
+  value = read_number(file);
+  if (value < 0) {
+    printf("Error: reading width of pnm failed\n");
+    ERROR(INPUT_ERROR);
+  }
+  width = (unsigned)value;
+
+  skip_whitespace(file);
+  skip_comment(file);
+  skip_whitespace(file);
+
+  value = read_number(file);
+  if (value < 0) {
+    printf("Error: reading height of pnm failed\n");
+    ERROR(INPUT_ERROR);
+  }
+  height = (unsigned)value;
+
+  skip_whitespace(file);
+  skip_comment(file);
+  skip_whitespace(file);
+
+  if (format == MONO) {
+    maxval = 1;
+    type = p_U8;
+  }
+  else {
+    value = read_number(file);
+    if (value < 0) {
+      printf("Error: reading maxval of pnm failed\n");
+      ERROR(INPUT_ERROR);
+    }
+    maxval = (unsigned)value;
+
+    if (maxval < 256) {
+      type = p_U8;
+    }
+    else
+    if (maxval < 65536) {
+      type = p_U16;
+    }
+    else {
+      type = p_U32;
+    }
+
+    skip_whitespace(file);
+    skip_comment(file);
+    skip_whitespace(file);
+  }
+
+  if (format == RGB) {
+    CHECK(pixel_image_create(target, type, format, width, height, 3, 3 * width));
+  }
+  else {
+    CHECK(pixel_image_create(target, type, format, width, height, 1, width));
+  }
+
+  /* ASCII types must be read value by value and stored in the array */
+  if (number < 4) {
+    if (type == p_U8) {
+      byte *target_data;
+      uint32 pos, size;
+
+      target_data = (byte *)target->data;
+      size = target->size;
+      pos = 0;
+      while (pos < size) {
+        value = read_number(file);
+        if (value < 0) {
+          printf("Error: reading pnm image data failed at position %d/%d\n", pos, size-1);
+          ERROR(INPUT_ERROR);
+        }
+        if (value > 255) {
+          printf("Error: too large pnm image value at position %d/%d\n", pos, size-1);
+          ERROR(INPUT_ERROR);
+        }
+
+        target_data[pos] = (byte)value;
+        pos++;
+        skip_whitespace(file);
+      }
+    }
+    else
+    if (type == p_U16) {
+      uint16 *target_data;
+      uint32 pos, size;
+
+      target_data = (uint16 *)target->data;
+      size = target->size;
+      pos = 0;
+      while (pos < size) {
+        value = read_number(file);
+        if (value < 0) {
+          printf("Error: reading pnm image data failed at position %d/%d\n", pos, size-1);
+          ERROR(INPUT_ERROR);
+        }
+        if (value > 65535) {
+          printf("Error: too large pnm image value at position %d/%d\n", pos, size-1);
+          ERROR(INPUT_ERROR);
+        }
+
+        target_data[pos] = (uint16)value;
+        pos++;
+        skip_whitespace(file);
+      }
+    }
+    else {
+      uint32 *target_data, pos, size;
+
+      target_data = (uint32 *)target->data;
+      size = target->size;
+      pos = 0;
+      while (pos < size) {
+        value = read_number(file);
+        if (value < 0) {
+          printf("Error: reading pnm image data failed at position %d/%d\n", pos, size-1);
+          ERROR(INPUT_ERROR);
+        }
+
+        target_data[pos] = (uint32)value;
+        pos++;
+        skip_whitespace(file);
+      }
+    }
+  }
+  /* binary types can be read in one chunk... */
+  else {
+    read_count = fread(target->data, sizeof(byte), target->size, file);
+    if (read_count != target->size) {
+      printf("Error: reading pnm image data failed\n");
+      ERROR(INPUT_ERROR);
+    }
+  }
+
+  printf("Successfully read type %d image of size (%d x %d)\n", number, width, height);
+
+  FINALLY(pixel_image_read);
+  fclose(file);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result pixel_image_write
+(
+  pixel_image *source,
+  string target,
+  uint32 ascii
+)
+{
+  TRY();
+  FILE* file;
+  int write_count, number, maxval;
+
+  CHECK_POINTER(target);
+  CHECK_POINTER(source);
+  CHECK_PARAM(source->type == p_U8 || source->type == p_U16);
+  CHECK_PARAM(source->format == MONO || source->format == GREY || source->format == RGB);
+
+  printf("Starting to write image '%s'...\n", target);
+  file = fopen(target, "wb");
+  if (file == NULL) {
+    printf("Error: opening pnm file failed\n");
+    ERROR(INPUT_ERROR);
+  }
+
+  if (ascii == 1) {
+    if (source->format == MONO) {
+      number = 1;
+    }
+    else
+    if (source->format == GREY) {
+      number = 2;
+    }
+    else {
+      number = 3;
+    }
+  }
+  else {
+    if (source->format == MONO) {
+      number = 4;
+    }
+    else
+    if (source->format == GREY) {
+      number = 5;
+    }
+    else {
+      number = 6;
+    }
+  }
+
+  if (source->type == p_U8) {
+    maxval = 255;
+  }
+  else {
+    maxval = 65535;
+  }
+
+  fprintf(file, "P%d\n# Created by cvsu\n", number);
+  if (number == 1 || number == 4) {
+    fprintf(file, "%d %d", source->width, source->height);
+  }
+  else {
+    fprintf(file, "%d %d %d\n", source->width, source->height, maxval);
+  }
+
+  if (number < 4) {
+    int x, y, width, height, stride, pos;
+    width = source->width * source->step;
+    height = source->height;
+    stride = source->stride;
+    if (maxval = 255) {
+      byte *source_data;
+      source_data = (byte *)source->data;
+      for (y = 0; y < height; y++) {
+        pos = y * stride;
+        for (x = width; --x; pos++) {
+          if (x > 1) {
+            fprintf(file, "%d ", source_data[pos]);
+          }
+          else {
+            fprintf(file, "%d\n", source_data[pos]);
+          }
+        }
+      }
+    }
+    else {
+      uint16 *source_data;
+      source_data = (uint16 *)source->data;
+      for (y = 0; y < height; y++) {
+        pos = y * stride;
+        for (x = width; --x; pos++) {
+          if (x > 1) {
+            fprintf(file, "%d ", source_data[pos]);
+          }
+          else {
+            fprintf(file, "%d\n", source_data[pos]);
+          }
+        }
+      }
+    }
+  }
+  else {
+    write_count = fwrite(source->data, sizeof(byte), source->size, file);
+    if (write_count != source->size) {
+      printf("Error writing pnm file data\n");
+      ERROR(INPUT_ERROR);
+    }
+  }
+
+  FINALLY(pixel_image_write);
+  fclose(file);
+  RETURN();
 }
 
 /******************************************************************************/
