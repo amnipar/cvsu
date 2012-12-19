@@ -84,25 +84,6 @@ typedef unsigned long  uint32;
 typedef float          real32;
 typedef double         real64;
 
-/**
- * Stores a reference to a rectangular region within an image.
- * Used for extracting statistical properties of image regions.
- * Used both in @see pixel_image
- * and in @see integral_image.
- */
-typedef struct image_rect_t {
-  /** Is this a valid rect? */
-  uint32 valid;
-  /** Offset from the beginning of data array */
-  uint32 offset;
-  /** Horizontal step to the right edge of the rectangle */
-  uint32 hstep;
-  /** Vertical step to the bottom edge of the rectangle */
-  uint32 vstep;
-  /** Number of elements in roi */
-  uint32 N;
-} image_rect;
-
 typedef enum direction_t {
     d_NULL = 0,
     d_N,
@@ -287,6 +268,8 @@ typedef sint8 edge_strength;
  */
 typedef enum pixel_format_t {
     NONE = 0,
+    /** one-channel binary image */
+    MONO,
     /** one-channel greyscale image */
     GREY,
     /** two-channel image with UYVY values */
@@ -303,6 +286,28 @@ typedef enum pixel_format_t {
     RGBA
 } pixel_format;
 
+/**
+ * Stores a reference to a rectangular region within an image.
+ * Used for extracting statistical properties of image regions.
+ * Used both in @see pixel_image
+ * and in @see integral_image.
+ */
+typedef struct image_rect_t {
+  /** Is this a valid rect? */
+  uint32 valid;
+  /** Offset from the beginning of data array */
+  uint32 offset;
+  /** Horizontal step to the right edge of the rectangle */
+  uint32 hstep;
+  /** Vertical step to the bottom edge of the rectangle */
+  uint32 vstep;
+  /** Number of elements in roi */
+  uint32 N;
+} image_rect;
+
+/**
+ * Enumerates the different possibilities for image block type.
+ */
 typedef enum image_block_type_t {
     b_NONE = 0,
     b_INT,
@@ -330,11 +335,19 @@ typedef struct image_block_t {
     /*hstat_color value;*/
 } image_block;
 
+/**
+ * Stores the statistical properties of an image region, and the sums and item
+ * counts necessary for calculating them for combined regions.
+ */
 typedef struct statistics_t
 {
   I_value N;
   I_value sum;
   I_value sum2;
+#ifdef INTEGRAL_IMAGE_HIGHER_ORDER_STATISTICS
+  I_value sum3;
+  I_value sum4;
+#endif
   I_value mean;
   I_value variance;
   I_value deviation;
@@ -343,20 +356,6 @@ typedef struct statistics_t
   I_value kurtosis;
 #endif
 } statistics;
-
-/**
- * Stores region information for connected component analysis and segmentation
- * with union-find equivalence class approach.
- */
-typedef struct region_t
-{
-  region *id;
-  uint32 rank;
-  uint32 x1;
-  uint32 y1;
-  uint32 x2;
-  uint32 y2;
-} region;
 
 typedef struct consistency_t
 {

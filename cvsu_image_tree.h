@@ -64,7 +64,6 @@ typedef struct image_tree_neighbor_t {
 /**
  * Stores a quad tree holding image data.
  */
-
 typedef struct image_tree_t {
     struct image_tree_root_t *root;
     struct image_tree_t *parent;
@@ -92,7 +91,6 @@ typedef struct image_tree_t {
 /**
  * Stores a root of a tree contained within a forest.
  */
-
 typedef struct image_tree_root_t {
     pixel_image ROI;
     integral_image I;
@@ -104,7 +102,6 @@ typedef struct image_tree_root_t {
 /**
  * Stores a forest of image trees.
  */
-
 typedef struct image_tree_forest_t {
     pixel_image *original;
     pixel_image *source;
@@ -126,6 +123,22 @@ typedef struct image_tree_forest_t {
     list_item *last_base_value;
     image_tree_root *roots;
 } image_tree_forest;
+
+/**
+ * Stores region information for forest segmentation with union-find
+ * equivalence class approach. In addition to id and rank information contains
+ * also the region bounding box and statistics.
+ */
+typedef struct forest_region_t
+{
+  struct forest_region_t *id;
+  uint32 rank;
+  uint32 x1;
+  uint32 y1;
+  uint32 x2;
+  uint32 y2;
+  statistics stat;
+} forest_region;
 
 /**
  * Initializes the contents of the tree with null values.
@@ -216,17 +229,26 @@ result image_tree_forest_update(
 /**
  * Divides all trees in the forest that have dev smaller than threshold.
  */
-
 result image_tree_forest_divide_with_dev(
     image_tree_forest *target,
     sint16 threshold
 );
 
 /**
+ * Divides all trees in the forest that have high entropy.
+ * Will not divide trees that would become smaller than the given min size.
+ */
+result image_tree_forest_divide_with_entropy(
+  /** forest to be segmented */
+  image_tree_forest *target,
+  /** the minimum size for the trees in the end result */
+  uint32 min_size
+);
+
+/**
  * Reads an image from file and creates an image forest from it.
  * The resulting image will be owned by the forest and deallocated.
  */
-
 result image_tree_forest_read(
     image_tree_forest *target,
     string source,
