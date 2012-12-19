@@ -378,6 +378,30 @@ result scale_up(
 );
 
 /**
+ * Safely get the pixel value at the given position.
+ */
+I_value pixel_image_get_value(
+  pixel_image *target,
+  uint32 x,
+  uint32 y,
+);
+
+/**
+ * Fast but unsafe method for getting a pixel value.
+ * Useful when multiple values are needed and the bound checking etc. can be
+ * done once for the whole patch.
+ */
+I_value pixel_image_unsafe_get_value(
+  void *data,
+  uint32 x,
+  uint32 y,
+  uint32 step,
+  uint32 stride,
+  uint32 offset,
+  pixel_type type
+);
+
+/**
  * Produces a valid rectangle for the given pixel_image. Takes into account
  * image dimensions and reduces the size of the region at the border. May
  * cause edge effects in some applications.

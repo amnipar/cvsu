@@ -52,13 +52,15 @@ string image_tree_forest_nullify_name = "image_tree_forest_nullify";
 string image_tree_forest_update_prepare_name = "image_tree_forest_update_prepare";
 string image_tree_forest_update_name = "image_tree_forest_update";
 string image_tree_forest_divide_with_dev_name = "image_tree_forest_divide_with_dev";
+string image_tree_forest_divide_with_entropy_name = "image_tree_forest_divide_with_entropy";
 string image_tree_forest_read_name = "image_tree_forest_read";
 string image_tree_root_update_name = "image_tree_root_update";
 string image_tree_update_name = "image_tree_update";
 string image_tree_calculate_consistency_name = "image_tree_calculate_consistency";
 string image_tree_divide_name = "image_tree_divide";
+string image_tree_get_statistics_name = "image_tree_get_statistics";
 string image_tree_get_child_statistics_name = "image_tree_get_child_statistics";
-string image_tree_divide_by_entropy_name = "image_tree_divide_by_entropy";
+string image_tree_divide_with_entropy_name = "image_tree_divide_with_entropy";
 string image_tree_create_neighbor_list_name = "image_tree_create_neighbor_list";
 string image_tree_get_direct_neighbor_name = "image_tree_get_direct_neighbor";
 string image_tree_get_direct_neighbor_n_name = "image_tree_get_direct_neighbor_n";
@@ -257,7 +259,13 @@ result image_tree_forest_init
       CHECK(pixel_image_create_roi(&target->roots[pos].ROI, target->original, block_ptr->x, block_ptr->y, block_ptr->w, block_ptr->h));
       CHECK(small_integral_image_create(&target->roots[pos].I, &target->roots[pos].ROI));
     }
-  }
+  }result image_tree_forest_divide_with_entropy(
+  /** forest to be segmented */
+  image_tree_forest *target,
+                                                /** the minimum size for the trees in the end result */
+                                                uint32 min_size
+                                                );
+
 
   target->last_base_block = target->blocks.last.prev;
   target->last_base_tree = target->trees.last.prev;
@@ -607,6 +615,32 @@ result image_tree_forest_divide_with_dev
   }
 
   FINALLY(image_tree_forest_divide_with_dev);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result image_tree_forest_divide_with_entropy
+(
+  image_tree_forest *target,
+  uint32 min_size
+)
+{
+  TRY();
+  list_item *trees;
+  image_tree *current_tree;
+
+  CHECK_POINTER(target);
+  CHECK_PARAM(min_size < target->tree_width && min_size < target->tree_height);
+
+  trees = target->trees.first.next;
+  while (trees != &target->trees.last) {
+    current_tree = (image_tree *)trees->data;
+    CHECK(image_tree_divide_with_entropy(current_tree, min_size));
+    trees = trees->next;
+  }
+
+  FINALLY(image_tree_forest_divide_with_entropy);
   RETURN();
 }
 
@@ -1118,11 +1152,50 @@ result image_tree_divide
 
 /******************************************************************************/
 
-result image_tree_get_child_statistics
-  (
+result image_tree_get_statistics
+(
   image_tree *source,
   statistics *target
-  )
+)
+{
+  TRY();
+
+  CHECK_POINTER(source);
+  CHECK_POINTER(target);
+
+  if (source->root->forest->type == b_STATISTICS) {
+    CHECK(memory_copy((void*)target, (void*)source->block->value, 1, sizeof(statistics)));
+  }
+  else {
+    I_value mean, var;
+    small_integral_image_box *box;
+
+    box = &source->root->box;
+
+    small_integral_image_box_resize(box, source->block->w, source->block->h);
+    box->channel = 0;
+    small_integral_image_box_update(box, source->block->x, source->block->y);
+    mean = ((I_value)box->sum / (I_value)box->N);
+    var = (((I_value)box->sumsqr / (I_value)box->N) - (mean * mean));
+    if (var < 0) var = 0;
+
+    target->N = (I_value)box->N;
+    target->sum = (I_value)box->sum;
+    target->sum2 = (I_value)box->sumsqr;
+    target->mean = ((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
+    target->variance = var;
+    target->deviation = sqrt(var);
+  }
+
+  FINALLY(image_tree_get_statistics);
+  RETURN();
+}
+
+result image_tree_get_child_statistics
+(
+  image_tree *source,
+  statistics *target
+)
 {
   TRY();
   uint16 x, y, w, h;
@@ -1146,79 +1219,144 @@ result image_tree_get_child_statistics
   }
   /* otherwise have to calculate */
   else {
-    if (source->block->w > 1 && source->block->h > 1) {
-      box = &source->root->box;
+      if (source->block->w > 1 && source->block->h > 1) {
+        box = &source->root->box;
 
-      w = (uint16)(source->block->w / 2);
-      h = (uint16)(source->block->h / 2);
+        w = (uint16)(source->block->w / 2);
+        h = (uint16)(source->block->h / 2);
 
-      small_integral_image_box_resize(box, w, h);
-      box->channel = 0;
+        /* if the new width is 1, no need to calculate, use the pixel values */
+        if (w == 1 && h == 1) {
 
-      /* nw child block */
-      x = source->block->x;
-      y = source->block->y;
+          /* nw child block */
+          x = source->block->x;
+          y = source->block->y;
 
-      small_integral_image_box_update(box, x, y);
-      mean = ((I_value)box->sum / (I_value)box->N);
-      var = (((I_value)box->sumsqr / (I_value)box->N) - (mean * mean));
-      if (var < 0) var = 0;
+          stat = &target[0];
+          stat->N = 1;
+          stat->sum = (I_value)box->sum;
+          stat->sum2 = (I_value)box->sumsqr;
+          stat->mean = ((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
+          stat->variance = var;
+          stat->deviation = sqrt(var);
 
-      stat = &target[0];
-      stat->N = (I_value)box->N;
-      stat->sum = (I_value)box->sum;
-      stat->sum2 = (I_value)box->sumsqr;
-      stat->mean = ((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
-      stat->variance = var;
-      stat->deviation = sqrt(var);
+          /* ne child block */
+          x = x + w;
 
-      /* ne child block */
-      x = x + w;
+          small_integral_image_box_update(box, x, y);
+          mean = ((I_value)box->sum / (I_value)box->N);
+          var = (((I_value)box->sumsqr / (I_value)box->N) - (mean * mean));
+          if (var < 0) var = 0;
 
-      small_integral_image_box_update(box, x, y);
-      mean = ((I_value)box->sum / (I_value)box->N);
-      var = (((I_value)box->sumsqr / (I_value)box->N) - (mean * mean));
-      if (var < 0) var = 0;
+          stat = &target[1];
+          stat->N = (I_value)box->N;
+          stat->sum = (I_value)box->sum;
+          stat->sum2 = (I_value)box->sumsqr;
+          stat->mean = ((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
+          stat->variance = var;
+          stat->deviation = sqrt(var);
 
-      stat = &target[1];
-      stat->N = (I_value)box->N;
-      stat->sum = (I_value)box->sum;
-      stat->sum2 = (I_value)box->sumsqr;
-      stat->mean = ((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
-      stat->variance = var;
-      stat->deviation = sqrt(var);
+          /* se child block */
+          y = y + h;
 
-      /* se child block */
-      y = y + h;
+          small_integral_image_box_update(box, x, y);
+          mean = ((I_value)box->sum / (I_value)box->N);
+          var = (((I_value)box->sumsqr / (I_value)box->N) - (mean * mean));
+          if (var < 0) var = 0;
 
-      small_integral_image_box_update(box, x, y);
-      mean = ((I_value)box->sum / (I_value)box->N);
-      var = (((I_value)box->sumsqr / (I_value)box->N) - (mean * mean));
-      if (var < 0) var = 0;
+          stat = &target[3];
+          stat->N = (I_value)box->N;
+          stat->sum = (I_value)box->sum;
+          stat->sum2 = (I_value)box->sumsqr;
+          stat->mean = ((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
+          stat->variance = var;
+          stat->deviation = sqrt(var);
 
-      stat = &target[3];
-      stat->N = (I_value)box->N;
-      stat->sum = (I_value)box->sum;
-      stat->sum2 = (I_value)box->sumsqr;
-      stat->mean = ((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
-      stat->variance = var;
-      stat->deviation = sqrt(var);
+          /* sw child block */
+          x = x - w;
 
-      /* sw child block */
-      x = x - w;
+          small_integral_image_box_update(box, x, y);
+          mean = ((I_value)box->sum / (I_value)box->N);
+          var = (((I_value)box->sumsqr / (I_value)box->N) - (mean * mean));
+          if (var < 0) var = 0;
 
-      small_integral_image_box_update(box, x, y);
-      mean = ((I_value)box->sum / (I_value)box->N);
-      var = (((I_value)box->sumsqr / (I_value)box->N) - (mean * mean));
-      if (var < 0) var = 0;
+          stat = &target[2];
+          stat->N = (I_value)box->N;
+          stat->sum = (I_value)box->sum;
+          stat->sum2 = (I_value)box->sumsqr;
+          stat->mean = ((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
+          stat->variance = var;
+          stat->deviation = sqrt(var);
+        }
+        else {
+        small_integral_image_box_resize(box, w, h);
+        box->channel = 0;
 
-      stat = &target[2];
-      stat->N = (I_value)box->N;
-      stat->sum = (I_value)box->sum;
-      stat->sum2 = (I_value)box->sumsqr;
-      stat->mean = ((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
-      stat->variance = var;
-      stat->deviation = sqrt(var);
+        /* nw child block */
+        x = source->block->x;
+        y = source->block->y;
+
+        small_integral_image_box_update(box, x, y);
+        mean = ((I_value)box->sum / (I_value)box->N);
+        var = (((I_value)box->sumsqr / (I_value)box->N) - (mean * mean));
+        if (var < 0) var = 0;
+
+        stat = &target[0];
+        stat->N = (I_value)box->N;
+        stat->sum = (I_value)box->sum;
+        stat->sum2 = (I_value)box->sumsqr;
+        stat->mean = ((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
+        stat->variance = var;
+        stat->deviation = sqrt(var);
+
+        /* ne child block */
+        x = x + w;
+
+        small_integral_image_box_update(box, x, y);
+        mean = ((I_value)box->sum / (I_value)box->N);
+        var = (((I_value)box->sumsqr / (I_value)box->N) - (mean * mean));
+        if (var < 0) var = 0;
+
+        stat = &target[1];
+        stat->N = (I_value)box->N;
+        stat->sum = (I_value)box->sum;
+        stat->sum2 = (I_value)box->sumsqr;
+        stat->mean = ((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
+        stat->variance = var;
+        stat->deviation = sqrt(var);
+
+        /* se child block */
+        y = y + h;
+
+        small_integral_image_box_update(box, x, y);
+        mean = ((I_value)box->sum / (I_value)box->N);
+        var = (((I_value)box->sumsqr / (I_value)box->N) - (mean * mean));
+        if (var < 0) var = 0;
+
+        stat = &target[3];
+        stat->N = (I_value)box->N;
+        stat->sum = (I_value)box->sum;
+        stat->sum2 = (I_value)box->sumsqr;
+        stat->mean = ((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
+        stat->variance = var;
+        stat->deviation = sqrt(var);
+
+        /* sw child block */
+        x = x - w;
+
+        small_integral_image_box_update(box, x, y);
+        mean = ((I_value)box->sum / (I_value)box->N);
+        var = (((I_value)box->sumsqr / (I_value)box->N) - (mean * mean));
+        if (var < 0) var = 0;
+
+        stat = &target[2];
+        stat->N = (I_value)box->N;
+        stat->sum = (I_value)box->sum;
+        stat->sum2 = (I_value)box->sumsqr;
+        stat->mean = ((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
+        stat->variance = var;
+        stat->deviation = sqrt(var);
+      }
     }
   }
 
@@ -1228,42 +1366,45 @@ result image_tree_get_child_statistics
 
 /******************************************************************************/
 
-result image_tree_divide_by_entropy
-  (
+result image_tree_divide_with_entropy
+(
   image_tree *target,
-  I_value threshold,
-  uint32 *outcome
-  )
+  uint32 min_size
+)
 {
   TRY();
   image_tree_forest *forest;
   image_tree nw_tree, ne_tree, sw_tree, se_tree, *child_tree;
   image_block nw_block, ne_block, sw_block, se_block, *child_block;
-  statistics nw_value, ne_value, sw_value, se_value, *child_value;
+  statistics value, values[4], *child_value;
+  I_value zscores[4];
   image_block_type type;
+  uint16 i, x, y, w, h;
 
-  CHECK_POINTER(outcome);
-  *outcome = 0;
   CHECK_POINTER(target);
+
   CHECK(image_tree_nullify(&nw_tree));
   CHECK(image_tree_nullify(&ne_tree));
   CHECK(image_tree_nullify(&sw_tree));
   CHECK(image_tree_nullify(&se_tree));
 
+  w = (uint16)(source->block->w / 2);
+  h = (uint16)(source->block->h / 2);
+
   if (target->nw == NULL && target->ne == NULL && target->sw == NULL && target->se == NULL) {
-    if (target->block->w > 1 && target->block->h > 1) {
-
+    value = *((statistics *)target->block->value);
+    image_tree_get_child_statistics(target, values);
+    for (i = 0; i < 4; i++) {
+      zscores[i] =
     }
-    else {
-      *outcome = 3;
-    }
-  }
-  else {
-    *outcome = 2;
-  }
-  *outcome = 1;
 
-  FINALLY(image_tree_divide_by_entropy);
+    /* nw child block */
+    x = source->block->x;
+    y = source->block->y;
+
+  }
+
+  FINALLY(image_tree_divide_with_entropy);
   RETURN();
 }
 

@@ -294,10 +294,11 @@ result image_tree_get_child_statistics(
  * Calculates the child tree statistics but divides the tree only if the
  * Shannon entropy of the children is higher than the given threshold.
  */
-result image_tree_divide_by_entropy(
+result image_tree_divide_with_entropy(
+  /** The tree to be divided in case its entropy is sufficiently high. */
   image_tree *target,
-  I_value threshold,
-  uint32 *outcome
+  /** The minimum size for the child trees in the end result. */
+  uint32 min_size
 );
 
 /**
