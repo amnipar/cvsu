@@ -48,8 +48,8 @@ result pixel_image_create_from_ipl_image(
 result pixel_image_create_from_file(
     pixel_image *target,
     const char *filename,
-    pixel_format format,
-    pixel_type type
+    pixel_type type,
+    pixel_format format
 );
 
 result pixel_image_write_to_file(

@@ -97,7 +97,13 @@ result pixel_image_create_from_ipl_image(pixel_image *target, IplImage *source, 
 
 /******************************************************************************/
 
-result pixel_image_create_from_file(pixel_image *target, const char *filename, pixel_format format, pixel_type type)
+result pixel_image_create_from_file
+(
+  pixel_image *target,
+  const char *filename,
+  pixel_type type,
+  pixel_format format
+)
 {
   TRY();
   int depth;
