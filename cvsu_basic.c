@@ -872,11 +872,11 @@ result pixel_image_read
       while (pos < size) {
         value = read_number(file);
         if (value < 0) {
-          printf("Error: reading pnm image data failed at position %d/%d\n", pos, size-1);
+          printf("Error: reading pnm image data failed at position %lu/%lu\n", pos, size-1);
           ERROR(INPUT_ERROR);
         }
         if (value > 255) {
-          printf("Error: too large pnm image value at position %d/%d\n", pos, size-1);
+          printf("Error: too large pnm image value at position %lu/%lu\n", pos, size-1);
           ERROR(INPUT_ERROR);
         }
 
@@ -896,11 +896,11 @@ result pixel_image_read
       while (pos < size) {
         value = read_number(file);
         if (value < 0) {
-          printf("Error: reading pnm image data failed at position %d/%d\n", pos, size-1);
+          printf("Error: reading pnm image data failed at position %lu/%lu\n", pos, size-1);
           ERROR(INPUT_ERROR);
         }
         if (value > 65535) {
-          printf("Error: too large pnm image value at position %d/%d\n", pos, size-1);
+          printf("Error: too large pnm image value at position %lu/%lu\n", pos, size-1);
           ERROR(INPUT_ERROR);
         }
 
@@ -918,7 +918,7 @@ result pixel_image_read
       while (pos < size) {
         value = read_number(file);
         if (value < 0) {
-          printf("Error: reading pnm image data failed at position %d/%d\n", pos, size-1);
+          printf("Error: reading pnm image data failed at position %lu/%lu\n", pos, size-1);
           ERROR(INPUT_ERROR);
         }
 
@@ -937,7 +937,7 @@ result pixel_image_read
     }
   }
 
-  printf("Successfully read type %d image of size (%d x %d)\n", number, width, height);
+  printf("Successfully read type %lu image of size (%lu x %lu)\n", number, width, height);
 
   FINALLY(pixel_image_read);
   fclose(file);
@@ -1003,10 +1003,10 @@ result pixel_image_write
 
   fprintf(file, "P%d\n# Created by cvsu\n", number);
   if (number == 1 || number == 4) {
-    fprintf(file, "%d %d", source->width, source->height);
+    fprintf(file, "%lu %lu", source->width, source->height);
   }
   else {
-    fprintf(file, "%d %d %d\n", source->width, source->height, maxval);
+    fprintf(file, "%lu %lu %d\n", source->width, source->height, maxval);
   }
 
   if (number < 4) {

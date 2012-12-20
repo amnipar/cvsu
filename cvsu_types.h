@@ -219,9 +219,9 @@ typedef enum pixel_type_t {
     /** signed 32-bit integer (long) values */
     p_S32,
     /** unsigned 64-bit integer (long long) values */
-    p_U64,
+    /*p_U64,*/
     /** signed 64-bit integer (long long) values */
-    p_S64,
+    /*p_S64,*/
     /** 32-bit floating point (float) values */
     p_F32,
     /** 64-bit floating point values (double) */
@@ -260,6 +260,11 @@ typedef uint32 SI_1_t;
 typedef uint32 SI_2_t;
 #define p_SI_1 p_U32
 #define p_SI_2 p_U32
+
+/**
+ * Useful for getting a pixel value in a generic type
+ */
+I_value cast_pixel_value(void *data, pixel_type type, uint32 offset);
 
 typedef sint8 edge_strength;
 

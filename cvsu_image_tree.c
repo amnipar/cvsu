@@ -132,7 +132,7 @@ result image_tree_forest_init
     target->dx = (uint16)((width - (target->cols * target->tree_width)) / 2);
     target->dy = (uint16)((height - (target->rows * target->tree_height)) / 2);
     size = target->rows * target->cols;
-
+    
     if (target->roots != NULL) {
       CHECK(memory_deallocate((data_pointer*)&target->roots));
     }
@@ -191,6 +191,11 @@ result image_tree_forest_init
       /* should never reach here actually */
       ERROR(BAD_PARAM);
     }
+
+    if (!integral_image_is_null(&target->integral)) {
+      CHECK(integral_image_destroy(&target->integral));
+    }
+    CHECK(integral_image_create(&target->integral, target->source));
 
     /* image is only created here, content is copied/converted in update stage */
     target->type = type;
@@ -259,13 +264,7 @@ result image_tree_forest_init
       CHECK(pixel_image_create_roi(&target->roots[pos].ROI, target->original, block_ptr->x, block_ptr->y, block_ptr->w, block_ptr->h));
       CHECK(small_integral_image_create(&target->roots[pos].I, &target->roots[pos].ROI));
     }
-  }result image_tree_forest_divide_with_entropy(
-  /** forest to be segmented */
-  image_tree_forest *target,
-                                                /** the minimum size for the trees in the end result */
-                                                uint32 min_size
-                                                );
-
+  }
 
   target->last_base_block = target->blocks.last.prev;
   target->last_base_tree = target->trees.last.prev;
@@ -403,6 +402,7 @@ result image_tree_forest_destroy(
     }
     CHECK(memory_deallocate((data_pointer*)&target->roots));
 
+    CHECK(integral_image_destroy(&target->integral));
     CHECK(pixel_image_destroy(target->source));
     CHECK(memory_deallocate((data_pointer*)&target->source));
 
@@ -416,34 +416,36 @@ result image_tree_forest_destroy(
 
 /******************************************************************************/
 
-result image_tree_forest_nullify(
-    image_tree_forest *target
-    )
+result image_tree_forest_nullify
+(
+  image_tree_forest *target
+)
 {
-    TRY();
+  TRY();
 
-    CHECK_POINTER(target);
+  CHECK_POINTER(target);
 
-    target->original = NULL;
-    target->source = NULL;
-    /*CHECK(edge_block_image_nullify(&target->edge_image));*/
-    target->rows = 0;
-    target->cols = 0;
-    target->tree_width = 0;
-    target->tree_height = 0;
-    target->dx = 0;
-    target->dy = 0;
-    target->type = b_NONE;
-    CHECK(list_nullify(&target->trees));
-    CHECK(list_nullify(&target->blocks));
-    CHECK(list_nullify(&target->values));
-    target->last_base_tree = NULL;
-    target->last_base_block = NULL;
-    target->last_base_value = NULL;
-    target->roots = NULL;
+  target->original = NULL;
+  target->source = NULL;
+  CHECK(integral_image_nullify(&target->integral));
+  /*CHECK(edge_block_image_nullify(&target->edge_image));*/
+  target->rows = 0;
+  target->cols = 0;
+  target->tree_width = 0;
+  target->tree_height = 0;
+  target->dx = 0;
+  target->dy = 0;
+  target->type = b_NONE;
+  CHECK(list_nullify(&target->trees));
+  CHECK(list_nullify(&target->blocks));
+  CHECK(list_nullify(&target->values));
+  target->last_base_tree = NULL;
+  target->last_base_block = NULL;
+  target->last_base_value = NULL;
+  target->roots = NULL;
 
-    FINALLY(image_tree_forest_nullify);
-    RETURN();
+  FINALLY(image_tree_forest_nullify);
+  RETURN();
 }
 
 /******************************************************************************/
@@ -547,17 +549,53 @@ result image_tree_forest_update
 )
 {
   TRY();
-  uint32 pos, size;
-  /*printf("update\n");*/
+  uint32 row, col, rows, cols, pos, step, stride, hstep, vstep, dstep, offset;
+  image_tree *tree;
+  integral_image *I;
+  statistics *stat;
+  I_value *iA, *i2A, N, sum1, sum2, mean, var;
+        
+  I = &target->integral;
+  N = (I_value)(target->tree_width * target->tree_height);
+  step = I->step;
+  stride = I->stride;
+  hstep = target->tree_width * step;
+  vstep = target->tree_height * stride;
+  dstep = hstep + vstep;
 
   CHECK(image_tree_forest_update_prepare(target));
+  
+  CHECK(integral_image_update(&target->integral));
 
-  size = target->rows * target->cols;
-  /*printf("size = %ul\n", size);*/
-  for (pos = 0; pos < size; pos++) {
-      CHECK(image_tree_root_update(&target->roots[pos]));
+  rows = target->rows;
+  cols = target->cols;
+  pos = 0;
+  
+  for (row = 0; row < rows; row++) {
+    tree = target->roots[pos].tree;
+    offset = (tree->block->y * stride) + (tree->block->x * step);
+    for (col = 0; col < cols; col++, pos++, offset += hstep) {
+      tree = target->roots[pos].tree;
+      
+      iA = ((I_value *)I->I_1.data) + offset;
+      i2A = ((I_value *)I->I_2.data) + offset;
+        
+      sum1 = *(iA + dstep) + *iA - *(iA + hstep) - *(iA - vstep);
+      sum2 = *(i2A + dstep) + *i2A - *(i2A + hstep) - *(i2A - vstep);
+      mean = sum1 / N;
+      var = sum2 / N - mean*mean;
+      if (var < 0) var = 0;
+        
+      stat = (statistics *)tree->block->value;
+      stat->N = N;
+      stat->sum = sum1;
+      stat->sum2 = sum2;
+      stat->mean = mean;
+      stat->variance = var;
+      stat->deviation = sqrt(var);
+    }
   }
-
+  
   FINALLY(image_tree_forest_update);
   RETURN();
 }
@@ -876,6 +914,89 @@ result image_tree_calculate_consistency
 
 /******************************************************************************/
 
+/* private function for caching beighbors, to be used only when it is known
+ * that the tree exists, and its children exist */
+void image_tree_cache_neighbors
+(
+  image_tree *target
+)
+{
+  target->nw->e = target->ne;
+  target->nw->s = target->sw;
+  target->ne->w = target->nw;
+  target->ne->s = target->se;
+  target->sw->e = target->se;
+  target->sw->n = target->nw;
+  target->se->w = target->sw;
+  target->se->n = target->ne;
+  if (target->n != NULL) {
+    if (target->n->sw != NULL) {
+      target->nw->n = target->n->sw;
+      target->n->sw->s = target->nw;
+    }
+    else {
+      target->nw->n = target->n;
+    }
+    if (target->n->se != NULL) {
+      target->ne->n = target->n->se;
+      target->n->se->s = target->ne;
+    }
+    else {
+      target->ne->n = target->n;
+    }
+  }
+  if (target->e != NULL) {
+    if (target->e->nw != NULL) {
+      target->ne->e = target->e->nw;
+      target->e->nw->w = target->ne;
+    }
+    else {
+      target->ne->e = target->e;
+    }
+    if (target->e->sw != NULL) {
+      target->se->e = target->e->sw;
+      target->e->sw->w = target->se;
+    }
+    else {
+      target->se->e = target->e;
+    }
+  }
+  if (target->s != NULL) {
+    if (target->s->nw != NULL) {
+      target->sw->s = target->s->nw;
+      target->s->nw->n = target->sw;
+    }
+    else {
+      target->sw->s = target->s;
+    }
+    if (target->s->ne != NULL) {
+      target->se->s = target->s->ne;
+      target->s->ne->n = target->se;
+    }
+    else {
+      target->se->s = target->s;
+    }
+  }
+  if (target->w != NULL) {
+    if (target->w->ne != NULL) {
+      target->nw->w = target->w->ne;
+      target->w->ne->e = target->nw;
+    }
+    else {
+      target->nw->w = target->w;
+    }
+    if (target->w->se != NULL) {
+      target->sw->w = target->w->se;
+      target->w->se->e = target->sw;
+    }
+    else {
+      target->sw->w = target->w;
+    }
+  }
+}
+
+/******************************************************************************/
+
 /*
  * TODO: each image tree root should have its own sublist of blocks, for
  * allowing parallel division of each root.
@@ -1069,79 +1190,7 @@ result image_tree_divide
       CHECK(list_append_reveal_data(&forest->trees, (pointer)&new_tree, (pointer*)&child_tree));
       target->sw = child_tree;
 
-      target->nw->e = target->ne;
-      target->nw->s = target->sw;
-      target->ne->w = target->nw;
-      target->ne->s = target->se;
-      target->sw->e = target->se;
-      target->sw->n = target->nw;
-      target->se->w = target->sw;
-      target->se->n = target->ne;
-      if (target->n != NULL) {
-        if (target->n->sw != NULL) {
-          target->nw->n = target->n->sw;
-          target->n->sw->s = target->nw;
-        }
-        else {
-          target->nw->n = target->n;
-        }
-        if (target->n->se != NULL) {
-          target->ne->n = target->n->se;
-          target->n->se->s = target->ne;
-        }
-        else {
-          target->ne->n = target->n;
-        }
-      }
-      if (target->e != NULL) {
-        if (target->e->nw != NULL) {
-          target->ne->e = target->e->nw;
-          target->e->nw->w = target->ne;
-        }
-        else {
-          target->ne->e = target->e;
-        }
-        if (target->e->sw != NULL) {
-          target->se->e = target->e->sw;
-          target->e->sw->w = target->se;
-        }
-        else {
-          target->se->e = target->e;
-        }
-      }
-      if (target->s != NULL) {
-        if (target->s->nw != NULL) {
-          target->sw->s = target->s->nw;
-          target->s->nw->n = target->sw;
-        }
-        else {
-          target->sw->s = target->s;
-        }
-        if (target->s->ne != NULL) {
-          target->se->s = target->s->ne;
-          target->s->ne->n = target->se;
-        }
-        else {
-          target->se->s = target->s;
-        }
-      }
-      if (target->w != NULL) {
-        if (target->w->ne != NULL) {
-          target->nw->w = target->w->ne;
-          target->w->ne->e = target->nw;
-        }
-        else {
-          target->nw->w = target->w;
-        }
-        if (target->w->se != NULL) {
-          target->sw->w = target->w->se;
-          target->w->se->e = target->sw;
-        }
-        else {
-          target->sw->w = target->w;
-        }
-      }
-
+      image_tree_cache_neighbors(target);
       CHECK(image_tree_update(child_tree));
     }
   }
@@ -1152,62 +1201,35 @@ result image_tree_divide
 
 /******************************************************************************/
 
-result image_tree_get_statistics
+bool image_tree_has_children
 (
-  image_tree *source,
-  statistics *target
+  image_tree *tree
 )
 {
-  TRY();
-
-  CHECK_POINTER(source);
-  CHECK_POINTER(target);
-
-  if (source->root->forest->type == b_STATISTICS) {
-    CHECK(memory_copy((void*)target, (void*)source->block->value, 1, sizeof(statistics)));
+  /* there should be no case in which some children would not be set */
+  /* the pointers are nullified at init; therefore, check only one */
+  if (tree->nw != NULL) {
+    return true;
   }
-  else {
-    I_value mean, var;
-    small_integral_image_box *box;
-
-    box = &source->root->box;
-
-    small_integral_image_box_resize(box, source->block->w, source->block->h);
-    box->channel = 0;
-    small_integral_image_box_update(box, source->block->x, source->block->y);
-    mean = ((I_value)box->sum / (I_value)box->N);
-    var = (((I_value)box->sumsqr / (I_value)box->N) - (mean * mean));
-    if (var < 0) var = 0;
-
-    target->N = (I_value)box->N;
-    target->sum = (I_value)box->sum;
-    target->sum2 = (I_value)box->sumsqr;
-    target->mean = ((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
-    target->variance = var;
-    target->deviation = sqrt(var);
-  }
-
-  FINALLY(image_tree_get_statistics);
-  RETURN();
+  return false;
 }
+
+/******************************************************************************/
 
 result image_tree_get_child_statistics
 (
   image_tree *source,
-  statistics *target
+  statistics *target,
+  image_block *blocks
 )
 {
   TRY();
-  uint16 x, y, w, h;
-  I_value mean, var;
-  small_integral_image_box *box;
-  statistics *stat;
 
   CHECK_POINTER(source);
   CHECK_POINTER(target);
 
   /* if the tree has already been divided, return the values from the children */
-  if (source->root->forest->type == b_STATISTICS && source->nw != NULL && source->ne != NULL && source->sw != NULL && source->se != NULL) {
+  if (image_tree_has_children(source)) {
     /* nw child block */
     CHECK(memory_copy((void*)&target[0], (void*)source->nw->block->value, 1, sizeof(statistics)));
     /* ne child block */
@@ -1219,143 +1241,223 @@ result image_tree_get_child_statistics
   }
   /* otherwise have to calculate */
   else {
-      if (source->block->w > 1 && source->block->h > 1) {
-        box = &source->root->box;
+    if (source->block->w > 1 && source->block->h > 1) {
+      uint32 x, y, w, h, step, stride, offset;
+      statistics *stat;
+      
+      w = (uint32)(source->block->w / 2);
+      h = (uint32)(source->block->h / 2);
+      
+      if (blocks != NULL) {
+        blocks[0].w = blocks[1].w = blocks[2].w = blocks[3].w = w;
+        blocks[0].h = blocks[1].h = blocks[2].h = blocks[3].h = h;
+      }
 
-        w = (uint16)(source->block->w / 2);
-        h = (uint16)(source->block->h / 2);
-
-        /* if the new width is 1, no need to calculate, use the pixel values */
-        if (w == 1 && h == 1) {
-
-          /* nw child block */
-          x = source->block->x;
-          y = source->block->y;
-
-          stat = &target[0];
-          stat->N = 1;
-          stat->sum = (I_value)box->sum;
-          stat->sum2 = (I_value)box->sumsqr;
-          stat->mean = ((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
-          stat->variance = var;
-          stat->deviation = sqrt(var);
-
-          /* ne child block */
-          x = x + w;
-
-          small_integral_image_box_update(box, x, y);
-          mean = ((I_value)box->sum / (I_value)box->N);
-          var = (((I_value)box->sumsqr / (I_value)box->N) - (mean * mean));
-          if (var < 0) var = 0;
-
-          stat = &target[1];
-          stat->N = (I_value)box->N;
-          stat->sum = (I_value)box->sum;
-          stat->sum2 = (I_value)box->sumsqr;
-          stat->mean = ((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
-          stat->variance = var;
-          stat->deviation = sqrt(var);
-
-          /* se child block */
-          y = y + h;
-
-          small_integral_image_box_update(box, x, y);
-          mean = ((I_value)box->sum / (I_value)box->N);
-          var = (((I_value)box->sumsqr / (I_value)box->N) - (mean * mean));
-          if (var < 0) var = 0;
-
-          stat = &target[3];
-          stat->N = (I_value)box->N;
-          stat->sum = (I_value)box->sum;
-          stat->sum2 = (I_value)box->sumsqr;
-          stat->mean = ((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
-          stat->variance = var;
-          stat->deviation = sqrt(var);
-
-          /* sw child block */
-          x = x - w;
-
-          small_integral_image_box_update(box, x, y);
-          mean = ((I_value)box->sum / (I_value)box->N);
-          var = (((I_value)box->sumsqr / (I_value)box->N) - (mean * mean));
-          if (var < 0) var = 0;
-
-          stat = &target[2];
-          stat->N = (I_value)box->N;
-          stat->sum = (I_value)box->sum;
-          stat->sum2 = (I_value)box->sumsqr;
-          stat->mean = ((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
-          stat->variance = var;
-          stat->deviation = sqrt(var);
-        }
-        else {
-        small_integral_image_box_resize(box, w, h);
-        box->channel = 0;
-
+      /* if the new width is 1, no need to calculate, use the pixel values */
+      if (w == 1 && h == 1) {
+        pixel_image *original;
+        void *data;
+        pixel_type type;
+        I_value mean;
+        
+        original = source->root->forest->source;
+        data = original->data;
+        type = original->type;
+        step = original->step;
+        stride = original->stride;
+        
         /* nw child block */
+        
         x = source->block->x;
         y = source->block->y;
-
-        small_integral_image_box_update(box, x, y);
-        mean = ((I_value)box->sum / (I_value)box->N);
-        var = (((I_value)box->sumsqr / (I_value)box->N) - (mean * mean));
-        if (var < 0) var = 0;
-
+        offset = y * stride + x * step;
+        mean = cast_pixel_value(original->data, type, offset);
+        
         stat = &target[0];
-        stat->N = (I_value)box->N;
-        stat->sum = (I_value)box->sum;
-        stat->sum2 = (I_value)box->sumsqr;
-        stat->mean = ((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
-        stat->variance = var;
-        stat->deviation = sqrt(var);
-
+        stat->N = 1;
+        stat->sum = mean;
+        stat->sum2 = mean*mean;
+        stat->mean = mean;
+        stat->variance = 0;
+        stat->deviation = 0;
+        
+        if (blocks != NULL) {
+          blocks[0].x = x;
+          blocks[0].y = y;
+        }
+        
         /* ne child block */
-        x = x + w;
-
-        small_integral_image_box_update(box, x, y);
-        mean = ((I_value)box->sum / (I_value)box->N);
-        var = (((I_value)box->sumsqr / (I_value)box->N) - (mean * mean));
-        if (var < 0) var = 0;
-
+        
+        x = x + 1;
+        offset = offset + step;
+        mean = cast_pixel_value(original->data, type, offset);
+        
         stat = &target[1];
-        stat->N = (I_value)box->N;
-        stat->sum = (I_value)box->sum;
-        stat->sum2 = (I_value)box->sumsqr;
-        stat->mean = ((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
-        stat->variance = var;
-        stat->deviation = sqrt(var);
-
+        stat->N = 1;
+        stat->sum = mean;
+        stat->sum2 = mean*mean;
+        stat->mean = mean;
+        stat->variance = 0;
+        stat->deviation = 0;
+        
+        if (blocks != NULL) {
+          blocks[1].x = x;
+          blocks[1].y = y;
+        }
+        
         /* se child block */
-        y = y + h;
-
-        small_integral_image_box_update(box, x, y);
-        mean = ((I_value)box->sum / (I_value)box->N);
-        var = (((I_value)box->sumsqr / (I_value)box->N) - (mean * mean));
-        if (var < 0) var = 0;
-
+        
+        y = y + 1;
+        offset = offset + stride;
+        mean = cast_pixel_value(original->data, type, offset);
+        
         stat = &target[3];
-        stat->N = (I_value)box->N;
-        stat->sum = (I_value)box->sum;
-        stat->sum2 = (I_value)box->sumsqr;
-        stat->mean = ((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
-        stat->variance = var;
-        stat->deviation = sqrt(var);
-
+        stat->N = 1;
+        stat->sum = mean;
+        stat->sum2 = mean*mean;
+        stat->mean = mean;
+        stat->variance = 0;
+        stat->deviation = 0;
+        
+        if (blocks != NULL) {
+          blocks[3].x = x;
+          blocks[3].y = y;
+        }
+        
         /* sw child block */
-        x = x - w;
-
-        small_integral_image_box_update(box, x, y);
-        mean = ((I_value)box->sum / (I_value)box->N);
-        var = (((I_value)box->sumsqr / (I_value)box->N) - (mean * mean));
-        if (var < 0) var = 0;
-
+        
+        x = x - 1;
+        offset = offset - step;
+        mean = cast_pixel_value(original->data, type, offset);
+        
         stat = &target[2];
-        stat->N = (I_value)box->N;
-        stat->sum = (I_value)box->sum;
-        stat->sum2 = (I_value)box->sumsqr;
-        stat->mean = ((mean < 0) ? 0 : ((mean > 255) ? 255 : mean));
+        stat->N = 1;
+        stat->sum = mean;
+        stat->sum2 = mean*mean;
+        stat->mean = mean;
+        stat->variance = 0;
+        stat->deviation = 0;
+        
+        if (blocks != NULL) {
+          blocks[2].x = x;
+          blocks[2].y = y;
+        }
+      }
+      else {
+        uint32 hstep, vstep, dstep;
+        integral_image *I;
+        I_value *iA, *i2A, N, sum1, sum2, mean, var;
+        
+        I = &source->root->forest->integral;
+        N = (I_value)(w * h);
+        step = I->step;
+        stride = I->stride;
+        hstep = w * step;
+        vstep = h * stride;
+        dstep = hstep + vstep;
+        
+        /* nw child block */
+        
+        x = source->block->x;
+        y = source->block->y;
+        offset = y * stride + x * step;
+        
+        iA = ((I_value *)I->I_1.data) + offset;
+        i2A = ((I_value *)I->I_2.data) + offset;
+        
+        sum1 = *(iA + dstep) + *iA - *(iA + hstep) - *(iA - vstep);
+        sum2 = *(i2A + dstep) + *i2A - *(i2A + hstep) - *(i2A - vstep);
+        mean = sum1 / N;
+        var = sum2 / N - mean*mean;
+        if (var < 0) var = 0;
+        
+        stat = &target[0];
+        stat->N = N;
+        stat->sum = sum1;
+        stat->sum2 = sum2;
+        stat->mean = mean;
         stat->variance = var;
         stat->deviation = sqrt(var);
+        
+        if (blocks != NULL) {
+          blocks[0].x = x;
+          blocks[0].y = y;
+        }
+        
+        /* ne child block */
+        
+        x = x + w;
+        iA = iA + hstep;
+        i2A = i2A + hstep;
+
+        sum1 = *(iA + dstep) + *iA - *(iA + hstep) - *(iA - vstep);
+        sum2 = *(i2A + dstep) + *i2A - *(i2A + hstep) - *(i2A - vstep);
+        mean = sum1 / N;
+        var = sum2 / N - mean*mean;
+        if (var < 0) var = 0;
+        
+        stat = &target[1];
+        stat->N = N;
+        stat->sum = sum1;
+        stat->sum2 = sum2;
+        stat->mean = mean;
+        stat->variance = var;
+        stat->deviation = sqrt(var);
+        
+        if (blocks != NULL) {
+          blocks[1].x = x;
+          blocks[1].y = y;
+        }
+        
+        /* se child block */
+        
+        y = y + h;
+        iA = iA + vstep;
+        i2A = i2A + vstep;
+
+        sum1 = *(iA + dstep) + *iA - *(iA + hstep) - *(iA - vstep);
+        sum2 = *(i2A + dstep) + *i2A - *(i2A + hstep) - *(i2A - vstep);
+        mean = sum1 / N;
+        var = sum2 / N - mean*mean;
+        if (var < 0) var = 0;
+        
+        stat = &target[3];
+        stat->N = N;
+        stat->sum = sum1;
+        stat->sum2 = sum2;
+        stat->mean = mean;
+        stat->variance = var;
+        stat->deviation = sqrt(var);
+        
+        if (blocks != NULL) {
+          blocks[3].x = x;
+          blocks[3].y = y;
+        }
+        
+        /* sw child block */
+        
+        x = x - w;
+        iA = iA - hstep;
+        i2A = i2A - hstep;
+
+        sum1 = *(iA + dstep) + *iA - *(iA + hstep) - *(iA - vstep);
+        sum2 = *(i2A + dstep) + *i2A - *(i2A + hstep) - *(i2A - vstep);
+        mean = sum1 / N;
+        var = sum2 / N - mean*mean;
+        if (var < 0) var = 0;
+        
+        stat = &target[2];
+        stat->N = N;
+        stat->sum = sum1;
+        stat->sum2 = sum2;
+        stat->mean = mean;
+        stat->variance = var;
+        stat->deviation = sqrt(var);
+        
+        if (blocks != NULL) {
+          blocks[2].x = x;
+          blocks[2].y = y;
+        }
       }
     }
   }
@@ -1373,35 +1475,90 @@ result image_tree_divide_with_entropy
 )
 {
   TRY();
-  image_tree_forest *forest;
-  image_tree nw_tree, ne_tree, sw_tree, se_tree, *child_tree;
-  image_block nw_block, ne_block, sw_block, se_block, *child_block;
-  statistics value, values[4], *child_value;
-  I_value zscores[4];
-  image_block_type type;
-  uint16 i, x, y, w, h;
 
   CHECK_POINTER(target);
 
-  CHECK(image_tree_nullify(&nw_tree));
-  CHECK(image_tree_nullify(&ne_tree));
-  CHECK(image_tree_nullify(&sw_tree));
-  CHECK(image_tree_nullify(&se_tree));
-
-  w = (uint16)(source->block->w / 2);
-  h = (uint16)(source->block->h / 2);
-
-  if (target->nw == NULL && target->ne == NULL && target->sw == NULL && target->se == NULL) {
-    value = *((statistics *)target->block->value);
-    image_tree_get_child_statistics(target, values);
-    for (i = 0; i < 4; i++) {
-      zscores[i] =
+  if (!image_tree_has_children(target)) {
+    uint32 w, h;
+    w = (uint16)(target->block->w / 2);
+    h = (uint16)(target->block->h / 2);
+    if (w > min_size && h > min_size) {
+      image_tree_forest *forest;
+      image_block blocks[4];
+      statistics values[4];
+      uint32 i;
+      I_value m, s, x1, x2, x1min, x1max, x2min, x2max, intersection, entropy;
+      
+      forest = target->root->forest;
+      
+      CHECK(image_tree_get_child_statistics(target, values, blocks));
+      
+      m = values[0].mean;
+      s = values[0].deviation * 3;
+      x1min = m - s;
+      x1max = x1min;
+      x2min = m + s;
+      x2max = x2min;
+      for (i = 1; i < 4; i++) {
+        m = values[i].mean;
+        s = values[i].deviation * 3;
+        x1 = m - s;
+        x2 = m + s;
+        if (x1 < x1min) x1min = x1;
+        else if (x1 > x1max) x1max = x1;
+        if (x2 < x2min) x2min = x2;
+        else if (x2 > x2max) x2max = x2;
+      }
+      
+      /* it is possible that intersection is negative, this means an empty set */
+      intersection = (x2min - x1max);
+      if (intersection < 0) intersection = 0;
+      
+      /* let us define this entropy measure as intersection divided by union */
+      entropy = intersection / (x2max - x1min);
+      
+      if (entropy > 1) {
+        image_tree new_tree, *child_tree;
+        image_block *child_block;
+        statistics *child_value;
+        
+        CHECK(image_tree_nullify(&new_tree));
+        
+        /* nw child block */
+        CHECK(list_append_reveal_data(&forest->values, (pointer)&values[0], (pointer*)&child_value));
+        blocks[0].value = (pointer)child_value;
+        CHECK(list_append_reveal_data(&forest->blocks, (pointer)&blocks[0], (pointer*)&child_block));
+        new_tree.block = child_block;
+        CHECK(list_append_reveal_data(&forest->trees, (pointer)&new_tree, (pointer*)&child_tree));
+        target->nw = child_tree;
+        
+        /* ne child block */
+        CHECK(list_append_reveal_data(&forest->values, (pointer)&values[1], (pointer*)&child_value));
+        blocks[1].value = (pointer)child_value;
+        CHECK(list_append_reveal_data(&forest->blocks, (pointer)&blocks[1], (pointer*)&child_block));
+        new_tree.block = child_block;
+        CHECK(list_append_reveal_data(&forest->trees, (pointer)&new_tree, (pointer*)&child_tree));
+        target->ne = child_tree;
+        
+        /* sw child block */
+        CHECK(list_append_reveal_data(&forest->values, (pointer)&values[2], (pointer*)&child_value));
+        blocks[2].value = (pointer)child_value;
+        CHECK(list_append_reveal_data(&forest->blocks, (pointer)&blocks[2], (pointer*)&child_block));
+        new_tree.block = child_block;
+        CHECK(list_append_reveal_data(&forest->trees, (pointer)&new_tree, (pointer*)&child_tree));
+        target->sw = child_tree;
+        
+        /* se child block */
+        CHECK(list_append_reveal_data(&forest->values, (pointer)&values[3], (pointer*)&child_value));
+        blocks[3].value = (pointer)child_value;
+        CHECK(list_append_reveal_data(&forest->blocks, (pointer)&blocks[3], (pointer*)&child_block));
+        new_tree.block = child_block;
+        CHECK(list_append_reveal_data(&forest->trees, (pointer)&new_tree, (pointer*)&child_tree));
+        target->se = child_tree;
+        
+        image_tree_cache_neighbors(target);
+      }
     }
-
-    /* nw child block */
-    x = source->block->x;
-    y = source->block->y;
-
   }
 
   FINALLY(image_tree_divide_with_entropy);

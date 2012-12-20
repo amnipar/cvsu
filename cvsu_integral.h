@@ -147,6 +147,13 @@ result integral_image_nullify(
 );
 
 /**
+ * Everything that can be nullified should be able to tell if it's null
+ */
+bool integral_image_is_null(
+  integral_image *target
+);
+
+/**
  * Transform the target integral_image into a clone of source integral_image.
  * Only the structure is cloned; for copying content, use the copy function.
  * @see copy_integral_image

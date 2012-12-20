@@ -105,6 +105,7 @@ typedef struct image_tree_root_t {
 typedef struct image_tree_forest_t {
     pixel_image *original;
     pixel_image *source;
+    integral_image integral;
     /*edge_block_image edge_image;*/
     uint32 rows;
     uint32 cols;
@@ -281,13 +282,24 @@ result image_tree_divide(
 );
 
 /**
+ * Determine whether the tree has child trees set.
+ */
+bool image_tree_has_children(
+  image_tree *tree
+);
+
+/**
  * Generates the statistics of the four child trees without dividing the tree.
  * Useful for determining consistency before deciding to divide.
  * @param target must be an array of four statistics values.
  */
 result image_tree_get_child_statistics(
+  /** The tree whose children will be examined. */
   image_tree *source,
-  statistics *target
+  /** The array of statistics structures to fill, must contain at least 4 */
+  statistics *target,
+  /** The block structures to fill, can be null, if not must contain 4 */
+  image_block *blocks
 );
 
 /**

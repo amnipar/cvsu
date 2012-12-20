@@ -383,7 +383,7 @@ result scale_up(
 I_value pixel_image_get_value(
   pixel_image *target,
   uint32 x,
-  uint32 y,
+  uint32 y
 );
 
 /**

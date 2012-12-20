@@ -204,6 +204,24 @@ result integral_image_nullify
 
 /******************************************************************************/
 
+bool integral_image_is_null
+(
+  integral_image *target
+)
+{
+  if (target != NULL) {
+    if (target->original == NULL) {
+      return true;
+    }
+  }
+  else {
+    return true;
+  }
+  return false;
+}
+
+/******************************************************************************/
+
 result integral_image_clone
   (
   integral_image *target,
