@@ -230,19 +230,23 @@ result image_tree_forest_update(
 /**
  * Divides all trees in the forest that have dev smaller than threshold.
  */
-result image_tree_forest_divide_with_dev(
-    image_tree_forest *target,
-    sint16 threshold
+result image_tree_forest_segment_with_deviation(
+  /** Forest to be segmented */
+  image_tree_forest *target,
+  /** Threshold value for deviation, trees with larger value are divided */
+  I_value threshold,
+  /** The minimum size for the trees in the end result */
+  uint32 min_size
 );
 
 /**
  * Divides all trees in the forest that have high entropy.
  * Will not divide trees that would become smaller than the given min size.
  */
-result image_tree_forest_divide_with_entropy(
-  /** forest to be segmented */
+result image_tree_forest_segment_with_entropy(
+  /** Forest to be segmented */
   image_tree_forest *target,
-  /** the minimum size for the trees in the end result */
+  /** The minimum size for the trees in the end result */
   uint32 min_size
 );
 
