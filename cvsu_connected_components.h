@@ -43,17 +43,20 @@ extern "C" {
 /**
  * Stores region information for connected component analysis with union-find
  * equivalence class approach. In addition to id and rank information contains
- * also the region bounding box.
+ * also the region bounding box, color, and knowledge if this is a border pixel.
  */
-typedef struct region_t
+typedef struct region_info_t
 {
-  struct region_t *id;
+  struct region_info_t *id;
   uint32 rank;
   uint32 x1;
   uint32 y1;
   uint32 x2;
   uint32 y2;
-} region;
+  byte *value;
+  uint32 is_border;
+  byte color[4];
+} region_info;
 
 /**
  * Stores the connected components information extracted from a pixel image.
@@ -63,8 +66,45 @@ typedef struct region_t
 typedef struct connected_components_t
 {
   pixel_image *original;
-  region *regions;
+  uint32 width;
+  uint32 height;
+  uint32 channels;
+  region_info *pixels;
+  region_info **regions;
+  uint32 count;
 } connected_components;
+
+connected_components *connected_components_alloc();
+
+void connected_components_free(
+  connected_components *ptr
+);
+
+result connected_components_create(
+  connected_components *target,
+  pixel_image *source
+);
+
+result connected_components_destroy(
+  connected_components *target
+);
+
+result connected_components_nullify(
+  connected_components *target
+);
+
+bool connected_components_is_null(
+  connected_components *target
+);
+
+result connected_components_update(
+  connected_components *target
+);
+
+result connected_components_draw_image(
+  connected_components *source,
+  pixel_image *target
+);
 
 #ifdef __cplusplus
 }
