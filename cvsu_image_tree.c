@@ -70,12 +70,15 @@ string image_tree_get_direct_neighbor_w_name = "image_tree_get_direct_neighbor_w
 string image_tree_add_children_as_immediate_neighbors_name = "image_tree_add_children_as_immediate_neighbors";
 string image_tree_find_all_immediate_neighbors_name = "image_tree_find_all_immediate_neighbors";
 
+/******************************************************************************/
+
 result image_tree_nullify
 (
   image_tree *target
 )
 {
   TRY();
+  
   target->root = NULL;
   target->parent = NULL;
   target->class_id = NULL;
@@ -89,6 +92,7 @@ result image_tree_nullify
   target->w = NULL;
   target->level = 0;
   target->class_rank = 0;
+  
   FINALLY(image_tree_nullify);
   RETURN();
 }
