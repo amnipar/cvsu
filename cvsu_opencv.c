@@ -36,6 +36,7 @@
 #include <stdio.h>
 
 string pixel_image_create_from_ipl_image_name = "pixel_image_create_from_ipl_image";
+string ipl_image_create_from_pixel_image_name = "ipl_image_create_from_pixel_image";
 string pixel_image_create_from_file_name = "pixel_image_create_from_file";
 string pixel_image_write_to_file_name = "pixel_image_write_to_file";
 
@@ -93,6 +94,45 @@ result pixel_image_create_from_ipl_image(pixel_image *target, IplImage *source, 
 
     FINALLY(pixel_image_create_from_ipl_image);
     RETURN();
+}
+
+/******************************************************************************/
+
+result ipl_image_create_from_pixel_image
+(
+  IplImage **target,
+  pixel_image *source,
+  pixel_format format
+)
+{
+  TRY();
+  IplImage *temp;
+  CvSize size;
+  
+  CHECK_POINTER(source);
+  CHECK_PARAM(source->type == p_U8);
+  CHECK_PARAM(source->format == RGB || source->format == GREY);
+  
+  size.width = (signed)source->width;
+  size.height = (signed)source->height;
+  switch (source->format) {
+    case RGB:
+      temp = cvCreateImageHeader(size, IPL_DEPTH_8U, 3);
+      break;
+    case GREY:
+      temp = cvCreateImageHeader(size, IPL_DEPTH_8U, 1);
+      break;
+    default:
+      temp = NULL;
+  }
+  
+  cvSetData(temp, source->data, (signed)source->stride);
+
+  *target = cvCloneImage(temp);
+  
+  FINALLY(ipl_image_create_from_pixel_image);
+  cvReleaseImageHeader(&temp);
+  RETURN();
 }
 
 /******************************************************************************/

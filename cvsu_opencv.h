@@ -45,6 +45,12 @@ result pixel_image_create_from_ipl_image(
     pixel_format format
 );
 
+result ipl_image_create_from_pixel_image(
+  IplImage **target,
+  pixel_image *source,
+  pixel_format format
+);
+
 result pixel_image_create_from_file(
     pixel_image *target,
     const char *filename,
