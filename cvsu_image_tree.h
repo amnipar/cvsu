@@ -62,12 +62,27 @@ typedef struct image_tree_neighbor_t {
 */
 
 /**
+ * Stores region information for forest segmentation with union-find
+ * equivalence class approach. In addition to id and rank information contains
+ * also the region bounding box and statistics.
+ */
+typedef struct forest_region_info_t
+{
+  struct forest_region_info_t *id;
+  uint32 rank;
+  uint32 x1;
+  uint32 y1;
+  uint32 x2;
+  uint32 y2;
+  statistics stat;
+} forest_region_info;
+
+/**
  * Stores a quad tree holding image data.
  */
 typedef struct image_tree_t {
     struct image_tree_root_t *root;
     struct image_tree_t *parent;
-    struct image_tree_t *class_id;
 
     /* subtrees, NULL if the tree has not beed divided */
     struct image_tree_t *nw;
@@ -85,7 +100,7 @@ typedef struct image_tree_t {
 
     /*edge_block *edge;*/
     uint32 level;
-    uint32 class_rank;
+    forest_region_info region_info;
 } image_tree;
 
 /**
@@ -126,25 +141,18 @@ typedef struct image_tree_forest_t {
 } image_tree_forest;
 
 /**
- * Stores region information for forest segmentation with union-find
- * equivalence class approach. In addition to id and rank information contains
- * also the region bounding box and statistics.
- */
-typedef struct forest_region_t
-{
-  struct forest_region_t *id;
-  uint32 rank;
-  uint32 x1;
-  uint32 y1;
-  uint32 x2;
-  uint32 y2;
-  statistics stat;
-} forest_region;
-
-/**
  * Initializes the contents of the tree with null values.
  */
-result image_tree_nullify(image_tree *target);
+result image_tree_nullify(
+  image_tree *target
+);
+
+/**
+ * Everything that can be nullified should be able to tell if it's null.
+ */
+bool image_tree_is_null(
+  image_tree *target
+);
 
 /**
  * Allocates an image forest structure.
@@ -155,8 +163,9 @@ image_tree_forest *image_tree_forest_alloc();
 /**
  * Frees an image forest structure allocated with @see image_tree_forest_alloc
  */
-
-void image_tree_forest_free(image_tree_forest *ptr);
+void image_tree_forest_free(
+  image_tree_forest *ptr
+);
 
 /**
  * Creates an image forest from a pixel image.
@@ -198,7 +207,7 @@ result image_tree_forest_nullify(
 );
 
 /**
-* Everything that can be nullified should be able to tell if it's null
+* Everything that can be nullified should be able to tell if it's null.
 */
 
 bool image_tree_forest_is_null(
@@ -264,7 +273,6 @@ result image_tree_forest_read(
 /**
  * Updates an image tree root.
  */
-
 result image_tree_root_update(
     image_tree_root *target
 );
@@ -272,7 +280,6 @@ result image_tree_root_update(
 /**
  * Updates an image tree.
  */
-
 result image_tree_update(
     image_tree *tree
 );
@@ -280,7 +287,6 @@ result image_tree_update(
 /**
  * Divides an image tree in four smaller trees, if width is greater than 1.
  */
-
 result image_tree_divide(
     image_tree *target
 );
@@ -385,7 +391,6 @@ result image_tree_get_direct_neighbor_w(
  * 2. If tree has chilren, call recursively for the two children in the proper
  *    direction
  */
-
 result image_tree_add_children_as_immediate_neighbors(
     list *target,
     image_tree *tree,
@@ -404,7 +409,6 @@ result image_tree_add_children_as_immediate_neighbors(
  *    end of the list
  * 3.
  */
-
 result image_tree_find_all_immediate_neighbors(
   list *target,
   image_tree *tree
@@ -430,7 +434,7 @@ void image_tree_class_union(image_tree *tree1, image_tree *tree2);
  * Finds the representative item in the class this tree belongs to.
  * Part of the Union-Find implementation for image trees.
  */
-image_tree *image_tree_class_find(image_tree *tree);
+forest_region_info *image_tree_class_find(forest_region_info *region);
 
 /**
  * Gets the class label for this tree. Effectively the pointer cast into int.

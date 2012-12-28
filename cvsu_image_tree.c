@@ -79,9 +79,10 @@ result image_tree_nullify
 {
   TRY();
   
+  CHECK(memory_clear((data_pointer)target, 1, sizeof(image_tree)));
+  /*
   target->root = NULL;
   target->parent = NULL;
-  target->class_id = NULL;
   target->nw = NULL;
   target->ne = NULL;
   target->sw = NULL;
@@ -91,10 +92,30 @@ result image_tree_nullify
   target->s = NULL;
   target->w = NULL;
   target->level = 0;
-  target->class_rank = 0;
-  
+  target->region_info.id = NULL;
+  target->region_info.rank = 0;
+  target->region_info.x1 = 0;
+  target->region_info.y1 = 0;
+  target->region_info.x2 = 0;
+  target->region_info.y2 = 0;
+  */
   FINALLY(image_tree_nullify);
   RETURN();
+}
+
+/******************************************************************************/
+
+bool image_tree_is_null
+(
+  image_tree *target
+)
+{
+  if (target != NULL) {
+    if (target->root != NULL) {
+      return false;
+    }
+  }
+  return true;
 }
 
 /******************************************************************************/
@@ -249,18 +270,9 @@ result image_tree_forest_init
       }
       CHECK(list_append_reveal_data(&target->blocks, (pointer)&new_block, (pointer*)&block_ptr));
 
+      image_tree_nullify(&new_tree);
       new_tree.root = &target->roots[pos];
-      new_tree.parent = NULL;
-      new_tree.class_id = NULL;
-      new_tree.nw = NULL;
-      new_tree.ne = NULL;
-      new_tree.sw = NULL;
-      new_tree.se = NULL;
       new_tree.block = block_ptr;
-      new_tree.n = NULL;
-      new_tree.e = NULL;
-      new_tree.s = NULL;
-      new_tree.w = NULL;
       new_tree.level = 1;
       CHECK(list_append_reveal_data(&target->trees, (pointer)&new_tree, (pointer*)&tree_ptr));
 
@@ -537,8 +549,8 @@ result image_tree_forest_update_prepare
   size = target->rows * target->cols;
   for (pos = 0; pos < size; pos++) {
     tree = target->roots[pos].tree;
-    tree->class_id = NULL;
-    tree->class_rank = 0;
+    tree->region_info.id = NULL;
+    tree->region_info.rank = 0;
     tree->nw = NULL;
     tree->ne = NULL;
     tree->sw = NULL;
@@ -679,8 +691,8 @@ result image_tree_forest_segment_with_entropy
       /* neighbor n */
       neighbor = tree->n;
       if (neighbor != NULL && neighbor->nw == NULL &&
-            ((tree->class_id == NULL && neighbor->class_id == NULL) || 
-             (tree->class_id != neighbor->class_id)))
+            ((tree->region_info.id == NULL && neighbor->region_info.id == NULL) || 
+             (tree->region_info.id != neighbor->region_info.id)))
       {
         /*printf("neighbor n ");*/
         stat = (statistics *)neighbor->block->value;
@@ -717,8 +729,8 @@ result image_tree_forest_segment_with_entropy
       /* neighbor e */
       neighbor = tree->e;
       if (neighbor != NULL && neighbor->nw == NULL &&
-            ((tree->class_id == NULL && neighbor->class_id == NULL) || 
-            (tree->class_id != neighbor->class_id)))
+            ((tree->region_info.id == NULL && neighbor->region_info.id == NULL) || 
+            (tree->region_info.id != neighbor->region_info.id)))
       {
         /*printf("neighbor e ");*/
         stat = (statistics *)neighbor->block->value;
@@ -756,8 +768,8 @@ result image_tree_forest_segment_with_entropy
       /* neighbor s */
       neighbor = tree->s;
       if (neighbor != NULL && neighbor->nw == NULL &&
-            ((tree->class_id == NULL && neighbor->class_id == NULL) || 
-            (tree->class_id != neighbor->class_id)))
+            ((tree->region_info.id == NULL && neighbor->region_info.id == NULL) || 
+            (tree->region_info.id != neighbor->region_info.id)))
       {
         /*printf("neighbor s ");*/
         stat = (statistics *)neighbor->block->value;
@@ -794,8 +806,8 @@ result image_tree_forest_segment_with_entropy
       /* neighbor w */
       neighbor = tree->w;
       if (neighbor != NULL && neighbor->nw == NULL &&
-            ((tree->class_id == NULL && neighbor->class_id == NULL) || 
-            (tree->class_id != neighbor->class_id)))
+            ((tree->region_info.id == NULL && neighbor->region_info.id == NULL) || 
+            (tree->region_info.id != neighbor->region_info.id)))
       {
         /*printf("neighbor w ");*/
         stat = (statistics *)neighbor->block->value;
@@ -2206,12 +2218,19 @@ result image_tree_find_all_immediate_neighbors
 
 void image_tree_class_create(image_tree *tree)
 {
+  forest_region_info *region;
   if (tree != NULL) {
-    /* if tree already has a class, don't reset it */
-    if (tree->class_id == NULL) {
+    region = &tree->region_info;
+    /* proceed only if the tree doesn't have its region info initialized yet */
+    if (region->id == NULL) {
       /* one-tree class is it's own id, and has the rank of 0 */
-      tree->class_id = tree;
-      tree->class_rank = 0;
+      region->id = region;
+      region->rank = 0;
+      region->x1 = tree->block->x;
+      region->y1 = tree->block->y;
+      region->x2 = region->x1;
+      region->y2 = region->y1;
+      memory_copy((void*)&region->stat, (void*)tree->block->value, 1, sizeof(statistics));
     }
   }
 }
@@ -2221,10 +2240,10 @@ void image_tree_class_create(image_tree *tree)
 void image_tree_class_union(image_tree *tree1, image_tree *tree2)
 {
   if (tree1 != NULL && tree2 != NULL) {
-    image_tree *id1, *id2;
+    forest_region_info *id1, *id2;
 
-    id1 = image_tree_class_find(tree1);
-    id2 = image_tree_class_find(tree2);
+    id1 = image_tree_class_find(&tree1->region_info);
+    id2 = image_tree_class_find(&tree2->region_info);
     if (id1 == NULL || id2 == NULL) {
       return;
     }
@@ -2234,17 +2253,44 @@ void image_tree_class_union(image_tree *tree1, image_tree *tree2)
     }
     /* otherwise set the tree with higher class rank as id of the union */
     else {
-      if (id1->class_rank < id2->class_rank) {
-        id1->class_id = id2;
+      statistics *stat;
+      I_value N, mean, variance;
+      if (id1->rank < id2->rank) {
+        id1->id = id2;
+        id2->x1 = (id1->x1 < id2->x1) ? id1->x1 : id2->x1;
+        id2->y1 = (id1->y1 < id2->y1) ? id1->y1 : id2->y1;
+        id2->x2 = (id1->x2 > id2->x2) ? id1->x2 : id2->x2;
+        id2->y2 = (id1->y2 > id2->y2) ? id1->y2 : id2->y2;
+        stat = &id2->stat;
+        N = (stat->N += id1->stat.N);
+        stat->sum += id1->stat.sum;
+        stat->sum2 += id1->stat.sum2;
+        mean = stat->mean = stat->sum / N;
+        variance = stat->variance = stat->sum2 / N - mean*mean;
+        if (variance < 0) variance = 0;
+        stat->deviation = sqrt(variance);
       }
-      else
-      if (id1->class_rank > id2->class_rank) {
-        id2->class_id = id1;
-      }
-      /* when equal rank trees are combined, the root tree's rank is increased */
       else {
-        id2->class_id = id1;
-        id1->class_rank += 1;
+        id2->id = id1;
+        /* when equal rank trees are combined, the root tree's rank is increased */
+        if (id1->rank == id2->rank) {
+          id1->rank += 1;
+        }
+        id1->x1 = (id1->x1 < id2->x1) ? id1->x1 : id2->x1;
+        id1->y1 = (id1->y1 < id2->y1) ? id1->y1 : id2->y1;
+        id1->x2 = (id1->x2 > id2->x2) ? id1->x2 : id2->x2;
+        id1->y2 = (id1->y2 > id2->y2) ? id1->y2 : id2->y2;
+        id1->stat.N += id2->stat.N;
+        id1->stat.sum += id2->stat.sum;
+        id1->stat.sum2 += id2->stat.sum2;
+        stat = &id1->stat;
+        N = (stat->N += id2->stat.N);
+        stat->sum += id2->stat.sum;
+        stat->sum2 += id2->stat.sum2;
+        mean = stat->mean = stat->sum / N;
+        variance = stat->variance = stat->sum2 / N - mean*mean;
+        if (variance < 0) variance = 0;
+        stat->deviation = sqrt(variance);
       }
     }
   }
@@ -2252,13 +2298,13 @@ void image_tree_class_union(image_tree *tree1, image_tree *tree2)
 
 /******************************************************************************/
 
-image_tree *image_tree_class_find(image_tree *tree)
+forest_region_info *image_tree_class_find(forest_region_info *region)
 {
-  if (tree != NULL) {
-    if (tree->class_id != tree && tree->class_id != NULL) {
-      tree->class_id = image_tree_class_find(tree->class_id);
+  if (region != NULL) {
+    if (region->id != NULL && region->id != region) {
+      region->id = image_tree_class_find(region->id);
     }
-    return tree->class_id;
+    return region->id;
   }
   return NULL;
 }
@@ -2267,7 +2313,7 @@ image_tree *image_tree_class_find(image_tree *tree)
 
 uint32 image_tree_class_get(image_tree *tree)
 {
-  return (uint32)image_tree_class_find(tree);
+  return (uint32)image_tree_class_find(&tree->region_info);
 }
 
 /******************************************************************************/
