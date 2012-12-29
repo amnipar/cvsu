@@ -77,6 +77,12 @@ typedef struct forest_region_info_t
   statistics stat;
 } forest_region_info;
 
+typedef struct forest_region_t
+{
+  forest_region_info *region;
+  byte color[4];
+} forest_region;
+
 /**
  * Stores a quad tree holding image data.
  */
@@ -124,6 +130,7 @@ typedef struct image_tree_forest_t {
     /*edge_block_image edge_image;*/
     uint32 rows;
     uint32 cols;
+    uint32 regions;
     uint32 tree_width;
     uint32 tree_height;
     uint32 dx;
@@ -257,6 +264,17 @@ result image_tree_forest_segment_with_entropy(
   image_tree_forest *target,
   /** The minimum size for the trees in the end result */
   uint32 min_size
+);
+
+/**
+ * Collects all region parents into a list and assigns colors to them.
+ * The array has to be allocated by the caller.
+ */
+result image_tree_forest_get_regions(
+  /** Forest whose regions are collected */
+  image_tree_forest *source,
+  /** Region array, must be allocated by the caller and have correct size */
+  forest_region *target
 );
 
 /**
@@ -441,6 +459,11 @@ forest_region_info *image_tree_class_find(forest_region_info *region);
  * Helper function on top of the Union-Find implementation for image trees.
  */
 uint32 image_tree_class_get(image_tree *tree);
+
+/**
+ * Checks if this image is a class parent (id == region_info)
+ */
+bool image_tree_is_class_parent(image_tree *tree);
 
 #ifdef __cplusplus
 }

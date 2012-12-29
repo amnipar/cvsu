@@ -53,6 +53,7 @@ string image_tree_forest_update_prepare_name = "image_tree_forest_update_prepare
 string image_tree_forest_update_name = "image_tree_forest_update";
 string image_tree_forest_segment_with_deviation_name = "image_tree_forest_segment_with_deviation";
 string image_tree_forest_segment_with_entropy_name = "image_tree_forest_segment_with_entropy";
+string image_tree_forest_get_regions_name = "image_tree_forest_get_regions";
 string image_tree_forest_read_name = "image_tree_forest_read";
 string image_tree_root_update_name = "image_tree_root_update";
 string image_tree_update_name = "image_tree_update";
@@ -275,6 +276,7 @@ result image_tree_forest_init
       new_tree.block = block_ptr;
       new_tree.level = 1;
       CHECK(list_append_reveal_data(&target->trees, (pointer)&new_tree, (pointer*)&tree_ptr));
+      image_tree_class_create(tree_ptr);
 
       target->roots[pos].forest = target;
       target->roots[pos].tree = tree_ptr;
@@ -448,6 +450,7 @@ result image_tree_forest_nullify
   /*CHECK(edge_block_image_nullify(&target->edge_image));*/
   target->rows = 0;
   target->cols = 0;
+  target->regions = 0;
   target->tree_width = 0;
   target->tree_height = 0;
   target->dx = 0;
@@ -630,22 +633,39 @@ result image_tree_forest_segment_with_deviation
 {
   TRY();
   list_item *trees;
-  image_tree *current_tree;
+  image_tree *tree;
+  uint32 count;
 
   CHECK_POINTER(target);
   CHECK_PARAM(threshold > 0);
   CHECK_PARAM(min_size > 0);
 
+  /* first, divide until all trees are consistent */
   trees = target->trees.first.next;
   while (trees != &target->trees.last) {
-    current_tree = (image_tree *)trees->data;
-    if (current_tree->block->w >= 2 * min_size && current_tree->block->h >= 2 * min_size) {
-      if (((statistics *)current_tree->block->value)->deviation > threshold) {
-        CHECK(image_tree_divide(current_tree));
+    tree = (image_tree *)trees->data;
+    if (tree->block->w >= 2 * min_size && tree->block->h >= 2 * min_size) {
+      if (((statistics *)tree->block->value)->deviation > threshold) {
+        CHECK(image_tree_divide(tree));
       }
     }
     trees = trees->next;
   }
+  /* then, make a union of those neighboring regions that are consistent together */
+  /* .. */
+  /* finally, count regions */
+  count = 0;
+  trees = target->trees.first.next;
+  while (trees != &target->trees.last) {
+    tree = (image_tree *)trees->data;
+    if (!image_tree_has_children(tree)) {
+      if (image_tree_is_class_parent(tree)) {
+        count++;
+      }
+    }
+    trees = trees->next;
+  }
+  target->regions = count;
   
   FINALLY(image_tree_forest_segment_with_deviation);
   RETURN();
@@ -664,6 +684,7 @@ result image_tree_forest_segment_with_entropy
   image_tree *tree, *neighbor;
   statistics *stat;
   I_value tm, ts, nm, ns, x1, x2, x1min, x1max, x2min, x2max, I, U, entropy, req_diff;
+  uint32 count;
 
   CHECK_POINTER(target);
   CHECK_PARAM(min_size <= target->tree_width && min_size <= target->tree_height);
@@ -685,7 +706,7 @@ result image_tree_forest_segment_with_entropy
     tree = (image_tree *)trees->data;
     /* only consider consistent trees (those that have not been divided) */
     if (!image_tree_has_children(tree)) {
-      stat = (statistics *)tree->block->value;
+      stat = (statistics *)&tree->region_info.stat; /*block->value;*/
       tm = stat->mean;
       ts = fmax(1, stat->deviation);
       /* neighbor n */
@@ -695,7 +716,7 @@ result image_tree_forest_segment_with_entropy
              (tree->region_info.id != neighbor->region_info.id)))
       {
         /*printf("neighbor n ");*/
-        stat = (statistics *)neighbor->block->value;
+        stat = (statistics *)&neighbor->region_info.stat; /*block->value;*/
         nm = stat->mean;
         ns = fmax(1, stat->deviation);
         x1min = tm - ts;
@@ -721,8 +742,6 @@ result image_tree_forest_segment_with_entropy
         /*printf("entropy = %.3f\n", entropy);*/
         /* if union is less than double the intersection, we have high 'entropy' */
         if (entropy > req_diff) {
-          image_tree_class_create(tree);
-          image_tree_class_create(neighbor);
           image_tree_class_union(tree, neighbor);
         }
       }
@@ -733,7 +752,7 @@ result image_tree_forest_segment_with_entropy
             (tree->region_info.id != neighbor->region_info.id)))
       {
         /*printf("neighbor e ");*/
-        stat = (statistics *)neighbor->block->value;
+        stat = (statistics *)&neighbor->region_info.stat; /*block->value;*/
         nm = stat->mean;
         ns = fmax(1, stat->deviation);
         x1min = tm - ts;
@@ -760,8 +779,6 @@ result image_tree_forest_segment_with_entropy
         /*printf("entropy = %.3f\n", entropy);*/
         /* if union is less than double the intersection, we have high 'entropy' */
         if (entropy > req_diff) {
-          image_tree_class_create(tree);
-          image_tree_class_create(neighbor);
           image_tree_class_union(tree, neighbor);
         }
       }
@@ -772,7 +789,7 @@ result image_tree_forest_segment_with_entropy
             (tree->region_info.id != neighbor->region_info.id)))
       {
         /*printf("neighbor s ");*/
-        stat = (statistics *)neighbor->block->value;
+        stat = (statistics *)&neighbor->region_info.stat; /*block->value;*/
         nm = stat->mean;
         ns = fmax(1, stat->deviation);
         x1min = tm - ts;
@@ -798,8 +815,6 @@ result image_tree_forest_segment_with_entropy
         /*printf("entropy = %.3f\n", entropy);*/
         /* if union is less than double the intersection, we have high 'entropy' */
         if (entropy > req_diff) {
-          image_tree_class_create(tree);
-          image_tree_class_create(neighbor);
           image_tree_class_union(tree, neighbor);
         }
       }
@@ -810,7 +825,7 @@ result image_tree_forest_segment_with_entropy
             (tree->region_info.id != neighbor->region_info.id)))
       {
         /*printf("neighbor w ");*/
-        stat = (statistics *)neighbor->block->value;
+        stat = (statistics *)&neighbor->region_info.stat; /*block->value;*/
         nm = stat->mean;
         ns = fmax(1, stat->deviation);
         x1min = tm - ts;
@@ -836,16 +851,69 @@ result image_tree_forest_segment_with_entropy
         /*printf("entropy = %.3f\n", entropy);*/
         /* if union is less than double the intersection, we have high 'entropy' */
         if (entropy > req_diff) {
-          image_tree_class_create(tree);
-          image_tree_class_create(neighbor);
           image_tree_class_union(tree, neighbor);
         }
       }
     }
     trees = trees->next;
   }
-  printf("segmentation finished\n");
+  /* finally, count regions */
+  count = 0;
+  trees = target->trees.first.next;
+  while (trees != &target->trees.last) {
+    tree = (image_tree *)trees->data;
+    if (!image_tree_has_children(tree)) {
+      if (image_tree_is_class_parent(tree)) {
+        count++;
+      }
+    }
+    trees = trees->next;
+  }
+  target->regions = count;
+  printf("segmentation finished, %lu regions found\n", count);
   FINALLY(image_tree_forest_segment_with_entropy);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result image_tree_forest_get_regions
+(
+  image_tree_forest *source,
+  forest_region *target
+)
+{
+  TRY();
+  list_item *trees;
+  image_tree *tree;
+  forest_region_info *id;
+  uint32 count;
+  
+  CHECK_POINTER(source);
+  CHECK_POINTER(target);
+  printf("get regions\n");
+  /* collect all regions to array and generate colors */
+  count = 0;
+  /* initialize the random number generator for generating the colors */
+  srand(1234);
+  trees = source->trees.first.next;
+  while (trees != &source->trees.last) {
+    printf(".");
+    tree = (image_tree *)trees->data;
+    if (!image_tree_has_children(tree)) {
+      if (image_tree_is_class_parent(tree)) {
+        printf("%lu\n", count);
+        target[count].region = &tree->region_info;
+        target[count].color[0] = (byte)(rand() % 256);
+        target[count].color[1] = (byte)(rand() % 256);
+        target[count].color[2] = (byte)(rand() % 256);
+        count++;
+      }
+    }
+    trees = trees->next;
+  }
+  printf("done\n");
+  FINALLY(image_tree_forest_get_regions);
   RETURN();
 }
 
@@ -1214,6 +1282,7 @@ result image_tree_divide
         CHECK(list_append_reveal_data(&forest->blocks, (pointer)&blocks[0], (pointer*)&child_block));
         new_tree.block = child_block;
         CHECK(list_append_reveal_data(&forest->trees, (pointer)&new_tree, (pointer*)&child_tree));
+        image_tree_class_create(child_tree);
         target->nw = child_tree;
         
         /* ne child block */
@@ -1222,6 +1291,7 @@ result image_tree_divide
         CHECK(list_append_reveal_data(&forest->blocks, (pointer)&blocks[1], (pointer*)&child_block));
         new_tree.block = child_block;
         CHECK(list_append_reveal_data(&forest->trees, (pointer)&new_tree, (pointer*)&child_tree));
+        image_tree_class_create(child_tree);
         target->ne = child_tree;
         
         /* sw child block */
@@ -1230,6 +1300,7 @@ result image_tree_divide
         CHECK(list_append_reveal_data(&forest->blocks, (pointer)&blocks[2], (pointer*)&child_block));
         new_tree.block = child_block;
         CHECK(list_append_reveal_data(&forest->trees, (pointer)&new_tree, (pointer*)&child_tree));
+        image_tree_class_create(child_tree);
         target->sw = child_tree;
         
         /* se child block */
@@ -1238,6 +1309,7 @@ result image_tree_divide
         CHECK(list_append_reveal_data(&forest->blocks, (pointer)&blocks[3], (pointer*)&child_block));
         new_tree.block = child_block;
         CHECK(list_append_reveal_data(&forest->trees, (pointer)&new_tree, (pointer*)&child_tree));
+        image_tree_class_create(child_tree);
         target->se = child_tree;
         
         image_tree_cache_neighbors(target);
@@ -1600,6 +1672,7 @@ result image_tree_divide_with_entropy
         CHECK(list_append_reveal_data(&forest->blocks, (pointer)&blocks[0], (pointer*)&child_block));
         new_tree.block = child_block;
         CHECK(list_append_reveal_data(&forest->trees, (pointer)&new_tree, (pointer*)&child_tree));
+        image_tree_class_create(child_tree);
         target->nw = child_tree;
         
         /* ne child block */
@@ -1608,6 +1681,7 @@ result image_tree_divide_with_entropy
         CHECK(list_append_reveal_data(&forest->blocks, (pointer)&blocks[1], (pointer*)&child_block));
         new_tree.block = child_block;
         CHECK(list_append_reveal_data(&forest->trees, (pointer)&new_tree, (pointer*)&child_tree));
+        image_tree_class_create(child_tree);
         target->ne = child_tree;
         
         /* sw child block */
@@ -1616,6 +1690,7 @@ result image_tree_divide_with_entropy
         CHECK(list_append_reveal_data(&forest->blocks, (pointer)&blocks[2], (pointer*)&child_block));
         new_tree.block = child_block;
         CHECK(list_append_reveal_data(&forest->trees, (pointer)&new_tree, (pointer*)&child_tree));
+        image_tree_class_create(child_tree);
         target->sw = child_tree;
         
         /* se child block */
@@ -1624,6 +1699,7 @@ result image_tree_divide_with_entropy
         CHECK(list_append_reveal_data(&forest->blocks, (pointer)&blocks[3], (pointer*)&child_block));
         new_tree.block = child_block;
         CHECK(list_append_reveal_data(&forest->trees, (pointer)&new_tree, (pointer*)&child_tree));
+        image_tree_class_create(child_tree);
         target->se = child_tree;
         
         image_tree_cache_neighbors(target);
@@ -2314,6 +2390,24 @@ forest_region_info *image_tree_class_find(forest_region_info *region)
 uint32 image_tree_class_get(image_tree *tree)
 {
   return (uint32)image_tree_class_find(&tree->region_info);
+}
+
+/******************************************************************************/
+
+bool image_tree_is_class_parent
+(
+  image_tree *tree
+)
+{
+  if (tree != NULL) {
+    forest_region_info *region, *id;
+    region = &tree->region_info;
+    id = image_tree_class_find(region);
+    if (id == region) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /******************************************************************************/
