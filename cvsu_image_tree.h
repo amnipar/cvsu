@@ -120,6 +120,8 @@ typedef struct image_tree_root_t {
     struct image_tree_t *tree;
 } image_tree_root;
 
+/* TODO: get rid of roots and types, always use statistics, roots are image trees */
+
 /**
  * Stores a forest of image trees.
  */
@@ -278,17 +280,6 @@ result image_tree_forest_get_regions(
 );
 
 /**
- * Reads an image from file and creates an image forest from it.
- * The resulting image will be owned by the forest and deallocated.
- */
-result image_tree_forest_read(
-    image_tree_forest *target,
-    string source,
-    uint16 tree_width,
-    uint16 tree_height
-);
-
-/**
  * Updates an image tree root.
  */
 result image_tree_root_update(
@@ -431,10 +422,6 @@ result image_tree_find_all_immediate_neighbors(
   list *target,
   image_tree *tree
 );
-
-dir image_tree_dir_i(image_tree *tree);
-dir image_tree_dir_c1(image_tree *tree);
-dir image_tree_dir_c2(image_tree *tree);
 
 /**
  * Creates an equivalence class for this tree.
