@@ -54,7 +54,7 @@ string image_tree_forest_update_name = "image_tree_forest_update";
 string image_tree_forest_segment_with_deviation_name = "image_tree_forest_segment_with_deviation";
 string image_tree_forest_segment_with_entropy_name = "image_tree_forest_segment_with_entropy";
 string image_tree_forest_get_regions_name = "image_tree_forest_get_regions";
-string image_tree_forest_read_name = "image_tree_forest_read";
+string image_tree_forest_draw_image_name = "image_tree_forest_draw_image";
 string image_tree_root_update_name = "image_tree_root_update";
 string image_tree_update_name = "image_tree_update";
 string image_tree_calculate_consistency_name = "image_tree_calculate_consistency";
@@ -685,7 +685,6 @@ result image_tree_forest_segment_with_entropy
   forest_region_info *tree_id, *neighbor_id;
   statistics *stat;
   I_value tm, ts, nm, ns, x1, x2, x1min, x1max, x2min, x2max, I, U, entropy, req_diff, ebest;
-  uint32 count;
 
   CHECK_POINTER(target);
   CHECK_PARAM(min_size <= target->tree_width && min_size <= target->tree_height);
@@ -1065,20 +1064,33 @@ result image_tree_forest_segment_with_entropy
     trees = trees->next;
   }
   
-  /* finally, count regions */
-  count = 0;
-  trees = target->trees.first.next;
-  while (trees != &target->trees.last) {
-    tree = (image_tree *)trees->data;
-    if (tree->nw == NULL) {
-      if (image_tree_is_class_parent(tree)) {
-        count++;
+  /* finally, count regions and assign colors */
+  {
+    forest_region_info *id, *region;
+    uint32 count;
+    
+    count = 0;
+    /* initialize the random number generator for assigning the colors */
+    srand(1234);
+    
+    trees = target->trees.first.next;
+    while (trees != &target->trees.last) {
+      tree = (image_tree *)trees->data;
+      if (tree->nw == NULL) {
+        region = &tree->region_info;
+        id = image_tree_class_find(region);
+        if (id == region) {
+          region->color[0] = (byte)(rand() % 256);
+          region->color[1] = (byte)(rand() % 256);
+          region->color[2] = (byte)(rand() % 256);
+          count++;
+        }
       }
+      trees = trees->next;
     }
-    trees = trees->next;
+    target->regions = count;
+    printf("segmentation finished, %lu regions found\n", count);
   }
-  target->regions = count;
-  printf("segmentation finished, %lu regions found\n", count);
   FINALLY(image_tree_forest_segment_with_entropy);
   RETURN();
 }
@@ -1088,13 +1100,13 @@ result image_tree_forest_segment_with_entropy
 result image_tree_forest_get_regions
 (
   image_tree_forest *source,
-  forest_region *target
+  forest_region_info **target
 )
 {
   TRY();
   list_item *trees;
   image_tree *tree;
-  forest_region_info *id;
+  forest_region_info *region, *id;
   uint32 count;
   
   CHECK_POINTER(source);
@@ -1102,17 +1114,14 @@ result image_tree_forest_get_regions
   
   /* collect all regions to array and generate colors */
   count = 0;
-  /* initialize the random number generator for generating the colors */
-  srand(1234);
   trees = source->trees.first.next;
   while (trees != &source->trees.last) {
     tree = (image_tree *)trees->data;
     if (tree->nw == NULL) {
-      if (image_tree_is_class_parent(tree)) {
-        target[count].region = &tree->region_info;
-        target[count].color[0] = (byte)(rand() % 256);
-        target[count].color[1] = (byte)(rand() % 256);
-        target[count].color[2] = (byte)(rand() % 256);
+      region = &tree->region_info;
+      id = image_tree_class_find(region);
+      if (id == region) {
+        target[count] = region;
         count++;
       }
     }
@@ -1120,6 +1129,133 @@ result image_tree_forest_get_regions
   }
   
   FINALLY(image_tree_forest_get_regions);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result image_tree_forest_draw_image
+(
+  image_tree_forest *forest,
+  pixel_image *target,
+  uint32 use_regions,
+  uint32 use_colors
+)
+{
+  TRY();
+  list_item *trees;
+  image_tree *tree;
+  forest_region_info *id;
+  uint32 x, y, width, height, stride, row_step;
+  byte *target_data, *target_pos, color0, color1, color2;
+  
+  CHECK_POINTER(forest);
+  CHECK_POINTER(forest->source);
+  CHECK_POINTER(target);
+  
+  width = forest->source->width;
+  height = forest->source->height;
+  
+  CHECK(pixel_image_create(target, p_U8, RGB, width, height, 3, 3 * width));
+  
+  stride = target->stride;
+  target_data = (byte*)target->data;
+
+  /* draw using tree mean value */
+  if (use_regions == 0) {
+    statistics *stat;
+    trees = forest->trees.first.next;
+    while (trees != &forest->trees.last) {
+      tree = (image_tree *)trees->data;
+      if (tree->nw == NULL) {
+        stat = (statistics *)tree->block->value;
+        /* TODO: maybe could create only a grayscale image..? */
+        color0 = (byte)stat->mean;
+        color1 = color0;
+        color2 = color0;
+        width = tree->block->w;
+        height = tree->block->h;
+        row_step = stride - 3 * width;
+        target_pos = target_data + tree->block->y * stride + tree->block->x * 3;
+        for (y = 0; y < height; y++, target_pos += row_step) {
+          for (x = 0; x < width; x++) {
+            *target_pos = color0;
+            target_pos++;
+            *target_pos = color1;
+            target_pos++;
+            *target_pos = color2;
+            *target_pos++;
+          }
+        }
+        
+      }
+      trees = trees->next;
+    }
+  }
+  else {
+    /* draw using region mean value */
+    if (use_colors == 0) {
+      trees = forest->trees.first.next;
+      while (trees != &forest->trees.last) {
+        tree = (image_tree *)trees->data;
+        if (tree->nw == NULL) {
+          id = image_tree_class_find(&tree->region_info);
+          if (id != NULL) {
+            color0 = (byte)id->stat.mean;
+            color1 = color0;
+            color2 = color0;
+            width = tree->block->w;
+            height = tree->block->h;
+            row_step = stride - 3 * width;
+            target_pos = target_data + tree->block->y * stride + tree->block->x * 3;
+            for (y = 0; y < height; y++, target_pos += row_step) {
+              for (x = 0; x < width; x++) {
+                *target_pos = color0;
+                target_pos++;
+                *target_pos = color1;
+                target_pos++;
+                *target_pos = color2;
+                *target_pos++;
+              }
+            }
+          }
+        }
+        trees = trees->next;
+      }
+    }
+    /* draw using region color */
+    else {
+      trees = forest->trees.first.next;
+      while (trees != &forest->trees.last) {
+        tree = (image_tree *)trees->data;
+        if (tree->nw == NULL) {
+          id = image_tree_class_find(&tree->region_info);
+          if (id != NULL) {
+            color0 = id->color[0];
+            color1 = id->color[1];
+            color2 = id->color[2];
+            width = tree->block->w;
+            height = tree->block->h;
+            row_step = stride - 3 * width;
+            target_pos = target_data + tree->block->y * stride + tree->block->x * 3;
+            for (y = 0; y < height; y++, target_pos += row_step) {
+              for (x = 0; x < width; x++) {
+                *target_pos = color0;
+                target_pos++;
+                *target_pos = color1;
+                target_pos++;
+                *target_pos = color2;
+                *target_pos++;
+              }
+            }
+          }
+        }
+        trees = trees->next;
+      }
+    }
+  }
+
+  FINALLY(image_tree_forest_draw_image);
   RETURN();
 }
 
@@ -2396,4 +2532,5 @@ bool image_tree_is_class_parent
   return false;
 }
 
+/* end of file                                                                */
 /******************************************************************************/

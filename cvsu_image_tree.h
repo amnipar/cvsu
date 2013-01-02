@@ -75,13 +75,8 @@ typedef struct forest_region_info_t
   uint32 x2;
   uint32 y2;
   statistics stat;
-} forest_region_info;
-
-typedef struct forest_region_t
-{
-  forest_region_info *region;
   byte color[4];
-} forest_region;
+} forest_region_info;
 
 /**
  * Stores a quad tree holding image data.
@@ -276,7 +271,22 @@ result image_tree_forest_get_regions(
   /** Forest whose regions are collected */
   image_tree_forest *source,
   /** Region array, must be allocated by the caller and have correct size */
-  forest_region *target
+  forest_region_info **target
+);
+
+/**
+ * Draw image of the forest using current division and region info.
+ */
+result image_tree_forest_draw_image
+(
+  /** Forest to be drawn. */
+  image_tree_forest *forest,
+  /** Pointer to image, will be (re-)created to fit the forest image. */
+  pixel_image *target,
+  /** Should we use region info or individual tree info? */
+  uint32 use_regions,
+  /** For regions, should we use mean or colors? No effect for trees. */
+  uint32 use_colors
 );
 
 /**
