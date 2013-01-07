@@ -240,20 +240,20 @@ typedef enum pixel_type_t {
 
 #if INTEGRAL_IMAGE_DATA_TYPE == INTEGRAL_IMAGE_USING_FLOAT
 
-typedef real32 I_value;
+typedef real32 integral_value;
 typedef real32 I_1_t;
 typedef real32 I_2_t;
 #define p_I p_F32
 
 #elif INTEGRAL_IMAGE_DATA_TYPE == INTEGRAL_IMAGE_USING_DOUBLE
 
-typedef real64 I_value;
+typedef real64 integral_value;
 typedef real64 I_1_t;
 typedef real64 I_2_t;
 #define p_I p_F64
 
 #else
-#error "Integral image data type not defined"
+#error "integral image data type not defined"
 #endif
 
 typedef uint32 SI_1_t;
