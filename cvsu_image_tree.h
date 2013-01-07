@@ -249,18 +249,27 @@ result image_tree_forest_segment_with_deviation(
   /** Threshold value for deviation, trees with larger value are divided */
   I_value threshold,
   /** The minimum size for the trees in the end result */
-  uint32 min_size
+  uint32 min_size,
+  /** Deviation multiplier used for creating estimated intensity range */
+  I_value alpha
 );
 
 /**
  * Divides all trees in the forest that have high entropy.
  * Will not divide trees that would become smaller than the given min size.
+ * TODO: maybe add some region size constraint as parameter
  */
 result image_tree_forest_segment_with_entropy(
   /** Forest to be segmented */
   image_tree_forest *target,
   /** The minimum size for the trees in the end result */
-  uint32 min_size
+  uint32 min_size,
+  /** Deviation multiplier used for creating estimated intensity range */
+  I_value alpha,
+  /** Entropy difference used for evaluating trees to merge */
+  I_value diff_tree,
+  /** Entropy difference used for evaluating regions to merge */
+  I_value diff_region
 );
 
 /**

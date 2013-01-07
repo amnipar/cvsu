@@ -38,6 +38,9 @@
 #include <sys/time.h>
 #include <math.h>
 
+double fmin (double __x, double __y);
+double fmax (double __x, double __y);
+
 /******************************************************************************/
 /* constants for reporting function names in error messages                   */
 
@@ -79,7 +82,7 @@ result image_tree_nullify
 )
 {
   TRY();
-  
+
   CHECK(memory_clear((data_pointer)target, 1, sizeof(image_tree)));
   /*
   target->root = NULL;
@@ -158,7 +161,7 @@ result image_tree_forest_init
     target->dx = (uint16)((width - (target->cols * target->tree_width)) / 2);
     target->dy = (uint16)((height - (target->rows * target->tree_height)) / 2);
     size = target->rows * target->cols;
-    
+
     if (target->roots != NULL) {
       CHECK(memory_deallocate((data_pointer*)&target->roots));
     }
@@ -499,7 +502,7 @@ result image_tree_forest_update_prepare
   image_tree *tree;
 
   CHECK_POINTER(target);
-  
+
   /*printf("update prepare\n");*/
 
   /* create a fresh copy of the source image in case it has changed */
@@ -568,9 +571,9 @@ result image_tree_forest_update
   integral_image *I;
   statistics *stat;
   I_value *iA, *i2A, N, sum1, sum2, mean, var;
-  
+
   /*printf("update\n");*/
-        
+
   I = &target->integral;
   N = (I_value)(target->tree_width * target->tree_height);
   step = I->step;
@@ -590,26 +593,26 @@ result image_tree_forest_update
     /* TODO: calculate offset for first row only, then add vstep */
     offset = (tree->block->y * stride) + (tree->block->x * step);
     for (col = 0; col < cols; col++, pos++, offset += hstep) {
-      
+
       iA = ((I_value *)I->I_1.data) + offset;
       i2A = ((I_value *)I->I_2.data) + offset;
-        
+
       sum1 = *(iA + dstep) + *iA - *(iA + hstep) - *(iA + vstep);
       sum2 = *(i2A + dstep) + *i2A - *(i2A + hstep) - *(i2A + vstep);
       mean = sum1 / N;
       var = sum2 / N - mean*mean;
       if (var < 0) var = 0;
-        
+
       tree = target->roots[pos].tree;
       stat = (statistics *)tree->block->value;
-      
+
       stat->N = N;
       stat->sum = sum1;
       stat->sum2 = sum2;
       stat->mean = mean;
       stat->variance = var;
       stat->deviation = sqrt(var);
-      
+
       image_tree_class_create(tree);
       tree->nw = NULL;
       tree->ne = NULL;
@@ -617,28 +620,38 @@ result image_tree_forest_update
       tree->se = NULL;
     }
   }
-  
+
   FINALLY(image_tree_forest_update);
   RETURN();
 }
 
 /******************************************************************************/
 
+/* a macro for calculating neighbor difference; neighbor should be statistics pointer */
+#define EVALUATE_NEIGHBOR_DEVIATION(neighbor)\
+  stat = (statistics *)(neighbor);\
+  nm = stat->mean;\
+  dist = fabs(tm - nm)
+
 result image_tree_forest_segment_with_deviation
 (
   image_tree_forest *target,
   I_value threshold,
-  uint32 min_size
+  uint32 min_size,
+  I_value alpha
 )
 {
   TRY();
   list_item *trees;
-  image_tree *tree;
-  uint32 count;
+  image_tree *tree, *neighbor, *best_neighbor;
+  forest_region_info *tree_id, *neighbor_id;
+  statistics *stat;
+  I_value tm, nm, dist, best_dist;
 
   CHECK_POINTER(target);
   CHECK_PARAM(threshold > 0);
-  CHECK_PARAM(min_size > 0);
+  CHECK_PARAM(min_size <= target->tree_width && min_size <= target->tree_height);
+  CHECK_PARAM(alpha > 0);
 
   /* first, divide until all trees are consistent */
   trees = target->trees.first.next;
@@ -651,56 +664,8 @@ result image_tree_forest_segment_with_deviation
     }
     trees = trees->next;
   }
+
   /* then, make a union of those neighboring regions that are consistent together */
-  /* TODO: finish the merging part as well */
-  /* finally, count regions */
-  count = 0;
-  trees = target->trees.first.next;
-  while (trees != &target->trees.last) {
-    tree = (image_tree *)trees->data;
-    if (!image_tree_has_children(tree)) {
-      if (image_tree_is_class_parent(tree)) {
-        count++;
-      }
-    }
-    trees = trees->next;
-  }
-  target->regions = count;
-  
-  FINALLY(image_tree_forest_segment_with_deviation);
-  RETURN();
-}
-
-/******************************************************************************/
-
-result image_tree_forest_segment_with_entropy
-(
-  image_tree_forest *target,
-  uint32 min_size
-)
-{
-  TRY();
-  list_item *trees;
-  image_tree *tree, *neighbor, *nbest;
-  forest_region_info *tree_id, *neighbor_id;
-  statistics *stat;
-  I_value tm, ts, nm, ns, x1, x2, x1min, x1max, x2min, x2max, I, U, entropy, req_diff, ebest;
-
-  CHECK_POINTER(target);
-  CHECK_PARAM(min_size <= target->tree_width && min_size <= target->tree_height);
-
-  req_diff = 0.5;
-  
-  /* first, divide until all trees are consistent */
-  printf("starting to divide trees\n");
-  trees = target->trees.first.next;
-  while (trees != &target->trees.last) {
-    tree = (image_tree *)trees->data;
-    CHECK(image_tree_divide_with_entropy(tree, min_size));
-    trees = trees->next;
-  }
-  
-  /* then, merge each tree with the best neighboring tree that is close enough */
   printf("starting to merge trees\n");
   trees = target->trees.first.next;
   while (trees != &target->trees.last) {
@@ -708,54 +673,21 @@ result image_tree_forest_segment_with_entropy
     tree_id = image_tree_class_find(&tree->region_info);
     /* only consider consistent trees (those that have not been divided) */
     if (tree->nw == NULL) {
-      /*stat = (statistics *)&tree->region_info.stat; */
       stat = (statistics *)tree->block->value;
       tm = stat->mean;
-      ts = fmax(3, 3 * stat->deviation);
-      
-      ebest = 0;
-      nbest = NULL;
+
+      best_dist = 255;
+      best_neighbor = NULL;
       /* neighbor n */
       neighbor = tree->n;
       if (neighbor != NULL && neighbor->nw == NULL) {
         neighbor_id = image_tree_class_find(&neighbor->region_info);
         if (tree_id != neighbor_id) {
-          /*printf("neighbor n ");*/
-          /*stat = (statistics *)&neighbor_id->stat;*/
-          stat = (statistics *)neighbor->block->value;
-          nm = stat->mean;
-          ns = fmax(3, 3 * stat->deviation);
-          x1min = fmax(0, tm - ts);
-          x1max = x1min;
-          x2min = fmin(255, tm + ts);
-          x2max = x2min;
-          x1 = fmax(0, nm - ns);
-          x2 = fmin(255, nm + ns);
-          if (x1 < x1min) x1min = x1; else x1max = x1;
-          if (x2 < x2min) x2min = x2; else x2max = x2;
-          /* it is possible that intersection is negative, this means an empty set */
-          if (x1max > x2min) {
-            I = 0;
+          EVALUATE_NEIGHBOR_DEVIATION(neighbor->block->value);
+          if (dist < best_dist) {
+            best_dist = dist;
+            best_neighbor = neighbor;
           }
-          else {
-            I = (x2min - x1max);
-            if (I < 1) I = 1;
-          }
-          U = (x2max - x1min);
-          if (U < 1) U = 1;
-          /*printf("%.3f-%.3f, %.3f-%.3f, %.3f, %.3f ", x1min,x2max,x1max,x2min,I,U);*/
-          /* let us define this entropy measure as intersection divided by union */
-          entropy = I / U;
-          /* if union is less than double the intersection, we have high 'entropy' */
-          if (entropy > ebest) {
-            ebest = entropy;
-            nbest = neighbor;
-          }
-          /*
-          if (entropy > req_diff) {
-            image_tree_class_union(tree, neighbor);
-          }
-          */
         }
       }
       /* neighbor e */
@@ -763,42 +695,11 @@ result image_tree_forest_segment_with_entropy
       if (neighbor != NULL && neighbor->nw == NULL) {
         neighbor_id = image_tree_class_find(&neighbor->region_info);
         if (tree_id != neighbor_id) {
-          /*printf("neighbor e ");*/
-          /*stat = (statistics *)&neighbor_id->stat;*/
-          stat = (statistics *)neighbor->block->value;
-          nm = stat->mean;
-          ns = fmax(3, 3 * stat->deviation);
-          x1min = fmax(0, tm - ts);
-          x1max = x1min;
-          x2min = fmin(255, tm + ts);
-          x2max = x2min;
-          x1 = fmax(0, nm - ns);
-          x2 = fmin(255, nm + ns);
-          if (x1 < x1min) x1min = x1; else x1max = x1;
-          if (x2 < x2min) x2min = x2; else x2max = x2;
-          /* it is possible that intersection is negative, this means an empty set */
-          if (x1max > x2min) {
-            I = 0;
+          EVALUATE_NEIGHBOR_DEVIATION(neighbor->block->value);
+          if (dist < best_dist) {
+            best_dist = dist;
+            best_neighbor = neighbor;
           }
-          else {
-            I = (x2min - x1max);
-            if (I < 1) I = 1;
-          }
-          U = (x2max - x1min);
-          if (U < 1) U = 1;
-          /*printf("%.3f-%.3f, %.3f-%.3f, %.3f, %.3f ", x1min,x2max,x1max,x2min,I,U);*/
-          /* let us define this entropy measure as intersection divided by union */
-          entropy = I / U;
-          /* if union is less than double the intersection, we have high 'entropy' */
-          if (entropy > ebest) {
-            ebest = entropy;
-            nbest = neighbor;
-          }
-          /*
-          if (entropy > req_diff) {
-            image_tree_class_union(tree, neighbor);
-          }
-          */
         }
       }
       /* neighbor s */
@@ -806,42 +707,11 @@ result image_tree_forest_segment_with_entropy
       if (neighbor != NULL && neighbor->nw == NULL) {
         neighbor_id = image_tree_class_find(&neighbor->region_info);
         if (tree_id != neighbor_id) {
-          /*printf("neighbor s ");*/
-          /*stat = (statistics *)&neighbor_id->stat;*/
-          stat = (statistics *)neighbor->block->value;
-          nm = stat->mean;
-          ns = fmax(3, 3 * stat->deviation);
-          x1min = fmax(0, tm - ts);
-          x1max = x1min;
-          x2min = fmin(255, tm + ts);
-          x2max = x2min;
-          x1 = fmax(0, nm - ns);
-          x2 = fmin(255, nm + ns);
-          if (x1 < x1min) x1min = x1; else x1max = x1;
-          if (x2 < x2min) x2min = x2; else x2max = x2;
-          /* it is possible that intersection is negative, this means an empty set */
-          if (x1max > x2min) {
-            I = 0;
+          EVALUATE_NEIGHBOR_DEVIATION(neighbor->block->value);
+          if (dist < best_dist) {
+            best_dist = dist;
+            best_neighbor = neighbor;
           }
-          else {
-            I = (x2min - x1max);
-            if (I < 1) I = 1;
-          }
-          U = (x2max - x1min);
-          if (U < 1) U = 1;
-          /*printf("%.3f-%.3f, %.3f-%.3f, %.3f, %.3f ", x1min,x2max,x1max,x2min,I,U);*/
-          /* let us define this entropy measure as intersection divided by union */
-          entropy = I / U;
-          /* if union is less than double the intersection, we have high 'entropy' */
-          if (entropy > ebest) {
-            ebest = entropy;
-            nbest = neighbor;
-          }
-          /*
-          if (entropy > req_diff) {
-            image_tree_class_union(tree, neighbor);
-          }
-          */
         }
       }
       /* neighbor w */
@@ -849,55 +719,23 @@ result image_tree_forest_segment_with_entropy
       if (neighbor != NULL && neighbor->nw == NULL) {
         neighbor_id = image_tree_class_find(&neighbor->region_info);
         if (tree_id != neighbor_id) {
-          /*printf("neighbor w ");*/
-          /*stat = (statistics *)&neighbor_id->stat;*/
-          stat = (statistics *)neighbor->block->value;
-          nm = stat->mean;
-          ns = fmax(3, 3 * stat->deviation);
-          x1min = fmax(0, tm - ts);
-          x1max = x1min;
-          x2min = fmin(255, tm + ts);
-          x2max = x2min;
-          x1 = fmax(0, nm - ns);
-          x2 = fmin(255, nm + ns);
-          if (x1 < x1min) x1min = x1; else x1max = x1;
-          if (x2 < x2min) x2min = x2; else x2max = x2;
-          /* it is possible that intersection is negative, this means an empty set */
-          if (x1max > x2min) {
-            I = 0;
+          EVALUATE_NEIGHBOR_DEVIATION(neighbor->block->value);
+          if (dist < best_dist) {
+            best_dist = dist;
+            best_neighbor = neighbor;
           }
-          else {
-            I = (x2min - x1max);
-            if (I < 1) I = 1;
-          }
-          U = (x2max - x1min);
-          if (U < 1) U = 1;
-          /*printf("%.3f-%.3f, %.3f-%.3f, %.3f, %.3f ", x1min,x2max,x1max,x2min,I,U);*/
-          /* let us define this entropy measure as intersection divided by union */
-          entropy = I / U;
-          /* if union is less than double the intersection, we have high 'entropy' */
-          if (entropy > ebest) {
-            ebest = entropy;
-            nbest = neighbor;
-          }
-          /*
-          if (entropy > req_diff) {
-            image_tree_class_union(tree, neighbor);
-          }
-          */
         }
       }
-      
-      if (ebest > req_diff) {
-        image_tree_class_union(tree, nbest);
+
+      if (best_dist < alpha * threshold) {
+        image_tree_class_union(tree, best_neighbor);
       }
     }
     trees = trees->next;
   }
-  
+
   /* then, merge those neighboring regions that are consistent together */
   printf("starting to merge regions\n");
-  req_diff = 0.5;
   trees = target->trees.first.next;
   while (trees != &target->trees.last) {
     tree = (image_tree *)trees->data;
@@ -906,42 +744,14 @@ result image_tree_forest_segment_with_entropy
     if (tree->nw == NULL) {
       stat = (statistics *)&tree_id->stat;
       tm = stat->mean;
-      ts = fmax(3, 3 * stat->deviation);
-      
+
       /* neighbor n */
       neighbor = tree->n;
       if (neighbor != NULL && neighbor->nw == NULL) {
         neighbor_id = image_tree_class_find(&neighbor->region_info);
         if (tree_id != neighbor_id) {
-          stat = (statistics *)&neighbor_id->stat;
-          
-          nm = stat->mean;
-          ns = fmax(3, 3 * stat->deviation);
-          x1min = fmax(0, tm - ts);
-          x1max = x1min;
-          x2min = fmin(255, tm + ts);
-          x2max = x2min;
-          x1 = fmax(0, nm - ns);
-          x2 = fmin(255, nm + ns);
-          if (x1 < x1min) x1min = x1; else x1max = x1;
-          if (x2 < x2min) x2min = x2; else x2max = x2;
-          /* it is possible that intersection is negative, this means an empty set */
-          if (x1max > x2min) {
-            I = 0;
-          }
-          else {
-            I = (x2min - x1max);
-            if (I < 1) I = 1;
-          }
-          U = (x2max - x1min);
-          if (U < 1) U = 1;
-          
-          /* let us define this entropy measure as intersection divided by union */
-          entropy = I / U;
-          /*printf("%d %d a %.3f b %.3f c %.3f d %.3f ", tree->block->x,tree->block->y,x2max,x1min,x2min,x1max);*/
-          /*printf("%.3f ", entropy);*/
-          /* if union is less than double the intersection, we have high 'entropy' */
-          if (entropy > req_diff) {
+          EVALUATE_NEIGHBOR_DEVIATION(&neighbor_id->stat);
+          if (dist < alpha * threshold) {
             image_tree_class_union(tree, neighbor);
           }
         }
@@ -951,35 +761,8 @@ result image_tree_forest_segment_with_entropy
       if (neighbor != NULL && neighbor->nw == NULL) {
         neighbor_id = image_tree_class_find(&neighbor->region_info);
         if (tree_id != neighbor_id) {
-          stat = (statistics *)&neighbor_id->stat;
-          
-          nm = stat->mean;
-          ns = fmax(3, 3 * stat->deviation);
-          x1min = fmax(0, tm - ts);
-          x1max = x1min;
-          x2min = fmin(255, tm + ts);
-          x2max = x2min;
-          x1 = fmax(0, nm - ns);
-          x2 = fmin(255, nm + ns);
-          if (x1 < x1min) x1min = x1; else x1max = x1;
-          if (x2 < x2min) x2min = x2; else x2max = x2;
-          /* it is possible that intersection is negative, this means an empty set */
-          if (x1max > x2min) {
-            I = 0;
-          }
-          else {
-            I = (x2min - x1max);
-            if (I < 1) I = 1;
-          }
-          U = (x2max - x1min);
-          if (U < 1) U = 1;
-          
-          /* let us define this entropy measure as intersection divided by union */
-          entropy = I / U;
-          /*printf("%d %d a %.3f b %.3f c %.3f d %.3f ", tree->block->x,tree->block->y,x2max,x1min,x2min,x1max);*/
-          /*printf("%.3f ", entropy);*/
-          /* if union is less than double the intersection, we have high 'entropy' */
-          if (entropy > req_diff) {
+          EVALUATE_NEIGHBOR_DEVIATION(&neighbor_id->stat);
+          if (dist < alpha * threshold) {
             image_tree_class_union(tree, neighbor);
           }
         }
@@ -989,35 +772,8 @@ result image_tree_forest_segment_with_entropy
       if (neighbor != NULL && neighbor->nw == NULL) {
         neighbor_id = image_tree_class_find(&neighbor->region_info);
         if (tree_id != neighbor_id) {
-          stat = (statistics *)&neighbor_id->stat;
-          
-          nm = stat->mean;
-          ns = fmax(3, 3 * stat->deviation);
-          x1min = fmax(0, tm - ts);
-          x1max = x1min;
-          x2min = fmin(255, tm + ts);
-          x2max = x2min;
-          x1 = fmax(0, nm - ns);
-          x2 = fmin(255, nm + ns);
-          if (x1 < x1min) x1min = x1; else x1max = x1;
-          if (x2 < x2min) x2min = x2; else x2max = x2;
-          /* it is possible that intersection is negative, this means an empty set */
-          if (x1max > x2min) {
-            I = 0;
-          }
-          else {
-            I = (x2min - x1max);
-            if (I < 1) I = 1;
-          }
-          U = (x2max - x1min);
-          if (U < 1) U = 1;
-          
-          /* let us define this entropy measure as intersection divided by union */
-          entropy = I / U;
-          /*printf("%d %d a %.3f b %.3f c %.3f d %.3f ", tree->block->x,tree->block->y,x2max,x1min,x2min,x1max);*/
-          /*printf("%.3f ", entropy);*/
-          /* if union is less than double the intersection, we have high 'entropy' */
-          if (entropy > req_diff) {
+          EVALUATE_NEIGHBOR_DEVIATION(&neighbor_id->stat);
+          if (dist < alpha * threshold) {
             image_tree_class_union(tree, neighbor);
           }
         }
@@ -1027,35 +783,8 @@ result image_tree_forest_segment_with_entropy
       if (neighbor != NULL && neighbor->nw == NULL) {
         neighbor_id = image_tree_class_find(&neighbor->region_info);
         if (tree_id != neighbor_id) {
-          stat = (statistics *)&neighbor_id->stat;
-          
-          nm = stat->mean;
-          ns = fmax(3, 3 * stat->deviation);
-          x1min = fmax(0, tm - ts);
-          x1max = x1min;
-          x2min = fmin(255, tm + ts);
-          x2max = x2min;
-          x1 = fmax(0, nm - ns);
-          x2 = fmin(255, nm + ns);
-          if (x1 < x1min) x1min = x1; else x1max = x1;
-          if (x2 < x2min) x2min = x2; else x2max = x2;
-          /* it is possible that intersection is negative, this means an empty set */
-          if (x1max > x2min) {
-            I = 0;
-          }
-          else {
-            I = (x2min - x1max);
-            if (I < 1) I = 1;
-          }
-          U = (x2max - x1min);
-          if (U < 1) U = 1;
-          
-          /* let us define this entropy measure as intersection divided by union */
-          entropy = I / U;
-          /*printf("%d %d a %.3f b %.3f c %.3f d %.3f ", tree->block->x,tree->block->y,x2max,x1min,x2min,x1max);*/
-          /*printf("%.3f ", entropy);*/
-          /* if union is less than double the intersection, we have high 'entropy' */
-          if (entropy > req_diff) {
+          EVALUATE_NEIGHBOR_DEVIATION(&neighbor_id->stat);
+          if (dist < alpha * threshold) {
             image_tree_class_union(tree, neighbor);
           }
         }
@@ -1063,16 +792,235 @@ result image_tree_forest_segment_with_entropy
     }
     trees = trees->next;
   }
-  
+
   /* finally, count regions and assign colors */
   {
     forest_region_info *id, *region;
     uint32 count;
-    
+
     count = 0;
     /* initialize the random number generator for assigning the colors */
     srand(1234);
-    
+
+    trees = target->trees.first.next;
+    while (trees != &target->trees.last) {
+      tree = (image_tree *)trees->data;
+      if (tree->nw == NULL) {
+        region = &tree->region_info;
+        id = image_tree_class_find(region);
+        if (id == region) {
+          region->color[0] = (byte)(rand() % 256);
+          region->color[1] = (byte)(rand() % 256);
+          region->color[2] = (byte)(rand() % 256);
+          count++;
+        }
+      }
+      trees = trees->next;
+    }
+    target->regions = count;
+    printf("segmentation finished, %lu regions found\n", count);
+  }
+
+  FINALLY(image_tree_forest_segment_with_deviation);
+  RETURN();
+}
+
+/******************************************************************************/
+
+/* a macro for calculating neighbor entropy; neighbor should be statistics pointer */
+#define EVALUATE_NEIGHBOR_ENTROPY(neighbor)\
+  stat = (statistics *)(neighbor);\
+  nm = stat->mean;\
+  ns = fmax(alpha, alpha * stat->deviation);\
+  x1min = fmax(0, tm - ts);\
+  x1max = x1min;\
+  x2min = fmin(255, tm + ts);\
+  x2max = x2min;\
+  x1 = fmax(0, nm - ns);\
+  x2 = fmin(255, nm + ns);\
+  if (x1 < x1min) x1min = x1; else x1max = x1;\
+  if (x2 < x2min) x2min = x2; else x2max = x2;\
+  if (x1max > x2min) {\
+    I = 0;\
+  }\
+  else {\
+    I = (x2min - x1max);\
+    if (I < 1) I = 1;\
+  }\
+  U = (x2max - x1min);\
+  if (U < 1) U = 1;\
+  entropy = I / U
+
+result image_tree_forest_segment_with_entropy
+(
+  image_tree_forest *target,
+  uint32 min_size,
+  I_value alpha,
+  I_value diff_tree,
+  I_value diff_region
+)
+{
+  TRY();
+  list_item *trees;
+  image_tree *tree, *neighbor, *best_neighbor;
+  forest_region_info *tree_id, *neighbor_id;
+  statistics *stat;
+  I_value tm, ts, nm, ns, x1, x2, x1min, x1max, x2min, x2max, I, U, entropy, best_entropy;
+
+  CHECK_POINTER(target);
+  CHECK_PARAM(min_size <= target->tree_width && min_size <= target->tree_height);
+  CHECK_PARAM(alpha > 0);
+  CHECK_PARAM(diff_tree > 0);
+  CHECK_PARAM(diff_region > 0);
+
+  /* first, divide until all trees are consistent */
+  printf("starting to divide trees\n");
+  trees = target->trees.first.next;
+  while (trees != &target->trees.last) {
+    tree = (image_tree *)trees->data;
+    CHECK(image_tree_divide_with_entropy(tree, min_size));
+    trees = trees->next;
+  }
+
+  /* then, merge each tree with the best neighboring tree that is close enough */
+  printf("starting to merge trees\n");
+  trees = target->trees.first.next;
+  while (trees != &target->trees.last) {
+    tree = (image_tree *)trees->data;
+    tree_id = image_tree_class_find(&tree->region_info);
+    /* only consider consistent trees (those that have not been divided) */
+    if (tree->nw == NULL) {
+      stat = (statistics *)tree->block->value;
+      tm = stat->mean;
+      ts = fmax(alpha, alpha * stat->deviation);
+
+      best_entropy = 0;
+      best_neighbor = NULL;
+      /* neighbor n */
+      neighbor = tree->n;
+      if (neighbor != NULL && neighbor->nw == NULL) {
+        neighbor_id = image_tree_class_find(&neighbor->region_info);
+        if (tree_id != neighbor_id) {
+          EVALUATE_NEIGHBOR_ENTROPY(neighbor->block->value);
+          if (entropy > best_entropy) {
+            best_entropy = entropy;
+            best_neighbor = neighbor;
+          }
+        }
+      }
+      /* neighbor e */
+      neighbor = tree->e;
+      if (neighbor != NULL && neighbor->nw == NULL) {
+        neighbor_id = image_tree_class_find(&neighbor->region_info);
+        if (tree_id != neighbor_id) {
+          EVALUATE_NEIGHBOR_ENTROPY(neighbor->block->value);
+          if (entropy > best_entropy) {
+            best_entropy = entropy;
+            best_neighbor = neighbor;
+          }
+        }
+      }
+      /* neighbor s */
+      neighbor = tree->s;
+      if (neighbor != NULL && neighbor->nw == NULL) {
+        neighbor_id = image_tree_class_find(&neighbor->region_info);
+        if (tree_id != neighbor_id) {
+          EVALUATE_NEIGHBOR_ENTROPY(neighbor->block->value);
+          if (entropy > best_entropy) {
+            best_entropy = entropy;
+            best_neighbor = neighbor;
+          }
+        }
+      }
+      /* neighbor w */
+      neighbor = tree->w;
+      if (neighbor != NULL && neighbor->nw == NULL) {
+        neighbor_id = image_tree_class_find(&neighbor->region_info);
+        if (tree_id != neighbor_id) {
+          EVALUATE_NEIGHBOR_ENTROPY(neighbor->block->value);
+          if (entropy > best_entropy) {
+            best_entropy = entropy;
+            best_neighbor = neighbor;
+          }
+        }
+      }
+
+      if (best_entropy > diff_tree) {
+        image_tree_class_union(tree, best_neighbor);
+      }
+    }
+    trees = trees->next;
+  }
+
+  /* then, merge those neighboring regions that are consistent together */
+  printf("starting to merge regions\n");
+  trees = target->trees.first.next;
+  while (trees != &target->trees.last) {
+    tree = (image_tree *)trees->data;
+    tree_id = image_tree_class_find(&tree->region_info);
+    /* only consider consistent trees (those that have not been divided) */
+    if (tree->nw == NULL) {
+      stat = (statistics *)&tree_id->stat;
+      tm = stat->mean;
+      ts = fmax(alpha, alpha * stat->deviation);
+
+      /* neighbor n */
+      neighbor = tree->n;
+      if (neighbor != NULL && neighbor->nw == NULL) {
+        neighbor_id = image_tree_class_find(&neighbor->region_info);
+        if (tree_id != neighbor_id) {
+          EVALUATE_NEIGHBOR_ENTROPY(&neighbor_id->stat);
+          if (entropy > diff_region) {
+            image_tree_class_union(tree, neighbor);
+          }
+        }
+      }
+      /* neighbor e */
+      neighbor = tree->e;
+      if (neighbor != NULL && neighbor->nw == NULL) {
+        neighbor_id = image_tree_class_find(&neighbor->region_info);
+        if (tree_id != neighbor_id) {
+          EVALUATE_NEIGHBOR_ENTROPY(&neighbor_id->stat);
+          if (entropy > diff_region) {
+            image_tree_class_union(tree, neighbor);
+          }
+        }
+      }
+      /* neighbor s */
+      neighbor = tree->s;
+      if (neighbor != NULL && neighbor->nw == NULL) {
+        neighbor_id = image_tree_class_find(&neighbor->region_info);
+        if (tree_id != neighbor_id) {
+          EVALUATE_NEIGHBOR_ENTROPY(&neighbor_id->stat);
+          if (entropy > diff_region) {
+            image_tree_class_union(tree, neighbor);
+          }
+        }
+      }
+      /* neighbor w */
+      neighbor = tree->w;
+      if (neighbor != NULL && neighbor->nw == NULL) {
+        neighbor_id = image_tree_class_find(&neighbor->region_info);
+        if (tree_id != neighbor_id) {
+          EVALUATE_NEIGHBOR_ENTROPY(&neighbor_id->stat);
+          if (entropy > diff_region) {
+            image_tree_class_union(tree, neighbor);
+          }
+        }
+      }
+    }
+    trees = trees->next;
+  }
+
+  /* finally, count regions and assign colors */
+  {
+    forest_region_info *id, *region;
+    uint32 count;
+
+    count = 0;
+    /* initialize the random number generator for assigning the colors */
+    srand(1234);
+
     trees = target->trees.first.next;
     while (trees != &target->trees.last) {
       tree = (image_tree *)trees->data;
@@ -1108,10 +1056,10 @@ result image_tree_forest_get_regions
   image_tree *tree;
   forest_region_info *region, *id;
   uint32 count;
-  
+
   CHECK_POINTER(source);
   CHECK_POINTER(target);
-  
+
   /* collect all regions to array and generate colors */
   count = 0;
   trees = source->trees.first.next;
@@ -1127,7 +1075,7 @@ result image_tree_forest_get_regions
     }
     trees = trees->next;
   }
-  
+
   FINALLY(image_tree_forest_get_regions);
   RETURN();
 }
@@ -1148,16 +1096,16 @@ result image_tree_forest_draw_image
   forest_region_info *id;
   uint32 x, y, width, height, stride, row_step;
   byte *target_data, *target_pos, color0, color1, color2;
-  
+
   CHECK_POINTER(forest);
   CHECK_POINTER(forest->source);
   CHECK_POINTER(target);
-  
+
   width = forest->source->width;
   height = forest->source->height;
-  
+
   CHECK(pixel_image_create(target, p_U8, RGB, width, height, 3, 3 * width));
-  
+
   stride = target->stride;
   target_data = (byte*)target->data;
 
@@ -1187,7 +1135,7 @@ result image_tree_forest_draw_image
             *target_pos++;
           }
         }
-        
+
       }
       trees = trees->next;
     }
@@ -1507,9 +1455,9 @@ result image_tree_divide
 {
   TRY();
   uint16 w, h;
-  
+
   CHECK_POINTER(target);
-  
+
   w = target->block->w;
   h = target->block->h;
   if (w > 1 && h > 1) {
@@ -1519,26 +1467,26 @@ result image_tree_divide
       image_block blocks[4];
       statistics values[4];
       uint32 i;
-      
+
       w = (uint16)(w / 2);
       h = (uint16)(h / 2);
-      
+
       /*printf("creating child trees with size %u,%u\n",w,h);*/
-      
+
       forest = target->root->forest;
-      
+
       CHECK(image_tree_get_child_statistics(target, values, blocks));
       {
         image_tree new_tree, *child_tree;
         image_block *child_block;
         statistics *child_value;
-        
+
         CHECK(image_tree_nullify(&new_tree));
-        
+
         new_tree.root = target->root;
         new_tree.parent = target;
         new_tree.level = target->level+1;
-        
+
         /* nw child block */
         CHECK(list_append_reveal_data(&forest->values, (pointer)&values[0], (pointer*)&child_value));
         blocks[0].value = (pointer)child_value;
@@ -1547,7 +1495,7 @@ result image_tree_divide
         CHECK(list_append_reveal_data(&forest->trees, (pointer)&new_tree, (pointer*)&child_tree));
         image_tree_class_create(child_tree);
         target->nw = child_tree;
-        
+
         /* ne child block */
         CHECK(list_append_reveal_data(&forest->values, (pointer)&values[1], (pointer*)&child_value));
         blocks[1].value = (pointer)child_value;
@@ -1556,7 +1504,7 @@ result image_tree_divide
         CHECK(list_append_reveal_data(&forest->trees, (pointer)&new_tree, (pointer*)&child_tree));
         image_tree_class_create(child_tree);
         target->ne = child_tree;
-        
+
         /* sw child block */
         CHECK(list_append_reveal_data(&forest->values, (pointer)&values[2], (pointer*)&child_value));
         blocks[2].value = (pointer)child_value;
@@ -1565,7 +1513,7 @@ result image_tree_divide
         CHECK(list_append_reveal_data(&forest->trees, (pointer)&new_tree, (pointer*)&child_tree));
         image_tree_class_create(child_tree);
         target->sw = child_tree;
-        
+
         /* se child block */
         CHECK(list_append_reveal_data(&forest->values, (pointer)&values[3], (pointer*)&child_value));
         blocks[3].value = (pointer)child_value;
@@ -1574,12 +1522,12 @@ result image_tree_divide
         CHECK(list_append_reveal_data(&forest->trees, (pointer)&new_tree, (pointer*)&child_tree));
         image_tree_class_create(child_tree);
         target->se = child_tree;
-        
+
         image_tree_cache_neighbors(target);
       }
     }
   }
-  
+
   FINALLY(image_tree_divide);
   RETURN();
 }
@@ -1630,10 +1578,10 @@ result image_tree_get_child_statistics
       uint16 x, y, w, h;
       uint32 step, stride, offset;
       statistics *stat;
-      
+
       w = (uint16)(source->block->w / 2);
       h = (uint16)(source->block->h / 2);
-      
+
       if (blocks != NULL) {
         blocks[0].w = blocks[1].w = blocks[2].w = blocks[3].w = w;
         blocks[0].h = blocks[1].h = blocks[2].h = blocks[3].h = h;
@@ -1645,20 +1593,20 @@ result image_tree_get_child_statistics
         void *data;
         pixel_type type;
         I_value mean;
-        
+
         original = source->root->forest->source;
         data = original->data;
         type = original->type;
         step = original->step;
         stride = original->stride;
-        
+
         /* nw child block */
-        
+
         x = source->block->x;
         y = source->block->y;
         offset = y * stride + x * step;
         mean = cast_pixel_value(original->data, type, offset);
-        
+
         stat = &target[0];
         stat->N = 1;
         stat->sum = mean;
@@ -1666,18 +1614,18 @@ result image_tree_get_child_statistics
         stat->mean = mean;
         stat->variance = 0;
         stat->deviation = 0;
-        
+
         if (blocks != NULL) {
           blocks[0].x = x;
           blocks[0].y = y;
         }
-        
+
         /* ne child block */
-        
+
         x = x + 1;
         offset = offset + step;
         mean = cast_pixel_value(original->data, type, offset);
-        
+
         stat = &target[1];
         stat->N = 1;
         stat->sum = mean;
@@ -1685,18 +1633,18 @@ result image_tree_get_child_statistics
         stat->mean = mean;
         stat->variance = 0;
         stat->deviation = 0;
-        
+
         if (blocks != NULL) {
           blocks[1].x = x;
           blocks[1].y = y;
         }
-        
+
         /* se child block */
-        
+
         y = y + 1;
         offset = offset + stride;
         mean = cast_pixel_value(original->data, type, offset);
-        
+
         stat = &target[3];
         stat->N = 1;
         stat->sum = mean;
@@ -1704,18 +1652,18 @@ result image_tree_get_child_statistics
         stat->mean = mean;
         stat->variance = 0;
         stat->deviation = 0;
-        
+
         if (blocks != NULL) {
           blocks[3].x = x;
           blocks[3].y = y;
         }
-        
+
         /* sw child block */
-        
+
         x = x - 1;
         offset = offset - step;
         mean = cast_pixel_value(original->data, type, offset);
-        
+
         stat = &target[2];
         stat->N = 1;
         stat->sum = mean;
@@ -1723,7 +1671,7 @@ result image_tree_get_child_statistics
         stat->mean = mean;
         stat->variance = 0;
         stat->deviation = 0;
-        
+
         if (blocks != NULL) {
           blocks[2].x = x;
           blocks[2].y = y;
@@ -1733,7 +1681,7 @@ result image_tree_get_child_statistics
         uint32 hstep, vstep, dstep;
         integral_image *I;
         I_value *iA, *i2A, N, sum1, sum2, mean, var;
-        
+
         I = &source->root->forest->integral;
         N = (I_value)(w * h);
         step = I->step;
@@ -1741,22 +1689,22 @@ result image_tree_get_child_statistics
         hstep = w * step;
         vstep = h * stride;
         dstep = hstep + vstep;
-        
+
         /* nw child block */
-        
+
         x = source->block->x;
         y = source->block->y;
         offset = y * stride + x * step;
-        
+
         iA = ((I_value *)I->I_1.data) + offset;
         i2A = ((I_value *)I->I_2.data) + offset;
-        
+
         sum1 = *(iA + dstep) + *iA - *(iA + hstep) - *(iA + vstep);
         sum2 = *(i2A + dstep) + *i2A - *(i2A + hstep) - *(i2A + vstep);
         mean = sum1 / N;
         var = sum2 / N - mean*mean;
         if (var < 0) var = 0;
-        
+
         stat = &target[0];
         stat->N = N;
         stat->sum = sum1;
@@ -1764,14 +1712,14 @@ result image_tree_get_child_statistics
         stat->mean = mean;
         stat->variance = var;
         stat->deviation = sqrt(var);
-        
+
         if (blocks != NULL) {
           blocks[0].x = x;
           blocks[0].y = y;
         }
-        
+
         /* ne child block */
-        
+
         x = x + w;
         iA = iA + hstep;
         i2A = i2A + hstep;
@@ -1781,7 +1729,7 @@ result image_tree_get_child_statistics
         mean = sum1 / N;
         var = sum2 / N - mean*mean;
         if (var < 0) var = 0;
-        
+
         stat = &target[1];
         stat->N = N;
         stat->sum = sum1;
@@ -1789,14 +1737,14 @@ result image_tree_get_child_statistics
         stat->mean = mean;
         stat->variance = var;
         stat->deviation = sqrt(var);
-        
+
         if (blocks != NULL) {
           blocks[1].x = x;
           blocks[1].y = y;
         }
-        
+
         /* se child block */
-        
+
         y = y + h;
         iA = iA + vstep;
         i2A = i2A + vstep;
@@ -1806,7 +1754,7 @@ result image_tree_get_child_statistics
         mean = sum1 / N;
         var = sum2 / N - mean*mean;
         if (var < 0) var = 0;
-        
+
         stat = &target[3];
         stat->N = N;
         stat->sum = sum1;
@@ -1814,14 +1762,14 @@ result image_tree_get_child_statistics
         stat->mean = mean;
         stat->variance = var;
         stat->deviation = sqrt(var);
-        
+
         if (blocks != NULL) {
           blocks[3].x = x;
           blocks[3].y = y;
         }
-        
+
         /* sw child block */
-        
+
         x = x - w;
         iA = iA - hstep;
         i2A = i2A - hstep;
@@ -1831,7 +1779,7 @@ result image_tree_get_child_statistics
         mean = sum1 / N;
         var = sum2 / N - mean*mean;
         if (var < 0) var = 0;
-        
+
         stat = &target[2];
         stat->N = N;
         stat->sum = sum1;
@@ -1839,7 +1787,7 @@ result image_tree_get_child_statistics
         stat->mean = mean;
         stat->variance = var;
         stat->deviation = sqrt(var);
-        
+
         if (blocks != NULL) {
           blocks[2].x = x;
           blocks[2].y = y;
@@ -1868,7 +1816,7 @@ result image_tree_divide_with_entropy
   /*printf("tree %u %u\n", target->block->x, target->block->y);*/
   if (target->nw == NULL) {
     uint16 w, h;
-    
+
     w = target->block->w;
     h = target->block->h;
     if (w >= min_size*2 && h >= min_size*2) {
@@ -1880,11 +1828,11 @@ result image_tree_divide_with_entropy
       statistics values[4];
       uint32 i;
       I_value m, s, x1, x2, x1min, x1max, x2min, x2max, I, U, entropy;
-      
+
       forest = target->root->forest;
-      
+
       CHECK(image_tree_get_child_statistics(target, values, blocks));
-      
+
       m = values[0].mean;
       s = fmax(3, 3 * values[0].deviation);
       x1min = fmax(0, m - s);
@@ -1901,7 +1849,7 @@ result image_tree_divide_with_entropy
         if (x2 < x2min) x2min = x2;
         else if (x2 > x2max) x2max = x2;
       }
-      
+
       /* it is possible that intersection is negative, this means an empty set */
       if (x1max > x2min) {
         I = 0;
@@ -1912,23 +1860,23 @@ result image_tree_divide_with_entropy
       }
       U = (x2max - x1min);
       if (U < 1) U = 1;
-      
+
       /*printf("%.3f-%.3f, %.3f-%.3f, %.3f, %.3f\n", x1min,x2max,x1max,x2min,I,U);*/
       /* let us define this entropy measure as intersection divided by union */
       entropy = I / U;
-      
+
       /* if union is more than double the intersection, we have high 'entropy' */
       if (entropy < 0.5) {
         image_tree new_tree, *child_tree;
         image_block *child_block;
         statistics *child_value;
-        
+
         CHECK(image_tree_nullify(&new_tree));
-        
+
         new_tree.root = target->root;
         new_tree.parent = target;
         new_tree.level = target->level+1;
-        
+
         /* nw child block */
         CHECK(list_append_reveal_data(&forest->values, (pointer)&values[0], (pointer*)&child_value));
         blocks[0].value = (pointer)child_value;
@@ -1937,7 +1885,7 @@ result image_tree_divide_with_entropy
         CHECK(list_append_reveal_data(&forest->trees, (pointer)&new_tree, (pointer*)&child_tree));
         image_tree_class_create(child_tree);
         target->nw = child_tree;
-        
+
         /* ne child block */
         CHECK(list_append_reveal_data(&forest->values, (pointer)&values[1], (pointer*)&child_value));
         blocks[1].value = (pointer)child_value;
@@ -1946,7 +1894,7 @@ result image_tree_divide_with_entropy
         CHECK(list_append_reveal_data(&forest->trees, (pointer)&new_tree, (pointer*)&child_tree));
         image_tree_class_create(child_tree);
         target->ne = child_tree;
-        
+
         /* sw child block */
         CHECK(list_append_reveal_data(&forest->values, (pointer)&values[2], (pointer*)&child_value));
         blocks[2].value = (pointer)child_value;
@@ -1955,7 +1903,7 @@ result image_tree_divide_with_entropy
         CHECK(list_append_reveal_data(&forest->trees, (pointer)&new_tree, (pointer*)&child_tree));
         image_tree_class_create(child_tree);
         target->sw = child_tree;
-        
+
         /* se child block */
         CHECK(list_append_reveal_data(&forest->values, (pointer)&values[3], (pointer*)&child_value));
         blocks[3].value = (pointer)child_value;
@@ -1964,7 +1912,7 @@ result image_tree_divide_with_entropy
         CHECK(list_append_reveal_data(&forest->trees, (pointer)&new_tree, (pointer*)&child_tree));
         image_tree_class_create(child_tree);
         target->se = child_tree;
-        
+
         image_tree_cache_neighbors(target);
       }
     }
