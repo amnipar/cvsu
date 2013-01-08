@@ -3,7 +3,7 @@
  * @author Matti J. Eskelinen <matti.j.eskelinen@gmail.com>
  * @brief Quad Forest hierarchical data structure for analyzing images.
  *
- * Copyright (c) 2011, Matti Johannes Eskelinen
+ * Copyright (c) 2011-2013, Matti Johannes Eskelinen
  * All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -42,13 +42,13 @@ extern "C" {
 #include "cvsu_list.h"
 
 /**
- * Stores region information for forest segmentation with union-find
- * equivalence class approach. In addition to id and rank information contains
- * also the region bounding box and statistics.
+ * Stores segment information for forest segmentation with union-find
+ * disjoint set approach. In addition to id and rank information contains
+ * also the segment bounding box and statistics.
  */
-typedef struct forest_region_info_t
+typedef struct quad_forest_segment_t
 {
-  struct forest_region_info_t *id;
+  struct quad_forest_segment_t *parent;
   uint32 rank;
   uint32 x1;
   uint32 y1;
@@ -56,7 +56,7 @@ typedef struct forest_region_info_t
   uint32 y2;
   statistics stat;
   byte color[4];
-} forest_region_info;
+} quad_forest_segment;
 
 /**
  * Stores a quad tree holding image data.
@@ -75,7 +75,7 @@ typedef struct quad_tree_t {
   /** Statistics of the image region covered by this tree. */
   statistics stat;
   /** Region info used in segmentation. */
-  forest_region_info region_info;
+  quad_forest_segment segment;
   /** Parent tree, NULL if this is a root tree */
   struct quad_tree_t *parent;
   /* child trees, all NULL if the tree has not beed divided */
@@ -113,7 +113,7 @@ typedef struct quad_forest_t {
   /** The number of cols in the tree grid. */
   uint32 cols;
   /** The number of regions found from the tree (after segmentation). */
-  uint32 regions;
+  uint32 segments;
   /** The maximum size of trees (the size of root trees). */
   uint32 tree_max_size;
   /** The minimum size of trees, no tree will be divided beyond this size. */
@@ -127,7 +127,7 @@ typedef struct quad_forest_t {
   /** Pointer to the end of the root tree list for resetting the forest. */
   list_item *last_root_tree;
   /** The array containing the root tree grid. */
-  quad_tree *roots;
+  quad_tree **roots;
 } quad_forest;
 
 /**
@@ -214,20 +214,6 @@ bool quad_forest_is_null(
 );
 
 /**
- * Prepares an image forest for the update stage.
- * This is separate from the actual update to allow easier parallelization.
- * All root trees are separate from each other, so arbitrary tree collections
- * can be handled in parallel.
- * In this stage new image content is copied from the source
- * (possibly converting the format) and data structures cleaned for a new
- * iteration.
- */
-/* TODO: what to do with this? */
-result image_tree_forest_update_prepare(
-  image_tree_forest *target
-);
-
-/**
  * Updates a quad_forest structure; copies data from the original image,
  * possibly converting the format, cleans the data structure, updates the
  * integral_image and updates the statistics of all trees.
@@ -273,18 +259,18 @@ result quad_forest_segment_with_entropy(
  * array has to be allocated by the caller to the correct size, as indicated
  * by the regions member of the quad_tree structure.
  */
-result quad_forest_get_regions(
-  /** The quad_forest where the regions will be collected. */
+result quad_forest_get_segments(
+  /** The quad_forest where the segments will be collected. */
   quad_forest *source,
-  /** A region array, must be allocated by the caller to the correct size. */
-  forest_region_info **target
+  /** A segment array, must be allocated by the caller to the correct size. */
+  quad_forest_segment **target
 );
 
 /**
  * Draws an image of the quad_forest structure using the current division and
- * region info. Each quad_tree will be painted as a square with uniform color,
- * using the color assigned to the region id, the mean value from the region
- * statistics, or the mean value from the quad_tree statistics.
+ * segment info. Each quad_tree will be painted as a square with uniform color,
+ * using the color assigned to the segment parent, the mean value from the
+ * segment statistics, or the mean value from the quad_tree statistics.
  */
 result quad_forest_draw_image
 (
@@ -292,9 +278,9 @@ result quad_forest_draw_image
   image_tree_forest *forest,
   /** Pointer to a pixel_image, will be (re)created to fit the forest image. */
   pixel_image *target,
-  /** Should we use region statistics or individual tree statistics? */
-  uint32 use_regions,
-  /** For regions, should we use mean or colors? No effect for trees. */
+  /** Should we use segment statistics or individual tree statistics? */
+  uint32 use_segments,
+  /** For segments, should we use mean or colors? No effect for trees. */
   uint32 use_colors
 );
 
@@ -308,7 +294,7 @@ result quad_tree_divide(
 /**
  * Determine whether the quad_tree has child trees.
  */
-bool quad_tree_has_children(
+uint32 quad_tree_has_children(
   quad_tree *target
 );
 
@@ -319,9 +305,7 @@ bool quad_tree_has_children(
 result quad_tree_get_child_statistics(
   /** The quad_tree that will will be examined. */
   quad_tree *source,
-  /** The array of statistics structures to fill, must contain at least 4. */
-  statistics *target,
-  /** The quad_tree structures to fill, can be null, if not must contain 4. */
+  /** The array of child trees to fill, must contain at least 4. */
   quad_tree *children
 );
 
@@ -337,14 +321,13 @@ result quad_tree_divide_with_entropy(
   integral_value overlap_threshold
 );
 
-/**
+/*
  * Creates and initializes a neighbor list
- */
+ *
 result image_tree_create_neighbor_list(
     list *target
 );
 
-/**
  * Finds the direct neighbor (directly adjacent on the same level) of a tree
  * and returns it in the neighbor reference. If the tree does not have a
  * neighbor on the same level, the direct neighbor on the highest level is
@@ -359,23 +342,21 @@ result image_tree_create_neighbor_list(
  *    case, the neighbor is set to NULL
  *
  * This requires that the neighbors of top level trees have been set properly.
- */
+ *
 
-/**
  * Recursive function for adding child trees from the highest level as
  * immediate neighbors to another tree
  *
  * 1. If tree has no childen, add it to list and return
  * 2. If tree has chilren, call recursively for the two children in the proper
  *    direction
- */
+ *
 result image_tree_add_children_as_immediate_neighbors(
     list *target,
     image_tree *tree,
     direction dir
 );
 
-/**
  * Finds all immediate neighbors (directly adjacent neighbors on the highest
  * level) of a tree in the given direction and stores them in the list.
  *
@@ -386,20 +367,21 @@ result image_tree_add_children_as_immediate_neighbors(
  *    two children adjacent to this tree into the stack; if not, add it to the
  *    end of the list
  * 3.
- */
+ *
 result image_tree_find_all_immediate_neighbors(
   list *target,
   image_tree *tree
 );
+*/
 
 /**
- * Creates a segment from this quad_tree.
+ * Creates a new segment from this quad_tree.
  * Part of the Union-Find implementation for quad_trees.
  */
 void quad_tree_segment_create(quad_tree *tree);
 
 /**
- * Creates a union of the two segments these two trees belong to.
+ * Creates a union of the two segments these two quad_trees belong to.
  * Part of the Union-Find implementation for quad_trees.
  */
 void quad_tree_segment_union(quad_tree *tree1, quad_tree *tree2);
@@ -408,16 +390,16 @@ void quad_tree_segment_union(quad_tree *tree1, quad_tree *tree2);
  * Finds the parent element in the segment this tree belongs to.
  * Part of the Union-Find implementation for quad_trees.
  */
-forest_region_info *quad_tree_segment_find(forest_region_info *region);
+quad_forest_segment *quad_tree_segment_find(quad_tree *tree);
 
 /**
- * Gets the class label for this tree. Effectively the pointer cast into int.
- * Helper function on top of the Union-Find implementation for image trees.
+ * Gets the segment id for this quad_tree. Effectively the pointer cast into an
+ * int. Helper function on top of the Union-Find implementation for quad_trees.
  */
 uint32 quad_tree_segment_get(quad_tree *tree);
 
 /**
- * Checks if this image is a class parent (id == region_info)
+ * Checks if this quad_tree is a segment parent (id == segment_info)
  */
 bool quad_tree_is_segment_parent(quad_tree *tree);
 
@@ -425,4 +407,4 @@ bool quad_tree_is_segment_parent(quad_tree *tree);
 }
 #endif
 
-#endif /* IMAGE_TREE_H */
+#endif /* CVSU_QUAD_FOREST_H */

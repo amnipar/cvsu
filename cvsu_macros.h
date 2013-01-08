@@ -85,8 +85,26 @@ finally:
         goto finally;\
     } } while (0)
 
+#define CHECK_TRUE(expr) do {\
+  r == SUCCESS;\
+  if ((expr) == 0) {\
+    r = BAD_PARAM;\
+    goto finally;\
+  } } while (0)
+
+#define CHECK_FALSE(expr) do {\
+  r == SUCCESS;\
+  if ((expr) != 0) {\
+    r = BAD_PARAM;\
+    goto finally;\
+  } } while (0)
+
 #define TRUNC(value, min, max)\
     (((value) < (min)) ? (min) : (((value) > (max)) ? (max) : (value)))
+
+#define IS_TRUE(expr) ((expr) != 0)
+
+#define IS_FALSE(expr) ((expr) == 0)
 
 /******************************************************************************/
 /* macros for index access                                                    */
