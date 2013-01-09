@@ -66,10 +66,8 @@ typedef struct quad_tree_t {
   uint32 x;
   /** The y coordinate of the top left corner. */
   uint32 y;
-  /** Width of the image region covered by this tree. */
-  uint32 w;
-  /** Height of the image region covered by this tree. */
-  uint32 h;
+  /** Size of the image region covered by this tree. */
+  uint32 size;
   /** Level of this tree in the hierarchy. Top level is 0. */
   uint32 level;
   /** Statistics of the image region covered by this tree. */
@@ -80,22 +78,22 @@ typedef struct quad_tree_t {
   struct quad_tree_t *parent;
   /* child trees, all NULL if the tree has not beed divided */
   /** Upper left child tree */
-  struct image_tree_t *nw;
+  struct quad_tree_t *nw;
   /** Upper right child tree */
-  struct image_tree_t *ne;
+  struct quad_tree_t *ne;
   /** Lower left child tree */
-  struct image_tree_t *sw;
+  struct quad_tree_t *sw;
   /** Lower right child tree */
-  struct image_tree_t *se;
+  struct quad_tree_t *se;
   /* direct neighbors are cached in each tree as they are determined */
   /** Direct neighbor on the top side. */
-  struct image_tree_t *n;
+  struct quad_tree_t *n;
   /** Direct neighbor on the right side. */
-  struct image_tree_t *e;
+  struct quad_tree_t *e;
   /** Direct neighbor on the bottom side. */
-  struct image_tree_t *s;
+  struct quad_tree_t *s;
   /** Direct neighbor on the left side. */
-  struct image_tree_t *w;
+  struct quad_tree_t *w;
 } quad_tree;
 
 /**
@@ -133,7 +131,8 @@ typedef struct quad_forest_t {
 /**
  * Initializes the contents of a quad_tree with null values.
  */
-result quad_tree_nullify(
+result quad_tree_nullify
+(
   /** The quad_tree structure to be nullified. */
   quad_tree *target
 );
@@ -141,7 +140,8 @@ result quad_tree_nullify(
 /**
  * Everything that can be nullified should be able to tell if it's null.
  */
-bool quad_tree_is_null(
+truth_value quad_tree_is_null
+(
   /** The quad_tree structure to be checked for null. */
   quad_tree *target
 );
@@ -156,7 +156,8 @@ quad_forest *quad_forest_alloc();
  * @see quad_forest_alloc. Will also destroy the structure properly using
  * @see quad_forest_destroy.
  */
-void quad_forest_free(
+void quad_forest_free
+(
   /** A pointer to the quad_forest to be freed. */
   quad_forest *target
 );
@@ -164,7 +165,8 @@ void quad_forest_free(
 /**
  * Creates a quad_forest from a pixel_image.
  */
-result quad_forest_create(
+result quad_forest_create
+(
   /** The quad_forest that will store the created data structure. */
   quad_forest *target,
   /** The pixel_image where the image data is acquired. */
@@ -180,7 +182,8 @@ result quad_forest_create(
  * different tree sizes. Also used in the @see quad_forest_create function, to
  * initialize the structures for the first time.
  */
-result quad_forest_reload(
+result quad_forest_reload
+(
   /** The quad_forest that will be reloaded. */
   quad_forest *target,
   /** The maximum size of the trees (initial size of the root trees). */
@@ -192,7 +195,8 @@ result quad_forest_reload(
 /**
  * Destroys a quad_forest structure and deallocates all data.
  */
-result quad_forest_destroy(
+result quad_forest_destroy
+(
   /** The quad_forest structure to be destroyed. */
   quad_forest *target
 );
@@ -200,7 +204,8 @@ result quad_forest_destroy(
 /**
  * Initializes the contents of a quad_forest to null. Does not deallocate data.
  */
-result quad_forest_nullify(
+result quad_forest_nullify
+(
   /** The quad_forest structure to be nullified. */
   quad_forest *target
 );
@@ -208,7 +213,8 @@ result quad_forest_nullify(
 /**
 * Everything that can be nullified should be able to tell if it's null.
 */
-bool quad_forest_is_null(
+truth_value quad_forest_is_null
+(
   /** The quad_forest structure to be checked for null. */
   quad_forest *target
 );
@@ -218,7 +224,8 @@ bool quad_forest_is_null(
  * possibly converting the format, cleans the data structure, updates the
  * integral_image and updates the statistics of all trees.
  */
-result quad_forest_update(
+result quad_forest_update
+(
   /** The quad_forest structure to be updated. */
   quad_forest *target
 );
@@ -229,7 +236,8 @@ result quad_forest_update(
  * larger than the threshold, and then merges trees and regions that have the
  * difference of means smaller than the threshold.
  */
-result quad_forest_segment_with_deviation(
+result quad_forest_segment_with_deviation
+(
   /** The quad_forest structure to be segmented. */
   quad_forest *target,
   /** Threshold value for deviation, trees with larger value are divided. */
@@ -243,15 +251,16 @@ result quad_forest_segment_with_deviation(
  * and similarity criteria.
  * TODO: maybe add some region size constraint as a parameter.
  */
-result quad_forest_segment_with_entropy(
+result quad_forest_segment_with_overlap
+(
   /** The quad_forest structure to be segmented. */
-  image_tree_forest *target,
+  quad_forest *target,
   /** Deviation multiplier used for creating the estimated intensity range. */
   integral_value alpha,
-  /** Range overlap ratio used for determining the trees to merge. */
-  integral_value overlap_trees,
-  /** Range overlap ratio used for determining the regions to merge. */
-  integral_value overlap_regions
+  /** Range overlap threshold used for determining the trees to merge. */
+  integral_value threshold_trees,
+  /** Range overlap threshold used for determining the segments to merge. */
+  integral_value threshold_segments
 );
 
 /**
@@ -259,7 +268,8 @@ result quad_forest_segment_with_entropy(
  * array has to be allocated by the caller to the correct size, as indicated
  * by the regions member of the quad_tree structure.
  */
-result quad_forest_get_segments(
+result quad_forest_get_segments
+(
   /** The quad_forest where the segments will be collected. */
   quad_forest *source,
   /** A segment array, must be allocated by the caller to the correct size. */
@@ -275,26 +285,32 @@ result quad_forest_get_segments(
 result quad_forest_draw_image
 (
   /** The quad_forest to be drawn into an image. */
-  image_tree_forest *forest,
+  quad_forest *forest,
   /** Pointer to a pixel_image, will be (re)created to fit the forest image. */
   pixel_image *target,
   /** Should we use segment statistics or individual tree statistics? */
-  uint32 use_segments,
+  truth_value use_segments,
   /** For segments, should we use mean or colors? No effect for trees. */
-  uint32 use_colors
+  truth_value use_colors
 );
 
 /**
  * Divides a quad_tree in four smaller trees, if width is greater than 1.
  */
-result quad_tree_divide(
+result quad_tree_divide
+(
+  /** The quad_forest where the tree resides. */
+  quad_forest *forest,
+  /** The quad_tree to be divided. */
   quad_tree *target
 );
 
 /**
  * Determine whether the quad_tree has child trees.
  */
-uint32 quad_tree_has_children(
+truth_value quad_tree_has_children
+(
+  /** The quad_tree to be checked for presence of children. */
   quad_tree *target
 );
 
@@ -302,11 +318,14 @@ uint32 quad_tree_has_children(
  * Generates the statistics of the four child trees without dividing the tree.
  * Useful for determining consistency before deciding to divide.
  */
-result quad_tree_get_child_statistics(
+result quad_tree_get_child_statistics
+(
+  /** The quad_forest where the tree resides. */
+  quad_forest *forest,
   /** The quad_tree that will will be examined. */
   quad_tree *source,
-  /** The array of child trees to fill, must contain at least 4. */
-  quad_tree *children
+  /** The array of child quad_trees to fill, must contain at least 4. */
+  quad_tree *target
 );
 
 /**
@@ -314,10 +333,15 @@ result quad_tree_get_child_statistics(
  * entropy measure of the children is higher than the given threshold.
  * Higher values will require higher overlap to divide.
  */
-result quad_tree_divide_with_entropy(
-  /** The quad_tree to be divided in case its entropy is sufficiently high. */
+result quad_tree_divide_with_overlap
+(
+  /** The quad_forest where the tree resides. */
+  quad_forest *forest,
+  /** The quad_tree to be divided if its internal overlap is high. */
   quad_tree *target,
-  /** The threshold value used to decide whether to divide or not. */
+  /** Deviation multiplier used for creating the estimated intensity range. */
+  integral_value alpha,
+  /** Range overlap threshold value used to decide whether to divide or not. */
   integral_value overlap_threshold
 );
 
@@ -378,30 +402,46 @@ result image_tree_find_all_immediate_neighbors(
  * Creates a new segment from this quad_tree.
  * Part of the Union-Find implementation for quad_trees.
  */
-void quad_tree_segment_create(quad_tree *tree);
+void quad_tree_segment_create
+(
+  quad_tree *tree
+);
 
 /**
  * Creates a union of the two segments these two quad_trees belong to.
  * Part of the Union-Find implementation for quad_trees.
  */
-void quad_tree_segment_union(quad_tree *tree1, quad_tree *tree2);
+void quad_tree_segment_union
+(
+  quad_tree *tree1,
+  quad_tree *tree2
+);
 
 /**
  * Finds the parent element in the segment this tree belongs to.
  * Part of the Union-Find implementation for quad_trees.
  */
-quad_forest_segment *quad_tree_segment_find(quad_tree *tree);
+quad_forest_segment *quad_tree_segment_find
+(
+  quad_tree *tree
+);
 
 /**
  * Gets the segment id for this quad_tree. Effectively the pointer cast into an
  * int. Helper function on top of the Union-Find implementation for quad_trees.
  */
-uint32 quad_tree_segment_get(quad_tree *tree);
+uint32 quad_tree_segment_get
+(
+  quad_tree *tree
+);
 
 /**
  * Checks if this quad_tree is a segment parent (id == segment_info)
  */
-bool quad_tree_is_segment_parent(quad_tree *tree);
+truth_value quad_tree_is_segment_parent
+(
+  quad_tree *tree
+);
 
 #ifdef __cplusplus
 }

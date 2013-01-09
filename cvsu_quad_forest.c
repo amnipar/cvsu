@@ -54,12 +54,12 @@ string quad_forest_destroy_name = "quad_forest_destroy";
 string quad_forest_nullify_name = "quad_forest_nullify";
 string quad_forest_update_name = "quad_forest_update";
 string quad_forest_segment_with_deviation_name = "quad_forest_segment_with_deviation";
-string quad_forest_segment_with_entropy_name = "quad_forest_segment_with_entropy";
+string quad_forest_segment_with_overlap_name = "quad_forest_segment_with_overlap";
 string quad_forest_get_segments_name = "quad_forest_get_regions";
 string quad_forest_draw_image_name = "quad_forest_draw_image";
 string quad_tree_divide_name = "quad_tree_divide";
 string quad_tree_get_child_statistics_name = "quad_tree_get_child_statistics";
-string quad_tree_divide_with_entropy_name = "quad_tree_divide_with_entropy";
+string quad_tree_divide_with_overlap_name = "quad_tree_divide_with_overlap";
 /*
 string image_tree_create_neighbor_list_name = "image_tree_create_neighbor_list";
 string image_tree_add_children_as_immediate_neighbors_name = "image_tree_add_children_as_immediate_neighbors";
@@ -82,18 +82,18 @@ result quad_tree_nullify
 
 /******************************************************************************/
 
-bool quad_tree_is_null
+truth_value quad_tree_is_null
 (
   quad_tree *target
 )
 {
   if (target != NULL) {
-    /* a tree is NULL if its width has not been set. */
-    if (target->w != 0 && target->h != 0) {
-      return false;
+    /* a tree is NULL if its size has not been set */
+    if (target->s != 0) {
+      return FALSE;
     }
   }
-  return true;
+  return TRUE;
 }
 
 /******************************************************************************/
@@ -163,8 +163,7 @@ result quad_forest_init
   /* create tree roots and their trees and blocks */
   /* TODO: init value only once */
   quad_tree_nullify(&new_tree);
-  new_tree.w = tree_max_size;
-  new_tree.h = tree_max_size;
+  new_tree.size = tree_max_size;
   for (row = 0, pos = 0; row < rows; row++) {
     new_tree.y = (uint32)(target->dy + row * tree_max_size);
     new_tree.x = (uint32)(target->dx);
@@ -341,17 +340,17 @@ result quad_forest_nullify
 
 /******************************************************************************/
 
-bool quad_forest_is_null
+truth_value quad_forest_is_null
 (
   quad_forest *target
 )
 {
   if (target != NULL) {
     if (target->original == NULL && target->source == NULL) {
-      return true;
+      return TRUE;
     }
   }
-  return false;
+  return FALSE;
 }
 
 /******************************************************************************/
@@ -458,7 +457,7 @@ result quad_forest_segment_with_deviation
   trees = target->trees.first.next;
   while (trees != &target->trees.last) {
     tree = (quad_tree *)trees->data;
-    if (tree->w >= 2 * min_size && tree->h >= 2 * min_size) {
+    if (tree->size >= 2 * min_size) {
       if (tree->stat.deviation > threshold) {
         CHECK(quad_tree_divide(tree));
       }
@@ -628,8 +627,8 @@ result quad_forest_segment_with_deviation
 
 /******************************************************************************/
 
-/* a macro for calculating neighbor entropy; neighbor should be statistics pointer */
-#define EVALUATE_NEIGHBOR_ENTROPY(neighbor)\
+/* a macro for calculating neighbor overlap; neighbor should be statistics pointer */
+#define EVALUATE_NEIGHBOR_OVERLAP(neighbor)\
   stat = neighbor;\
   nm = stat->mean;\
   ns = fmax(alpha, alpha * stat->deviation);\
@@ -650,14 +649,14 @@ result quad_forest_segment_with_deviation
   }\
   U = (x2max - x1min);\
   if (U < 1) U = 1;\
-  entropy = I / U
+  overlap = I / U
 
-result quad_forest_segment_with_entropy
+result quad_forest_segment_with_overlap
 (
   quad_forest *target,
   integral_value alpha,
-  integral_value diff_tree,
-  integral_value diff_region
+  integral_value threshold_trees,
+  integral_value threshold_segments
 )
 {
   TRY();
@@ -665,22 +664,19 @@ result quad_forest_segment_with_entropy
   quad_tree *tree, *neighbor, *best_neighbor;
   quad_forest_segment *tree_segment, *neighbor_segment;
   statistics *stat;
-  I_value tm, ts, nm, ns, x1, x2, x1min, x1max, x2min, x2max, I, U, entropy, best_entropy;
-  uint32 min_size;
+  I_value tm, ts, nm, ns, x1, x2, x1min, x1max, x2min, x2max, I, U, overlap, best_overlap;
 
   CHECK_POINTER(target);
   CHECK_PARAM(alpha > 0);
-  CHECK_PARAM(diff_tree > 0);
-  CHECK_PARAM(diff_region > 0);
-
-  min_size = target->tree_min_size;
+  CHECK_PARAM(threshold_trees > 0);
+  CHECK_PARAM(threshold_segments > 0);
 
   /* first, divide until all trees are consistent */
   printf("starting to divide trees\n");
   trees = target->trees.first.next;
   while (trees != &target->trees.last) {
     tree = (quad_tree *)trees->data;
-    CHECK(quad_tree_divide_with_entropy(tree, min_size));
+    CHECK(quad_tree_divide_with_overlap(forest, tree, alpha, threshold_trees));
     trees = trees->next;
   }
 
@@ -696,16 +692,16 @@ result quad_forest_segment_with_entropy
       tm = stat->mean;
       ts = fmax(alpha, alpha * stat->deviation);
 
-      best_entropy = 0;
+      best_overlap = 0;
       best_neighbor = NULL;
       /* neighbor n */
       neighbor = tree->n;
       if (neighbor != NULL && neighbor->nw == NULL) {
         neighbor_segment = quad_tree_segment_find(neighbor);
         if (tree_segment != neighbor_segment) {
-          EVALUATE_NEIGHBOR_ENTROPY(&neighbor->stat);
-          if (entropy > best_entropy) {
-            best_entropy = entropy;
+          EVALUATE_NEIGHBOR_OVERLAP(&neighbor->stat);
+          if (overlap > best_overlap) {
+            best_overlap = entropy;
             best_neighbor = neighbor;
           }
         }
@@ -715,9 +711,9 @@ result quad_forest_segment_with_entropy
       if (neighbor != NULL && neighbor->nw == NULL) {
         neighbor_segment = quad_tree_segment_find(neighbor);
         if (tree_segment != neighbor_segment) {
-          EVALUATE_NEIGHBOR_ENTROPY(&neighbor->stat);
-          if (entropy > best_entropy) {
-            best_entropy = entropy;
+          EVALUATE_NEIGHBOR_OVERLAP(&neighbor->stat);
+          if (overlap > best_overlap) {
+            best_overlap = overlap;
             best_neighbor = neighbor;
           }
         }
@@ -727,9 +723,9 @@ result quad_forest_segment_with_entropy
       if (neighbor != NULL && neighbor->nw == NULL) {
         neighbor_segment = quad_tree_segment_find(neighbor);
         if (tree_segment != neighbor_segment) {
-          EVALUATE_NEIGHBOR_ENTROPY(&neighbor->stat);
-          if (entropy > best_entropy) {
-            best_entropy = entropy;
+          EVALUATE_NEIGHBOR_OVERLAP(&neighbor->stat);
+          if (overlap > best_overlap) {
+            best_overlap = overlap;
             best_neighbor = neighbor;
           }
         }
@@ -739,15 +735,15 @@ result quad_forest_segment_with_entropy
       if (neighbor != NULL && neighbor->nw == NULL) {
         neighbor_segment = quad_tree_segment_find(neighbor);
         if (tree_segment != neighbor_segment) {
-          EVALUATE_NEIGHBOR_ENTROPY(&neighbor->stat);
-          if (entropy > best_entropy) {
-            best_entropy = entropy;
+          EVALUATE_NEIGHBOR_OVERLAP(&neighbor->stat);
+          if (overlap > best_overlap) {
+            best_overlap = overlap;
             best_neighbor = neighbor;
           }
         }
       }
 
-      if (best_entropy > diff_tree) {
+      if (best_overlap > threshold_trees) {
         quad_tree_segment_union(tree, best_neighbor);
       }
     }
@@ -771,8 +767,8 @@ result quad_forest_segment_with_entropy
       if (neighbor != NULL && neighbor->nw == NULL) {
         neighbor_segment = quad_tree_segment_find(neighbor);
         if (tree_segment != neighbor_segment) {
-          EVALUATE_NEIGHBOR_ENTROPY(&neighbor_segment->stat);
-          if (entropy > diff_region) {
+          EVALUATE_NEIGHBOR_OVERLAP(&neighbor_segment->stat);
+          if (overlap > threshold_segments) {
             quad_tree_segment_union(tree, neighbor);
           }
         }
@@ -782,8 +778,8 @@ result quad_forest_segment_with_entropy
       if (neighbor != NULL && neighbor->nw == NULL) {
         neighbor_segment = quad_tree_segment_find(neighbor);
         if (tree_segment != neighbor_segment) {
-          EVALUATE_NEIGHBOR_ENTROPY(&neighbor_segment->stat);
-          if (entropy > diff_region) {
+          EVALUATE_NEIGHBOR_OVERLAP(&neighbor_segment->stat);
+          if (overlap > threshold_segments) {
             quad_tree_segment_union(tree, neighbor);
           }
         }
@@ -793,8 +789,8 @@ result quad_forest_segment_with_entropy
       if (neighbor != NULL && neighbor->nw == NULL) {
         neighbor_segment = quad_tree_segment_find(neighbor);
         if (tree_segment != neighbor_segment) {
-          EVALUATE_NEIGHBOR_ENTROPY(&neighbor_segment->stat);
-          if (entropy > diff_region) {
+          EVALUATE_NEIGHBOR_OVERLAP(&neighbor_segment->stat);
+          if (overlap > threshold_segments) {
             quad_tree_segment_union(tree, neighbor);
           }
         }
@@ -804,8 +800,8 @@ result quad_forest_segment_with_entropy
       if (neighbor != NULL && neighbor->nw == NULL) {
         neighbor_segment = quad_tree_segment_find(neighbor);
         if (tree_segment != neighbor_segment) {
-          EVALUATE_NEIGHBOR_ENTROPY(&neighbor_segment->stat);
-          if (entropy > diff_region) {
+          EVALUATE_NEIGHBOR_OVERLAP(&neighbor_segment->stat);
+          if (overlap > threshold_segments) {
             quad_tree_segment_union(tree, neighbor);
           }
         }
@@ -842,7 +838,7 @@ result quad_forest_segment_with_entropy
     printf("segmentation finished, %lu segments found\n", count);
   }
 
-  FINALLY(quad_forest_segment_with_entropy);
+  FINALLY(quad_forest_segment_with_overlap);
   RETURN();
 }
 
@@ -889,8 +885,8 @@ result quad_forest_draw_image
 (
   quad_forest *forest,
   pixel_image *target,
-  uint32 use_segments,
-  uint32 use_colors
+  truth_value use_segments,
+  truth_value use_colors
 )
 {
   TRY();
@@ -913,7 +909,7 @@ result quad_forest_draw_image
   target_data = (byte*)target->data;
 
   /* draw using tree mean value */
-  if (use_segments == 0) {
+  if (IS_FALSE(use_segments)) {
     statistics *stat;
     trees = forest->trees.first.next;
     while (trees != &forest->trees.last) {
@@ -922,8 +918,8 @@ result quad_forest_draw_image
         stat = &tree->stat;
         /* TODO: maybe could create only a grayscale image..? */
         color0 = (byte)stat->mean;
-        width = tree->w;
-        height = tree->h;
+        width = tree->size;
+        height = width;
         row_step = stride - 3 * width;
         target_pos = target_data + tree->y * stride + tree->x * 3;
         for (y = 0; y < height; y++, target_pos += row_step) {
@@ -942,7 +938,7 @@ result quad_forest_draw_image
   }
   else {
     /* draw using region mean value */
-    if (use_colors == 0) {
+    if (IS_FALSE(use_colors)) {
       trees = forest->trees.first.next;
       while (trees != &forest->trees.last) {
         tree = (quad_tree *)trees->data;
@@ -952,8 +948,8 @@ result quad_forest_draw_image
             color0 = (byte)parent->stat.mean;
             color1 = color0;
             color2 = color0;
-            width = tree->w;
-            height = tree->h;
+            width = tree->size;
+            height = width;
             row_step = stride - 3 * width;
             target_pos = target_data + tree->y * stride + tree->x * 3;
             for (y = 0; y < height; y++, target_pos += row_step) {
@@ -982,8 +978,8 @@ result quad_forest_draw_image
             color0 = id->color[0];
             color1 = id->color[1];
             color2 = id->color[2];
-            width = tree->w;
-            height = tree->h;
+            width = tree->size;
+            height = width;
             row_step = stride - 3 * width;
             target_pos = target_data + tree->y * stride + tree->x * 3;
             for (y = 0; y < height; y++, target_pos += row_step) {
@@ -1101,12 +1097,10 @@ result quad_tree_divide
 )
 {
   TRY();
-  uint32 min_size;
 
   CHECK_POINTER(target);
 
-  min_size = forest->min_tree_size * 2;
-  if (target->w >= min_size && target->h >= min_size) {
+  if (target->size >= forest->min_tree_size * 2) {
     if (target->nw == NULL) {
       quad_tree children[4];
 
@@ -1161,7 +1155,7 @@ result quad_tree_divide
 
 /******************************************************************************/
 
-uint32 quad_tree_has_children
+truth_value quad_tree_has_children
 (
   quad_tree *tree
 )
@@ -1169,9 +1163,9 @@ uint32 quad_tree_has_children
   /* there should be no case in which some children would not be set */
   /* the pointers are nullified at init; therefore, check only one */
   if (tree->nw != NULL) {
-    return 1;
+    return TRUE;
   }
-  return 0;
+  return FALSE;
 }
 
 /******************************************************************************/
@@ -1201,19 +1195,17 @@ result quad_tree_get_child_statistics
   }
   /* otherwise have to calculate */
   else {
-    uint32 x, y, w, h;
+    uint32 x, y, size;
     uint32 step, stride, offset;
     statistics *stat;
 
-    w = (uint32)(source->w / 2);
-    h = (uint32)(source->h / 2);
+    size = (uint32)(source->size / 2);
 
-    target[0].w = target[1].w = target[2].w = target[3].w = w;
-    target[0].h = target[1].h = target[2].h = target[3].h = h;
+    target[0].size = target[1].size = target[2].size = target[3].size = size;
 
     /* if the new width is 1 or 0, no need to calculate, use the pixel values */
     /* size 0 should not happen unless someone tries to divide tree with size 1 */
-    if (w < 2 && h < 2) {
+    if (size < 2) {
       pixel_image *original;
       void *data;
       pixel_type type;
@@ -1243,8 +1235,8 @@ result quad_tree_get_child_statistics
       target[0].y = y;
 
       /* ne child block */
-      x = x + w;
-      offset = offset + w * step;
+      x = x + size;
+      offset = offset + size * step;
       mean = cast_pixel_value(original->data, type, offset);
 
       stat = &target[1].stat;
@@ -1259,8 +1251,8 @@ result quad_tree_get_child_statistics
       target[1].y = y;
 
       /* se child block */
-      y = y + h;
-      offset = offset + h * stride;
+      y = y + size;
+      offset = offset + size * stride;
       mean = cast_pixel_value(original->data, type, offset);
 
       stat = &target[3].stat;
@@ -1275,8 +1267,8 @@ result quad_tree_get_child_statistics
       target[3].y = y;
 
       /* sw child block */
-      x = x - w;
-      offset = offset - w * step;
+      x = x - size;
+      offset = offset - size * step;
       mean = cast_pixel_value(original->data, type, offset);
 
       stat = &target[2].stat;
@@ -1296,11 +1288,11 @@ result quad_tree_get_child_statistics
       integral_value *iA, *i2A, N, sum1, sum2, mean, var;
 
       I = &forest->integral;
-      N = (integral_value)(w * h);
+      N = (integral_value)(size * size);
       step = I->step;
       stride = I->stride;
-      hstep = w * step;
-      vstep = h * stride;
+      hstep = size * step;
+      vstep = size * stride;
       dstep = hstep + vstep;
 
       /* nw child block */
@@ -1329,7 +1321,7 @@ result quad_tree_get_child_statistics
       target[0].y = y;
 
       /* ne child block */
-      x = x + w;
+      x = x + size;
       iA = iA + hstep;
       i2A = i2A + hstep;
 
@@ -1351,7 +1343,7 @@ result quad_tree_get_child_statistics
       target[1].y = y;
 
       /* se child block */
-      y = y + h;
+      y = y + size;
       iA = iA + vstep;
       i2A = i2A + vstep;
 
@@ -1373,7 +1365,7 @@ result quad_tree_get_child_statistics
       target[3].y = y;
 
       /* sw child block */
-      x = x - w;
+      x = x - size;
       iA = iA - hstep;
       i2A = i2A - hstep;
 
@@ -1402,12 +1394,12 @@ result quad_tree_get_child_statistics
 
 /******************************************************************************/
 
-result quad_tree_divide_with_entropy
+result quad_tree_divide_with_overlap
 (
   quad_forest *forest,
   quad_tree *target,
   integral_value alpha,
-  integral_value diff
+  integral_value overlap_threshold
 )
 {
   TRY();
@@ -1416,24 +1408,16 @@ result quad_tree_divide_with_entropy
   CHECK_POINTER(target);
 
   if (target->nw == NULL) {
-    uint32 w, h, min_size;
-
-    w = target->w;
-    h = target->h;
-    min_size = forest->tree_min_size;
-    if (w >= min_size*2 && h >= min_size*2) {
+    if (target->size >= forest->tree_min_size * 2) {
       quad_tree children[4];
       uint32 i;
       statistics *stat;
-      integral_value m, s, x1, x2, x1min, x1max, x2min, x2max, I, U, entropy;
+      integral_value m, s, x1, x2, x1min, x1max, x2min, x2max, I, U, overlap;
 
       CHECK(quad_tree_nullify(&children[0]));
       CHECK(quad_tree_nullify(&children[1]));
       CHECK(quad_tree_nullify(&children[2]));
       CHECK(quad_tree_nullify(&children[3]));
-
-      w = (uint32)(w / 2);
-      h = (uint32)(h / 2);
 
       CHECK(quad_tree_get_child_statistics(forest, target, children));
 
@@ -1467,12 +1451,11 @@ result quad_tree_divide_with_entropy
       U = (x2max - x1min);
       if (U < 1) U = 1;
 
-      /*printf("%.3f-%.3f, %.3f-%.3f, %.3f, %.3f\n", x1min,x2max,x1max,x2min,I,U);*/
       /* let us define this entropy measure as intersection divided by union */
-      entropy = I / U;
+      overlap = I / U;
 
       /* if union is more than double the intersection, we have high 'entropy' */
-      if (entropy < diff) {
+      if (overlap < overlap_threshold) {
         quad_tree *child_tree;
         uint32 level;
 
@@ -1511,7 +1494,7 @@ result quad_tree_divide_with_entropy
     }
   }
 
-  FINALLY(quad_tree_divide_with_entropy);
+  FINALLY(quad_tree_divide_with_overlap);
   RETURN();
 }
 
@@ -1600,7 +1583,10 @@ result image_tree_find_all_immediate_neighbors
 
 *******************************************************************************/
 
-void quad_tree_segment_create(quad_tree *tree)
+void quad_tree_segment_create
+(
+  quad_tree *tree
+)
 {
   quad_forest_segment *segment;
   if (tree != NULL) {
@@ -1612,8 +1598,8 @@ void quad_tree_segment_create(quad_tree *tree)
       segment->rank = 0;
       segment->x1 = tree->x;
       segment->y1 = tree->y;
-      segment->x2 = tree->x + tree->w;
-      segment->y2 = tree->y + tree->h;
+      segment->x2 = tree->x + tree->size;
+      segment->y2 = tree->y + tree->size;
       memory_copy((data_pointer)&segment->stat, (data_pointer)&tree->stat, 1, sizeof(statistics));
     /*}*/
   }
@@ -1621,7 +1607,11 @@ void quad_tree_segment_create(quad_tree *tree)
 
 /******************************************************************************/
 
-void quad_tree_segment_union(quad_tree *tree1, quad_tree *tree2)
+void quad_tree_segment_union
+(
+  quad_tree *tree1,
+  quad_tree *tree2
+)
 {
   if (tree1 != NULL && tree2 != NULL) {
     quad_forest_segment *segment1, *segment2;
@@ -1680,8 +1670,13 @@ void quad_tree_segment_union(quad_tree *tree1, quad_tree *tree2)
 }
 
 /******************************************************************************/
+/* a private function that takes a segment instead of a tree                  */
+/* allows using quad_tree in the public interface                             */
 
-quad_forest_segment *segment_find(quad_forest_segment *segment)
+quad_forest_segment *segment_find
+(
+  quad_forest_segment *segment
+)
 {
   if (segment != NULL) {
     if (segment->parent != NULL && segment->parent != segment) {
@@ -1692,7 +1687,12 @@ quad_forest_segment *segment_find(quad_forest_segment *segment)
   return NULL;
 }
 
-quad_forest_segment *quad_tree_segment_find(quad_tree *tree)
+/******************************************************************************/
+
+quad_forest_segment *quad_tree_segment_find
+(
+  quad_tree *tree
+)
 {
   if (tree != NULL) {
     return segment_find(&tree->segment);
@@ -1702,24 +1702,27 @@ quad_forest_segment *quad_tree_segment_find(quad_tree *tree)
 
 /******************************************************************************/
 
-uint32 quad_tree_segment_get(quad_tree *tree)
+uint32 quad_tree_segment_get
+(
+  quad_tree *tree
+)
 {
   return (uint32)quad_tree_segment_find(tree);
 }
 
 /******************************************************************************/
 
-uint32 quad_tree_is_segment_parent
+truth_value quad_tree_is_segment_parent
 (
   quad_tree *tree
 )
 {
   if (tree != NULL) {
     if (quad_tree_segment_find(tree) == &tree->segment) {
-      return true;
+      return TRUE;
     }
   }
-  return false;
+  return FALSE;
 }
 
 /* end of file                                                                */

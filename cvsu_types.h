@@ -84,6 +84,17 @@ typedef unsigned long  uint32;
 typedef float          real32;
 typedef double         real64;
 
+typedef truth_value uint32;
+
+#ifdef FALSE
+#undef FALSE
+#endif
+#define FALSE ((truth_value) 0)
+#ifdef TRUE
+#undef TRUE
+#endif
+#define TRUE ((truth_value) 1)
+
 typedef enum direction_t {
     d_NULL = 0,
     d_N,
