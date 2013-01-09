@@ -922,8 +922,6 @@ result quad_forest_draw_image
         stat = &tree->stat;
         /* TODO: maybe could create only a grayscale image..? */
         color0 = (byte)stat->mean;
-        color1 = color0;
-        color2 = color0;
         width = tree->w;
         height = tree->h;
         row_step = stride - 3 * width;
@@ -932,9 +930,9 @@ result quad_forest_draw_image
           for (x = 0; x < width; x++) {
             *target_pos = color0;
             target_pos++;
-            *target_pos = color1;
+            *target_pos = color0;
             target_pos++;
-            *target_pos = color2;
+            *target_pos = color0;
             *target_pos++;
           }
         }
