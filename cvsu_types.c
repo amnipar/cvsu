@@ -31,64 +31,64 @@
 
 #include "cvsu_types.h"
 
-typedef I_value (*pixel_casting_function)(
+typedef integral_value (*pixel_casting_function)(
   void *data,
   uint32 offset
 );
 
-I_value cast_none(void *data, uint32 offset)
+integral_value cast_none(void *data, uint32 offset)
 {
   return 0;
 }
 
-I_value cast_u8(void *data, uint32 offset)
+integral_value cast_u8(void *data, uint32 offset)
 {
-  return (I_value)*(((byte *)data) + offset);
+  return (integral_value)*(((byte *)data) + offset);
 }
 
-I_value cast_s8(void *data, uint32 offset)
+integral_value cast_s8(void *data, uint32 offset)
 {
-  return (I_value)*(((char *)data) + offset);
+  return (integral_value)*(((char *)data) + offset);
 }
 
-I_value cast_u16(void *data, uint32 offset)
+integral_value cast_u16(void *data, uint32 offset)
 {
-  return (I_value)*(((uint16 *)data) + offset);
+  return (integral_value)*(((uint16 *)data) + offset);
 }
 
-I_value cast_s16(void *data, uint32 offset)
+integral_value cast_s16(void *data, uint32 offset)
 {
-  return (I_value)*(((sint16 *)data) + offset);
+  return (integral_value)*(((sint16 *)data) + offset);
 }
 
-I_value cast_u32(void *data, uint32 offset)
+integral_value cast_u32(void *data, uint32 offset)
 {
-  return (I_value)*(((uint32 *)data) + offset);
+  return (integral_value)*(((uint32 *)data) + offset);
 }
 
-I_value cast_s32(void *data, uint32 offset)
+integral_value cast_s32(void *data, uint32 offset)
 {
-  return (I_value)*(((sint32 *)data) + offset);
+  return (integral_value)*(((sint32 *)data) + offset);
 }
 /*
-I_value cast_u64(void *data, uint32 offset)
+integral_value cast_u64(void *data, uint32 offset)
 {
-  return (I_value)*(((uint64 *)data) + offset);
+  return (integral_value)*(((uint64 *)data) + offset);
 }
 
-I_value cast_s64(void *data, uint32 offset)
+integral_value cast_s64(void *data, uint32 offset)
 {
-  return (I_value)*(((sint64 *)data) + offset);
+  return (integral_value)*(((sint64 *)data) + offset);
 }
 */
-I_value cast_f32(void *data, uint32 offset)
+integral_value cast_f32(void *data, uint32 offset)
 {
-  return (I_value)*(((real32 *)data) + offset);
+  return (integral_value)*(((real32 *)data) + offset);
 }
 
-I_value cast_f64(void *data, uint32 offset)
+integral_value cast_f64(void *data, uint32 offset)
 {
-  return (I_value)*(((real64 *)data) + offset);
+  return (integral_value)*(((real64 *)data) + offset);
 }
 
 pixel_casting_function casts[] =
@@ -108,7 +108,7 @@ pixel_casting_function casts[] =
     &cast_f64
   };
 
-I_value cast_pixel_value
+integral_value cast_pixel_value
 (
   void *data,
   pixel_type type,

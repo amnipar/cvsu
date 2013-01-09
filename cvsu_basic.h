@@ -149,6 +149,14 @@ result pixel_image_nullify(
 );
 
 /**
+* Everything that can be nullified should be able to tell if it's null.
+*/
+truth_value pixel_image_is_null
+(
+  pixel_image *target
+);
+
+/**
  * Creates a subset, or region of interest (ROI) of an image.
  * Useful for processing only a part of an image.
  * Does not copy the data, no need to deallocate with @see pixel_image_destroy.
@@ -380,7 +388,7 @@ result scale_up(
 /**
  * Safely get the pixel value at the given position.
  */
-I_value pixel_image_get_value(
+integral_value pixel_image_get_value(
   pixel_image *target,
   uint32 x,
   uint32 y
@@ -391,7 +399,7 @@ I_value pixel_image_get_value(
  * Useful when multiple values are needed and the bound checking etc. can be
  * done once for the whole patch.
  */
-I_value pixel_image_unsafe_get_value(
+integral_value pixel_image_unsafe_get_value(
   void *data,
   uint32 x,
   uint32 y,
@@ -425,7 +433,7 @@ image_rect pixel_image_create_rect(
  * Finds the minimum intensity value in the given image region.
  * The region may be adjusted near the border to ensure the region is valid.
  */
-I_value pixel_image_find_min_byte(
+integral_value pixel_image_find_min_byte(
   pixel_image *target,
   sint32 x,
   sint32 y,
@@ -438,7 +446,7 @@ I_value pixel_image_find_min_byte(
 * Finds the maximum intensity value in the given image region.
 * The region may be adjusted near the border to ensure the region is valid.
 */
-I_value pixel_image_find_max_byte(
+integral_value pixel_image_find_max_byte(
   pixel_image *target,
   sint32 x,
   sint32 y,
@@ -451,7 +459,7 @@ I_value pixel_image_find_max_byte(
 * Calculates the intensity mean in the given image region.
 * The region may be adjusted near the border to ensure the region is valid.
 */
-I_value pixel_image_calculate_mean_byte(
+integral_value pixel_image_calculate_mean_byte(
   pixel_image *target,
   sint32 x,
   sint32 y,
@@ -464,7 +472,7 @@ I_value pixel_image_calculate_mean_byte(
 * Calculates the intensity variance in the given image region.
 * The region may be adjusted near the border to ensure the region is valid.
 */
-I_value pixel_image_calculate_variance_byte(
+integral_value pixel_image_calculate_variance_byte(
   pixel_image *target,
   sint32 x,
   sint32 y,

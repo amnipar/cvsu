@@ -218,7 +218,7 @@ quad_forest *quad_forest_alloc()
 
 void quad_forest_free
 (
-  image_tree_forest *forest
+  quad_forest *forest
 )
 {
   TRY();
@@ -229,7 +229,7 @@ void quad_forest_free
     CHECK(memory_deallocate((data_pointer *)&forest));
   }
 
-  FINALLY(image_tree_forest_free);
+  FINALLY(quad_forest_free);
 }
 
 /******************************************************************************/
@@ -245,6 +245,7 @@ result quad_forest_create
   TRY();
 
   CHECK_POINTER(target);
+
   CHECK_FALSE(pixel_image_is_null(source));
 
   CHECK_PARAM(source->type == p_U8);
@@ -255,7 +256,7 @@ result quad_forest_create
 
   target->original = source;
 
-  CHECK(image_tree_forest_init(target, tree_max_size, tree_min_size));
+  CHECK(quad_forest_init(target, tree_max_size, tree_min_size));
 
   FINALLY(quad_forest_create);
   RETURN();
@@ -276,7 +277,7 @@ result quad_forest_reload
   CHECK_POINTER(target->original);
 
   if (target->tree_max_size != tree_max_size || target->tree_min_size != tree_min_size) {
-    image_tree_forest_init(target, tree_max_size, tree_min_size);
+    quad_forest_init(target, tree_max_size, tree_min_size);
   }
 
   FINALLY(quad_forest_reload);
@@ -329,7 +330,6 @@ result quad_forest_nullify
   target->tree_min_size = 0;
   target->dx = 0;
   target->dy = 0;
-  target->type = b_NONE;
   CHECK(list_nullify(&target->trees));
   target->last_root_tree = NULL;
   target->roots = NULL;
@@ -459,7 +459,7 @@ result quad_forest_segment_with_deviation
     tree = (quad_tree *)trees->data;
     if (tree->size >= 2 * min_size) {
       if (tree->stat.deviation > threshold) {
-        CHECK(quad_tree_divide(tree));
+        CHECK(quad_tree_divide(target, tree));
       }
     }
     trees = trees->next;
@@ -664,7 +664,7 @@ result quad_forest_segment_with_overlap
   quad_tree *tree, *neighbor, *best_neighbor;
   quad_forest_segment *tree_segment, *neighbor_segment;
   statistics *stat;
-  I_value tm, ts, nm, ns, x1, x2, x1min, x1max, x2min, x2max, I, U, overlap, best_overlap;
+  integral_value tm, ts, nm, ns, x1, x2, x1min, x1max, x2min, x2max, I, U, overlap, best_overlap;
 
   CHECK_POINTER(target);
   CHECK_PARAM(alpha > 0);
@@ -676,7 +676,7 @@ result quad_forest_segment_with_overlap
   trees = target->trees.first.next;
   while (trees != &target->trees.last) {
     tree = (quad_tree *)trees->data;
-    CHECK(quad_tree_divide_with_overlap(forest, tree, alpha, threshold_trees));
+    CHECK(quad_tree_divide_with_overlap(target, tree, alpha, threshold_trees));
     trees = trees->next;
   }
 
@@ -701,7 +701,7 @@ result quad_forest_segment_with_overlap
         if (tree_segment != neighbor_segment) {
           EVALUATE_NEIGHBOR_OVERLAP(&neighbor->stat);
           if (overlap > best_overlap) {
-            best_overlap = entropy;
+            best_overlap = overlap;
             best_neighbor = neighbor;
           }
         }
@@ -875,7 +875,7 @@ result quad_forest_get_segments
     trees = trees->next;
   }
 
-  FINALLY(quad_forest_get_regions);
+  FINALLY(quad_forest_get_segments);
   RETURN();
 }
 
@@ -971,13 +971,13 @@ result quad_forest_draw_image
     else {
       trees = forest->trees.first.next;
       while (trees != &forest->trees.last) {
-        tree = (image_tree *)trees->data;
+        tree = (quad_tree *)trees->data;
         if (tree->nw == NULL) {
           parent = quad_tree_segment_find(tree);
           if (parent != NULL) {
-            color0 = id->color[0];
-            color1 = id->color[1];
-            color2 = id->color[2];
+            color0 = parent->color[0];
+            color1 = parent->color[1];
+            color2 = parent->color[2];
             width = tree->size;
             height = width;
             row_step = stride - 3 * width;
@@ -1100,7 +1100,7 @@ result quad_tree_divide
 
   CHECK_POINTER(target);
 
-  if (target->size >= forest->min_tree_size * 2) {
+  if (target->size >= forest->tree_min_size * 2) {
     if (target->nw == NULL) {
       quad_tree children[4];
 
@@ -1109,7 +1109,7 @@ result quad_tree_divide
       CHECK(quad_tree_nullify(&children[2]));
       CHECK(quad_tree_nullify(&children[3]));
 
-      CHECK(quad_tree_get_child_statistics(target, children));
+      CHECK(quad_tree_get_child_statistics(forest, target, children));
       {
         quad_tree *child_tree;
         uint32 level;
@@ -1149,7 +1149,7 @@ result quad_tree_divide
     }
   }
 
-  FINALLY(image_tree_divide);
+  FINALLY(quad_tree_divide);
   RETURN();
 }
 
@@ -1463,28 +1463,28 @@ result quad_tree_divide_with_overlap
 
         /* nw child block */
         CHECK(list_append_reveal_data(&forest->trees, (pointer)&children[0], (pointer*)&child_tree));
-        image_tree_class_create(child_tree);
+        quad_tree_segment_create(child_tree);
         child_tree->parent = target;
         child_tree->level = level;
         target->nw = child_tree;
 
         /* ne child block */
         CHECK(list_append_reveal_data(&forest->trees, (pointer)&children[1], (pointer*)&child_tree));
-        image_tree_class_create(child_tree);
+        quad_tree_segment_create(child_tree);
         child_tree->parent = target;
         child_tree->level = level;
         target->ne = child_tree;
 
         /* sw child block */
         CHECK(list_append_reveal_data(&forest->trees, (pointer)&children[2], (pointer*)&child_tree));
-        image_tree_class_create(child_tree);
+        quad_tree_segment_create(child_tree);
         child_tree->parent = target;
         child_tree->level = level;
         target->sw = child_tree;
 
         /* se child block */
         CHECK(list_append_reveal_data(&forest->trees, (pointer)&children[3], (pointer*)&child_tree));
-        image_tree_class_create(child_tree);
+        quad_tree_segment_create(child_tree);
         child_tree->parent = target;
         child_tree->level = level;
         target->se = child_tree;

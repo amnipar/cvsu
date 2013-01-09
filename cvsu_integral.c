@@ -36,6 +36,8 @@
 
 #include <math.h>
 
+double fmax (double __x, double __y);
+
 /******************************************************************************/
 /* constants for storing the function names                                   */
 /* used in error reporting macros                                             */
@@ -59,10 +61,10 @@ string small_integral_image_update_block_name = "small_integral_image_update_blo
 /* constants for lookup tables                                                */
 
 bool tables_initialized = false;
-I_value pixel_squared[256];
+integral_value pixel_squared[256];
 #ifdef INTEGRAL_IMAGE_HIGHER_ORDER_STATISTICS
-I_value pixel_cubed[256];
-I_value pixel_fourth[256];
+integral_value pixel_cubed[256];
+integral_value pixel_fourth[256];
 #endif
 SI_2_t small_pixel_squared[256];
 
@@ -73,10 +75,10 @@ void init_tables()
   if (!tables_initialized) {
     uint32 i;
     for (i = 0; i < 256; i++) {
-      pixel_squared[i] = (I_value)(i * i);
+      pixel_squared[i] = (integral_value)(i * i);
 #ifdef INTEGRAL_IMAGE_HIGHER_ORDER_STATISTICS
-      pixel_cubed[i] = (I_value)(i * i * i);
-      pixel_fourth[i] = (I_value)(i * i * i * i);
+      pixel_cubed[i] = (integral_value)(i * i * i);
+      pixel_fourth[i] = (integral_value)(i * i * i * i);
 #endif
       small_pixel_squared[i] = (SI_2_t)(i * i);
     }
@@ -349,7 +351,7 @@ result integral_image_update
   source = target->original;
   /* TODO: handle multiple channels, and higher powers */
   {
-    INTEGRAL_IMAGE_UPDATE_DEFINE_VARIABLES(I_value, I_value);
+    INTEGRAL_IMAGE_UPDATE_DEFINE_VARIABLES(integral_value, integral_value);
     uint32 intensity, width, height, x, y, h, v, d;
     SINGLE_DISCONTINUOUS_IMAGE_VARIABLES(source, byte);
 
@@ -361,8 +363,8 @@ result integral_image_update
 
     width = target->width;
     height = target->height;
-    I_1_data = (I_value *)target->I_1.data;
-    I_2_data = (I_value *)target->I_2.data;
+    I_1_data = (integral_value *)target->I_1.data;
+    I_2_data = (integral_value *)target->I_2.data;
 
     /* horizontal offset for integral images */
     h = target->step;
@@ -456,7 +458,7 @@ Notes:
 -this takes into account multi-channel images
 */
 
-I_value integral_image_calculate_mean
+integral_value integral_image_calculate_mean
   (
   integral_image *target,
   sint32 x,
@@ -467,23 +469,23 @@ I_value integral_image_calculate_mean
   )
 {
   image_rect rect;
-  I_value *iA, sum;
+  integral_value *iA, sum;
 
   rect = integral_image_create_rect(target, x, y, dx, dy, offset);
   if (rect.valid == 0) {
     return 0;
   }
   else {
-    iA = ((I_value *)target->I_1.data) + rect.offset;
+    iA = ((integral_value *)target->I_1.data) + rect.offset;
     sum = *(iA + rect.vstep + rect.hstep) + *iA - *(iA + rect.hstep) - *(iA + rect.vstep);
-    return sum / ((I_value)rect.N);
+    return sum / ((integral_value)rect.N);
   }
 }
 
 /**
  * Use integral_image to calculate intensity variance within the given area.
  */
-double integral_image_calculate_variance
+integral_value integral_image_calculate_variance
   (
   integral_image *target,
   sint32 x,
@@ -494,18 +496,18 @@ double integral_image_calculate_variance
   )
 {
   image_rect rect;
-  I_value *iA, *i2A, mean, sum2, var;
+  integral_value *iA, *i2A, mean, sum2, var;
 
   rect = integral_image_create_rect(target, x, y, dx, dy, offset);
   if (rect.valid == 0) {
     return 0;
   }
   else {
-    iA = ((I_value *)target->I_1.data) + rect.offset;
-    i2A = ((I_value *)target->I_2.data) + rect.offset;
-    mean = (*(iA + rect.vstep + rect.hstep) + *iA - *(iA + rect.hstep) - *(iA + rect.vstep)) / ((I_value)rect.N);
+    iA = ((integral_value *)target->I_1.data) + rect.offset;
+    i2A = ((integral_value *)target->I_2.data) + rect.offset;
+    mean = (*(iA + rect.vstep + rect.hstep) + *iA - *(iA + rect.hstep) - *(iA + rect.vstep)) / ((integral_value)rect.N);
     sum2 = *(i2A + rect.vstep + rect.hstep) + *i2A - *(i2A + rect.hstep) - *(i2A + rect.vstep);
-    var = (sum2 / ((I_value)rect.N)) - mean*mean;
+    var = (sum2 / ((integral_value)rect.N)) - mean*mean;
     if (var < 0) var = 0;
     return var;
   }
@@ -525,7 +527,7 @@ void integral_image_calculate_statistics(
   )
 {
   image_rect rect;
-  I_value *iA, *i2A, N, sum, sum2, mean, var;
+  integral_value *iA, *i2A, N, sum, sum2, mean, var;
 
   statistics_init(stat);
   rect = integral_image_create_rect(target, x, y, dx, dy, offset);
@@ -533,9 +535,9 @@ void integral_image_calculate_statistics(
     return;
   }
   else {
-    iA = ((I_value *)target->I_1.data) + rect.offset;
-    i2A = ((I_value *)target->I_2.data) + rect.offset;
-    N = ((I_value)rect.N);
+    iA = ((integral_value *)target->I_1.data) + rect.offset;
+    i2A = ((integral_value *)target->I_2.data) + rect.offset;
+    N = ((integral_value)rect.N);
     sum = *(iA + rect.vstep + rect.hstep) + *iA - *(iA + rect.hstep) - *(iA + rect.vstep);
     sum2 = *(i2A + rect.vstep + rect.hstep) + *i2A - *(i2A + rect.hstep) - *(i2A + rect.vstep);
     mean = sum / N;
@@ -558,13 +560,13 @@ result integral_image_threshold_sauvola
   integral_image *source,
   pixel_image *target,
   uint32 radius,
-  I_value k
+  integral_value k
 )
 {
   TRY();
   pixel_image temp_mean, temp_dev;
   byte *source_data, *target_data, source_value, target_value, t;
-  I_value *mean_data, *dev_data, mean, dev, dev_max;
+  integral_value *mean_data, *dev_data, mean, dev, dev_max;
   uint32 x, y, width, height, step, stride, offset, size, pos;
   statistics stat;
 
@@ -585,8 +587,8 @@ result integral_image_threshold_sauvola
 
   source_data = (byte *)source->original->data;
   target_data = (byte *)target->data;
-  mean_data = (I_value *)temp_mean.data;
-  dev_data = (I_value *)temp_dev.data;
+  mean_data = (integral_value *)temp_mean.data;
+  dev_data = (integral_value *)temp_dev.data;
   size = 2 * radius + 1;
 
   dev_max = 0;
@@ -631,12 +633,12 @@ result integral_image_threshold_feng
   integral_image *source,
   pixel_image *target,
   uint32 radius1,
-  I_value k
+  integral_value k
 )
 {
   TRY();
   byte *source_data, *target_data, source_value, target_value, t;
-  I_value min, mean, dev1, dev2, as, a1, a2, a3, k1, k2, g, asg;
+  integral_value min, mean, dev1, dev2, as, a1, a2, a3, k1, k2, g, asg;
   uint32 x, y, width, height, step, stride, offset, radius2, size1, size2, pos;
   statistics stat;
 

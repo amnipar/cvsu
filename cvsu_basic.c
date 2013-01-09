@@ -329,6 +329,21 @@ result pixel_image_nullify(
 
 /******************************************************************************/
 
+truth_value pixel_image_is_null
+(
+  pixel_image *target
+)
+{
+  if (target != NULL) {
+    if (target->data == NULL) {
+      return TRUE;
+    }
+  }
+  return FALSE;
+}
+
+/******************************************************************************/
+
 result pixel_image_convert(
     pixel_image *source,
     pixel_image *target
@@ -1980,7 +1995,7 @@ image_rect pixel_image_create_rect
 
 /******************************************************************************/
 
-I_value pixel_image_find_min_byte
+integral_value pixel_image_find_min_byte
 (
   pixel_image *target,
   sint32 x,
@@ -1991,7 +2006,7 @@ I_value pixel_image_find_min_byte
 )
 {
   image_rect rect;
-  I_value min, value;
+  integral_value min, value;
 
   rect = pixel_image_create_rect(target, x, y, dx, dy, offset);
   if (rect.valid == 0) {
@@ -2001,7 +2016,7 @@ I_value pixel_image_find_min_byte
     IMAGE_RECT_VARIABLES(target, byte, rect);
     min = 255;
     FOR_IMAGE_RECT_BEGIN(target, rect)
-      value = (I_value)PIXEL_VALUE(target);
+      value = (integral_value)PIXEL_VALUE(target);
       if (value < min) min = value;
     FOR_IMAGE_RECT_END(target);
     return min;
@@ -2010,7 +2025,7 @@ I_value pixel_image_find_min_byte
 
 /******************************************************************************/
 
-I_value pixel_image_find_max_byte
+integral_value pixel_image_find_max_byte
 (
   pixel_image *target,
   sint32 x,
@@ -2021,7 +2036,7 @@ I_value pixel_image_find_max_byte
 )
 {
   image_rect rect;
-  I_value max, value;
+  integral_value max, value;
 
   rect = pixel_image_create_rect(target, x, y, dx, dy, offset);
   if (rect.valid == 0) {
@@ -2031,7 +2046,7 @@ I_value pixel_image_find_max_byte
     IMAGE_RECT_VARIABLES(target, byte, rect);
     max = 0;
     FOR_IMAGE_RECT_BEGIN(target, rect)
-      value = (I_value)PIXEL_VALUE(target);
+      value = (integral_value)PIXEL_VALUE(target);
       if (value > max) max = value;
     FOR_IMAGE_RECT_END(target);
     return max;
@@ -2040,7 +2055,7 @@ I_value pixel_image_find_max_byte
 
 /******************************************************************************/
 
-I_value pixel_image_calculate_mean_byte
+integral_value pixel_image_calculate_mean_byte
 (
   pixel_image *target,
   sint32 x,
@@ -2051,7 +2066,7 @@ I_value pixel_image_calculate_mean_byte
 )
 {
   image_rect rect;
-  I_value sum, mean;
+  integral_value sum, mean;
 
   rect = pixel_image_create_rect(target, x, y, dx, dy, offset);
   if (rect.valid == 0) {
@@ -2061,16 +2076,16 @@ I_value pixel_image_calculate_mean_byte
     IMAGE_RECT_VARIABLES(target, byte, rect);
     sum = 0;
     FOR_IMAGE_RECT_BEGIN(target, rect)
-      sum += (I_value)PIXEL_VALUE(target);
+      sum += (integral_value)PIXEL_VALUE(target);
     FOR_IMAGE_RECT_END(target);
-    mean = sum / ((I_value)rect.N);
+    mean = sum / ((integral_value)rect.N);
     return mean;
   }
 }
 
 /******************************************************************************/
 
-I_value pixel_image_calculate_variance_byte
+integral_value pixel_image_calculate_variance_byte
 (
   pixel_image *target,
   sint32 x,
@@ -2081,7 +2096,7 @@ I_value pixel_image_calculate_variance_byte
 )
 {
   image_rect rect;
-  I_value value, sum1, sum2, N, mean, variance;
+  integral_value value, sum1, sum2, N, mean, variance;
 
   rect = pixel_image_create_rect(target, x, y, dx, dy, offset);
   if (rect.valid == 0) {
@@ -2092,11 +2107,11 @@ I_value pixel_image_calculate_variance_byte
     sum1 = 0;
     sum2 = 0;
     FOR_IMAGE_RECT_BEGIN(target, rect)
-      value = (I_value)PIXEL_VALUE(target);
+      value = (integral_value)PIXEL_VALUE(target);
       sum1 += value;
       sum2 += value*value;
     FOR_IMAGE_RECT_END(target);
-    N = (I_value)rect.N;
+    N = (integral_value)rect.N;
     mean = sum1 / N;
     variance = sum2 / N - mean*mean;
     return variance;

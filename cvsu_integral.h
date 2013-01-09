@@ -204,7 +204,7 @@ image_rect integral_image_create_rect(
 /**
  * Uses the integral_image to calculate intensity mean within the given region.
  */
-I_value integral_image_calculate_mean(
+integral_value integral_image_calculate_mean(
   /** the integral_image used for calculations */
   integral_image *target,
   /** left coordinate of the rectangle, can be negative */
@@ -223,7 +223,7 @@ I_value integral_image_calculate_mean(
  * Uses the integral_image to calculate intensity variance within the given
  * region.
  */
-double integral_image_calculate_variance(
+integral_value integral_image_calculate_variance(
   integral_image *target,
   sint32 x,
   sint32 y,

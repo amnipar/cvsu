@@ -84,7 +84,7 @@ typedef unsigned long  uint32;
 typedef float          real32;
 typedef double         real64;
 
-typedef truth_value uint32;
+typedef uint32 truth_value;
 
 #ifdef FALSE
 #undef FALSE
@@ -275,7 +275,7 @@ typedef uint32 SI_2_t;
 /**
  * Useful for getting a pixel value in a generic type
  */
-I_value cast_pixel_value(void *data, pixel_type type, uint32 offset);
+integral_value cast_pixel_value(void *data, pixel_type type, uint32 offset);
 
 typedef sint8 edge_strength;
 
@@ -357,28 +357,28 @@ typedef struct image_block_t {
  */
 typedef struct statistics_t
 {
-  I_value N;
-  I_value sum;
-  I_value sum2;
+  integral_value N;
+  integral_value sum;
+  integral_value sum2;
 #ifdef INTEGRAL_IMAGE_HIGHER_ORDER_STATISTICS
-  I_value sum3;
-  I_value sum4;
+  integral_value sum3;
+  integral_value sum4;
 #endif
-  I_value mean;
-  I_value variance;
-  I_value deviation;
+  integral_value mean;
+  integral_value variance;
+  integral_value deviation;
 #ifdef INTEGRAL_IMAGE_HIGHER_ORDER_STATISTICS
-  I_value skewness;
-  I_value kurtosis;
+  integral_value skewness;
+  integral_value kurtosis;
 #endif
 } statistics;
 
 typedef struct consistency_t
 {
-  I_value row_mean;
-  I_value row_deviation;
-  I_value col_mean;
-  I_value col_deviation;
+  integral_value row_mean;
+  integral_value row_deviation;
+  integral_value col_mean;
+  integral_value col_deviation;
 } consistency;
 
 void statistics_init(statistics *stat);
