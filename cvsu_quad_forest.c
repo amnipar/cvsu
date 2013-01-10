@@ -59,6 +59,7 @@ string quad_forest_get_segments_name = "quad_forest_get_regions";
 string quad_forest_draw_image_name = "quad_forest_draw_image";
 string quad_tree_divide_name = "quad_tree_divide";
 string quad_tree_get_child_statistics_name = "quad_tree_get_child_statistics";
+string quad_tree_get_neighborhood_statistics_name = "quad_tree_get_neighborhood_statistics";
 string quad_tree_divide_with_overlap_name = "quad_tree_divide_with_overlap";
 /*
 string image_tree_create_neighbor_list_name = "image_tree_create_neighbor_list";
@@ -1389,6 +1390,33 @@ result quad_tree_get_child_statistics
   }
 
   FINALLY(quad_tree_get_child_statistics);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result quad_tree_get_neighborhood_statistics
+(
+  quad_forest *forest,
+  quad_tree *tree,
+  statistics *target,
+  integral_value multiplier
+)
+{
+  TRY();
+  sint32 x, y, s;
+  
+  CHECK_POINTER(forest);
+  CHECK_POINTER(tree);
+  CHECK_PARAM(multiplier > 0);
+  
+  x = tree->x - (uint32)(multiplier * tree->size);
+  y = tree->y - (uint32)(multiplier * tree->size);
+  s = tree->size + (uint32)(2 * multiplier * tree->size);
+  
+  integral_image_calculate_statistics(&forest->integral, target, x, y, s, s, 0);
+  
+  FINALLY(quad_tree_get_neighborhood_statistics);
   RETURN();
 }
 

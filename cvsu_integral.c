@@ -559,14 +559,18 @@ result integral_image_threshold_sauvola
 (
   integral_image *source,
   pixel_image *target,
+  truth_value invert,
   uint32 radius,
-  integral_value k
+  integral_value k,
+  truth_value calculate_max,
+  integral_value max,
+  truth_value use_mean
 )
 {
   TRY();
   pixel_image temp_mean, temp_dev;
-  byte *source_data, *target_data, source_value, target_value, t;
-  integral_value *mean_data, *dev_data, mean, dev, dev_max;
+  byte *source_data, *target_data, source_value, t, value1, value2;
+  integral_value *mean_data, *dev_data, mean, dev, R, dev_max, dev_sum;
   uint32 x, y, width, height, step, stride, offset, size, pos;
   statistics stat;
 
@@ -582,6 +586,15 @@ result integral_image_threshold_sauvola
   stride = target->stride;
   offset = target->offset;
 
+  if (IS_TRUE(invert)) {
+    value1 = 0;
+    value2 = 255;
+  }
+  else {
+    value1 = 255;
+    value2 = 0;
+  }
+
   CHECK(pixel_image_create(&temp_mean, p_I, target->format, width, height, step, stride));
   CHECK(pixel_image_create(&temp_dev, p_I, target->format, width, height, step, stride));
 
@@ -591,34 +604,67 @@ result integral_image_threshold_sauvola
   dev_data = (integral_value *)temp_dev.data;
   size = 2 * radius + 1;
 
-  dev_max = 0;
-  for (y = 0; y < height; y++) {
-    pos = y * stride;
-    for (x = 0; x < width; x++, pos += step) {
-      integral_image_calculate_statistics(source, &stat, x-radius, y-radius, size, size, offset);
-      mean_data[pos] = stat.mean;
-      dev = stat.deviation;
-      dev_data[pos] = dev;
-      if (dev > dev_max) dev_max = dev;
+  if (IS_FALSE(calculate_max)) {
+    R = max;
+    for (y = 0; y < height; y++) {
+      pos = y * stride;
+      for (x = 0; x < width; x++, pos += step) {
+        source_value = source_data[pos];
+        integral_image_calculate_statistics(source, &stat, x-radius, y-radius, size, size, offset);
+        t = (byte)floor(stat.mean * (1.0 + k * ((stat.deviation / R) - 1.0)));
+        if (source_value > t) {
+          target_data[pos] = value1;
+        }
+        else {
+          target_data[pos] = value2;
+        }
+      }
+    }
+  }
+  else {
+    if (IS_FALSE(use_mean)) {
+      dev_max = 0;
+      for (y = 0; y < height; y++) {
+        pos = y * stride;
+        for (x = 0; x < width; x++, pos += step) {
+          integral_image_calculate_statistics(source, &stat, x-radius, y-radius, size, size, offset);
+          mean_data[pos] = stat.mean;
+          dev = stat.deviation;
+          dev_data[pos] = dev;
+          if (dev > dev_max) dev_max = dev;
+        }
+      }
+      R = dev_max;
+    }
+    else {
+      dev_sum = 0;
+      for (y = 0; y < height; y++) {
+        pos = y * stride;
+        for (x = 0; x < width; x++, pos += step) {
+          integral_image_calculate_statistics(source, &stat, x-radius, y-radius, size, size, offset);
+          mean_data[pos] = stat.mean;
+          dev_sum += dev_data[pos] = stat.deviation;
+        }
+      }
+      R = dev_sum / ((integral_value)(width*height));
+    }
+    for (y = 0; y < height; y++) {
+      pos = y * stride;
+      for (x = 0; x < width; x++, pos += step) {
+        source_value = source_data[pos];
+        mean = mean_data[pos];
+        dev = dev_data[pos];
+        t = (byte)floor(mean * (1.0 + k * ((dev / R) - 1.0)));
+        if (source_value > t) {
+          target_data[pos] = value1;
+        }
+        else {
+          target_data[pos] = value2;
+        }
+      }
     }
   }
 
-  for (y = 0; y < height; y++) {
-    pos = y * stride;
-    for (x = 0; x < width; x++, pos += step) {
-      source_value = source_data[pos];
-      mean = mean_data[pos];
-      dev = dev_data[pos];
-      t = (byte)floor(mean * (1.0 + k * ((dev / dev_max) - 1.0)));
-      if (source_value > t) {
-        target_value = 255;
-      }
-      else {
-        target_value = 0;
-      }
-      target_data[pos] = target_value;
-    }
-  }
 
   FINALLY(integral_image_threshold_sauvola);
   pixel_image_destroy(&temp_mean);
@@ -632,12 +678,15 @@ result integral_image_threshold_feng
 (
   integral_image *source,
   pixel_image *target,
+  truth_value invert,
   uint32 radius1,
-  integral_value k
+  integral_value multiplier,
+  truth_value estimate_min,
+  integral_value alpha
 )
 {
   TRY();
-  byte *source_data, *target_data, source_value, target_value, t;
+  byte *source_data, *target_data, source_value, t, value1, value2;
   integral_value min, mean, dev1, dev2, as, a1, a2, a3, k1, k2, g, asg;
   uint32 x, y, width, height, step, stride, offset, radius2, size1, size2, pos;
   statistics stat;
@@ -659,22 +708,34 @@ result integral_image_threshold_feng
   k1 = 0.25;
   k2 = 0.04;
 
+  if (IS_TRUE(invert)) {
+    value1 = 0;
+    value2 = 255;
+  }
+  else {
+    value1 = 255;
+    value2 = 0;
+  }
 
   source_data = (byte *)source->original->data;
   target_data = (byte *)target->data;
   size1 = 2 * radius1 + 1;
-  radius2 = 3 * radius1;
+  radius2 = (uint32)(multiplier * radius1);
   size2 = 2 * radius2 + 1;
 
   for (y = 0; y < height; y++) {
     pos = y * stride;
     for (x = 0; x < width; x++, pos += step) {
       source_value = source_data[pos];
-      min = pixel_image_find_min_byte(source->original, x-radius1, y-radius1, size1, size1, offset);
       integral_image_calculate_statistics(source, &stat, x-radius1, y-radius1, size1, size1, offset);
       mean = stat.mean;
       dev1 = stat.deviation;
-      integral_image_calculate_statistics;
+      if (IS_TRUE(estimate_min)) {
+        min = fmax(0, mean - alpha * dev1);
+      }
+      else {
+        min = pixel_image_find_min_byte(source->original, x-radius1, y-radius1, size1, size1, offset);
+      }
       dev2 = sqrt(integral_image_calculate_variance(source, x-radius2, y-radius2, size2, size2, offset));
       as = dev1 / fmax(1,dev2);
       asg = pow(as, g);
@@ -682,12 +743,11 @@ result integral_image_threshold_feng
       a3 = k2 * asg;
       t = (byte)floor((1 - a1) * mean + a2 * as * (mean - min) + a3 * min);
       if (source_value > t) {
-        target_value = 255;
+        target_data[pos] = value1;
       }
       else {
-        target_value = 0;
+        target_data[pos] = value2;
       }
-      target_data[pos] = target_value;
     }
   }
 

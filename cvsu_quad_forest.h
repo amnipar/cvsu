@@ -329,6 +329,24 @@ result quad_tree_get_child_statistics
 );
 
 /**
+ * Generates the statistics from a neighborhoood around a quad_tree. Tree size
+ * is multiplied by the multiplier value, and a region of that size is added
+ * around the region covered by the tree; in other words, the neighborhood size
+ * will be tree->size + 2 * multiplier * tree->size.
+ */
+result quad_tree_get_neighborhood_statistics
+(
+  /** The quad_forest where the tree resides. */
+  quad_forest *forest,
+  /** The quad_tree around which the neighborhood is generated. */
+  quad_tree *tree,
+  /** The statistics structure where the result will be stored. */
+  statistics *target,
+  /** The tree->size multiplier for generating the neighborhood. */
+  integral_value multiplier
+);
+
+/**
  * Calculates the child tree statistics but divides the tree only if the
  * entropy measure of the children is higher than the given threshold.
  * Higher values will require higher overlap to divide.
