@@ -150,12 +150,13 @@ result edge_block_image_new_block(
  * Pointer to a function that calculates edgel strength based on sums acquired
  * from integral images.
  */
-typedef long (*edgel_criterion_calculator)(
-    uint32 N,
-    uint32 sum1,
-    uint32 sum2,
-    double sumsqr1,
-    double sumsqr2
+typedef integral_value (*edgel_criterion_calculator)
+(
+  integral_value N,
+  integral_value sum1,
+  integral_value sum2,
+  integral_value sumsqr1,
+  integral_value sumsqr2
 );
 
 /**
@@ -241,12 +242,13 @@ result edge_image_overlay_to_grey8(
  * the difference of mean intensity values and the variance of the values.
  */
 
-long edgel_fisher_unsigned(
-    uint32 N,
-    uint32 sum1,
-    uint32 sum2,
-    double sumsqr1,
-    double sumsqr2
+integral_value edgel_fisher_unsigned
+(
+  integral_value N,
+  integral_value sum1,
+  integral_value sum2,
+  integral_value sumsqr1,
+  integral_value sumsqr2
 );
 
 /**
@@ -256,12 +258,13 @@ long edgel_fisher_unsigned(
  * variances is used below the line.
  */
 
-long edgel_fisher_signed(
-    uint32 N,
-    uint32 sum1,
-    uint32 sum2,
-    double sumsqr1,
-    double sumsqr2
+integral_value edgel_fisher_signed
+(
+  integral_value N,
+  integral_value sum1,
+  integral_value sum2,
+  integral_value sumsqr1,
+  integral_value sumsqr2
 );
 
 /**

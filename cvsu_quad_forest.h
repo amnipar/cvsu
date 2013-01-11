@@ -363,6 +363,22 @@ result quad_tree_divide_with_overlap
   integral_value overlap_threshold
 );
 
+/**
+ * Calculates the cumulative edge response in the region covered by a quad_tree
+ * using integral images.
+ */
+result quad_tree_get_edge_response
+(
+  /** The quad_forest where the tree resides. */
+  quad_forest *forest,
+  /** The quad_tree where the edge response is calculated. */
+  quad_tree *target,
+  /** Pointer where the horizontal scanning result is stored. */
+  integral_value *dx,
+  /** Pointer where the vertical scanning result is stored. */
+  integral_value *dy
+);
+
 /*
  * Creates and initializes a neighbor list
  *

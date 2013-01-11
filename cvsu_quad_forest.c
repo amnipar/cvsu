@@ -61,6 +61,7 @@ string quad_tree_divide_name = "quad_tree_divide";
 string quad_tree_get_child_statistics_name = "quad_tree_get_child_statistics";
 string quad_tree_get_neighborhood_statistics_name = "quad_tree_get_neighborhood_statistics";
 string quad_tree_divide_with_overlap_name = "quad_tree_divide_with_overlap";
+string quad_tree_get_edge_response_name = "quad_tree_get_edge_response";
 /*
 string image_tree_create_neighbor_list_name = "image_tree_create_neighbor_list";
 string image_tree_add_children_as_immediate_neighbors_name = "image_tree_add_children_as_immediate_neighbors";
@@ -1405,17 +1406,17 @@ result quad_tree_get_neighborhood_statistics
 {
   TRY();
   sint32 x, y, s;
-  
+
   CHECK_POINTER(forest);
   CHECK_POINTER(tree);
   CHECK_PARAM(multiplier > 0);
-  
+
   x = tree->x - (uint32)(multiplier * tree->size);
   y = tree->y - (uint32)(multiplier * tree->size);
   s = tree->size + (uint32)(2 * multiplier * tree->size);
-  
+
   integral_image_calculate_statistics(&forest->integral, target, x, y, s, s, 0);
-  
+
   FINALLY(quad_tree_get_neighborhood_statistics);
   RETURN();
 }
@@ -1525,6 +1526,82 @@ result quad_tree_divide_with_overlap
   FINALLY(quad_tree_divide_with_overlap);
   RETURN();
 }
+
+/******************************************************************************/
+
+result quad_tree_get_edge_response
+(
+  quad_forest *forest,
+  quad_tree *tree,
+  integral_value *dx,
+  integral_value *dy
+)
+{
+  TRY();
+  uint32 width, length, row, col, endrow, endcol;
+  integral_value hsum, vsum;
+  INTEGRAL_IMAGE_2BOX_VARIABLES();
+
+  CHECK_POINTER(forest);
+  CHECK_POINTER(tree);
+
+  width = tree->size;
+  length = (uint32)(width / 2);
+  stride = forest->integral.stride;
+  endcol = tree->x + width;
+  endrow = tree->y + width;
+
+  /* calculate horizontal cumulative gradient */
+  {
+    INTEGRAL_IMAGE_INIT_HBOX(&forest->integral, length, width);
+    col = tree->x - length;
+    endcol = col + width;
+    hsum = 0;
+    if (col >= 0 && endcol + length < forest->integral.width) {
+      iA1 = I_1_data + tree->y * stride + col;
+      i2A1 = I_2_data + tree->y * stride + col;
+      while (col < endcol) {
+        sum1 = INTEGRAL_IMAGE_SUM_1();
+        sum2 = INTEGRAL_IMAGE_SUM_2();
+        sumsqr1 = INTEGRAL_IMAGE_SUMSQR_1();
+        sumsqr2 = INTEGRAL_IMAGE_SUMSQR_2();
+        g = edgel_fisher_unsigned(N, sum1, sum2, sumsqr1, sumsqr2);
+        hsum += g;
+        col++;
+        iA1++;
+        i2A1++;
+      }
+    }
+    *dx = hsum;
+  }
+  /* calculate vertical cumulative gradient */
+  {
+    INTEGRAL_IMAGE_INIT_VBOX(&forest->integral, length, width);
+    row = tree->y - length;
+    endrow = row + width;
+    vsum = 0;
+    if (row >= 0 && endrow + length < forest->integral.height) {
+      iA1 = I_1_data + row * stride + tree->x;
+      i2A1 = I_2_data + row * stride + tree->x;
+      while (row < endrow) {
+        sum1 = INTEGRAL_IMAGE_SUM_1();
+        sum2 = INTEGRAL_IMAGE_SUM_2();
+        sumsqr1 = INTEGRAL_IMAGE_SUMSQR_1();
+        sumsqr2 = INTEGRAL_IMAGE_SUMSQR_2();
+        g = edgel_fisher_unsigned(N, sum1, sum2, sumsqr1, sumsqr2);
+        vsum += g;
+        row++;
+        iA1 += stride;
+        i2A1 += stride;
+      }
+    }
+    *dy = vsum;
+  }
+
+  FINALLY(quad_tree_get_edge_response);
+  RETURN();
+}
+
 
 /*******************************************************************************
 

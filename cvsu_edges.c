@@ -243,7 +243,7 @@ result edge_image_update(
 {
     TRY();
     bool rising, falling;
-    uint32 width, height, stride, target_stride;
+    uint32 width, height, /*stride,*/ target_stride;
     pixel_image *edges;
 
     CHECK_POINTER(target);
@@ -256,7 +256,7 @@ result edge_image_update(
 
     width = target->I.width;
     height = target->I.height;
-    stride = target->I.stride;
+    /*stride = target->I.stride;*/
 
     /* calculate vertical edges */
     edges = &target->vedges;
@@ -525,45 +525,47 @@ result edge_image_overlay_to_grey8(
 
 /******************************************************************************/
 
-long edgel_fisher_unsigned(
-    uint32 N,
-    uint32 sum1,
-    uint32 sum2,
-    double sumsqr1,
-    double sumsqr2
-    )
+integral_value edgel_fisher_unsigned
+(
+  integral_value N,
+  integral_value sum1,
+  integral_value sum2,
+  integral_value sumsqr1,
+  integral_value sumsqr2
+)
 {
-    double mean1, mean2, diff, var1, var2, var;
-    mean1 = (double)sum1 / (double)N;
-    mean2 = (double)sum2 / (double)N;
-    diff = mean2 - mean1;
-    diff = diff * diff;
-    var1 = (sumsqr1 / (double)N) - (mean1 * mean1);
-    var2 = (sumsqr2 / (double)N) - (mean2 * mean2);
-    var = var1 + var2;
-    if (var < 1) var = 1;
-    return (long)(diff / var);
+  integral_value mean1, mean2, diff, var1, var2, var;
+  mean1 = sum1 / N;
+  mean2 = sum2 / N;
+  diff = mean2 - mean1;
+  diff = diff * diff;
+  var1 = (sumsqr1 / N) - (mean1 * mean1);
+  var2 = (sumsqr2 / N) - (mean2 * mean2);
+  var = var1 + var2;
+  if (var < 1) var = 1;
+  return (diff / var);
 }
 
 /******************************************************************************/
 
-long edgel_fisher_signed(
-    uint32 N,
-    uint32 sum1,
-    uint32 sum2,
-    double sumsqr1,
-    double sumsqr2
-    )
+integral_value edgel_fisher_signed
+(
+  integral_value N,
+  integral_value sum1,
+  integral_value sum2,
+  integral_value sumsqr1,
+  integral_value sumsqr2
+)
 {
-    double mean1, mean2, var1, var2, var;
+  integral_value mean1, mean2, var1, var2, var;
 
-    mean1 = (double)sum1 / (double)N;
-    mean2 = (double)sum2 / (double)N;
-    var1 = (sumsqr1 / (double)N) - (mean1 * mean1);
-    var2 = (sumsqr2 / (double)N) - (mean2 * mean2);
-    var = var1 + var2;
-    if (var < 1) var = 1;
-    return (long)((mean2 - mean1) / sqrt(var));
+  mean1 = sum1 / N;
+  mean2 = sum2 / N;
+  var1 = (sumsqr1 / N) - (mean1 * mean1);
+  var2 = (sumsqr2 / N) - (mean2 * mean2);
+  var = var1 + var2;
+  if (var < 1) var = 1;
+  return ((mean2 - mean1) / sqrt(var));
 }
 
 /******************************************************************************/
