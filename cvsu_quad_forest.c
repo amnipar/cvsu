@@ -56,6 +56,7 @@ string quad_forest_update_name = "quad_forest_update";
 string quad_forest_segment_with_deviation_name = "quad_forest_segment_with_deviation";
 string quad_forest_segment_with_overlap_name = "quad_forest_segment_with_overlap";
 string quad_forest_get_segments_name = "quad_forest_get_regions";
+string quad_forest_get_segment_mask_name = "quad_forest_get_segment_mask";
 string quad_forest_draw_image_name = "quad_forest_draw_image";
 string quad_tree_divide_name = "quad_tree_divide";
 string quad_tree_get_child_statistics_name = "quad_tree_get_child_statistics";
@@ -882,6 +883,122 @@ result quad_forest_get_segments
 }
 
 /******************************************************************************/
+/* private function for drawing recursively the trees into the bitmask        */
+
+void quad_forest_draw_segments
+(
+  quad_tree *tree,
+  pixel_image *target,
+  uint32 dx,
+  uint32 dy,
+  quad_forest_segment **segments,
+  uint32 segment_count,
+  truth_value invert
+)
+{
+  if (tree->nw != NULL) {
+    quad_forest_draw_segments(tree->nw, target, dx, dy, segments, segment_count, invert);
+    quad_forest_draw_segments(tree->ne, target, dx, dy, segments, segment_count, invert);
+    quad_forest_draw_segments(tree->sw, target, dx, dy, segments, segment_count, invert);
+    quad_forest_draw_segments(tree->se, target, dx, dy, segments, segment_count, invert);
+  }
+  else {
+    uint32 i, x, y, width, height, row_step;
+    byte *target_pos, value;
+    quad_forest_segment *segment;
+    
+    if (IS_FALSE(invert)) {
+      value = 255;
+    }
+    else {
+      value = 0;
+    }
+    segment = quad_tree_segment_find(tree);
+    
+    /* loop through all segments, if the tree belongs to one of them, draw the pixels */
+    for (i = 0; i < segment_count; i++) {
+      if (segment == segments[i]) {
+        width = tree->size;
+        height = width;
+        row_step = target->stride - width;
+        target_pos = (byte*)target->data + (tree->y - dy) * target->stride + (tree->x - dx);
+        for (y = 0; y < height; y++, target_pos += row_step) {
+          for (x = 0; x < width; x++) {
+            *target_pos = value;
+            target_pos++;
+          }
+        }
+        break;
+      }
+    }
+  }
+}
+
+/******************************************************************************/
+
+result quad_forest_get_segment_mask
+(
+  quad_forest *forest,
+  pixel_image *target,
+  quad_forest_segment **segments,
+  uint32 segment_count,
+  truth_value invert
+)
+{
+  TRY();
+  uint32 i, x1, y1, x2, y2, width, height;
+  
+  CHECK_POINTER(forest);
+  CHECK_POINTER(target);
+  CHECK_POINTER(segments);
+  CHECK_PARAM(segment_count > 0);
+  
+  /*
+  loop all root trees under the segment bounding box
+  recurse to leaf trees
+  if parent is one of the segments, draw pixels to image
+  */
+  /* find bounding box of the collection */
+  x1 = segments[0]->x1;
+  y1 = segments[0]->y1;
+  x2 = segments[0]->x2;
+  y2 = segments[0]->y2;
+  for (i = 1; i < segment_count; i++) {
+    if (segments[i]->x1 < x1) x1 = segments[i]->x1;
+    if (segments[i]->y1 < y1) y1 = segments[i]->y1;
+    if (segments[i]->x2 > x2) x2 = segments[i]->x2;
+    if (segments[i]->y2 > y2) y2 = segments[i]->y2;
+  }
+  
+  /* create the image */
+  width = x2 - x1;
+  height = y2 - y1;
+  CHECK(pixel_image_create(target, p_U8, GREY, width, height, 1, width));
+  
+  {
+    uint32 pos, col, firstcol, lastcol, row, firstrow, lastrow;
+
+    /* determine which root trees are within the bounding box */
+    col = (uint32)((x1 - forest->dx) / forest->tree_max_size);
+    lastcol = (uint32)((x2 - forest->dx) / forest->tree_max_size);
+    row = (uint32)((y1 - forest->dy) / forest->tree_max_size);
+    lastrow = (uint32)((y2 - forest->dy) / forest->tree_max_size);
+    
+    /* loop through the root trees */
+    for (row = firstrow; row <= lastrow; row++) {
+      pos = row * forest->cols + firstcol;
+      for (col = firstcol; col <= lastcol; col++) {
+        quad_forest_draw_segments(forest->roots[pos], target, x1, y1, segments, segment_count, invert);
+        pos++;
+      }
+    }
+  }
+  
+  FINALLY(quad_forest_get_segment_mask);
+  RETURN();
+}
+
+/******************************************************************************/
 
 result quad_forest_draw_image
 (
@@ -1538,26 +1655,25 @@ result quad_tree_get_edge_response
 )
 {
   TRY();
-  uint32 width, length, row, col, endrow, endcol;
+  uint32 box_width, box_length, endrow, endcol;
+  sint32 row, col;
   integral_value hsum, vsum;
   INTEGRAL_IMAGE_2BOX_VARIABLES();
 
   CHECK_POINTER(forest);
   CHECK_POINTER(tree);
 
-  width = tree->size;
-  length = (uint32)(width / 2);
-  stride = forest->integral.stride;
-  endcol = tree->x + width;
-  endrow = tree->y + width;
+  box_width = tree->size;
+  box_length = (uint32)(box_width / 2);
 
   /* calculate horizontal cumulative gradient */
   {
-    INTEGRAL_IMAGE_INIT_HBOX(&forest->integral, length, width);
-    col = tree->x - length;
-    endcol = col + width;
+    INTEGRAL_IMAGE_INIT_HBOX(&forest->integral, box_length, box_width);
+    col = tree->x - box_length;
+    endcol = col + box_width;
     hsum = 0;
-    if (col >= 0 && endcol + length < forest->integral.width) {
+    /*printf("col %lu endcol %lu ", col, endcol);*/
+    if (col >= 0 && endcol + box_width + 1 <= forest->integral.width) {
       iA1 = I_1_data + tree->y * stride + col;
       i2A1 = I_2_data + tree->y * stride + col;
       while (col < endcol) {
@@ -1573,14 +1689,16 @@ result quad_tree_get_edge_response
       }
     }
     *dx = hsum;
+    /*printf("dx %.3f ", hsum);*/
   }
   /* calculate vertical cumulative gradient */
   {
-    INTEGRAL_IMAGE_INIT_VBOX(&forest->integral, length, width);
-    row = tree->y - length;
-    endrow = row + width;
+    INTEGRAL_IMAGE_INIT_VBOX(&forest->integral, box_length, box_width);
+    row = tree->y - box_length;
+    endrow = row + box_width;
     vsum = 0;
-    if (row >= 0 && endrow + length < forest->integral.height) {
+    /*printf("row %lu endrow %lu ", row, endrow);*/
+    if (row >= 0 && endrow + box_width + 1 <= forest->integral.height) {
       iA1 = I_1_data + row * stride + tree->x;
       i2A1 = I_2_data + row * stride + tree->x;
       while (row < endrow) {
@@ -1596,6 +1714,7 @@ result quad_tree_get_edge_response
       }
     }
     *dy = vsum;
+    /*printf("dy %.3f ", vsum);*/
   }
 
   FINALLY(quad_tree_get_edge_response);
