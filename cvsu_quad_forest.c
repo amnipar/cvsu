@@ -893,28 +893,22 @@ void quad_forest_draw_segments
   uint32 dy,
   quad_forest_segment **segments,
   uint32 segment_count,
-  truth_value invert
+  byte value
 )
 {
   if (tree->nw != NULL) {
-    quad_forest_draw_segments(tree->nw, target, dx, dy, segments, segment_count, invert);
-    quad_forest_draw_segments(tree->ne, target, dx, dy, segments, segment_count, invert);
-    quad_forest_draw_segments(tree->sw, target, dx, dy, segments, segment_count, invert);
-    quad_forest_draw_segments(tree->se, target, dx, dy, segments, segment_count, invert);
+    quad_forest_draw_segments(tree->nw, target, dx, dy, segments, segment_count, value);
+    quad_forest_draw_segments(tree->ne, target, dx, dy, segments, segment_count, value);
+    quad_forest_draw_segments(tree->sw, target, dx, dy, segments, segment_count, value);
+    quad_forest_draw_segments(tree->se, target, dx, dy, segments, segment_count, value);
   }
   else {
     uint32 i, x, y, width, height, row_step;
-    byte *target_pos, value;
+    byte *target_pos;
     quad_forest_segment *segment;
-    
-    if (IS_FALSE(invert)) {
-      value = 255;
-    }
-    else {
-      value = 0;
-    }
+
     segment = quad_tree_segment_find(tree);
-    
+
     /* loop through all segments, if the tree belongs to one of them, draw the pixels */
     for (i = 0; i < segment_count; i++) {
       if (segment == segments[i]) {
@@ -947,12 +941,13 @@ result quad_forest_get_segment_mask
 {
   TRY();
   uint32 i, x1, y1, x2, y2, width, height;
-  
+  byte value;
+
   CHECK_POINTER(forest);
   CHECK_POINTER(target);
   CHECK_POINTER(segments);
   CHECK_PARAM(segment_count > 0);
-  
+
   /*
   loop all root trees under the segment bounding box
   recurse to leaf trees
@@ -969,12 +964,23 @@ result quad_forest_get_segment_mask
     if (segments[i]->x2 > x2) x2 = segments[i]->x2;
     if (segments[i]->y2 > y2) y2 = segments[i]->y2;
   }
-  
+
   /* create the image */
   width = x2 - x1;
   height = y2 - y1;
   CHECK(pixel_image_create(target, p_U8, GREY, width, height, 1, width));
-  
+
+  if (IS_FALSE(invert)) {
+    CHECK(pixel_image_clear(target));
+    value = 255;
+  }
+  else {
+    SINGLE_CONTINUOUS_IMAGE_VARIABLES(target, byte);
+    FOR_CONTINUOUS_IMAGE(target)
+      PIXEL_VALUE(target) = 255;
+    value = 0;
+  }
+
   {
     uint32 pos, col, firstcol, lastcol, row, firstrow, lastrow;
 
@@ -983,17 +989,17 @@ result quad_forest_get_segment_mask
     lastcol = (uint32)((x2 - forest->dx) / forest->tree_max_size);
     row = (uint32)((y1 - forest->dy) / forest->tree_max_size);
     lastrow = (uint32)((y2 - forest->dy) / forest->tree_max_size);
-    
+
     /* loop through the root trees */
     for (row = firstrow; row <= lastrow; row++) {
       pos = row * forest->cols + firstcol;
       for (col = firstcol; col <= lastcol; col++) {
-        quad_forest_draw_segments(forest->roots[pos], target, x1, y1, segments, segment_count, invert);
+        quad_forest_draw_segments(forest->roots[pos], target, x1, y1, segments, segment_count, value);
         pos++;
       }
     }
   }
-  
+
   FINALLY(quad_forest_get_segment_mask);
   RETURN();
 }

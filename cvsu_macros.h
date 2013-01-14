@@ -119,7 +119,7 @@ finally:
   image##_pos = rect.offset
 
 #define SINGLE_CONTINUOUS_IMAGE_VARIABLES(image, type)\
-    const type *image##_data;\
+    type *image##_data;\
     uint32 image##_pos, image##_step, image##_size;\
     image##_data = (type *)image->data;\
     image##_step = image->step;\
@@ -310,7 +310,7 @@ finally:
   image##_pos = image##_data + rect.offset
 
 #define SINGLE_CONTINUOUS_IMAGE_VARIABLES(image, type)\
-    const type *image##_data, *image##_pos, *image_end;\
+    type *image##_data, *image##_pos, *image##_end;\
     uint32 image##_step;\
     image##_data = (type *)image->data;\
     image##_end = image##_data + image->size;\
