@@ -296,7 +296,7 @@ result quad_forest_destroy
 {
   TRY();
   uint32 pos, size;
-
+  
   CHECK_POINTER(target);
 
   CHECK(list_destroy(&target->trees));

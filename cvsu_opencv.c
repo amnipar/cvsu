@@ -199,7 +199,7 @@ result pixel_image_create_from_file
                                      src->width, src->height, channels, src->widthStep));
 
   FINALLY(pixel_image_create_from_file);
-  cvReleaseImageHeader(&src);
+  cvReleaseImage(&src);
   RETURN();
 }
 

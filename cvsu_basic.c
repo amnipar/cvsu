@@ -270,7 +270,39 @@ result pixel_image_create_from_data(
 
     size = height * stride;
 
-    CHECK(pixel_image_init(target, data, type, format, 0, 0, width, height, 0, step, stride, size));
+    CHECK(pixel_image_create(target, type, format, width, height, step, stride));
+    {
+      size_t pixel_size;
+      switch (type) {
+      case p_U8:
+          pixel_size = sizeof(uint8);
+          break;
+      case p_S8:
+          pixel_size = sizeof(sint8);
+          break;
+      case p_U16:
+          pixel_size = sizeof(uint16);
+          break;
+      case p_S16:
+          pixel_size = sizeof(sint16);
+          break;
+      case p_U32:
+          pixel_size = sizeof(uint32);
+          break;
+      case p_S32:
+          pixel_size = sizeof(sint32);
+          break;
+      case p_F32:
+          pixel_size = sizeof(real32);
+          break;
+      case p_F64:
+          pixel_size = sizeof(real64);
+          break;
+      default:
+          ERROR(BAD_TYPE);
+      }
+      memory_copy(target->data, data, size, pixel_size);
+    }
     /*target->own_data = 1;*/
 
     FINALLY(pixel_image_create_from_data);
@@ -284,7 +316,7 @@ result pixel_image_destroy(
     )
 {
     TRY();
-
+    
     CHECK_POINTER(target);
 
     /* don't delete if target has a parent, that's parent's responsibility */
