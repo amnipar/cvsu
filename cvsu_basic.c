@@ -243,7 +243,7 @@ result pixel_image_create(
     }
 
     CHECK(pixel_image_init(target, data, type, format, 0, 0, width, height, 0, step, stride, size));
-    target->own_data = 1;
+    /*target->own_data = 1;*/
 
     FINALLY(pixel_image_create);
     RETURN();
@@ -271,7 +271,7 @@ result pixel_image_create_from_data(
     size = height * stride;
 
     CHECK(pixel_image_init(target, data, type, format, 0, 0, width, height, 0, step, stride, size));
-    target->own_data = 0;
+    /*target->own_data = 1;*/
 
     FINALLY(pixel_image_create_from_data);
     RETURN();
@@ -288,7 +288,7 @@ result pixel_image_destroy(
     CHECK_POINTER(target);
 
     /* don't delete if target has a parent, that's parent's responsibility */
-    if (target->parent == NULL && target->own_data != 0) {
+    if (target->parent == NULL) { /* && target->own_data != 0 */
         CHECK(memory_deallocate((data_pointer *)&target->data));
     }
     CHECK(memory_deallocate((data_pointer *)&target->rows));
@@ -311,7 +311,7 @@ result pixel_image_nullify(
     target->parent = NULL;
     target->data = NULL;
     target->rows = NULL;
-    target->own_data = 0;
+    /*target->own_data = 0;*/
     target->type = p_NONE;
     target->format = NONE;
     target->dx = 0;

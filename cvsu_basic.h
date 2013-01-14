@@ -53,7 +53,6 @@ typedef struct pixel_image_t {
 #elif (IMAGE_ACCESS_METHOD == IMAGE_ACCESS_BY_POINTER)
     data_pointer *rows;
 #endif
-    uint32 own_data;
     /** Data type used to store pixel values in the @see data array. */
     pixel_type type;
     /** Format used to store data for one pixel. */
