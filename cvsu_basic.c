@@ -719,12 +719,28 @@ result pixel_image_clear(
 
 /******************************************************************************/
 
-void skip_whitespace(FILE *file)
+void skip_single_whitespace(FILE *file)
 {
   char c;
 
   c = getc(file);
-  while (c == ' ' || c == '\t' || c == '\v' || c == '\f' || c == '\n' || c == '\r') {
+  if (c != ' ' && c != '\t' && c != '\n' && c != '\r') {
+    ungetc(c, file);
+  }
+  if (c == '\r') {
+    c = getc(file);
+    if (c != '\n') {
+      ungetc(c, file);
+    }
+  }
+}
+
+void skip_all_whitespace(FILE *file)
+{
+  char c;
+
+  c = getc(file);
+  while (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
     c = getc(file);
   }
   ungetc(c, file);
@@ -790,7 +806,7 @@ result pixel_image_read
   CHECK_POINTER(target);
   CHECK_POINTER(source);
 
-  printf("Starting to read image '%s'...\n", source);
+  /*printf("Starting to read image '%s'...\n", source);*/
   file = fopen(source, "rb");
   if (file == NULL) {
     printf("Error: opening pnm file failed\n");
@@ -814,9 +830,9 @@ result pixel_image_read
     format = RGB;
   }
 
-  skip_whitespace(file);
+  skip_all_whitespace(file);
   skip_comment(file);
-  skip_whitespace(file);
+  skip_all_whitespace(file);
 
   value = read_number(file);
   if (value < 0) {
@@ -825,9 +841,9 @@ result pixel_image_read
   }
   width = (unsigned)value;
 
-  skip_whitespace(file);
+  skip_all_whitespace(file);
   skip_comment(file);
-  skip_whitespace(file);
+  skip_all_whitespace(file);
 
   value = read_number(file);
   if (value < 0) {
@@ -836,15 +852,18 @@ result pixel_image_read
   }
   height = (unsigned)value;
 
-  skip_whitespace(file);
-  skip_comment(file);
-  skip_whitespace(file);
 
   if (format == MONO) {
+    /* allowing only one whitespace after header and no comment */
+    skip_single_whitespace(file);
     maxval = 1;
     type = p_U8;
   }
   else {
+    skip_all_whitespace(file);
+    skip_comment(file);
+    skip_all_whitespace(file);
+
     value = read_number(file);
     if (value < 0) {
       printf("Error: reading maxval of pnm failed\n");
@@ -863,9 +882,10 @@ result pixel_image_read
       type = p_U32;
     }
 
-    skip_whitespace(file);
-    skip_comment(file);
-    skip_whitespace(file);
+    skip_single_whitespace(file);
+    /* allowing only single whitespace after header and no comment */
+    /*skip_comment(file);*/
+    /*skip_whitespace(file);*/
   }
 
   if (format == RGB) {
@@ -897,7 +917,7 @@ result pixel_image_read
 
         target_data[pos] = (byte)value;
         pos++;
-        skip_whitespace(file);
+        skip_single_whitespace(file);
       }
     }
     else
@@ -921,7 +941,7 @@ result pixel_image_read
 
         target_data[pos] = (uint16)value;
         pos++;
-        skip_whitespace(file);
+        skip_single_whitespace(file);
       }
     }
     else {
@@ -939,7 +959,7 @@ result pixel_image_read
 
         target_data[pos] = (uint32)value;
         pos++;
-        skip_whitespace(file);
+        skip_single_whitespace(file);
       }
     }
   }
@@ -948,11 +968,12 @@ result pixel_image_read
     read_count = fread(target->data, sizeof(byte), target->size, file);
     if (read_count != target->size) {
       printf("Error: reading pnm image data failed\n");
+      printf("%d %lu\n", read_count, target->size);
       ERROR(INPUT_ERROR);
     }
   }
 
-  printf("Successfully read type %lu image of size (%lu x %lu)\n", number, width, height);
+  /*printf("Successfully read type %lu image of size (%lu x %lu)\n", number, width, height);*/
 
   FINALLY(pixel_image_read);
   fclose(file);
