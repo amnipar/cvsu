@@ -141,7 +141,7 @@ result quad_forest_init
     if (!list_is_null(&target->trees)) {
       CHECK(list_destroy(&target->trees));
     }
-    CHECK(list_create(&target->trees, 32 * size, sizeof(quad_tree), 1));
+    CHECK(list_create(&target->trees, 20 * size, sizeof(quad_tree), 1));
   }
   else {
     rows = target->rows;
@@ -469,7 +469,7 @@ result quad_forest_segment_with_deviation
   }
 
   /* then, make a union of those neighboring regions that are consistent together */
-  printf("starting to merge trees\n");
+  /*printf("starting to merge trees\n");*/
   trees = target->trees.first.next;
   while (trees != &target->trees.last) {
     tree = (quad_tree *)trees->data;
@@ -538,7 +538,7 @@ result quad_forest_segment_with_deviation
   }
 
   /* then, merge those neighboring regions that are consistent together */
-  printf("starting to merge regions\n");
+  /*printf("starting to merge regions\n");*/
   trees = target->trees.first.next;
   while (trees != &target->trees.last) {
     tree = (quad_tree *)trees->data;
@@ -621,7 +621,7 @@ result quad_forest_segment_with_deviation
       trees = trees->next;
     }
     target->segments = count;
-    printf("segmentation finished, %lu segments found\n", count);
+    /*printf("segmentation finished, %lu segments found\n", count);*/
   }
 
   FINALLY(quad_forest_segment_with_deviation);
@@ -675,7 +675,7 @@ result quad_forest_segment_with_overlap
   CHECK_PARAM(threshold_segments > 0);
 
   /* first, divide until all trees are consistent */
-  printf("starting to divide trees\n");
+  /*printf("starting to divide trees\n");*/
   trees = target->trees.first.next;
   while (trees != &target->trees.last) {
     tree = (quad_tree *)trees->data;
@@ -684,7 +684,7 @@ result quad_forest_segment_with_overlap
   }
 
   /* then, merge each tree with the best neighboring tree that is close enough */
-  printf("starting to merge trees\n");
+  /*printf("starting to merge trees\n");*/
   trees = target->trees.first.next;
   while (trees != &target->trees.last) {
     tree = (quad_tree *)trees->data;
@@ -754,7 +754,7 @@ result quad_forest_segment_with_overlap
   }
 
   /* then, merge those neighboring regions that are consistent together */
-  printf("starting to merge regions\n");
+  /*printf("starting to merge regions\n");*/
   trees = target->trees.first.next;
   while (trees != &target->trees.last) {
     tree = (quad_tree *)trees->data;
@@ -838,7 +838,7 @@ result quad_forest_segment_with_overlap
       trees = trees->next;
     }
     target->segments = count;
-    printf("segmentation finished, %lu segments found\n", count);
+    /*printf("segmentation finished, %lu segments found\n", count);*/
   }
 
   FINALLY(quad_forest_segment_with_overlap);
