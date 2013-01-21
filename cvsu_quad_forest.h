@@ -291,6 +291,19 @@ result quad_forest_get_segment_mask
 );
 
 /**
+* Collects all trees contained in a list of segments and draws them on a
+* pixel_image with a red color (TODO: add parameter for selecting color)
+*/
+result quad_forest_highlight_segments
+(
+  quad_forest *forest,
+  pixel_image *target,
+  quad_forest_segment **segments,
+  uint32 segment_count,
+  byte color[4]
+);
+
+/**
  * Draws an image of the quad_forest structure using the current division and
  * segment info. Each quad_tree will be painted as a square with uniform color,
  * using the color assigned to the segment parent, the mean value from the

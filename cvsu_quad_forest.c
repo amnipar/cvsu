@@ -57,6 +57,7 @@ string quad_forest_segment_with_deviation_name = "quad_forest_segment_with_devia
 string quad_forest_segment_with_overlap_name = "quad_forest_segment_with_overlap";
 string quad_forest_get_segments_name = "quad_forest_get_regions";
 string quad_forest_get_segment_mask_name = "quad_forest_get_segment_mask";
+string quad_forest_highlight_segments_name = "quad_forest_highlight_segments";
 string quad_forest_draw_image_name = "quad_forest_draw_image";
 string quad_tree_divide_name = "quad_tree_divide";
 string quad_tree_get_child_statistics_name = "quad_tree_get_child_statistics";
@@ -141,7 +142,7 @@ result quad_forest_init
     if (!list_is_null(&target->trees)) {
       CHECK(list_destroy(&target->trees));
     }
-    CHECK(list_create(&target->trees, 20 * size, sizeof(quad_tree), 1));
+    CHECK(list_create(&target->trees, 24 * size, sizeof(quad_tree), 1));
   }
   else {
     rows = target->rows;
@@ -296,7 +297,7 @@ result quad_forest_destroy
 {
   TRY();
   uint32 pos, size;
-  
+
   CHECK_POINTER(target);
 
   CHECK(list_destroy(&target->trees));
@@ -893,14 +894,15 @@ void quad_forest_draw_segments
   uint32 dy,
   quad_forest_segment **segments,
   uint32 segment_count,
-  byte value
+  byte color[4],
+  uint32 channels
 )
 {
   if (tree->nw != NULL) {
-    quad_forest_draw_segments(tree->nw, target, dx, dy, segments, segment_count, value);
-    quad_forest_draw_segments(tree->ne, target, dx, dy, segments, segment_count, value);
-    quad_forest_draw_segments(tree->sw, target, dx, dy, segments, segment_count, value);
-    quad_forest_draw_segments(tree->se, target, dx, dy, segments, segment_count, value);
+    quad_forest_draw_segments(tree->nw, target, dx, dy, segments, segment_count, color, channels);
+    quad_forest_draw_segments(tree->ne, target, dx, dy, segments, segment_count, color, channels);
+    quad_forest_draw_segments(tree->sw, target, dx, dy, segments, segment_count, color, channels);
+    quad_forest_draw_segments(tree->se, target, dx, dy, segments, segment_count, color, channels);
   }
   else {
     uint32 i, x, y, width, height, row_step;
@@ -910,19 +912,43 @@ void quad_forest_draw_segments
     segment = quad_tree_segment_find(tree);
 
     /* loop through all segments, if the tree belongs to one of them, draw the pixels */
-    for (i = 0; i < segment_count; i++) {
-      if (segment == segments[i]) {
-        width = tree->size;
-        height = width;
-        row_step = target->stride - width;
-        target_pos = (byte*)target->data + (tree->y - dy) * target->stride + (tree->x - dx);
-        for (y = 0; y < height; y++, target_pos += row_step) {
-          for (x = 0; x < width; x++) {
-            *target_pos = value;
-            target_pos++;
+    if (channels == 1) {
+      for (i = 0; i < segment_count; i++) {
+        if (segment == segments[i]) {
+          width = tree->size;
+          height = width;
+          row_step = target->stride - width;
+          target_pos = (byte*)target->data + (tree->y - dy) * target->stride + (tree->x - dx);
+          for (y = 0; y < height; y++, target_pos += row_step) {
+            for (x = 0; x < width; x++) {
+              *target_pos = color[0];
+              target_pos++;
+            }
           }
+          break;
         }
-        break;
+      }
+    }
+    else
+    if (channels == 3) {
+      for (i = 0; i < segment_count; i++) {
+        if (segment == segments[i]) {
+          width = tree->size;
+          height = width;
+          row_step = target->stride - width * target->step;
+          target_pos = (byte*)target->data + (tree->y - dy) * target->stride + (tree->x - dx) * target->step;
+          for (y = 0; y < height; y++, target_pos += row_step) {
+            for (x = 0; x < width; x++) {
+              *target_pos = color[0];
+              target_pos++;
+              *target_pos = color[1];
+              target_pos++;
+              *target_pos = color[2];
+              target_pos++;
+            }
+          }
+          break;
+        }
       }
     }
   }
@@ -941,7 +967,7 @@ result quad_forest_get_segment_mask
 {
   TRY();
   uint32 i, x1, y1, x2, y2, width, height;
-  byte value;
+  byte value[4];
 
   CHECK_POINTER(forest);
   CHECK_POINTER(target);
@@ -972,13 +998,13 @@ result quad_forest_get_segment_mask
 
   if (IS_FALSE(invert)) {
     CHECK(pixel_image_clear(target));
-    value = 255;
+    value[0] = 255;
   }
   else {
     SINGLE_CONTINUOUS_IMAGE_VARIABLES(target, byte);
     FOR_CONTINUOUS_IMAGE(target)
       PIXEL_VALUE(target) = 255;
-    value = 0;
+    value[0] = 0;
   }
 
   {
@@ -994,13 +1020,67 @@ result quad_forest_get_segment_mask
     for (row = firstrow; row <= lastrow; row++) {
       pos = row * forest->cols + firstcol;
       for (col = firstcol; col <= lastcol; col++) {
-        quad_forest_draw_segments(forest->roots[pos], target, x1, y1, segments, segment_count, value);
+        quad_forest_draw_segments(forest->roots[pos], target, x1, y1, segments, segment_count, value, 1);
         pos++;
       }
     }
   }
 
   FINALLY(quad_forest_get_segment_mask);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result quad_forest_highlight_segments
+(
+  quad_forest *forest,
+  pixel_image *target,
+  quad_forest_segment **segments,
+  uint32 segment_count,
+  byte color[4]
+)
+{
+  TRY();
+  uint32 i, x1, y1, x2, y2, width, height;
+
+  CHECK_POINTER(forest);
+  CHECK_POINTER(target);
+  CHECK_POINTER(segments);
+  CHECK_PARAM(segment_count > 0);
+
+  /* find bounding box of the collection */
+  x1 = segments[0]->x1;
+  y1 = segments[0]->y1;
+  x2 = segments[0]->x2;
+  y2 = segments[0]->y2;
+  for (i = 1; i < segment_count; i++) {
+    if (segments[i]->x1 < x1) x1 = segments[i]->x1;
+    if (segments[i]->y1 < y1) y1 = segments[i]->y1;
+    if (segments[i]->x2 > x2) x2 = segments[i]->x2;
+    if (segments[i]->y2 > y2) y2 = segments[i]->y2;
+  }
+
+  {
+    uint32 pos, col, firstcol, lastcol, row, firstrow, lastrow;
+
+    /* determine which root trees are within the bounding box */
+    col = (uint32)((x1 - forest->dx) / forest->tree_max_size);
+    lastcol = (uint32)((x2 - forest->dx) / forest->tree_max_size);
+    row = (uint32)((y1 - forest->dy) / forest->tree_max_size);
+    lastrow = (uint32)((y2 - forest->dy) / forest->tree_max_size);
+
+    /* loop through the root trees */
+    for (row = firstrow; row <= lastrow; row++) {
+      pos = row * forest->cols + firstcol;
+      for (col = firstcol; col <= lastcol; col++) {
+        quad_forest_draw_segments(forest->roots[pos], target, 0, 0, segments, segment_count, color, 3);
+        pos++;
+      }
+    }
+  }
+
+  FINALLY(quad_forest_highlight_segments);
   RETURN();
 }
 
