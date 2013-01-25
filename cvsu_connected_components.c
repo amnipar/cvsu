@@ -1,33 +1,33 @@
 /**
-* @file cvsu_connected_components.c
-* @author Matti J. Eskelinen <matti.j.eskelinen@gmail.com>
-* @brief Connected components handling for the cvsu module.
-*
-* Copyright (c) 2011, Matti Johannes Eskelinen
-* All Rights Reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following conditions are met:
-*   * Redistributions of source code must retain the above copyright
-*     notice, this list of conditions and the following disclaimer.
-*   * Redistributions in binary form must reproduce the above copyright
-*     notice, this list of conditions and the following disclaimer in the
-*     documentation and/or other materials provided with the distribution.
-*   * Neither the name of the copyright holder nor the
-*     names of its contributors may be used to endorse or promote products
-*     derived from this software without specific prior written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-* AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-* IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-* ARE DISCLAIMED. IN NO EVENT SHALL COPYRIGHT HOLDER BE LIABLE FOR ANY
-* DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-* (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-* LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-* ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-* (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
+ * @file cvsu_connected_components.c
+ * @author Matti J. Eskelinen <matti.j.eskelinen@gmail.com>
+ * @brief Connected components handling for cvsu.
+ *
+ * Copyright (c) 2011-2013, Matti Johannes Eskelinen
+ * All Rights Reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *   * Redistributions of source code must retain the above copyright
+ *     notice, this list of conditions and the following disclaimer.
+ *   * Redistributions in binary form must reproduce the above copyright
+ *     notice, this list of conditions and the following disclaimer in the
+ *     documentation and/or other materials provided with the distribution.
+ *   * Neither the name of the copyright holder nor the
+ *     names of its contributors may be used to endorse or promote products
+ *     derived from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL COPYRIGHT HOLDER BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 
 #include "cvsu_config.h"
 #include "cvsu_macros.h"
@@ -156,23 +156,23 @@ result connected_components_create
   CHECK_POINTER(target);
   CHECK_POINTER(source);
   CHECK_PARAM(source->type == p_U8);
-  
+
   connected_components_nullify(target);
-  
+
   width = source->width;
   height = source->height;
-  
+
   CHECK(memory_allocate((data_pointer *)&target->pixels, width*height, sizeof(region_info)));
   CHECK(memory_clear((data_pointer)target->pixels, width*height, sizeof(region_info)));
-  
+
   target->original = source;
   target->width = width;
   target->height = height;
   target->channels = source->step;
-  
+
   {
     SINGLE_DISCONTINUOUS_IMAGE_VARIABLES(source, byte);
-    
+
     for (y = 0, pixel = target->pixels; y < height; y++) {
       for (x = 0, source_pos = source_rows[y]; x < width; x++, source_pos += source_step, pixel++) {
         pixel->id = pixel;
@@ -184,7 +184,7 @@ result connected_components_create
       }
     }
   }
-  
+
   FINALLY(connected_components_create);
   RETURN();
 }
@@ -275,13 +275,13 @@ result connected_components_update
   uint32 x, y, width, height, i, size, channels, count, pos;
   bool is_equal;
   region_info *pixel, *neighbor, *id, **region;
-  
+
   CHECK_POINTER(target);
-  
+
   width = target->width;
   height = target->height;
   channels = target->channels;
-  
+
   /* first, handle first row comparing only to left */
   y = 0;
   pixel = target->pixels;
@@ -304,7 +304,7 @@ result connected_components_update
       neighbor = pixel;
     }
   }
-  
+
   /* count the regions and set up colors */
   count = 0;
   /* initialize the random number generator for generating the colors */
@@ -321,7 +321,7 @@ result connected_components_update
 
   CHECK(memory_allocate((void*)&target->regions, count, sizeof(region_info*)));
   target->count = count;
-  
+
   /* finally, collect the parent regions to a list */
   for (i = width*height, pixel = target->pixels, region = target->regions; i--; pixel++) {
     id = region_find(pixel);
@@ -330,7 +330,7 @@ result connected_components_update
       region++;
     }
   }
-  
+
   FINALLY(connected_components_update);
   RETURN();
 }
@@ -347,16 +347,16 @@ result connected_components_draw_image
   uint32 width, height, i;
   region_info *pixel, *region;
   byte *target_pos;
-    
+
   CHECK_POINTER(source);
   CHECK_POINTER(source->pixels);
   CHECK_POINTER(target);
-  
+
   width = source->width;
   height = source->height;
-  
+
   CHECK(pixel_image_create(target, p_U8, RGB, width, height, 3, 3 * width));
-  
+
   target_pos = (byte *)target->data;
   for (i = width*height, pixel = source->pixels; i--; pixel++) {
     region = region_find(pixel);
@@ -367,7 +367,7 @@ result connected_components_draw_image
     *target_pos = region->color[2];
     target_pos++;
   }
-  
+
   FINALLY(connected_components_draw_image);
   RETURN();
 }

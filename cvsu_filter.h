@@ -1,9 +1,9 @@
 /**
  * @file cvsu_filter.h
  * @author Matti J. Eskelinen <matti.j.eskelinen@gmail.com>
- * @brief Basic image filters for the cvsu module.
+ * @brief Basic image filters for cvsu.
  *
- * Copyright (c) 2011, Matti Johannes Eskelinen
+ * Copyright (c) 2011-2013, Matti Johannes Eskelinen
  * All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -36,7 +36,7 @@
 extern "C" {
 #endif
 
-#include "cvsu_basic.h"
+#include "cvsu_pixel_image.h"
 
 /**
  * Thresholds an 8-bit grayscale image by changing all values smaller than t to

@@ -1,9 +1,9 @@
 /**
- * @file cvsu_basic.c
+ * @file cvsu_pixel_image.c
  * @author Matti J. Eskelinen <matti.j.eskelinen@gmail.com>
- * @brief Basic types and operations for the cvsu module.
+ * @brief Basic image types and operations for cvsu.
  *
- * Copyright (c) 2011, Matti Johannes Eskelinen
+ * Copyright (c) 2011-2013, Matti Johannes Eskelinen
  * All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,7 +32,7 @@
 #include "cvsu_config.h"
 #include "cvsu_macros.h"
 #include "cvsu_memory.h"
-#include "cvsu_basic.h"
+#include "cvsu_pixel_image.h"
 
 #include <stdlib.h>
 #include <math.h>
@@ -76,287 +76,283 @@ string pick_1_channel_from_3_channels_name = "pick_1_channel_from_3_channels";
 /******************************************************************************/
 /* private function for initializing the pixel_image structure                */
 
-result pixel_image_init(
-    pixel_image *target,
-    pointer data,
-    pixel_type type,
-    pixel_format format,
-    uint32 dx,
-    uint32 dy,
-    uint32 width,
-    uint32 height,
-    uint32 offset,
-    uint32 step,
-    uint32 stride,
-    uint32 size)
+result pixel_image_init
+(
+  pixel_image *target,
+  pointer data,
+  pixel_type type,
+  pixel_format format,
+  uint32 dx,
+  uint32 dy,
+  uint32 width,
+  uint32 height,
+  uint32 offset,
+  uint32 step,
+  uint32 stride,
+  uint32 size
+)
 {
-    TRY();
-    uint32 i;
-#if IMAGE_ACCESS_METHOD == IMAGE_ACCESS_BY_POINTER
-    byte **row;
-    size_t pixel_size;
-#endif
+  TRY();
+  uint32 i;
+  byte **row;
+  size_t pixel_size;
 
-    CHECK_POINTER(target);
+  CHECK_POINTER(target);
 
-    /* store data in image so we have the pointer for freeing the data */
-    /* in case other parameters are invalid */
-    target->data = data;
+  /* store data in image so we have the pointer for freeing the data */
+  /* in case other parameters are invalid */
+  target->data = data;
 
-    CHECK_POINTER(target->data);
-    CHECK_PARAM((dx + width) * step <= stride);
-    CHECK_PARAM((dy + height) * stride <= size);
+  CHECK_POINTER(target->data);
+  CHECK_PARAM((dx + width) * step <= stride);
+  CHECK_PARAM((dy + height) * stride <= size);
 
-    target->parent = NULL;
-    target->type = type;
-    target->format = format;
-    target->dx = dx;
-    target->dy = dy;
-    target->width = width;
-    target->height = height;
-    target->offset = offset;
-    target->step = step;
-    target->stride = stride;
-    target->size = size;
+  target->parent = NULL;
+  target->type = type;
+  target->format = format;
+  target->dx = dx;
+  target->dy = dy;
+  target->width = width;
+  target->height = height;
+  target->offset = offset;
+  target->step = step;
+  target->stride = stride;
+  target->size = size;
 
-#if IMAGE_ACCESS_METHOD == IMAGE_ACCESS_BY_INDEX
-    CHECK(memory_allocate((data_pointer *)&target->rows, height, sizeof(uint32)));
-    for (i = 0; i < target->height; i++) {
-        target->rows[i] = (target->dy + i) * target->stride + target->dx * target->step + target->offset;
-    }
-#elif IMAGE_ACCESS_METHOD == IMAGE_ACCESS_BY_POINTER
-    CHECK(memory_allocate((data_pointer *)&target->rows, height, sizeof(data_pointer *)));
-    switch (type) {
-    case p_U8:
-        pixel_size = sizeof(uint8);
-        break;
-    case p_S8:
-        pixel_size = sizeof(sint8);
-        break;
-    case p_U16:
-        pixel_size = sizeof(uint16);
-        break;
-    case p_S16:
-        pixel_size = sizeof(sint16);
-        break;
-    case p_U32:
-        pixel_size = sizeof(uint32);
-        break;
-    case p_S32:
-        pixel_size = sizeof(sint32);
-        break;
-    case p_F32:
-        pixel_size = sizeof(real32);
-        break;
-    case p_F64:
-        pixel_size = sizeof(real64);
-        break;
-    default:
-        ERROR(BAD_TYPE);
-    }
-    for (i = 0, row = (data_pointer *)target->rows; i < target->height; i++, row++) {
-        *row = (data_pointer)target->data + ((target->dy + i) * target->stride + target->dx * target->step + target->offset) * pixel_size;
-    }
-#endif
+  CHECK(memory_allocate((data_pointer *)&target->rows, height, sizeof(data_pointer *)));
+  switch (type) {
+  case p_U8:
+      pixel_size = sizeof(uint8);
+      break;
+  case p_S8:
+      pixel_size = sizeof(sint8);
+      break;
+  case p_U16:
+      pixel_size = sizeof(uint16);
+      break;
+  case p_S16:
+      pixel_size = sizeof(sint16);
+      break;
+  case p_U32:
+      pixel_size = sizeof(uint32);
+      break;
+  case p_S32:
+      pixel_size = sizeof(sint32);
+      break;
+  case p_F32:
+      pixel_size = sizeof(real32);
+      break;
+  case p_F64:
+      pixel_size = sizeof(real64);
+      break;
+  default:
+      ERROR(BAD_TYPE);
+  }
 
-    FINALLY(pixel_image_init);
-    RETURN();
+  for (i = 0, row = (data_pointer *)target->rows; i < target->height; i++, row++) {
+      *row = (data_pointer)target->data + ((target->dy + i) * target->stride + target->dx * target->step + target->offset) * pixel_size;
+  }
+
+  FINALLY(pixel_image_init);
+  RETURN();
 }
 
 /******************************************************************************/
 
 pixel_image *pixel_image_alloc()
 {
-    TRY();
-    pixel_image *ptr;
+  TRY();
+  pixel_image *ptr;
 
-    CHECK(memory_allocate((data_pointer *)&ptr, 1, sizeof(pixel_image)));
-    CHECK(pixel_image_nullify(ptr));
+  CHECK(memory_allocate((data_pointer *)&ptr, 1, sizeof(pixel_image)));
+  CHECK(pixel_image_nullify(ptr));
 
-    FINALLY(pixel_image_alloc);
-    return ptr;
+  FINALLY(pixel_image_alloc);
+  return ptr;
 }
 
 /******************************************************************************/
 
-void pixel_image_free(
-    pixel_image *ptr
-    )
+void pixel_image_free
+(
+  pixel_image *ptr
+)
 {
-    TRY();
+  TRY();
 
-    r = SUCCESS;
+  r = SUCCESS;
 
-    if (ptr != NULL) {
-        CHECK(pixel_image_destroy(ptr));
-        CHECK(memory_deallocate((data_pointer *)&ptr));
-    }
-    FINALLY(pixel_image_free);
+  if (ptr != NULL) {
+      CHECK(pixel_image_destroy(ptr));
+      CHECK(memory_deallocate((data_pointer *)&ptr));
+  }
+  FINALLY(pixel_image_free);
 }
 
 /******************************************************************************/
 
-result pixel_image_create(
-    pixel_image *target,
-    pixel_type type,
-    pixel_format format,
-    uint32 width,
-    uint32 height,
-    uint32 step,
-    uint32 stride
-    )
+result pixel_image_create
+(
+  pixel_image *target,
+  pixel_type type,
+  pixel_format format,
+  uint32 width,
+  uint32 height,
+  uint32 step,
+  uint32 stride
+)
 {
-    TRY();
-    data_pointer data;
-    uint32 size;
+  TRY();
+  data_pointer data;
+  uint32 size;
 
-    CHECK_POINTER(target);
+  CHECK_POINTER(target);
 
-    size = height * stride;
+  size = height * stride;
+  switch (type) {
+  case p_U8:
+    CHECK(memory_allocate(&data, size, sizeof(uint8)));
+    break;
+  case p_S8:
+    CHECK(memory_allocate(&data, size, sizeof(sint8)));
+    break;
+  case p_U16:
+    CHECK(memory_allocate(&data, size, sizeof(uint16)));
+    break;
+  case p_S16:
+    CHECK(memory_allocate(&data, size, sizeof(sint16)));
+    break;
+  case p_U32:
+    CHECK(memory_allocate(&data, size, sizeof(uint32)));
+    break;
+  case p_S32:
+    CHECK(memory_allocate(&data, size, sizeof(sint32)));
+    break;
+  case p_F32:
+    CHECK(memory_allocate(&data, size, sizeof(real32)));
+    break;
+  case p_F64:
+    CHECK(memory_allocate(&data, size, sizeof(real64)));
+    break;
+  default:
+    ERROR(BAD_TYPE);
+  }
+
+  CHECK(pixel_image_init(target, data, type, format, 0, 0, width, height, 0, step, stride, size));
+
+  FINALLY(pixel_image_create);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result pixel_image_create_from_data
+(
+  pixel_image *target,
+  data_pointer data,
+  pixel_type type,
+  pixel_format format,
+  uint32 width,
+  uint32 height,
+  uint32 step,
+  uint32 stride
+)
+{
+  TRY();
+  uint32 size;
+
+  CHECK_POINTER(target);
+  CHECK_POINTER(data);
+
+  size = height * stride;
+
+  CHECK(pixel_image_create(target, type, format, width, height, step, stride));
+  {
+    size_t pixel_size;
     switch (type) {
     case p_U8:
-        CHECK(memory_allocate(&data, size, sizeof(uint8)));
-        break;
+      pixel_size = sizeof(uint8);
+      break;
     case p_S8:
-        CHECK(memory_allocate(&data, size, sizeof(sint8)));
-        break;
+      pixel_size = sizeof(sint8);
+      break;
     case p_U16:
-        CHECK(memory_allocate(&data, size, sizeof(uint16)));
-        break;
+      pixel_size = sizeof(uint16);
+      break;
     case p_S16:
-        CHECK(memory_allocate(&data, size, sizeof(sint16)));
-        break;
+      pixel_size = sizeof(sint16);
+      break;
     case p_U32:
-        CHECK(memory_allocate(&data, size, sizeof(uint32)));
-        break;
+      pixel_size = sizeof(uint32);
+      break;
     case p_S32:
-        CHECK(memory_allocate(&data, size, sizeof(sint32)));
-        break;
+      pixel_size = sizeof(sint32);
+      break;
     case p_F32:
-        CHECK(memory_allocate(&data, size, sizeof(real32)));
-        break;
+      pixel_size = sizeof(real32);
+      break;
     case p_F64:
-        CHECK(memory_allocate(&data, size, sizeof(real64)));
-        break;
+      pixel_size = sizeof(real64);
+      break;
     default:
-        ERROR(BAD_TYPE);
+      ERROR(BAD_TYPE);
     }
+    memory_copy(target->data, data, size, pixel_size);
+  }
 
-    CHECK(pixel_image_init(target, data, type, format, 0, 0, width, height, 0, step, stride, size));
-    /*target->own_data = 1;*/
-
-    FINALLY(pixel_image_create);
-    RETURN();
+  FINALLY(pixel_image_create_from_data);
+  RETURN();
 }
 
 /******************************************************************************/
 
-result pixel_image_create_from_data(
-    pixel_image *target,
-    data_pointer data,
-    pixel_type type,
-    pixel_format format,
-    uint32 width,
-    uint32 height,
-    uint32 step,
-    uint32 stride
-    )
+result pixel_image_destroy
+(
+  pixel_image *target
+)
 {
-    TRY();
-    uint32 size;
+  TRY();
 
-    CHECK_POINTER(target);
-    CHECK_POINTER(data);
+  CHECK_POINTER(target);
 
-    size = height * stride;
+  /* don't delete if target has a parent, that's parent's responsibility */
+  if (target->parent == NULL) {
+    CHECK(memory_deallocate((data_pointer*)&target->data));
+  }
+  CHECK(memory_deallocate((data_pointer*)&target->rows));
+  CHECK(pixel_image_nullify(target));
 
-    CHECK(pixel_image_create(target, type, format, width, height, step, stride));
-    {
-      size_t pixel_size;
-      switch (type) {
-      case p_U8:
-          pixel_size = sizeof(uint8);
-          break;
-      case p_S8:
-          pixel_size = sizeof(sint8);
-          break;
-      case p_U16:
-          pixel_size = sizeof(uint16);
-          break;
-      case p_S16:
-          pixel_size = sizeof(sint16);
-          break;
-      case p_U32:
-          pixel_size = sizeof(uint32);
-          break;
-      case p_S32:
-          pixel_size = sizeof(sint32);
-          break;
-      case p_F32:
-          pixel_size = sizeof(real32);
-          break;
-      case p_F64:
-          pixel_size = sizeof(real64);
-          break;
-      default:
-          ERROR(BAD_TYPE);
-      }
-      memory_copy(target->data, data, size, pixel_size);
-    }
-    /*target->own_data = 1;*/
-
-    FINALLY(pixel_image_create_from_data);
-    RETURN();
+  FINALLY(pixel_image_destroy);
+  RETURN();
 }
 
 /******************************************************************************/
 
-result pixel_image_destroy(
-    pixel_image *target
-    )
+result pixel_image_nullify
+(
+  pixel_image *target
+)
 {
-    TRY();
-    
-    CHECK_POINTER(target);
+  TRY();
 
-    /* don't delete if target has a parent, that's parent's responsibility */
-    if (target->parent == NULL) { /* && target->own_data != 0 */
-        CHECK(memory_deallocate((data_pointer *)&target->data));
-    }
-    CHECK(memory_deallocate((data_pointer *)&target->rows));
-    CHECK(pixel_image_nullify(target));
+  CHECK_POINTER(target);
 
-    FINALLY(pixel_image_destroy);
-    RETURN();
-}
+  target->parent = NULL;
+  target->data = NULL;
+  target->rows = NULL;
+  target->type = p_NONE;
+  target->format = NONE;
+  target->dx = 0;
+  target->dy = 0;
+  target->width = 0;
+  target->height = 0;
+  target->offset = 0;
+  target->step = 0;
+  target->stride = 0;
+  target->size = 0;
 
-/******************************************************************************/
-
-result pixel_image_nullify(
-    pixel_image *target
-    )
-{
-    TRY();
-
-    CHECK_POINTER(target);
-
-    target->parent = NULL;
-    target->data = NULL;
-    target->rows = NULL;
-    /*target->own_data = 0;*/
-    target->type = p_NONE;
-    target->format = NONE;
-    target->dx = 0;
-    target->dy = 0;
-    target->width = 0;
-    target->height = 0;
-    target->offset = 0;
-    target->step = 0;
-    target->stride = 0;
-    target->size = 0;
-
-    FINALLY(pixel_image_nullify);
-    RETURN();
+  FINALLY(pixel_image_nullify);
+  RETURN();
 }
 
 /******************************************************************************/
@@ -376,380 +372,386 @@ truth_value pixel_image_is_null
 
 /******************************************************************************/
 
-result pixel_image_convert(
-    pixel_image *source,
-    pixel_image *target
-    )
+result pixel_image_convert
+(
+  pixel_image *source,
+  pixel_image *target
+)
 {
-    pixel_image *temp;
-    TRY();
+  pixel_image *temp;
+  TRY();
 
-    temp = NULL;
+  temp = NULL;
 
-    CHECK_POINTER(source);
-    CHECK_POINTER(target);
+  CHECK_POINTER(source);
+  CHECK_POINTER(target);
 
-    CHECK_PARAM(source->width == target->width);
-    CHECK_PARAM(source->height == target->height);
-    /*printf("t:%d->%d,f:%d->%d\n",source->type, target->type, source->format, target->format);*/
+  CHECK_PARAM(source->width == target->width);
+  CHECK_PARAM(source->height == target->height);
 
-    if (source->type == target->type && source->format == target->format) {
-        CHECK(pixel_image_copy(target, source));
+  if (source->type == target->type && source->format == target->format) {
+    CHECK(pixel_image_copy(target, source));
+  }
+  else {
+    /* first convert the pixel type of the source image */
+    if (source->type != target->type) {
+        ERROR(NOT_IMPLEMENTED);
     }
-    else {
-        /* first convert the pixel type of the source image */
-        if (source->type != target->type) {
-            ERROR(NOT_IMPLEMENTED);
-        }
-        /* then convert the format */
-        switch (source->format) {
-        case GREY:
-            if (target->format == RGB) {
-                CHECK(convert_grey8_to_grey24(source, target));
-            }
-            else
-            if (target->format == YUV) {
-                CHECK(convert_grey8_to_yuv24(source, target));
-            }
-            else {
-                ERROR(NOT_IMPLEMENTED);
-            }
-            break;
-        case RGB:
-          if (target->format == GREY) {
-              CHECK(convert_rgb24_to_grey8(source, target));
-          }
-          else
-          if (target->format == YUV) {
-              CHECK(convert_rgb24_to_yuv24(source, target));
-          }
-          else {
-              ERROR(NOT_IMPLEMENTED);
-          }
-          break;
-        case YUV:
-          if (target->format == GREY) {
-              CHECK(convert_yuv24_to_grey8(source, target));
-          }
-          else
-          if (target->format == RGB) {
-              CHECK(convert_yuv24_to_rgb24(source, target));
-          }
-          else {
-              ERROR(NOT_IMPLEMENTED);
-          }
-          break;
-        default:
-            ERROR(NOT_IMPLEMENTED);
-        }
+    /* then convert the format */
+    switch (source->format) {
+    case GREY:
+      if (target->format == RGB) {
+        CHECK(convert_grey8_to_grey24(source, target));
+      }
+      else
+      if (target->format == YUV) {
+        CHECK(convert_grey8_to_yuv24(source, target));
+      }
+      else {
+        ERROR(NOT_IMPLEMENTED);
+      }
+      break;
+    case RGB:
+      if (target->format == GREY) {
+        CHECK(convert_rgb24_to_grey8(source, target));
+      }
+      else
+      if (target->format == YUV) {
+        CHECK(convert_rgb24_to_yuv24(source, target));
+      }
+      else {
+        ERROR(NOT_IMPLEMENTED);
+      }
+      break;
+    case YUV:
+      if (target->format == GREY) {
+        CHECK(convert_yuv24_to_grey8(source, target));
+      }
+      else
+      if (target->format == RGB) {
+        CHECK(convert_yuv24_to_rgb24(source, target));
+      }
+      else {
+        ERROR(NOT_IMPLEMENTED);
+      }
+      break;
+    default:
+      ERROR(NOT_IMPLEMENTED);
     }
+  }
 
-    FINALLY(pixel_image_convert);
-    if (temp != NULL) {
-        pixel_image_free(temp);
-    }
-    RETURN();
+  FINALLY(pixel_image_convert);
+  if (temp != NULL) {
+      pixel_image_free(temp);
+  }
+  RETURN();
 }
 
 /******************************************************************************/
 
-result pixel_image_create_roi(
-    pixel_image *target,
-    pixel_image *source,
-    uint32 dx,
-    uint32 dy,
-    uint32 width,
-    uint32 height
-    )
+result pixel_image_create_roi
+(
+  pixel_image *target,
+  pixel_image *source,
+  uint32 dx,
+  uint32 dy,
+  uint32 width,
+  uint32 height
+)
 {
-    TRY();
+  TRY();
 
-    CHECK_POINTER(source);
+  CHECK_POINTER(source);
 
-    /* set data as NULL, in case create_image fails to set the pointer */
-    target->data = NULL;
-    CHECK(pixel_image_init(target, source->data, source->type, source->format,
-                           dx, dy, width, height,
-                           source->offset, source->step, source->stride, source->size));
+  /* set data as NULL, in case create_image fails to set the pointer */
+  target->data = NULL;
+  CHECK(pixel_image_init(target, source->data, source->type, source->format, dx,
+                         dy, width, height, source->offset, source->step,
+                         source->stride, source->size));
 
-    FINALLY(pixel_image_create_roi);
-    /* set parent here, as create_image has to set it as NULL */
-    target->parent = source;
-    target->format = source->format;
-    RETURN();
+  FINALLY(pixel_image_create_roi);
+  /* set parent here, as create_image has to set it as NULL */
+  target->parent = source;
+  target->format = source->format;
+  RETURN();
 }
 
 /******************************************************************************/
 
-result pixel_image_clone(
-    pixel_image *target,
-    const pixel_image *source
-    )
+result pixel_image_clone
+(
+  pixel_image *target,
+  const pixel_image *source
+)
 {
-    TRY();
-    CHECK_POINTER(source);
+  TRY();
+  CHECK_POINTER(source);
 
-    CHECK(pixel_image_create(target, source->type, source->format, source->width, source->height, source->step, source->stride));
+  CHECK(pixel_image_create(target, source->type, source->format, source->width,
+                           source->height, source->step, source->stride));
 
-    FINALLY(pixel_image_clone);
-    RETURN();
+  FINALLY(pixel_image_clone);
+  RETURN();
 }
 
 /******************************************************************************/
 
-result pixel_image_copy(
-    pixel_image *target,
-    const pixel_image *source
-    )
+result pixel_image_copy
+(
+  pixel_image *target,
+  const pixel_image *source
+)
 {
-    TRY();
+  TRY();
 
-    CHECK_POINTER(source);
-    CHECK_POINTER(target);
-    CHECK_POINTER(source->data);
-    CHECK_POINTER(target->data);
-    CHECK_PARAM(source->type == target->type);
-    CHECK_PARAM(source->format == target->format);
-    CHECK_PARAM(source->width == target->width);
-    CHECK_PARAM(source->height == target->height);
-    CHECK_PARAM(source->step == target->step);
+  CHECK_POINTER(source);
+  CHECK_POINTER(target);
+  CHECK_POINTER(source->data);
+  CHECK_POINTER(target->data);
+  CHECK_PARAM(source->type == target->type);
+  CHECK_PARAM(source->format == target->format);
+  CHECK_PARAM(source->width == target->width);
+  CHECK_PARAM(source->height == target->height);
+  CHECK_PARAM(source->step == target->step);
 
-    if (pixel_image_is_continuous(source) && pixel_image_is_continuous(target)) {
-        size_t pixel_size;
-        switch (source->type) {
-        case p_U8:
-            pixel_size = sizeof(uint8);
-            break;
-        case p_S8:
-            pixel_size = sizeof(sint8);
-            break;
-        case p_U16:
-            pixel_size = sizeof(uint16);
-            break;
-        case p_S16:
-            pixel_size = sizeof(sint16);
-            break;
-        case p_U32:
-            pixel_size = sizeof(uint32);
-            break;
-        case p_S32:
-            pixel_size = sizeof(sint32);
-            break;
-        case p_F32:
-            pixel_size = sizeof(real32);
-            break;
-        case p_F64:
-            pixel_size = sizeof(real64);
-            break;
-        default:
-            ERROR(BAD_TYPE);
-        }
-        memory_copy(target->data, source->data, source->size, pixel_size);
+  if (pixel_image_is_continuous(source) && pixel_image_is_continuous(target)) {
+    size_t pixel_size;
+    switch (source->type) {
+    case p_U8:
+      pixel_size = sizeof(uint8);
+      break;
+    case p_S8:
+      pixel_size = sizeof(sint8);
+      break;
+    case p_U16:
+      pixel_size = sizeof(uint16);
+      break;
+    case p_S16:
+      pixel_size = sizeof(sint16);
+      break;
+    case p_U32:
+      pixel_size = sizeof(uint32);
+      break;
+    case p_S32:
+      pixel_size = sizeof(sint32);
+      break;
+    case p_F32:
+      pixel_size = sizeof(real32);
+      break;
+    case p_F64:
+      pixel_size = sizeof(real64);
+      break;
+    default:
+      ERROR(BAD_TYPE);
     }
-    else {
-        uint32 x, y;
-        switch (source->type) {
-        case p_U8:
-            {
-                DISCONTINUOUS_IMAGE_VARIABLES(byte, byte);
-                FOR_2_DISCONTINUOUS_IMAGE_ROWS()
-                    memory_copy((data_pointer)POINTER_TO_PIXEL(target),
-                                (data_pointer)POINTER_TO_PIXEL(source),
-                                source->width * source_step, sizeof(byte));
-            }
-            break;
-        case p_S8:
-            {
-                DISCONTINUOUS_IMAGE_VARIABLES(sint8, sint8);
-                FOR_2_DISCONTINUOUS_IMAGE_ROWS()
-                    memory_copy((data_pointer)POINTER_TO_PIXEL(target),
-                                (data_pointer)POINTER_TO_PIXEL(source),
-                                source->width * source_step, sizeof(sint8));
-            }
-            break;
-        case p_U16:
-            {
-                DISCONTINUOUS_IMAGE_VARIABLES(word, word);
-                FOR_2_DISCONTINUOUS_IMAGE_ROWS()
-                    memory_copy((data_pointer)POINTER_TO_PIXEL(target),
-                                (data_pointer)POINTER_TO_PIXEL(source),
-                                source->width * source_step, sizeof(word));
-            }
-            break;
-        case p_S16:
-            {
-                DISCONTINUOUS_IMAGE_VARIABLES(sint16, sint16);
-                FOR_2_DISCONTINUOUS_IMAGE_ROWS()
-                    memory_copy((data_pointer)POINTER_TO_PIXEL(target),
-                                (data_pointer)POINTER_TO_PIXEL(source),
-                                source->width * source_step, sizeof(sint16));
-            }
-            break;
-        case p_U32:
-            {
-                DISCONTINUOUS_IMAGE_VARIABLES(dword, dword);
-                FOR_2_DISCONTINUOUS_IMAGE_ROWS()
-                    memory_copy((data_pointer)POINTER_TO_PIXEL(target),
-                                (data_pointer)POINTER_TO_PIXEL(source),
-                                source->width * source_step, sizeof(dword));
-            }
-            break;
-        case p_S32:
-            {
-                DISCONTINUOUS_IMAGE_VARIABLES(sint32, sint32);
-                FOR_2_DISCONTINUOUS_IMAGE_ROWS()
-                    memory_copy((data_pointer)POINTER_TO_PIXEL(target),
-                                (data_pointer)POINTER_TO_PIXEL(source),
-                                source->width * source_step, sizeof(sint32));
-            }
-            break;
-        case p_F32:
-            {
-                DISCONTINUOUS_IMAGE_VARIABLES(real32, real32);
-                FOR_2_DISCONTINUOUS_IMAGE_ROWS()
-                    memory_copy((data_pointer)POINTER_TO_PIXEL(target),
-                                (data_pointer)POINTER_TO_PIXEL(source),
-                                source->width * source_step, sizeof(real32));
-            }
-            break;
-        case p_F64:
-            {
-                DISCONTINUOUS_IMAGE_VARIABLES(real64, real64);
-                FOR_2_DISCONTINUOUS_IMAGE_ROWS()
-                    memory_copy((data_pointer)POINTER_TO_PIXEL(target),
-                                (data_pointer)POINTER_TO_PIXEL(source),
-                                source->width * source_step, sizeof(real64));
-            }
-            break;
-        default:
-            ERROR(BAD_TYPE);
-        }
+    memory_copy(target->data, source->data, source->size, pixel_size);
+  }
+  else {
+    uint32 x, y;
+    switch (source->type) {
+    case p_U8:
+      {
+        DISCONTINUOUS_IMAGE_VARIABLES(byte, byte);
+        FOR_2_DISCONTINUOUS_IMAGE_ROWS()
+            memory_copy((data_pointer)POINTER_TO_PIXEL(target),
+                        (data_pointer)POINTER_TO_PIXEL(source),
+                        source->width * source_step, sizeof(byte));
+      }
+      break;
+    case p_S8:
+      {
+        DISCONTINUOUS_IMAGE_VARIABLES(sint8, sint8);
+        FOR_2_DISCONTINUOUS_IMAGE_ROWS()
+            memory_copy((data_pointer)POINTER_TO_PIXEL(target),
+                        (data_pointer)POINTER_TO_PIXEL(source),
+                        source->width * source_step, sizeof(sint8));
+      }
+      break;
+    case p_U16:
+      {
+        DISCONTINUOUS_IMAGE_VARIABLES(word, word);
+        FOR_2_DISCONTINUOUS_IMAGE_ROWS()
+            memory_copy((data_pointer)POINTER_TO_PIXEL(target),
+                        (data_pointer)POINTER_TO_PIXEL(source),
+                        source->width * source_step, sizeof(word));
+      }
+      break;
+    case p_S16:
+      {
+        DISCONTINUOUS_IMAGE_VARIABLES(sint16, sint16);
+        FOR_2_DISCONTINUOUS_IMAGE_ROWS()
+            memory_copy((data_pointer)POINTER_TO_PIXEL(target),
+                        (data_pointer)POINTER_TO_PIXEL(source),
+                        source->width * source_step, sizeof(sint16));
+      }
+      break;
+    case p_U32:
+      {
+        DISCONTINUOUS_IMAGE_VARIABLES(dword, dword);
+        FOR_2_DISCONTINUOUS_IMAGE_ROWS()
+            memory_copy((data_pointer)POINTER_TO_PIXEL(target),
+                        (data_pointer)POINTER_TO_PIXEL(source),
+                        source->width * source_step, sizeof(dword));
+      }
+      break;
+    case p_S32:
+      {
+        DISCONTINUOUS_IMAGE_VARIABLES(sint32, sint32);
+        FOR_2_DISCONTINUOUS_IMAGE_ROWS()
+            memory_copy((data_pointer)POINTER_TO_PIXEL(target),
+                        (data_pointer)POINTER_TO_PIXEL(source),
+                        source->width * source_step, sizeof(sint32));
+      }
+      break;
+    case p_F32:
+      {
+        DISCONTINUOUS_IMAGE_VARIABLES(real32, real32);
+        FOR_2_DISCONTINUOUS_IMAGE_ROWS()
+            memory_copy((data_pointer)POINTER_TO_PIXEL(target),
+                        (data_pointer)POINTER_TO_PIXEL(source),
+                        source->width * source_step, sizeof(real32));
+      }
+      break;
+    case p_F64:
+      {
+        DISCONTINUOUS_IMAGE_VARIABLES(real64, real64);
+        FOR_2_DISCONTINUOUS_IMAGE_ROWS()
+            memory_copy((data_pointer)POINTER_TO_PIXEL(target),
+                        (data_pointer)POINTER_TO_PIXEL(source),
+                      source->width * source_step, sizeof(real64));
+      }
+      break;
+    default:
+      ERROR(BAD_TYPE);
     }
+  }
 
-    FINALLY(pixel_image_copy);
-    RETURN();
+  FINALLY(pixel_image_copy);
+  RETURN();
 }
 
 /******************************************************************************/
 
-result pixel_image_clear(
-    pixel_image *target
-    )
+result pixel_image_clear
+(
+  pixel_image *target
+)
 {
-    TRY();
+  TRY();
 
-    CHECK_POINTER(target);
-    CHECK_POINTER(target->data);
+  CHECK_POINTER(target);
+  CHECK_POINTER(target->data);
 
-    if (pixel_image_is_continuous(target)) {
-        size_t pixel_size;
-        switch (target->type) {
-        case p_U8:
-            pixel_size = sizeof(uint8);
-            break;
-        case p_S8:
-            pixel_size = sizeof(sint8);
-            break;
-        case p_U16:
-            pixel_size = sizeof(uint16);
-            break;
-        case p_S16:
-            pixel_size = sizeof(sint16);
-            break;
-        case p_U32:
-            pixel_size = sizeof(uint32);
-            break;
-        case p_S32:
-            pixel_size = sizeof(sint32);
-            break;
-        case p_F32:
-            pixel_size = sizeof(real32);
-            break;
-        case p_F64:
-            pixel_size = sizeof(real64);
-            break;
-        default:
-            ERROR(BAD_TYPE);
-        }
-        memory_clear((data_pointer)target->data, target->size, pixel_size);
+  if (pixel_image_is_continuous(target)) {
+    size_t pixel_size;
+    switch (target->type) {
+    case p_U8:
+      pixel_size = sizeof(uint8);
+      break;
+    case p_S8:
+      pixel_size = sizeof(sint8);
+      break;
+    case p_U16:
+      pixel_size = sizeof(uint16);
+      break;
+    case p_S16:
+      pixel_size = sizeof(sint16);
+      break;
+    case p_U32:
+      pixel_size = sizeof(uint32);
+      break;
+    case p_S32:
+      pixel_size = sizeof(sint32);
+      break;
+    case p_F32:
+      pixel_size = sizeof(real32);
+      break;
+    case p_F64:
+      pixel_size = sizeof(real64);
+      break;
+    default:
+      ERROR(BAD_TYPE);
     }
-    else {
-        uint32 x, y;
-        switch (target->type) {
-        case p_U8:
-            {
-                SINGLE_DISCONTINUOUS_IMAGE_VARIABLES(target, byte);
-                FOR_DISCONTINUOUS_IMAGE_ROW(target)
-                    memory_clear((data_pointer)POINTER_TO_PIXEL(target),
-                                 target->width * target_step, sizeof(byte));
-            }
-            break;
-        case p_S8:
-            {
-                SINGLE_DISCONTINUOUS_IMAGE_VARIABLES(target, char);
-                FOR_DISCONTINUOUS_IMAGE_ROW(target)
-                    memory_clear((data_pointer)POINTER_TO_PIXEL(target),
-                                 target->width * target_step, sizeof(char));
-            }
-            break;
-        case p_U16:
-            {
-                SINGLE_DISCONTINUOUS_IMAGE_VARIABLES(target, word);
-                FOR_DISCONTINUOUS_IMAGE_ROW(target)
-                    memory_clear((data_pointer)POINTER_TO_PIXEL(target),
-                                 target->width * target_step, sizeof(word));
-            }
-            break;
-        case p_S16:
-            {
-                SINGLE_DISCONTINUOUS_IMAGE_VARIABLES(target, sint16);
-                FOR_DISCONTINUOUS_IMAGE_ROW(target)
-                    memory_clear((data_pointer)POINTER_TO_PIXEL(target),
-                                 target->width * target_step, sizeof(sint16));
-            }
-            break;
-        case p_U32:
-            {
-                SINGLE_DISCONTINUOUS_IMAGE_VARIABLES(target, dword);
-                FOR_DISCONTINUOUS_IMAGE_ROW(target)
-                    memory_clear((data_pointer)POINTER_TO_PIXEL(target),
-                                 target->width * target_step, sizeof(dword));
-            }
-            break;
-        case p_S32:
-            {
-                SINGLE_DISCONTINUOUS_IMAGE_VARIABLES(target, sint32);
-                FOR_DISCONTINUOUS_IMAGE_ROW(target)
-                    memory_clear((data_pointer)POINTER_TO_PIXEL(target),
-                                 target->width * target_step, sizeof(sint32));
-            }
-            break;
-        case p_F32:
-            {
-                SINGLE_DISCONTINUOUS_IMAGE_VARIABLES(target, real32);
-                FOR_DISCONTINUOUS_IMAGE_ROW(target)
-                    memory_clear((data_pointer)POINTER_TO_PIXEL(target),
-                                 target->width * target_step, sizeof(real32));
-            }
-            break;
-        case p_F64:
-            {
-                SINGLE_DISCONTINUOUS_IMAGE_VARIABLES(target, real64);
-                FOR_DISCONTINUOUS_IMAGE_ROW(target)
-                    memory_clear((data_pointer)POINTER_TO_PIXEL(target),
-                                 target->width * target_step, sizeof(real64));
-            }
-            break;
-        default:
-            ERROR(BAD_TYPE);
-        }
+    memory_clear((data_pointer)target->data, target->size, pixel_size);
+  }
+  else {
+    uint32 x, y;
+    switch (target->type) {
+    case p_U8:
+      {
+        SINGLE_DISCONTINUOUS_IMAGE_VARIABLES(target, byte);
+        FOR_DISCONTINUOUS_IMAGE_ROW(target)
+            memory_clear((data_pointer)POINTER_TO_PIXEL(target),
+                         target->width * target_step, sizeof(byte));
+      }
+      break;
+    case p_S8:
+      {
+        SINGLE_DISCONTINUOUS_IMAGE_VARIABLES(target, char);
+        FOR_DISCONTINUOUS_IMAGE_ROW(target)
+            memory_clear((data_pointer)POINTER_TO_PIXEL(target),
+                         target->width * target_step, sizeof(char));
+      }
+      break;
+    case p_U16:
+      {
+        SINGLE_DISCONTINUOUS_IMAGE_VARIABLES(target, word);
+        FOR_DISCONTINUOUS_IMAGE_ROW(target)
+            memory_clear((data_pointer)POINTER_TO_PIXEL(target),
+                         target->width * target_step, sizeof(word));
+      }
+      break;
+    case p_S16:
+      {
+        SINGLE_DISCONTINUOUS_IMAGE_VARIABLES(target, sint16);
+        FOR_DISCONTINUOUS_IMAGE_ROW(target)
+            memory_clear((data_pointer)POINTER_TO_PIXEL(target),
+                         target->width * target_step, sizeof(sint16));
+      }
+      break;
+    case p_U32:
+      {
+        SINGLE_DISCONTINUOUS_IMAGE_VARIABLES(target, dword);
+        FOR_DISCONTINUOUS_IMAGE_ROW(target)
+            memory_clear((data_pointer)POINTER_TO_PIXEL(target),
+                         target->width * target_step, sizeof(dword));
+      }
+      break;
+    case p_S32:
+      {
+        SINGLE_DISCONTINUOUS_IMAGE_VARIABLES(target, sint32);
+        FOR_DISCONTINUOUS_IMAGE_ROW(target)
+            memory_clear((data_pointer)POINTER_TO_PIXEL(target),
+                         target->width * target_step, sizeof(sint32));
+      }
+      break;
+    case p_F32:
+      {
+        SINGLE_DISCONTINUOUS_IMAGE_VARIABLES(target, real32);
+        FOR_DISCONTINUOUS_IMAGE_ROW(target)
+            memory_clear((data_pointer)POINTER_TO_PIXEL(target),
+                         target->width * target_step, sizeof(real32));
+      }
+      break;
+    case p_F64:
+      {
+        SINGLE_DISCONTINUOUS_IMAGE_VARIABLES(target, real64);
+        FOR_DISCONTINUOUS_IMAGE_ROW(target)
+            memory_clear((data_pointer)POINTER_TO_PIXEL(target),
+                         target->width * target_step, sizeof(real64));
+      }
+      break;
+    default:
+      ERROR(BAD_TYPE);
     }
+  }
 
-    FINALLY(pixel_image_clear);
-    RETURN();
+  FINALLY(pixel_image_clear);
+  RETURN();
 }
 
 /******************************************************************************/
+/* private functions for parsing pnm files                                    */
 
 void skip_single_whitespace(FILE *file)
 {
@@ -821,6 +823,8 @@ int read_number(FILE *file)
   }
   return i;
 }
+
+/******************************************************************************/
 
 result pixel_image_read
 (
@@ -914,10 +918,8 @@ result pixel_image_read
       type = p_U32;
     }
 
+    /* allowing only one whitespace after header and no comment */
     skip_single_whitespace(file);
-    /* allowing only single whitespace after header and no comment */
-    /*skip_comment(file);*/
-    /*skip_whitespace(file);*/
   }
 
   if (format == RGB) {
@@ -1018,7 +1020,7 @@ result pixel_image_write
 (
   pixel_image *source,
   string target,
-  uint32 ascii
+  truth_value use_ascii
 )
 {
   TRY();
@@ -1037,7 +1039,7 @@ result pixel_image_write
     ERROR(INPUT_ERROR);
   }
 
-  if (ascii == 1) {
+  if (IS_TRUE(use_ascii)) {
     if (source->format == MONO) {
       number = 1;
     }
@@ -1128,56 +1130,63 @@ result pixel_image_write
 
 /******************************************************************************/
 
-bool pixel_image_is_continuous(const pixel_image *image)
+truth_value pixel_image_is_continuous
+(
+  const pixel_image *image
+)
 {
-    if (image == NULL) {
-        return false;
-    }
-    if (image->width * image->step != image->stride) {
-        return false;
-    }
-    if (image->dx > 0 || image->dy > 0) {
-        return false;
-    }
-    return true;
+  if (image == NULL) {
+    return FALSE;
+  }
+  if (image->width * image->step != image->stride) {
+    return FALSE;
+  }
+  if (image->dx > 0 || image->dy > 0) {
+    return FALSE;
+  }
+  return TRUE;
 }
 
 /******************************************************************************/
 
-result normalize(pixel_image *source, pixel_image *target)
+result normalize
+(
+  pixel_image *source,
+  pixel_image *target
+)
 {
-    TRY();
-    CHECK_POINTER(source);
-    CHECK_POINTER(target);
-    CHECK_PARAM(source->width == target->width);
-    CHECK_PARAM(source->height == target->height);
-    CHECK_PARAM(target->type == p_U8);
+  TRY();
+  CHECK_POINTER(source);
+  CHECK_POINTER(target);
+  CHECK_PARAM(source->width == target->width);
+  CHECK_PARAM(source->height == target->height);
+  CHECK_PARAM(target->type == p_U8);
 
-    switch (source->type) {
-    case p_U8:
-        CHECK(normalize_byte(source, target, 0, 0, 0));
-        break;
-    case p_S8:
-        CHECK(normalize_char(source, target, 0, 0, 0));
-        break;
-    case p_U16:
-        CHECK(normalize_word(source, target, 0, 0, 0));
-        break;
-    case p_S32:
-        CHECK(normalize_long(source, target, 0, 0, 0));
-        break;
-    case p_F32:
-        CHECK(normalize_float(source, target, 0, 0, 0));
-        break;
-    case p_F64:
-        CHECK(normalize_double(source, target, 0, 0, 0));
-        break;
-    default:
-        ERROR(BAD_TYPE);
-    }
+  switch (source->type) {
+  case p_U8:
+    CHECK(normalize_byte(source, target, 0, 0, 0));
+    break;
+  case p_S8:
+    CHECK(normalize_char(source, target, 0, 0, 0));
+    break;
+  case p_U16:
+    CHECK(normalize_word(source, target, 0, 0, 0));
+    break;
+  case p_S32:
+    CHECK(normalize_long(source, target, 0, 0, 0));
+    break;
+  case p_F32:
+    CHECK(normalize_float(source, target, 0, 0, 0));
+    break;
+  case p_F64:
+    CHECK(normalize_double(source, target, 0, 0, 0));
+    break;
+  default:
+    ERROR(BAD_TYPE);
+  }
 
-    FINALLY(normalize);
-    RETURN();
+  FINALLY(normalize);
+  RETURN();
 }
 
 /******************************************************************************/
@@ -1186,832 +1195,815 @@ result normalize(pixel_image *source, pixel_image *target)
 /* image processing code that is copy-pasted                                  */
 
 #define NORMALIZE_FUNCTION_BEGIN(type)\
-result normalize_##type(\
-    pixel_image *source,\
-    pixel_image *target,\
-    type min,\
-    type max,\
-    type mean\
-    )\
+result normalize_##type\
+(\
+  pixel_image *source,\
+  pixel_image *target,\
+  type min,\
+  type max,\
+  type mean\
+)\
 {\
-    type value;\
-    double factor;\
-    uint32 i;\
-    int temp;
+  type value;\
+  double factor;\
+  uint32 i;\
+  int temp;
 
 #define NORMALIZE_FUNCTION_END(type) }\
 
-#if IMAGE_ACCESS_METHOD == IMAGE_ACCESS_BY_INDEX
 #define CHECK_MINMAX()\
-    {\
-        value = source_data[source_pos];\
-        if (value < min) {\
-            min = value;\
-        }\
-        else if (value > max) {\
-            max = value;\
-        }\
-    }
-#elif IMAGE_ACCESS_METHOD == IMAGE_ACCESS_BY_POINTER
-#define CHECK_MINMAX()\
-    {\
-        value = *source_pos;\
-        if (value < min) {\
-            min = value;\
-        }\
-        else if (value > max) {\
-            max = value;\
-        }\
-    }
-#else
-#error "Image access method not defined"
-#endif
+  {\
+    value = *source_pos;\
+    if (value < min) {\
+        min = value;\
+    }\
+    else if (value > max) {\
+        max = value;\
+    }\
+  }
 
-#if IMAGE_ACCESS_METHOD == IMAGE_ACCESS_BY_INDEX
 #define NORMALIZE_VALUE()\
-    {\
-        temp = (int)(factor * (double)(source_data[source_pos] - min));\
-        target_data[target_pos] = (byte)((temp < 0) ? 0 : ((temp > 255) ? 255 : temp));\
-    }
-#elif IMAGE_ACCESS_METHOD == IMAGE_ACCESS_BY_POINTER
-#define NORMALIZE_VALUE()\
-    {\
-        temp = (int)(factor * (double)(*source_pos - min));\
-        *target_pos = (byte)((temp < 0) ? 0 : ((temp > 255) ? 255 : temp));\
-    }
-#else
-#error "Image access method not defined"
-#endif
+  {\
+    temp = (int)(factor * (double)(*source_pos - min));\
+    *target_pos = (byte)((temp < 0) ? 0 : ((temp > 255) ? 255 : temp));\
+  }
 
 /******************************************************************************/
 /* generate normalize functions                                               */
 
 NORMALIZE_FUNCTION_BEGIN(byte)
-    TRY();
+  TRY();
 
-    CHECK_POINTER(source);
-    CHECK_POINTER(target);
-    CHECK_PARAM(source->type == p_U8);
-    CHECK_PARAM(target->type == p_U8);
-    CHECK_PARAM((min <= mean) && (mean <= max));
+  CHECK_POINTER(source);
+  CHECK_POINTER(target);
+  CHECK_PARAM(source->type == p_U8);
+  CHECK_PARAM(target->type == p_U8);
+  CHECK_PARAM((min <= mean) && (mean <= max));
 
-    if (pixel_image_is_continuous(source) && pixel_image_is_continuous(target)) {
-        CONTINUOUS_IMAGE_VARIABLES(byte, byte);
-        for (i = 0; i < source->step; i++) {
-            if (min == 0 && max == 0) {
-                min = PIXEL_VALUE(source);
-                max = min;
+  if (pixel_image_is_continuous(source) && pixel_image_is_continuous(target)) {
+    CONTINUOUS_IMAGE_VARIABLES(byte, byte);
+    for (i = 0; i < source->step; i++) {
+      if (min == 0 && max == 0) {
+        min = PIXEL_VALUE(source);
+        max = min;
 
-                FOR_CONTINUOUS_IMAGE_WITH_OFFSET(source, i)
-                    CHECK_MINMAX()
-            }
-            factor = 256.0 / (double)(max - min);
+        FOR_CONTINUOUS_IMAGE_WITH_OFFSET(source, i)
+          CHECK_MINMAX()
+      }
+      factor = 256.0 / (double)(max - min);
 
-            FOR_2_CONTINUOUS_IMAGES_WITH_OFFSET(i, i)
-                NORMALIZE_VALUE()
-        }
+      FOR_2_CONTINUOUS_IMAGES_WITH_OFFSET(i, i)
+        NORMALIZE_VALUE()
     }
-    else {
-        uint32 x, y;
-        DISCONTINUOUS_IMAGE_VARIABLES(byte, byte);
-        for (i = 0; i < source->step; i++) {
-            if (min == 0 && max == 0) {
-                min = PIXEL_VALUE(source);
-                max = min;
+  }
+  else {
+    uint32 x, y;
+    DISCONTINUOUS_IMAGE_VARIABLES(byte, byte);
+    for (i = 0; i < source->step; i++) {
+      if (min == 0 && max == 0) {
+        min = PIXEL_VALUE(source);
+        max = min;
 
-                FOR_DISCONTINUOUS_IMAGE_WITH_OFFSET(source, i)
-                    CHECK_MINMAX()
-            }
-            factor = 256.0 / (double)(max - min);
+        FOR_DISCONTINUOUS_IMAGE_WITH_OFFSET(source, i)
+          CHECK_MINMAX()
+      }
+      factor = 256.0 / (double)(max - min);
 
-            FOR_2_DISCONTINUOUS_IMAGES_WITH_OFFSET(i, i)
-                NORMALIZE_VALUE()
-        }
+      FOR_2_DISCONTINUOUS_IMAGES_WITH_OFFSET(i, i)
+        NORMALIZE_VALUE()
     }
-    FINALLY(normalize_byte);
-    RETURN();
+  }
+  FINALLY(normalize_byte);
+  RETURN();
 NORMALIZE_FUNCTION_END()
 
 /******************************************************************************/
 
 NORMALIZE_FUNCTION_BEGIN(char)
-    TRY();
+  TRY();
 
-    CHECK_POINTER(source);
-    CHECK_POINTER(target);
-    CHECK_PARAM(source->type == p_S8);
-    CHECK_PARAM(target->type == p_U8);
-    CHECK_PARAM((min <= mean) && (mean <= max));
+  CHECK_POINTER(source);
+  CHECK_POINTER(target);
+  CHECK_PARAM(source->type == p_S8);
+  CHECK_PARAM(target->type == p_U8);
+  CHECK_PARAM((min <= mean) && (mean <= max));
 
-    if (pixel_image_is_continuous(source) && pixel_image_is_continuous(target)) {
-        CONTINUOUS_IMAGE_VARIABLES(char, byte);
-        for (i = 0; i < source->step; i++) {
-            if (min == 0 && max == 0) {
-                min = PIXEL_VALUE(source);
-                max = min;
+  if (pixel_image_is_continuous(source) && pixel_image_is_continuous(target)) {
+    CONTINUOUS_IMAGE_VARIABLES(char, byte);
+    for (i = 0; i < source->step; i++) {
+      if (min == 0 && max == 0) {
+        min = PIXEL_VALUE(source);
+        max = min;
 
-                FOR_CONTINUOUS_IMAGE_WITH_OFFSET(source, i)
-                    CHECK_MINMAX()
-            }
-            factor = 256.0 / (double)(max - min);
+        FOR_CONTINUOUS_IMAGE_WITH_OFFSET(source, i)
+          CHECK_MINMAX()
+      }
+      factor = 256.0 / (double)(max - min);
 
-            FOR_2_CONTINUOUS_IMAGES_WITH_OFFSET(i, i)
-                NORMALIZE_VALUE()
-        }
+      FOR_2_CONTINUOUS_IMAGES_WITH_OFFSET(i, i)
+        NORMALIZE_VALUE()
     }
-    else {
-        uint32 x, y;
-        DISCONTINUOUS_IMAGE_VARIABLES(char, byte);
-        for (i = 0; i < source->step; i++) {
-            if (min == 0 && max == 0) {
-                min = PIXEL_VALUE(source);
-                max = min;
+  }
+  else {
+    uint32 x, y;
+    DISCONTINUOUS_IMAGE_VARIABLES(char, byte);
+    for (i = 0; i < source->step; i++) {
+      if (min == 0 && max == 0) {
+        min = PIXEL_VALUE(source);
+        max = min;
 
-                FOR_DISCONTINUOUS_IMAGE_WITH_OFFSET(source, i)
-                    CHECK_MINMAX()
-            }
-            factor = 256.0 / (double)(max - min);
+        FOR_DISCONTINUOUS_IMAGE_WITH_OFFSET(source, i)
+          CHECK_MINMAX()
+      }
+      factor = 256.0 / (double)(max - min);
 
-            FOR_2_DISCONTINUOUS_IMAGES_WITH_OFFSET(i, i)
-                NORMALIZE_VALUE()
-        }
+      FOR_2_DISCONTINUOUS_IMAGES_WITH_OFFSET(i, i)
+        NORMALIZE_VALUE()
     }
+  }
 
-    FINALLY(normalize_char);
-    RETURN();
+  FINALLY(normalize_char);
+  RETURN();
 NORMALIZE_FUNCTION_END()
 
 /******************************************************************************/
 
 NORMALIZE_FUNCTION_BEGIN(word)
-    TRY();
+  TRY();
 
-    CHECK_POINTER(source);
-    CHECK_POINTER(target);
-    CHECK_PARAM(source->type == p_U16);
-    CHECK_PARAM(target->type == p_U8);
-    CHECK_PARAM((min <= mean) && (mean <= max));
+  CHECK_POINTER(source);
+  CHECK_POINTER(target);
+  CHECK_PARAM(source->type == p_U16);
+  CHECK_PARAM(target->type == p_U8);
+  CHECK_PARAM((min <= mean) && (mean <= max));
 
-    if (pixel_image_is_continuous(source) && pixel_image_is_continuous(target)) {
-        CONTINUOUS_IMAGE_VARIABLES(word, byte);
-        for (i = 0; i < source->step; i++) {
-            if (min == 0 && max == 0) {
-                min = PIXEL_VALUE(source);
-                max = min;
+  if (pixel_image_is_continuous(source) && pixel_image_is_continuous(target)) {
+    CONTINUOUS_IMAGE_VARIABLES(word, byte);
+    for (i = 0; i < source->step; i++) {
+      if (min == 0 && max == 0) {
+        min = PIXEL_VALUE(source);
+        max = min;
 
-                FOR_CONTINUOUS_IMAGE_WITH_OFFSET(source, i)
-                    CHECK_MINMAX()
-            }
-            factor = 256.0 / (double)(max - min);
+        FOR_CONTINUOUS_IMAGE_WITH_OFFSET(source, i)
+          CHECK_MINMAX()
+      }
+      factor = 256.0 / (double)(max - min);
 
-            FOR_2_CONTINUOUS_IMAGES_WITH_OFFSET(i, i)
-                NORMALIZE_VALUE()
-        }
+      FOR_2_CONTINUOUS_IMAGES_WITH_OFFSET(i, i)
+        NORMALIZE_VALUE()
     }
-    else {
-        uint32 x, y;
-        DISCONTINUOUS_IMAGE_VARIABLES(word, byte);
-        for (i = 0; i < source->step; i++) {
-            if (min == 0 && max == 0) {
-                min = PIXEL_VALUE(source);
-                max = min;
+  }
+  else {
+    uint32 x, y;
+    DISCONTINUOUS_IMAGE_VARIABLES(word, byte);
+    for (i = 0; i < source->step; i++) {
+      if (min == 0 && max == 0) {
+        min = PIXEL_VALUE(source);
+        max = min;
 
-                FOR_DISCONTINUOUS_IMAGE_WITH_OFFSET(source, i)
-                    CHECK_MINMAX()
-            }
-            factor = 256.0 / (double)(max - min);
+        FOR_DISCONTINUOUS_IMAGE_WITH_OFFSET(source, i)
+          CHECK_MINMAX()
+      }
+      factor = 256.0 / (double)(max - min);
 
-            FOR_2_DISCONTINUOUS_IMAGES_WITH_OFFSET(i, i)
-                NORMALIZE_VALUE()
-        }
+      FOR_2_DISCONTINUOUS_IMAGES_WITH_OFFSET(i, i)
+        NORMALIZE_VALUE()
     }
+  }
 
-    FINALLY(normalize_word);
-    RETURN();
+  FINALLY(normalize_word);
+  RETURN();
 NORMALIZE_FUNCTION_END()
 
 /******************************************************************************/
 
 NORMALIZE_FUNCTION_BEGIN(long)
-    TRY();
+  TRY();
 
-    CHECK_POINTER(source);
-    CHECK_POINTER(target);
-    CHECK_PARAM(source->type == p_S32);
-    CHECK_PARAM(target->type == p_U8);
-    CHECK_PARAM((min <= mean) && (mean <= max));
+  CHECK_POINTER(source);
+  CHECK_POINTER(target);
+  CHECK_PARAM(source->type == p_S32);
+  CHECK_PARAM(target->type == p_U8);
+  CHECK_PARAM((min <= mean) && (mean <= max));
 
-    if (pixel_image_is_continuous(source) && pixel_image_is_continuous(target)) {
-        CONTINUOUS_IMAGE_VARIABLES(long, byte);
-        for (i = 0; i < source->step; i++) {
-            if (min == 0 && max == 0) {
-                min = PIXEL_VALUE(source);
-                max = min;
+  if (pixel_image_is_continuous(source) && pixel_image_is_continuous(target)) {
+    CONTINUOUS_IMAGE_VARIABLES(long, byte);
+    for (i = 0; i < source->step; i++) {
+      if (min == 0 && max == 0) {
+        min = PIXEL_VALUE(source);
+        max = min;
 
-                FOR_CONTINUOUS_IMAGE_WITH_OFFSET(source, i)
-                    CHECK_MINMAX()
-            }
-            factor = 256.0 / (double)(max - min);
+        FOR_CONTINUOUS_IMAGE_WITH_OFFSET(source, i)
+          CHECK_MINMAX()
+      }
+      factor = 256.0 / (double)(max - min);
 
-            FOR_2_CONTINUOUS_IMAGES_WITH_OFFSET(i, i)
-                NORMALIZE_VALUE()
-        }
+      FOR_2_CONTINUOUS_IMAGES_WITH_OFFSET(i, i)
+        NORMALIZE_VALUE()
     }
-    else {
-        uint32 x, y;
-        DISCONTINUOUS_IMAGE_VARIABLES(long, byte);
-        for (i = 0; i < source->step; i++) {
-            if (min == 0 && max == 0) {
-                min = PIXEL_VALUE(source);
-                max = min;
+  }
+  else {
+    uint32 x, y;
+    DISCONTINUOUS_IMAGE_VARIABLES(long, byte);
+    for (i = 0; i < source->step; i++) {
+      if (min == 0 && max == 0) {
+        min = PIXEL_VALUE(source);
+        max = min;
 
-                FOR_DISCONTINUOUS_IMAGE_WITH_OFFSET(source, i)
-                    CHECK_MINMAX()
-            }
-            factor = 256.0 / (double)(max - min);
+        FOR_DISCONTINUOUS_IMAGE_WITH_OFFSET(source, i)
+          CHECK_MINMAX()
+      }
+      factor = 256.0 / (double)(max - min);
 
-            FOR_2_DISCONTINUOUS_IMAGES_WITH_OFFSET(i, i)
-                NORMALIZE_VALUE()
-        }
+      FOR_2_DISCONTINUOUS_IMAGES_WITH_OFFSET(i, i)
+        NORMALIZE_VALUE()
     }
+  }
 
-    FINALLY(normalize_long);
-    RETURN();
+  FINALLY(normalize_long);
+  RETURN();
 NORMALIZE_FUNCTION_END()
 
 /******************************************************************************/
 
 NORMALIZE_FUNCTION_BEGIN(float)
-    TRY();
+  TRY();
 
-    CHECK_POINTER(source);
-    CHECK_POINTER(target);
-    CHECK_PARAM(source->type == p_F32);
-    CHECK_PARAM(target->type == p_U8);
-    CHECK_PARAM((min <= mean) && (mean <= max));
+  CHECK_POINTER(source);
+  CHECK_POINTER(target);
+  CHECK_PARAM(source->type == p_F32);
+  CHECK_PARAM(target->type == p_U8);
+  CHECK_PARAM((min <= mean) && (mean <= max));
 
-    if (pixel_image_is_continuous(source) && pixel_image_is_continuous(target)) {
-        CONTINUOUS_IMAGE_VARIABLES(float, byte);
-        for (i = 0; i < source->step; i++) {
-            if (min == 0 && max == 0) {
-                min = PIXEL_VALUE(source);
-                max = min;
+  if (pixel_image_is_continuous(source) && pixel_image_is_continuous(target)) {
+    CONTINUOUS_IMAGE_VARIABLES(float, byte);
+    for (i = 0; i < source->step; i++) {
+      if (min == 0 && max == 0) {
+        min = PIXEL_VALUE(source);
+        max = min;
 
-                FOR_CONTINUOUS_IMAGE_WITH_OFFSET(source, i)
-                    CHECK_MINMAX()
-            }
-            factor = 256.0 / (float)(max - min);
+        FOR_CONTINUOUS_IMAGE_WITH_OFFSET(source, i)
+          CHECK_MINMAX()
+      }
+      factor = 256.0 / (float)(max - min);
 
-            FOR_2_CONTINUOUS_IMAGES_WITH_OFFSET(i, i)
-                NORMALIZE_VALUE()
-        }
+      FOR_2_CONTINUOUS_IMAGES_WITH_OFFSET(i, i)
+        NORMALIZE_VALUE()
     }
-    else {
-        uint32 x, y;
-        DISCONTINUOUS_IMAGE_VARIABLES(float, byte);
-        for (i = 0; i < source->step; i++) {
-            if (min == 0 && max == 0) {
-                min = PIXEL_VALUE(source);
-                max = min;
+  }
+  else {
+    uint32 x, y;
+    DISCONTINUOUS_IMAGE_VARIABLES(float, byte);
+    for (i = 0; i < source->step; i++) {
+      if (min == 0 && max == 0) {
+        min = PIXEL_VALUE(source);
+        max = min;
 
-                FOR_DISCONTINUOUS_IMAGE_WITH_OFFSET(source, i)
-                    CHECK_MINMAX()
-            }
-            factor = 256.0 / (float)(max - min);
+        FOR_DISCONTINUOUS_IMAGE_WITH_OFFSET(source, i)
+          CHECK_MINMAX()
+      }
+      factor = 256.0 / (float)(max - min);
 
-            FOR_2_DISCONTINUOUS_IMAGES_WITH_OFFSET(i, i)
-                NORMALIZE_VALUE()
-        }
+      FOR_2_DISCONTINUOUS_IMAGES_WITH_OFFSET(i, i)
+        NORMALIZE_VALUE()
     }
+  }
 
-    FINALLY(normalize_float);
-    RETURN();
+  FINALLY(normalize_float);
+  RETURN();
 NORMALIZE_FUNCTION_END()
 
 /******************************************************************************/
 
 NORMALIZE_FUNCTION_BEGIN(double)
-    TRY();
+  TRY();
 
-    CHECK_POINTER(source);
-    CHECK_POINTER(target);
-    CHECK_PARAM(source->type == p_F64);
-    CHECK_PARAM(target->type == p_U8);
-    CHECK_PARAM((min <= mean) && (mean <= max));
+  CHECK_POINTER(source);
+  CHECK_POINTER(target);
+  CHECK_PARAM(source->type == p_F64);
+  CHECK_PARAM(target->type == p_U8);
+  CHECK_PARAM((min <= mean) && (mean <= max));
 
-    if (pixel_image_is_continuous(source) && pixel_image_is_continuous(target)) {
-        CONTINUOUS_IMAGE_VARIABLES(double, byte);
-        for (i = 0; i < source->step; i++) {
-            if (min == 0 && max == 0) {
-                min = PIXEL_VALUE(source);
-                max = min;
+  if (pixel_image_is_continuous(source) && pixel_image_is_continuous(target)) {
+    CONTINUOUS_IMAGE_VARIABLES(double, byte);
+    for (i = 0; i < source->step; i++) {
+      if (min == 0 && max == 0) {
+        min = PIXEL_VALUE(source);
+        max = min;
 
-                FOR_CONTINUOUS_IMAGE_WITH_OFFSET(source, i)
-                    CHECK_MINMAX()
-            }
-            factor = 256.0 / (double)(max - min);
+        FOR_CONTINUOUS_IMAGE_WITH_OFFSET(source, i)
+          CHECK_MINMAX()
+      }
+      factor = 256.0 / (double)(max - min);
 
-            FOR_2_CONTINUOUS_IMAGES_WITH_OFFSET(i, i)
-                NORMALIZE_VALUE()
-        }
+      FOR_2_CONTINUOUS_IMAGES_WITH_OFFSET(i, i)
+        NORMALIZE_VALUE()
     }
-    else {
-        uint32 x, y;
-        DISCONTINUOUS_IMAGE_VARIABLES(double, byte);
-        for (i = 0; i < source->step; i++) {
-            if (min == 0 && max == 0) {
-                min = PIXEL_VALUE(source);
-                max = min;
+  }
+  else {
+    uint32 x, y;
+    DISCONTINUOUS_IMAGE_VARIABLES(double, byte);
+    for (i = 0; i < source->step; i++) {
+      if (min == 0 && max == 0) {
+        min = PIXEL_VALUE(source);
+        max = min;
 
-                FOR_DISCONTINUOUS_IMAGE_WITH_OFFSET(source, i)
-                    CHECK_MINMAX()
-            }
-            factor = 256.0 / (double)(max - min);
+        FOR_DISCONTINUOUS_IMAGE_WITH_OFFSET(source, i)
+          CHECK_MINMAX()
+      }
+      factor = 256.0 / (double)(max - min);
 
-            FOR_2_DISCONTINUOUS_IMAGES_WITH_OFFSET(i, i)
-                NORMALIZE_VALUE()
-        }
+      FOR_2_DISCONTINUOUS_IMAGES_WITH_OFFSET(i, i)
+        NORMALIZE_VALUE()
     }
+  }
 
-    FINALLY(normalize_double);
-    RETURN();
+  FINALLY(normalize_double);
+  RETURN();
 NORMALIZE_FUNCTION_END()
 
 /******************************************************************************/
 
-result convert_grey8_to_grey24(
-    const pixel_image *source,
-    pixel_image *target
-    )
+result convert_grey8_to_grey24
+(
+  const pixel_image *source,
+  pixel_image *target
+)
 {
-    TRY();
+  TRY();
 
-    CHECK_POINTER(source);
-    CHECK_POINTER(target);
-    CHECK_POINTER(source->data);
-    CHECK_POINTER(target->data);
-    CHECK_PARAM(source->type == p_U8);
-    CHECK_PARAM(target->type == p_U8);
-    CHECK_PARAM(source->step == 1);
-    CHECK_PARAM(target->step == 3);
-    CHECK_PARAM(source->format == GREY);
-    CHECK_PARAM(target->format == RGB);
-    CHECK_PARAM(source->width == target->width);
-    CHECK_PARAM(source->height == target->height);
+  CHECK_POINTER(source);
+  CHECK_POINTER(target);
+  CHECK_POINTER(source->data);
+  CHECK_POINTER(target->data);
+  CHECK_PARAM(source->type == p_U8);
+  CHECK_PARAM(target->type == p_U8);
+  CHECK_PARAM(source->step == 1);
+  CHECK_PARAM(target->step == 3);
+  CHECK_PARAM(source->format == GREY);
+  CHECK_PARAM(target->format == RGB);
+  CHECK_PARAM(source->width == target->width);
+  CHECK_PARAM(source->height == target->height);
 
-    if (pixel_image_is_continuous(source) && pixel_image_is_continuous(target)) {
-        CONTINUOUS_IMAGE_VARIABLES(byte, byte);
-        FOR_2_CONTINUOUS_IMAGES()
-        {
-            PIXEL_VALUE(target)
-                    = PIXEL_VALUE_PLUS(target, 1)
-                    = PIXEL_VALUE_PLUS(target, 2)
-                    = PIXEL_VALUE(source);
-
-        }
-    }
-    else {
-        uint32 x, y;
-        DISCONTINUOUS_IMAGE_VARIABLES(byte, byte);
-        FOR_2_DISCONTINUOUS_IMAGES()
-        {
-            PIXEL_VALUE(target)
-                    = PIXEL_VALUE_PLUS(target, 1)
-                    = PIXEL_VALUE_PLUS(target, 2)
-                    = PIXEL_VALUE(source);
-
-        }
-    }
-
-    FINALLY(convert_grey8_to_grey24);
-    RETURN();
-}
-
-/******************************************************************************/
-
-result convert_grey8_to_yuv24(
-    const pixel_image *source,
-    pixel_image *target
-    )
-{
-    TRY();
-
-    CHECK_POINTER(source);
-    CHECK_POINTER(target);
-    CHECK_POINTER(source->data);
-    CHECK_POINTER(target->data);
-    CHECK_PARAM(source->type == p_U8);
-    CHECK_PARAM(target->type == p_U8);
-    CHECK_PARAM(source->step == 1);
-    CHECK_PARAM(target->step == 3);
-    CHECK_PARAM(source->format == GREY);
-    CHECK_PARAM(target->format == YUV);
-    CHECK_PARAM(source->width == target->width);
-    CHECK_PARAM(source->height == target->height);
-
-    if (pixel_image_is_continuous(source) && pixel_image_is_continuous(target)) {
-        CONTINUOUS_IMAGE_VARIABLES(byte, byte);
-        FOR_2_CONTINUOUS_IMAGES()
-        {
-            PIXEL_VALUE(target) = PIXEL_VALUE(source);
-            PIXEL_VALUE_PLUS(target, 1) = 128;
-            PIXEL_VALUE_PLUS(target, 2) = 128;
-        }
-    }
-    else {
-        uint32 x, y;
-        DISCONTINUOUS_IMAGE_VARIABLES(byte, byte);
-        FOR_2_DISCONTINUOUS_IMAGES()
-        {
-            PIXEL_VALUE(target) = PIXEL_VALUE(source);
-            PIXEL_VALUE_PLUS(target, 1) = 128;
-            PIXEL_VALUE_PLUS(target, 2) = 128;
-        }
-    }
-
-    FINALLY(convert_grey8_to_yuv24);
-    RETURN();
-}
-
-/******************************************************************************/
-
-result convert_rgb24_to_grey8(
-    const pixel_image *source,
-    pixel_image *target
-    )
-{
-    TRY();
-    sint32 value;
-
-    CHECK_POINTER(source);
-    CHECK_POINTER(target);
-    CHECK_POINTER(source->data);
-    CHECK_POINTER(target->data);
-    CHECK_PARAM(source->type == p_U8);
-    CHECK_PARAM(target->type == p_U8);
-    CHECK_PARAM(source->step == 3);
-    CHECK_PARAM(target->step == 1);
-    CHECK_PARAM(source->format == RGB);
-    CHECK_PARAM(target->format == GREY);
-    CHECK_PARAM(source->width == target->width);
-    CHECK_PARAM(source->height == target->height);
-
-    if (pixel_image_is_continuous(source) && pixel_image_is_continuous(target)) {
-        CONTINUOUS_IMAGE_VARIABLES(byte, byte);
-        FOR_2_CONTINUOUS_IMAGES()
-        {
-            value = (int)(0.30 * PIXEL_VALUE(source) +
-                          0.59 * PIXEL_VALUE_PLUS(source, 1) +
-                          0.11 * PIXEL_VALUE_PLUS(source, 2));
-            value = TRUNC(value, 0, 255);
-            PIXEL_VALUE(target) = (byte)value;
-        }
-    }
-    else {
-        uint32 x, y;
-        DISCONTINUOUS_IMAGE_VARIABLES(byte, byte);
-        FOR_2_DISCONTINUOUS_IMAGES()
-        {
-            value = (int)(0.30 * PIXEL_VALUE(source) +
-                          0.59 * PIXEL_VALUE_PLUS(source, 1) +
-                          0.11 * PIXEL_VALUE_PLUS(source, 2));
-            value = TRUNC(value, 0, 255);
-            PIXEL_VALUE(target) = (byte)value;
-        }
-    }
-
-    FINALLY(convert_rgb24_to_grey8);
-    RETURN();
-}
-
-/******************************************************************************/
-
-result convert_rgb24_to_yuv24(
-    const pixel_image *source,
-    pixel_image *target
-    )
-{
-    TRY();
-    byte R, G, B;
-    /*sint32 Y, U, V;*/
-    double  Y, U, V;
-
-    CHECK_POINTER(source);
-    CHECK_POINTER(target);
-    CHECK_POINTER(source->data);
-    CHECK_POINTER(target->data);
-    CHECK_PARAM(source->type == p_U8);
-    CHECK_PARAM(target->type == p_U8);
-    CHECK_PARAM(source->step == 3);
-    CHECK_PARAM(target->step == 3);
-    CHECK_PARAM(source->format == RGB);
-    CHECK_PARAM(target->format == YUV);
-    CHECK_PARAM(source->width == target->width);
-    CHECK_PARAM(source->height == target->height);
-
-    if (pixel_image_is_continuous(source) && pixel_image_is_continuous(target)) {
-        CONTINUOUS_IMAGE_VARIABLES(byte, byte);
-        FOR_2_CONTINUOUS_IMAGES()
-        {
-            R = PIXEL_VALUE(source);
-            G = PIXEL_VALUE_PLUS(source, 1);
-            B = PIXEL_VALUE_PLUS(source, 2);
-            Y = ( 0.29900 * ((double)R / 255.0)) + ( 0.58700 * ((double)G / 255.0)) + ( 0.11400 * ((double)B / 255.0));
-            U = (-0.14713 * ((double)R / 255.0)) + (-0.28886 * ((double)G / 255.0)) + ( 0.43600 * ((double)B / 255.0));
-            V = ( 0.61500 * ((double)R / 255.0)) + (-0.51499 * ((double)G / 255.0)) + (-0.10001 * ((double)B / 255.0));
-            /*
-            Y = ( 77 * R) + (150 * G) + ( 29 * B) + 128;
-            U = (-38 * R) + (-74 * G) + (112 * B) + 128;
-            V = (112 * R) + (-94 * G) + (-18 * B) + 128;
-            Y >>= 8;
-            U >>= 8;
-            V >>= 8;
-            */
-            PIXEL_VALUE(target)         = (byte)(Y * 255);
-            PIXEL_VALUE_PLUS(target, 1) = (byte)(((U + 0.436) / (2 * 0.436)) * 255);
-            PIXEL_VALUE_PLUS(target, 2) = (byte)(((V + 0.615) / (2 * 0.615)) * 255);
-        }
-    }
-    else {
-        uint32 x, y;
-        DISCONTINUOUS_IMAGE_VARIABLES(byte, byte);
-        FOR_2_DISCONTINUOUS_IMAGES()
-        {
-            R = PIXEL_VALUE(source);
-            G = PIXEL_VALUE_PLUS(source, 1);
-            B = PIXEL_VALUE_PLUS(source, 2);
-            Y = ( 0.29900 * ((double)R / 255.0)) + ( 0.58700 * ((double)G / 255.0)) + ( 0.11400 * ((double)B / 255.0));
-            U = (-0.14713 * ((double)R / 255.0)) + (-0.28886 * ((double)G / 255.0)) + ( 0.43600 * ((double)B / 255.0));
-            V = ( 0.61500 * ((double)R / 255.0)) + (-0.51499 * ((double)G / 255.0)) + (-0.10001 * ((double)B / 255.0));
-            /*
-            Y = ( 77 * R) + (150 * G) + ( 29 * B) + 128;
-            U = (-38 * R) + (-74 * G) + (112 * B) + 128;
-            V = (112 * R) + (-94 * G) + (-18 * B) + 128;
-            Y >>= 8;
-            U >>= 8;
-            V >>= 8;
-            */
-            PIXEL_VALUE(target)         = (byte)(Y * 255);
-            PIXEL_VALUE_PLUS(target, 1) = (byte)(((U + 0.436) / (2 * 0.436)) * 255);
-            PIXEL_VALUE_PLUS(target, 2) = (byte)(((V + 0.615) / (2 * 0.615)) * 255);
-        }
-    }
-
-    FINALLY(convert_rgb24_to_yuv24);
-    RETURN();
-}
-
-/******************************************************************************/
-
-result convert_yuv24_to_rgb24(
-    const pixel_image *source,
-    pixel_image *target
-    )
-{
-    TRY();
-    byte Yb, Ub, Vb;
-    /*sint32 Y, U, V;*/
-    double Y, U, V, R, G, B;
-
-    CHECK_POINTER(source);
-    CHECK_POINTER(target);
-    CHECK_POINTER(source->data);
-    CHECK_POINTER(target->data);
-    CHECK_PARAM(source->type == p_U8);
-    CHECK_PARAM(target->type == p_U8);
-    CHECK_PARAM(source->step == 3);
-    CHECK_PARAM(target->step == 3);
-    CHECK_PARAM(source->format == YUV);
-    CHECK_PARAM(target->format == RGB);
-    CHECK_PARAM(source->width == target->width);
-    CHECK_PARAM(source->height == target->height);
-
-    if (pixel_image_is_continuous(source) && pixel_image_is_continuous(target)) {
-        CONTINUOUS_IMAGE_VARIABLES(byte, byte);
-        FOR_2_CONTINUOUS_IMAGES()
-        {
-            Yb = PIXEL_VALUE(source);
-            Ub = PIXEL_VALUE_PLUS(source, 1);
-            Vb = PIXEL_VALUE_PLUS(source, 2);
-            Y = ((double)Yb / 255.0);
-            U = (((double)Ub / 255.0) * 2.0 * 0.436) - 0.436;
-            V = (((double)Vb / 255.0) * 2.0 * 0.615) - 0.615;
-            R = ( Y + 0.00000 * U + 1.13983 * V);
-            G = ( Y - 0.39465 * U - 0.58060 * V);
-            B = ( Y + 2.03211 * U + 0.00000 * V);
-            /*
-            Y = ( 77 * R) + (150 * G) + ( 29 * B) + 128;
-            U = (-38 * R) + (-74 * G) + (112 * B) + 128;
-            V = (112 * R) + (-94 * G) + (-18 * B) + 128;
-            Y >>= 8;
-            U >>= 8;
-            V >>= 8;
-            */
-            PIXEL_VALUE(target)         = (byte)(R * 255);
-            PIXEL_VALUE_PLUS(target, 1) = (byte)(G * 255);
-            PIXEL_VALUE_PLUS(target, 2) = (byte)(B * 255);
-        }
-    }
-    else {
-        uint32 x, y;
-        DISCONTINUOUS_IMAGE_VARIABLES(byte, byte);
-        FOR_2_DISCONTINUOUS_IMAGES()
-        {
-            Yb = PIXEL_VALUE(source);
-            Ub = PIXEL_VALUE_PLUS(source, 1);
-            Vb = PIXEL_VALUE_PLUS(source, 2);
-            Y = ((double)Yb / 255.0);
-            U = (((double)Ub / 255.0) * 2.0 * 0.436) - 0.436;
-            V = (((double)Vb / 255.0) * 2.0 * 0.615) - 0.615;
-            R = ( Y + 0.00000 * U + 1.13983 * V);
-            G = ( Y - 0.39465 * U - 0.58060 * V);
-            B = ( Y + 2.03211 * U + 0.00000 * V);
-            /*
-            Y = ( 77 * R) + (150 * G) + ( 29 * B) + 128;
-            U = (-38 * R) + (-74 * G) + (112 * B) + 128;
-            V = (112 * R) + (-94 * G) + (-18 * B) + 128;
-            Y >>= 8;
-            U >>= 8;
-            V >>= 8;
-            */
-            PIXEL_VALUE(target)         = (byte)(R * 255);
-            PIXEL_VALUE_PLUS(target, 1) = (byte)(G * 255);
-            PIXEL_VALUE_PLUS(target, 2) = (byte)(B * 255);
-        }
-    }
-
-    FINALLY(convert_yuv24_to_rgb24);
-    RETURN();
-}
-
-/******************************************************************************/
-
-result convert_yuv24_to_grey8(
-    const pixel_image *source,
-    pixel_image *target
-    )
-{
-    TRY();
-    byte Y;
-
-    CHECK_POINTER(source);
-    CHECK_POINTER(target);
-    CHECK_POINTER(source->data);
-    CHECK_POINTER(target->data);
-    CHECK_PARAM(source->type == p_U8);
-    CHECK_PARAM(target->type == p_U8);
-    CHECK_PARAM(source->step == 3);
-    CHECK_PARAM(target->step == 1);
-    CHECK_PARAM(source->format == YUV);
-    CHECK_PARAM(target->format == GREY);
-    CHECK_PARAM(source->width == target->width);
-    CHECK_PARAM(source->height == target->height);
-
-    if (pixel_image_is_continuous(source) && pixel_image_is_continuous(target)) {
-        CONTINUOUS_IMAGE_VARIABLES(byte, byte);
-        FOR_2_CONTINUOUS_IMAGES()
-        {
-            Y = PIXEL_VALUE(source);
-            PIXEL_VALUE(target) = Y;
-        }
-    }
-    else {
-        uint32 x, y;
-        DISCONTINUOUS_IMAGE_VARIABLES(byte, byte);
-        FOR_2_DISCONTINUOUS_IMAGES()
-        {
-            Y = PIXEL_VALUE(source);
-            PIXEL_VALUE(target) = Y;
-        }
-    }
-
-    FINALLY(convert_yuv24_to_grey8);
-    RETURN();
-}
-
-/******************************************************************************/
-
-result pick_1_channel_from_3_channels(
-    const pixel_image *source,
-    pixel_image *target,
-    uint32 channel
-    )
-{
-    TRY();
-
-    CHECK_POINTER(source);
-    CHECK_POINTER(target);
-    CHECK_POINTER(source->data);
-    CHECK_POINTER(target->data);
-    CHECK_PARAM(source->type == p_U8);
-    CHECK_PARAM(target->type == p_U8);
-    CHECK_PARAM(source->step == 3);
-    CHECK_PARAM(target->step == 1);
-    CHECK_PARAM(target->format == GREY);
-    CHECK_PARAM(source->width == target->width);
-    CHECK_PARAM(source->height == target->height);
-    CHECK_PARAM(channel < 3);
-
-    if (pixel_image_is_continuous(source) && pixel_image_is_continuous(target)) {
-        CONTINUOUS_IMAGE_VARIABLES(byte, byte);
-        FOR_2_CONTINUOUS_IMAGES()
-        {
-            PIXEL_VALUE(target) = PIXEL_VALUE_PLUS(source, channel);
-        }
-    }
-    else {
-        uint32 x, y;
-        DISCONTINUOUS_IMAGE_VARIABLES(byte, byte);
-        FOR_2_DISCONTINUOUS_IMAGES()
-        {
-            PIXEL_VALUE(target) = PIXEL_VALUE_PLUS(source, channel);
-        }
-    }
-
-    FINALLY(pick_1_channel_from_3_channels);
-    RETURN();
-}
-
-/******************************************************************************/
-
-result scale_down(
-    const pixel_image *source,
-    pixel_image *target
-    )
-{
-    TRY();
-
-    CHECK_POINTER(source);
-    CHECK_POINTER(target);
-    CHECK_POINTER(source->data);
-    CHECK_POINTER(target->data);
-    CHECK_PARAM(source->type == p_U8);
-    CHECK_PARAM(target->type == p_U8);
-    CHECK_PARAM(2 * target->width >= source->width);
-    CHECK_PARAM(2 * target->height >= source->height);
-
+  if (pixel_image_is_continuous(source) && pixel_image_is_continuous(target)) {
+    CONTINUOUS_IMAGE_VARIABLES(byte, byte);
+    FOR_2_CONTINUOUS_IMAGES()
     {
-        uint32 x, y;
-        IMAGE_WITH_STEP_VARIABLES(byte, byte);
-        FOR_2_IMAGES_WITH_STEP(2, 2, 1, 1)
-        {
-            PIXEL_VALUE(target) = PIXEL_VALUE(source);
-        }
+      PIXEL_VALUE(target)
+        = PIXEL_VALUE_PLUS(target, 1)
+        = PIXEL_VALUE_PLUS(target, 2)
+        = PIXEL_VALUE(source);
     }
+  }
+  else {
+    uint32 x, y;
+    DISCONTINUOUS_IMAGE_VARIABLES(byte, byte);
+    FOR_2_DISCONTINUOUS_IMAGES()
+    {
+      PIXEL_VALUE(target)
+        = PIXEL_VALUE_PLUS(target, 1)
+        = PIXEL_VALUE_PLUS(target, 2)
+        = PIXEL_VALUE(source);
+    }
+  }
 
-    FINALLY(scale_down);
-    RETURN();
+  FINALLY(convert_grey8_to_grey24);
+  RETURN();
 }
 
 /******************************************************************************/
 
-result scale_up(
-    const pixel_image *source,
-    pixel_image *target
-    )
+result convert_grey8_to_yuv24
+(
+  const pixel_image *source,
+  pixel_image *target
+)
 {
-    TRY();
+  TRY();
 
-    CHECK_POINTER(source);
-    CHECK_POINTER(target);
-    CHECK_POINTER(source->data);
-    CHECK_POINTER(target->data);
-    CHECK_PARAM(source->type == p_U8);
-    CHECK_PARAM(target->type == p_U8);
-    CHECK_PARAM(target->width >= 2 * source->width);
-    CHECK_PARAM(target->height >= 2 * source->height);
+  CHECK_POINTER(source);
+  CHECK_POINTER(target);
+  CHECK_POINTER(source->data);
+  CHECK_POINTER(target->data);
+  CHECK_PARAM(source->type == p_U8);
+  CHECK_PARAM(target->type == p_U8);
+  CHECK_PARAM(source->step == 1);
+  CHECK_PARAM(target->step == 3);
+  CHECK_PARAM(source->format == GREY);
+  CHECK_PARAM(target->format == YUV);
+  CHECK_PARAM(source->width == target->width);
+  CHECK_PARAM(source->height == target->height);
 
+  if (pixel_image_is_continuous(source) && pixel_image_is_continuous(target)) {
+    CONTINUOUS_IMAGE_VARIABLES(byte, byte);
+    FOR_2_CONTINUOUS_IMAGES()
     {
-        uint32 x, y, offset_1, offset_2, offset_3;
-        IMAGE_WITH_STEP_VARIABLES(byte, byte);
-        offset_1 = target->step;
-        offset_2 = target->stride;
-        offset_3 = target->stride + target->step;
-        FOR_2_IMAGES_WITH_STEP_REVERSE(1, 1, 2, 2)
-        {
-            PIXEL_VALUE(target) =
-            PIXEL_VALUE_PLUS(target, offset_1) =
-            PIXEL_VALUE_PLUS(target, offset_2) =
-            PIXEL_VALUE_PLUS(target, offset_3) =
-            PIXEL_VALUE(source);
-        }
+      PIXEL_VALUE(target) = PIXEL_VALUE(source);
+      PIXEL_VALUE_PLUS(target, 1) = 128;
+      PIXEL_VALUE_PLUS(target, 2) = 128;
     }
+  }
+  else {
+    uint32 x, y;
+    DISCONTINUOUS_IMAGE_VARIABLES(byte, byte);
+    FOR_2_DISCONTINUOUS_IMAGES()
+    {
+      PIXEL_VALUE(target) = PIXEL_VALUE(source);
+      PIXEL_VALUE_PLUS(target, 1) = 128;
+      PIXEL_VALUE_PLUS(target, 2) = 128;
+    }
+  }
 
-    FINALLY(scale_up);
-    RETURN();
+  FINALLY(convert_grey8_to_yuv24);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result convert_rgb24_to_grey8
+(
+  const pixel_image *source,
+  pixel_image *target
+)
+{
+  TRY();
+  sint32 value;
+
+  CHECK_POINTER(source);
+  CHECK_POINTER(target);
+  CHECK_POINTER(source->data);
+  CHECK_POINTER(target->data);
+  CHECK_PARAM(source->type == p_U8);
+  CHECK_PARAM(target->type == p_U8);
+  CHECK_PARAM(source->step == 3);
+  CHECK_PARAM(target->step == 1);
+  CHECK_PARAM(source->format == RGB);
+  CHECK_PARAM(target->format == GREY);
+  CHECK_PARAM(source->width == target->width);
+  CHECK_PARAM(source->height == target->height);
+
+  if (pixel_image_is_continuous(source) && pixel_image_is_continuous(target)) {
+    CONTINUOUS_IMAGE_VARIABLES(byte, byte);
+    FOR_2_CONTINUOUS_IMAGES()
+    {
+      value = (int)(0.30 * PIXEL_VALUE(source) +
+                    0.59 * PIXEL_VALUE_PLUS(source, 1) +
+                    0.11 * PIXEL_VALUE_PLUS(source, 2));
+      value = TRUNC(value, 0, 255);
+      PIXEL_VALUE(target) = (byte)value;
+    }
+  }
+  else {
+    uint32 x, y;
+    DISCONTINUOUS_IMAGE_VARIABLES(byte, byte);
+    FOR_2_DISCONTINUOUS_IMAGES()
+    {
+      value = (int)(0.30 * PIXEL_VALUE(source) +
+                    0.59 * PIXEL_VALUE_PLUS(source, 1) +
+                    0.11 * PIXEL_VALUE_PLUS(source, 2));
+      value = TRUNC(value, 0, 255);
+      PIXEL_VALUE(target) = (byte)value;
+    }
+  }
+
+  FINALLY(convert_rgb24_to_grey8);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result convert_rgb24_to_yuv24
+(
+  const pixel_image *source,
+  pixel_image *target
+)
+{
+  TRY();
+  byte R, G, B;
+  /*sint32 Y, U, V;*/
+  double  Y, U, V;
+
+  CHECK_POINTER(source);
+  CHECK_POINTER(target);
+  CHECK_POINTER(source->data);
+  CHECK_POINTER(target->data);
+  CHECK_PARAM(source->type == p_U8);
+  CHECK_PARAM(target->type == p_U8);
+  CHECK_PARAM(source->step == 3);
+  CHECK_PARAM(target->step == 3);
+  CHECK_PARAM(source->format == RGB);
+  CHECK_PARAM(target->format == YUV);
+  CHECK_PARAM(source->width == target->width);
+  CHECK_PARAM(source->height == target->height);
+
+  if (pixel_image_is_continuous(source) && pixel_image_is_continuous(target)) {
+    CONTINUOUS_IMAGE_VARIABLES(byte, byte);
+    FOR_2_CONTINUOUS_IMAGES()
+    {
+      R = PIXEL_VALUE(source);
+      G = PIXEL_VALUE_PLUS(source, 1);
+      B = PIXEL_VALUE_PLUS(source, 2);
+      Y = ( 0.29900 * ((double)R / 255.0)) + ( 0.58700 * ((double)G / 255.0)) + ( 0.11400 * ((double)B / 255.0));
+      U = (-0.14713 * ((double)R / 255.0)) + (-0.28886 * ((double)G / 255.0)) + ( 0.43600 * ((double)B / 255.0));
+      V = ( 0.61500 * ((double)R / 255.0)) + (-0.51499 * ((double)G / 255.0)) + (-0.10001 * ((double)B / 255.0));
+      /*
+      Y = ( 77 * R) + (150 * G) + ( 29 * B) + 128;
+      U = (-38 * R) + (-74 * G) + (112 * B) + 128;
+      V = (112 * R) + (-94 * G) + (-18 * B) + 128;
+      Y >>= 8;
+      U >>= 8;
+      V >>= 8;
+      */
+      PIXEL_VALUE(target)         = (byte)(Y * 255);
+      PIXEL_VALUE_PLUS(target, 1) = (byte)(((U + 0.436) / (2 * 0.436)) * 255);
+      PIXEL_VALUE_PLUS(target, 2) = (byte)(((V + 0.615) / (2 * 0.615)) * 255);
+    }
+  }
+  else {
+    uint32 x, y;
+    DISCONTINUOUS_IMAGE_VARIABLES(byte, byte);
+    FOR_2_DISCONTINUOUS_IMAGES()
+    {
+      R = PIXEL_VALUE(source);
+      G = PIXEL_VALUE_PLUS(source, 1);
+      B = PIXEL_VALUE_PLUS(source, 2);
+      Y = ( 0.29900 * ((double)R / 255.0)) + ( 0.58700 * ((double)G / 255.0)) + ( 0.11400 * ((double)B / 255.0));
+      U = (-0.14713 * ((double)R / 255.0)) + (-0.28886 * ((double)G / 255.0)) + ( 0.43600 * ((double)B / 255.0));
+      V = ( 0.61500 * ((double)R / 255.0)) + (-0.51499 * ((double)G / 255.0)) + (-0.10001 * ((double)B / 255.0));
+      /*
+      Y = ( 77 * R) + (150 * G) + ( 29 * B) + 128;
+      U = (-38 * R) + (-74 * G) + (112 * B) + 128;
+      V = (112 * R) + (-94 * G) + (-18 * B) + 128;
+      Y >>= 8;
+      U >>= 8;
+      V >>= 8;
+      */
+      PIXEL_VALUE(target)         = (byte)(Y * 255);
+      PIXEL_VALUE_PLUS(target, 1) = (byte)(((U + 0.436) / (2 * 0.436)) * 255);
+      PIXEL_VALUE_PLUS(target, 2) = (byte)(((V + 0.615) / (2 * 0.615)) * 255);
+    }
+  }
+
+  FINALLY(convert_rgb24_to_yuv24);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result convert_yuv24_to_rgb24
+(
+  const pixel_image *source,
+  pixel_image *target
+)
+{
+  TRY();
+  byte Yb, Ub, Vb;
+  /*sint32 Y, U, V;*/
+  double Y, U, V, R, G, B;
+
+  CHECK_POINTER(source);
+  CHECK_POINTER(target);
+  CHECK_POINTER(source->data);
+  CHECK_POINTER(target->data);
+  CHECK_PARAM(source->type == p_U8);
+  CHECK_PARAM(target->type == p_U8);
+  CHECK_PARAM(source->step == 3);
+  CHECK_PARAM(target->step == 3);
+  CHECK_PARAM(source->format == YUV);
+  CHECK_PARAM(target->format == RGB);
+  CHECK_PARAM(source->width == target->width);
+  CHECK_PARAM(source->height == target->height);
+
+  if (pixel_image_is_continuous(source) && pixel_image_is_continuous(target)) {
+    CONTINUOUS_IMAGE_VARIABLES(byte, byte);
+    FOR_2_CONTINUOUS_IMAGES()
+    {
+      Yb = PIXEL_VALUE(source);
+      Ub = PIXEL_VALUE_PLUS(source, 1);
+      Vb = PIXEL_VALUE_PLUS(source, 2);
+      Y = ((double)Yb / 255.0);
+      U = (((double)Ub / 255.0) * 2.0 * 0.436) - 0.436;
+      V = (((double)Vb / 255.0) * 2.0 * 0.615) - 0.615;
+      R = ( Y + 0.00000 * U + 1.13983 * V);
+      G = ( Y - 0.39465 * U - 0.58060 * V);
+      B = ( Y + 2.03211 * U + 0.00000 * V);
+      /*
+      Y = ( 77 * R) + (150 * G) + ( 29 * B) + 128;
+      U = (-38 * R) + (-74 * G) + (112 * B) + 128;
+      V = (112 * R) + (-94 * G) + (-18 * B) + 128;
+      Y >>= 8;
+      U >>= 8;
+      V >>= 8;
+      */
+      PIXEL_VALUE(target)         = (byte)(R * 255);
+      PIXEL_VALUE_PLUS(target, 1) = (byte)(G * 255);
+      PIXEL_VALUE_PLUS(target, 2) = (byte)(B * 255);
+    }
+  }
+  else {
+    uint32 x, y;
+    DISCONTINUOUS_IMAGE_VARIABLES(byte, byte);
+    FOR_2_DISCONTINUOUS_IMAGES()
+    {
+      Yb = PIXEL_VALUE(source);
+      Ub = PIXEL_VALUE_PLUS(source, 1);
+      Vb = PIXEL_VALUE_PLUS(source, 2);
+      Y = ((double)Yb / 255.0);
+      U = (((double)Ub / 255.0) * 2.0 * 0.436) - 0.436;
+      V = (((double)Vb / 255.0) * 2.0 * 0.615) - 0.615;
+      R = ( Y + 0.00000 * U + 1.13983 * V);
+      G = ( Y - 0.39465 * U - 0.58060 * V);
+      B = ( Y + 2.03211 * U + 0.00000 * V);
+      /*
+      Y = ( 77 * R) + (150 * G) + ( 29 * B) + 128;
+      U = (-38 * R) + (-74 * G) + (112 * B) + 128;
+      V = (112 * R) + (-94 * G) + (-18 * B) + 128;
+      Y >>= 8;
+      U >>= 8;
+      V >>= 8;
+      */
+      PIXEL_VALUE(target)         = (byte)(R * 255);
+      PIXEL_VALUE_PLUS(target, 1) = (byte)(G * 255);
+      PIXEL_VALUE_PLUS(target, 2) = (byte)(B * 255);
+    }
+  }
+
+  FINALLY(convert_yuv24_to_rgb24);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result convert_yuv24_to_grey8
+(
+  const pixel_image *source,
+  pixel_image *target
+)
+{
+  TRY();
+  byte Y;
+
+  CHECK_POINTER(source);
+  CHECK_POINTER(target);
+  CHECK_POINTER(source->data);
+  CHECK_POINTER(target->data);
+  CHECK_PARAM(source->type == p_U8);
+  CHECK_PARAM(target->type == p_U8);
+  CHECK_PARAM(source->step == 3);
+  CHECK_PARAM(target->step == 1);
+  CHECK_PARAM(source->format == YUV);
+  CHECK_PARAM(target->format == GREY);
+  CHECK_PARAM(source->width == target->width);
+  CHECK_PARAM(source->height == target->height);
+
+  if (pixel_image_is_continuous(source) && pixel_image_is_continuous(target)) {
+    CONTINUOUS_IMAGE_VARIABLES(byte, byte);
+    FOR_2_CONTINUOUS_IMAGES()
+    {
+      Y = PIXEL_VALUE(source);
+      PIXEL_VALUE(target) = Y;
+    }
+  }
+  else {
+    uint32 x, y;
+    DISCONTINUOUS_IMAGE_VARIABLES(byte, byte);
+    FOR_2_DISCONTINUOUS_IMAGES()
+    {
+      Y = PIXEL_VALUE(source);
+      PIXEL_VALUE(target) = Y;
+    }
+  }
+
+  FINALLY(convert_yuv24_to_grey8);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result pick_1_channel_from_3_channels
+(
+  const pixel_image *source,
+  pixel_image *target,
+  uint32 channel
+)
+{
+  TRY();
+
+  CHECK_POINTER(source);
+  CHECK_POINTER(target);
+  CHECK_POINTER(source->data);
+  CHECK_POINTER(target->data);
+  CHECK_PARAM(source->type == p_U8);
+  CHECK_PARAM(target->type == p_U8);
+  CHECK_PARAM(source->step == 3);
+  CHECK_PARAM(target->step == 1);
+  CHECK_PARAM(target->format == GREY);
+  CHECK_PARAM(source->width == target->width);
+  CHECK_PARAM(source->height == target->height);
+  CHECK_PARAM(channel < 3);
+
+  if (pixel_image_is_continuous(source) && pixel_image_is_continuous(target)) {
+    CONTINUOUS_IMAGE_VARIABLES(byte, byte);
+    FOR_2_CONTINUOUS_IMAGES()
+    {
+      PIXEL_VALUE(target) = PIXEL_VALUE_PLUS(source, channel);
+    }
+  }
+  else {
+    uint32 x, y;
+    DISCONTINUOUS_IMAGE_VARIABLES(byte, byte);
+    FOR_2_DISCONTINUOUS_IMAGES()
+    {
+      PIXEL_VALUE(target) = PIXEL_VALUE_PLUS(source, channel);
+    }
+  }
+
+  FINALLY(pick_1_channel_from_3_channels);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result scale_down
+(
+  const pixel_image *source,
+  pixel_image *target
+)
+{
+  TRY();
+
+  CHECK_POINTER(source);
+  CHECK_POINTER(target);
+  CHECK_POINTER(source->data);
+  CHECK_POINTER(target->data);
+  CHECK_PARAM(source->type == p_U8);
+  CHECK_PARAM(target->type == p_U8);
+  CHECK_PARAM(2 * target->width >= source->width);
+  CHECK_PARAM(2 * target->height >= source->height);
+
+  {
+    uint32 x, y;
+    IMAGE_WITH_STEP_VARIABLES(byte, byte);
+    FOR_2_IMAGES_WITH_STEP(2, 2, 1, 1)
+    {
+      PIXEL_VALUE(target) = PIXEL_VALUE(source);
+    }
+  }
+
+  FINALLY(scale_down);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result scale_up
+(
+  const pixel_image *source,
+  pixel_image *target
+)
+{
+  TRY();
+
+  CHECK_POINTER(source);
+  CHECK_POINTER(target);
+  CHECK_POINTER(source->data);
+  CHECK_POINTER(target->data);
+  CHECK_PARAM(source->type == p_U8);
+  CHECK_PARAM(target->type == p_U8);
+  CHECK_PARAM(target->width >= 2 * source->width);
+  CHECK_PARAM(target->height >= 2 * source->height);
+
+  {
+    uint32 x, y, offset_1, offset_2, offset_3;
+    IMAGE_WITH_STEP_VARIABLES(byte, byte);
+    offset_1 = target->step;
+    offset_2 = target->stride;
+    offset_3 = target->stride + target->step;
+    FOR_2_IMAGES_WITH_STEP_REVERSE(1, 1, 2, 2)
+    {
+      PIXEL_VALUE(target) =
+      PIXEL_VALUE_PLUS(target, offset_1) =
+      PIXEL_VALUE_PLUS(target, offset_2) =
+      PIXEL_VALUE_PLUS(target, offset_3) =
+      PIXEL_VALUE(source);
+    }
+  }
+
+  FINALLY(scale_up);
+  RETURN();
 }
 
 /******************************************************************************/
 
 image_rect pixel_image_create_rect
-  (
+(
   pixel_image *target,
   sint32 x,
   sint32 y,
   sint32 dx,
   sint32 dy,
   uint32 offset
-  )
+)
 {
   image_rect rect;
   register uint32 width, height, step, stride;

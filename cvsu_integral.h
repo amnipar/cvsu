@@ -1,9 +1,9 @@
 /**
  * @file cvsu_integral.h
  * @author Matti J. Eskelinen <matti.j.eskelinen@gmail.com>
- * @brief Integral image types and operations for the cvsu module.
+ * @brief Integral image types and operations for cvsu.
  *
- * Copyright (c) 2011, Matti Johannes Eskelinen
+ * Copyright (c) 2011-2013, Matti Johannes Eskelinen
  * All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -38,7 +38,7 @@ extern "C" {
 
 #include "cvsu_config.h"
 #include "cvsu_types.h"
-#include "cvsu_basic.h"
+#include "cvsu_pixel_image.h"
 
 /**
  * Stores an integral and squared integral representation of a pixel image.

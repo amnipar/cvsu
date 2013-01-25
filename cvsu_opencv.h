@@ -1,9 +1,9 @@
 /**
  * @file cvsu_opencv.h
  * @author Matti J. Eskelinen <matti.j.eskelinen@gmail.com>
- * @brief Interfaces for OpenCV and IplImage type.
+ * @brief Interfaces for selected OpenCV functions and IplImage type.
  *
- * Copyright (c) 2011, Matti Johannes Eskelinen
+ * Copyright (c) 2011-2013, Matti Johannes Eskelinen
  * All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,7 +37,7 @@ extern "C" {
 #endif
 
 #include <opencv2/core/core_c.h>
-#include "cvsu_basic.h"
+#include "cvsu_pixel_image.h"
 
 result pixel_image_create_from_ipl_image(
     pixel_image *target,

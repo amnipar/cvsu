@@ -1,9 +1,9 @@
 /**
  * @file cvsu_opencv.c
  * @author Matti J. Eskelinen <matti.j.eskelinen@gmail.com>
- * @brief Interfaces for OpenCV and IplImage type.
+ * @brief Interfaces for selected OpenCV functions and IplImage type.
  *
- * Copyright (c) 2011, Matti Johannes Eskelinen
+ * Copyright (c) 2011-2013, Matti Johannes Eskelinen
  * All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,6 +34,10 @@
 #include "cvsu_opencv.h"
 #include <opencv2/highgui/highgui_c.h>
 #include <stdio.h>
+
+/******************************************************************************/
+/* constants for storing the function names                                   */
+/* used in error reporting macros                                             */
 
 string pixel_image_create_from_ipl_image_name = "pixel_image_create_from_ipl_image";
 string ipl_image_create_from_pixel_image_name = "ipl_image_create_from_pixel_image";
@@ -108,11 +112,11 @@ result ipl_image_create_from_pixel_image
   TRY();
   IplImage *temp;
   CvSize size;
-  
+
   CHECK_POINTER(source);
   CHECK_PARAM(source->type == p_U8);
   CHECK_PARAM(source->format == RGB || source->format == GREY);
-  
+
   size.width = (signed)source->width;
   size.height = (signed)source->height;
   switch (source->format) {
@@ -125,11 +129,11 @@ result ipl_image_create_from_pixel_image
     default:
       temp = NULL;
   }
-  
+
   cvSetData(temp, source->data, (signed)source->stride);
 
   *target = cvCloneImage(temp);
-  
+
   FINALLY(ipl_image_create_from_pixel_image);
   cvReleaseImageHeader(&temp);
   RETURN();
@@ -210,11 +214,11 @@ result pixel_image_write_to_file(pixel_image *source, const char *filename)
   TRY();
   IplImage *dst;
   CvSize size;
-  
+
   CHECK_POINTER(source);
   CHECK_PARAM(source->type == p_U8);
   CHECK_PARAM(source->format == RGB || source->format == GREY);
-  
+
   size.width = (signed)source->width;
   size.height = (signed)source->height;
   switch (source->format) {
@@ -227,11 +231,11 @@ result pixel_image_write_to_file(pixel_image *source, const char *filename)
     default:
       dst = NULL;
   }
-  
+
   /*printf("width=%ul,height=%ul,step=%ul\n",source->width,source->height,source->stride);*/
   cvSetData(dst, source->data, (signed)source->stride);
   cvSaveImage(filename, dst, 0);
-  
+
   FINALLY(pixel_image_write_to_file);
   RETURN();
 }

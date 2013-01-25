@@ -1,9 +1,9 @@
 /**
  * @file cvsu_output.h
  * @author Matti J. Eskelinen <matti.j.eskelinen@gmail.com>
- * @brief Output methods for the cvsu module.
+ * @brief Output handling functions for cvsu.
  *
- * Copyright (c) 2011, Matti Johannes Eskelinen
+ * Copyright (c) 2011-2013, Matti Johannes Eskelinen
  * All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without

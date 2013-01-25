@@ -1,9 +1,9 @@
 /**
  * @file cvsu_edges.h
  * @author Matti J. Eskelinen <matti.j.eskelinen@gmail.com>
- * @brief Edge detection and handling for the cvsu module.
+ * @brief Edge detection and handling for cvsu.
  *
- * Copyright (c) 2011, Matti Johannes Eskelinen
+ * Copyright (c) 2011-2013, Matti Johannes Eskelinen
  * All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,7 +37,7 @@ extern "C" {
 #endif
 
 #include "cvsu_types.h"
-#include "cvsu_basic.h"
+#include "cvsu_pixel_image.h"
 #include "cvsu_integral.h"
 #include "cvsu_list.h"
 

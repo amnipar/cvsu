@@ -3,7 +3,7 @@
  * @author Matti J. Eskelinen <matti.j.eskelinen@gmail.com>
  * @brief A double-linked list that stores any object as void pointer.
  *
- * Copyright (c) 2011, Matti Johannes Eskelinen
+ * Copyright (c) 2011-2013, Matti Johannes Eskelinen
  * All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without

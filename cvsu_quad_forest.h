@@ -36,7 +36,7 @@
 extern "C" {
 #endif
 
-#include "cvsu_basic.h"
+#include "cvsu_pixel_image.h"
 #include "cvsu_integral.h"
 #include "cvsu_edges.h"
 #include "cvsu_list.h"
