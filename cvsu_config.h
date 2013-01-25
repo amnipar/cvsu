@@ -1,7 +1,7 @@
 /**
  * @file cvsu_config.h
  * @author Matti J. Eskelinen <matti.j.eskelinen@gmail.com>
- * @brief Configuration flags for the cvsu module.
+ * @brief Configuration flags for cvsu.
  *
  * Copyright (c) 2011, Matti Johannes Eskelinen
  * All Rights Reserved.
@@ -107,16 +107,6 @@
 #define OUTPUT_LEVEL_INFO 3
 #define OUTPUT_LEVEL_DEBUG 4
 #define OUTPUT_LEVEL OUTPUT_LEVEL_ERRORS
-
-/**
- * Define image access method.
- * These definitions decide which macros are expanded for accessing pixels.
- */
-#define IMAGE_ACCESS_BY_INDEX   0
-#define IMAGE_ACCESS_BY_POINTER 1
-/* #define IMAGE_ACCESS_METHOD IMAGE_ACCESS_BY_INDEX */
-/* #define IMAGE_ACCESS_METHOD IMAGE_ACCESS_BY_POINTER */
-#define IMAGE_ACCESS_METHOD IMAGE_ACCESS_BY_POINTER
 
 /**
  * Define integral image data type.
