@@ -19,10 +19,18 @@ CFLAGS=-I. \
 %.o: %.c
 	$(CC) -c -o $@ $< $(CFLAGS)
 
-cvsu-test: cvsu_memory.o cvsu_output.o cvsu_basic.o cvsu_integral.o cvsu_filter.o cvsu_scale.o cvsu_edges.o cvsu_list.o cvsu_simple_scene.o cvsu_image_tree.o cvsu_opencv.o main.o
-	gcc -o cvsu-test cvsu_memory.o cvsu_output.o cvsu_basic.o cvsu_integral.o cvsu_filter.o cvsu_scale.o cvsu_edges.o cvsu_list.o cvsu_simple_scene.o cvsu_image_tree.o cvsu_opencv.o main.o -lm -lopencv_core -lopencv_highgui -I.
-
 .PHONY: clean
 
+all: edges segment threshold
+
 clean:
-	rm -f cvsu-test *.o
+	rm -f find_edges quad_forest_segment threshold_adaptive *.o
+
+edges: cvsu_memory.o cvsu_output.o cvsu_types.o cvsu_pixel_image.o cvsu_integral.o cvsu_filter.o cvsu_edges.o cvsu_list.o cvsu_opencv.o find_edges.o
+	gcc -o find_edges cvsu_memory.o cvsu_output.o cvsu_types.o cvsu_pixel_image.o cvsu_integral.o cvsu_filter.o cvsu_edges.o cvsu_list.o cvsu_opencv.o find_edges.o -lm -lopencv_core -lopencv_highgui -I.
+
+segment: cvsu_memory.o cvsu_output.o cvsu_types.o cvsu_pixel_image.o cvsu_integral.o cvsu_list.o cvsu_edges.o cvsu_filter.o cvsu_quad_forest.o cvsu_opencv.o quad_forest_segment.o
+	gcc -o quad_forest_segment cvsu_memory.o cvsu_output.o cvsu_types.o cvsu_pixel_image.o cvsu_integral.o cvsu_list.o cvsu_edges.o cvsu_filter.o cvsu_quad_forest.o cvsu_opencv.o quad_forest_segment.o -lm -lopencv_core -lopencv_highgui -I.
+
+threshold: cvsu_memory.o cvsu_output.o cvsu_types.o cvsu_pixel_image.o cvsu_integral.o cvsu_list.o cvsu_connected_components.o cvsu_opencv.o threshold_adaptive.o
+	gcc -o threshold_adaptive cvsu_memory.o cvsu_output.o cvsu_types.o cvsu_pixel_image.o cvsu_integral.o cvsu_list.o cvsu_connected_components.o cvsu_opencv.o threshold_adaptive.o -lm -lopencv_core -lopencv_highgui -I.

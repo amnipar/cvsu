@@ -1,9 +1,9 @@
 /**
- * @file main.c
+ * @file find_edges.c
  * @author Matti J. Eskelinen (matti dot j dot eskelinen at jyu dot fi)
- * @brief Simple program to test image operations.
+ * @brief Simple program to demonstrate edge detection.
  *
- * Copyright (c) 2011, Matti Johannes Eskelinen
+ * Copyright (c) 2011-2013, Matti Johannes Eskelinen
  * All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -27,7 +27,6 @@
  * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
  */
 
 #include <stdlib.h>
@@ -37,58 +36,54 @@
 
 #include "cvsu_config.h"
 #include "cvsu_macros.h"
-#include "cvsu_memory.h"
-#include "cvsu_basic.h"
+#include "cvsu_pixel_image.h"
 #include "cvsu_opencv.h"
-#include "cvsu_integral.h"
 #include "cvsu_filter.h"
-#include "cvsu_scale.h"
 #include "cvsu_edges.h"
-#include "cvsu_list.h"
-#include "cvsu_simple_scene.h"
-#include "cvsu_image_tree.h"
 
-string main_name = "main";
+string main_name = "find_edges";
 
 /*
-Usage: cv-sks [p #]
-Without parameters, writes to output image the result of edge detection
-using box filters and deviation.
-With parameter p, writes to output image the result of edge detection
-using sobel operator in scale space.
-With additional parameter # (number 0-4) shows the image pyramid level
-with that number
-*/
+ * Usage: find_edges width length source_file target_file
+ */
+
 int main (int argc, char *argv[])
 {
-    TRY();
-    pixel_image src_image;
-    pixel_image tmp_image;
-    edge_image edges;
+  TRY();
+  pixel_image src_image;
+  pixel_image tmp_image;
+  edge_image edges;
+  uint32 width, length;
+  string source_file, target_file;
 
-    printf("load image...\n");
-    CHECK(pixel_image_create_from_file(&src_image, "smallLena.jpg", p_U8, GREY));
-    printf("...done\n");
+  width = 12;
+  length = 6;
+  source_file = "smallLena.jpg";
+  target_file = "edges.png";
 
-    printf("smooth image..\n");
-    CHECK(pixel_image_clone(&tmp_image, &src_image));
-    CHECK(smooth_binomial(&src_image, &tmp_image, 2));
-    printf("...done\n");
+  printf("load image...\n");
+  CHECK(pixel_image_create_from_file(&src_image, source_file, p_U8, GREY));
+  printf("...done\n");
 
-    printf("create edge image...\n");
-    CHECK(edge_image_create(&edges, &tmp_image, 12, 12, 12, 12, 12, 6));
-    printf("...done\n");
+  printf("smooth image..\n");
+  CHECK(pixel_image_clone(&tmp_image, &src_image));
+  CHECK(smooth_binomial(&src_image, &tmp_image, 2));
+  printf("...done\n");
 
-    CHECK(edge_image_update(&edges));
-    CHECK(edge_image_overlay_to_grey8(&edges, &tmp_image));
-    printf("write image...\n");
-    CHECK(pixel_image_write_to_file(&tmp_image, "result.png"));
-    printf("...done\n");
+  printf("create edge image...\n");
+  CHECK(edge_image_create(&edges, &tmp_image, width, width, width, width, width, length));
+  printf("...done\n");
 
-    FINALLY(main);
-    pixel_image_destroy(&src_image);
-    pixel_image_destroy(&tmp_image);
-    edge_image_destroy(&edges);
+  CHECK(edge_image_update(&edges));
+  CHECK(edge_image_overlay_to_grey8(&edges, &tmp_image));
+  printf("write image...\n");
+  CHECK(pixel_image_write_to_file(&tmp_image, target_file));
+  printf("...done\n");
 
-    return 0;
+  FINALLY(main);
+  pixel_image_destroy(&src_image);
+  pixel_image_destroy(&tmp_image);
+  edge_image_destroy(&edges);
+
+  return 0;
 }
