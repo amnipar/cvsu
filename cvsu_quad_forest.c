@@ -142,7 +142,7 @@ result quad_forest_init
     if (!list_is_null(&target->trees)) {
       CHECK(list_destroy(&target->trees));
     }
-    CHECK(list_create(&target->trees, 24 * size, sizeof(quad_tree), 1));
+    CHECK(list_create(&target->trees, 8 * size, sizeof(quad_tree), 1));
   }
   else {
     rows = target->rows;

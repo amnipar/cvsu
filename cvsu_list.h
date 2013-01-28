@@ -100,14 +100,20 @@ typedef result (*list_item_handler)(const list_item *item);
 */
 
 typedef struct chunk_t {
-    /** Size of one item in the array in bytes. */
-    size_t item_size;
-    /** Total number of items available in the array. */
-    size_t size;
-    /** Number of items taken in use (including freed items). */
-    size_t count;
-    /** Pointer to the data array. */
-    byte *chunk;
+  /** Size of one item in the array in bytes */
+  size_t item_size;
+  /** Total number of items available in a current chunk */
+  size_t size;
+  /** Number of items taken in use in current chunk (including freed items) */
+  size_t count;
+  /** Number of chunks currently allocated */
+  size_t chunk_count;
+  /** Index of the current chunk from which items are distributed */
+  size_t current_chunk;
+  /** Pointer to the array holding the chunk array */
+  byte **chunks;
+  /** Pointer to the current chunk holding the data */
+  byte *chunk;
 } chunk;
 
 /**

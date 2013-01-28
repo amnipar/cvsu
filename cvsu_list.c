@@ -86,64 +86,80 @@ string pointer_list_prepend_name = "pointer_list_prepend";
 
 /******************************************************************************/
 
-result chunk_create(
-    chunk *target,
-    size_t max_size,
-    size_t item_size
-    )
+result chunk_create
+(
+  chunk *target,
+  size_t max_size,
+  size_t item_size
+)
 {
-    TRY();
+  TRY();
 
-    CHECK_POINTER(target);
+  CHECK_POINTER(target);
 
-    CHECK(memory_allocate(&target->chunk, max_size, item_size));
-    CHECK(memory_clear(target->chunk, max_size, item_size));
+  /* allocate space for the chunk array */
+  CHECK(memory_allocate((data_pointer*)&target->chunks, 10, sizeof(byte*)));
+  CHECK(memory_clear((data_pointer)target->chunks, 10, sizeof(byte*)));
+  /* allocate the first chunk */
+  CHECK(memory_allocate(&target->chunk, max_size, item_size));
+  CHECK(memory_clear(target->chunk, max_size, item_size));
 
-    target->item_size = item_size;
-    target->size = max_size;
-    target->count = 0;
+  target->chunks[0] = target->chunk;
+  target->current_chunk = 0;
+  target->chunk_count = 10;
+  target->item_size = item_size;
+  target->size = max_size;
+  target->count = 0;
 
-    FINALLY(chunk_create);
-    RETURN();
+  FINALLY(chunk_create);
+  RETURN();
 }
 
 /******************************************************************************/
 
-result chunk_destroy(
-    chunk *target
-    )
+result chunk_destroy
+(
+  chunk *target
+)
 {
-    TRY();
+  TRY();
+  size_t i;
 
-    CHECK_POINTER(target);
+  CHECK_POINTER(target);
 
-    target->item_size = 0;
-    target->size = 0;
-    target->count = 0;
+  if (target->chunks != NULL) {
+    for (i = 0; i <= target->current_chunk; i++) {
+      CHECK(memory_deallocate(&target->chunks[i]));
+    }
+    CHECK(memory_deallocate((data_pointer*)&target->chunks));
+  }
+  chunk_nullify(target);
 
-    CHECK(memory_deallocate(&target->chunk));
-
-    FINALLY(chunk_destroy);
-    RETURN();
+  FINALLY(chunk_destroy);
+  RETURN();
 }
 
 /******************************************************************************/
 
-result chunk_nullify(
-    chunk *target
-    )
+result chunk_nullify
+(
+  chunk *target
+)
 {
-    TRY();
+  TRY();
 
-    CHECK_POINTER(target);
+  CHECK_POINTER(target);
 
-    target->item_size = 0;
-    target->size = 0;
-    target->count = 0;
-    target->chunk = NULL;
+  target->item_size = 0;
+  target->size = 0;
+  target->count = 0;
+  target->chunk_count = 0;
+  target->current_chunk = 0;
+  target->chunks = NULL;
+  target->chunk = NULL;
 
-    FINALLY(chunk_nullify);
-    RETURN();
+  FINALLY(chunk_nullify);
+  RETURN();
 }
 
 /******************************************************************************/
@@ -154,7 +170,7 @@ bool chunk_is_null
 )
 {
   if (target != NULL) {
-    if (target->chunk == NULL) {
+    if (target->chunks == NULL && target->chunk == NULL) {
       return true;
     }
   }
@@ -163,107 +179,156 @@ bool chunk_is_null
 
 /******************************************************************************/
 
-result chunk_clear(
-    chunk *target
-    )
+result chunk_clear
+(
+  chunk *target
+)
 {
-    TRY();
+  TRY();
+  size_t i;
 
-    CHECK_POINTER(target);
+  CHECK_POINTER(target);
 
-    target->count = 0;
+  target->count = 0;
 
-    CHECK(memory_clear(target->chunk, target->size, target->item_size));
+  for (i = 0; i <= target->current_chunk; i++) {
+    CHECK(memory_clear(target->chunks[i], target->size, target->item_size));
+  }
 
-    FINALLY(chunk_clear);
-    RETURN();
+  FINALLY(chunk_clear);
+  RETURN();
 }
 
 /******************************************************************************/
 
-result chunk_allocate_item(
-    data_pointer *target,
-    chunk *source
-    )
+result chunk_allocate_item
+(
+  data_pointer *target,
+  chunk *source
+)
 {
-    TRY();
+  TRY();
+  byte *new_chunk, **new_chunks;
+  
+  new_chunk = NULL;
+  new_chunks = NULL;
 
-    CHECK_POINTER(target);
-    CHECK_POINTER(source);
-    CHECK_POINTER(source->chunk);
+  CHECK_POINTER(target);
+  CHECK_POINTER(source);
+  CHECK_POINTER(source->chunk);
 
-    *target = NULL;
-    if (source->count < source->size) {
-        *target = source->chunk + source->count * source->item_size;
-        source->count++;
+  *target = NULL;
+  /* if there are items left in the current chunk, take the first free one */
+  if (source->count < source->size) {
+      *target = source->chunk + source->count * source->item_size;
+      source->count++;
+  }
+  /* if current chunk is full, allocate a new one */
+  else {
+    printf("need to allocate a new chunk\n");
+    CHECK(memory_allocate(&new_chunk, source->size, source->item_size));
+    CHECK(memory_clear(new_chunk, source->size, source->item_size));
+    
+    source->current_chunk++;
+    /* if the chunk array is full, need to allocate a bigger one */
+    if (!(source->current_chunk < source->chunk_count)) {
+      size_t new_count, i;
+      printf("need to allocate a bigger chunk array\n");
+      
+      new_count = source->chunk_count + 10;
+      CHECK(memory_allocate((data_pointer*)&new_chunks, new_count, sizeof(byte*)));
+      CHECK(memory_clear((data_pointer)new_chunks, new_count, sizeof(byte*)));
+      for (i = 0; i < source->chunk_count; i++) {
+        new_chunks[i] = source->chunks[i];
+      }
+      CHECK(memory_deallocate((data_pointer*)&source->chunks));
+      source->chunks = new_chunks;
+      source->chunk_count = new_count;
     }
-    else {
-        ERROR(BAD_SIZE);
-    }
+    source->chunks[source->current_chunk] = new_chunk;
+    source->chunk = new_chunk;
+    *target = new_chunk;
+    source->count = 1;
+  }
 
-    FINALLY(chunk_allocate_item);
-    RETURN();
+  FINALLY(chunk_allocate_item);
+  
+  if (r != SUCCESS) {
+    if (new_chunk != NULL && source->chunk != new_chunk) {
+      memory_deallocate(&new_chunk);
+    }
+    if (new_chunks != NULL && source->chunks != new_chunks) {
+      memory_deallocate((data_pointer*)&new_chunks);
+    }
+  }
+  
+  RETURN();
 }
 
 /******************************************************************************/
 
-result chunk_get_item(
-    data_pointer *target,
-    chunk *source,
-    list_index index
-    )
+result chunk_get_item
+(
+  data_pointer *target,
+  chunk *source,
+  list_index index
+)
 {
-    TRY();
+  TRY();
 
-    CHECK_POINTER(target);
-    CHECK_POINTER(source);
-    CHECK_POINTER(source->chunk);
+  CHECK_POINTER(target);
+  CHECK_POINTER(source);
+  CHECK_POINTER(source->chunk);
 
-    *target = NULL;
-    if (index < source->count) {
-        *target = source->chunk + index * source->item_size;
-    }
-    else {
-        ERROR(BAD_PARAM);
-    }
+  *target = NULL;
+  if (index < (source->current_chunk * source->size) + source->count) {
+    list_index chunk_index, new_index;
+    
+    chunk_index = (list_index)(index / source->size);
+    new_index = (list_index)(index % source->size);
+    *target = source->chunks[chunk_index] + new_index * source->item_size;
+  }
+  else {
+    ERROR(BAD_PARAM);
+  }
 
-    FINALLY(chunk_get_item);
-    RETURN();
+  FINALLY(chunk_get_item);
+  RETURN();
 }
 
 /******************************************************************************/
 
-bool chunk_contains_item(
-    chunk *source,
-    data_pointer item
-    )
+bool chunk_contains_item
+(
+  chunk *source,
+  data_pointer item
+)
 {
-    if (source == NULL || source->chunk == NULL || item == NULL) {
-        return false;
+  size_t i, size;
+  
+  if (source == NULL || source->chunks == NULL || item == NULL) {
+      return false;
+  }
+  size = source->size * source->item_size;
+  for (i = 0; i <= source->current_chunk; i++) {
+    if (item >= source->chunks[i] && item < source->chunks[i] + size) {
+      return true;
     }
-    if (item < source->chunk) {
-        return false;
-    }
-    if (item > source->chunk + source->size * source->item_size) {
-        return false;
-    }
-    return true;
+  }
+  return false;
 }
 
 /******************************************************************************/
 
-data_pointer chunk_return_item(
-    chunk *source,
-    list_index index
-    )
+data_pointer chunk_return_item
+(
+  chunk *source,
+  list_index index
+)
 {
-    if (source == NULL || source->chunk == NULL) {
-        return NULL;
-    }
-    if (index < source->size) {
-        return source->chunk + index * source->item_size;
-    }
-    return NULL;
+  data_pointer target;
+  chunk_get_item(&target, source, index);
+  return target;
 }
 
 /******************************************************************************/
@@ -435,7 +500,6 @@ result list_link_item(
 {
     TRY();
     list *master;
-    bool is_master;
     byte *chunk_item;
 
     CHECK_POINTER(target);
@@ -444,12 +508,10 @@ result list_link_item(
     /* for sublists, use the parent list for allocating items */
     if (target->parent != NULL) {
         master = target->parent;
-        is_master = false;
     }
     /* for master lists, use the list itself */
     else {
         master = target;
-        is_master = true;
     }
 
     /* check that the item pointed to by index is within this list's chunk */
@@ -480,171 +542,176 @@ result list_link_item(
 
 list *list_alloc()
 {
-    TRY();
-    list *ptr;
-    CHECK(memory_allocate((data_pointer *)&ptr, 1, sizeof(list)));
-    CHECK(list_nullify(ptr));
-    FINALLY(list_alloc);
-    return ptr;
+  TRY();
+  list *ptr;
+  CHECK(memory_allocate((data_pointer *)&ptr, 1, sizeof(list)));
+  CHECK(list_nullify(ptr));
+  FINALLY(list_alloc);
+  return ptr;
 }
 
 /******************************************************************************/
 
-void list_free(
-    list *ptr
-    )
+void list_free
+(
+  list *ptr
+)
 {
-    TRY();
-    /*printf("free list\n");*/
-    r = SUCCESS;
-    if (ptr != NULL) {
-        CHECK(list_destroy(ptr));
-        CHECK(memory_deallocate((data_pointer *)&ptr));
-    }
-    FINALLY(list_free);
+  TRY();
+  /*printf("free list\n");*/
+  r = SUCCESS;
+  if (ptr != NULL) {
+      CHECK(list_destroy(ptr));
+      CHECK(memory_deallocate((data_pointer *)&ptr));
+  }
+  FINALLY(list_free);
 }
 
 /******************************************************************************/
 
-result list_create(
-    list *target,
-    size_t max_size,
-    size_t item_size,
-    size_t link_rate
-    )
+result list_create
+(
+  list *target,
+  size_t max_size,
+  size_t item_size,
+  size_t link_rate
+)
 {
-    TRY();
+  TRY();
 
-    CHECK_POINTER(target);
+  CHECK_POINTER(target);
 
-    /* link rate should be at least 1 */
-    CHECK_PARAM(link_rate > 0);
+  /* link rate should be at least 1 */
+  CHECK_PARAM(link_rate > 0);
 
-    /* allocate chunks */
-    CHECK(chunk_create(&target->item_chunk, max_size * link_rate, sizeof(list_item)));
-    CHECK(chunk_create(&target->data_chunk, max_size, item_size));
+  /* allocate chunks */
+  CHECK(chunk_create(&target->item_chunk, max_size * link_rate, sizeof(list_item)));
+  CHECK(chunk_create(&target->data_chunk, max_size, item_size));
 
-    target->first.prev = NULL;
-    target->first.next = &target->last;
-    target->first.data = NULL;
-    target->last.prev = &target->first;
-    target->last.next = NULL;
-    target->last.data = NULL;
-    target->first_free.prev = NULL;
-    target->first_free.next = &target->last_free;
-    target->first_free.data = NULL;
-    target->last_free.prev = &target->first_free;
-    target->last_free.next = NULL;
-    target->last_free.data = NULL;
+  target->first.prev = NULL;
+  target->first.next = &target->last;
+  target->first.data = NULL;
+  target->last.prev = &target->first;
+  target->last.next = NULL;
+  target->last.data = NULL;
+  target->first_free.prev = NULL;
+  target->first_free.next = &target->last_free;
+  target->first_free.data = NULL;
+  target->last_free.prev = &target->first_free;
+  target->last_free.next = NULL;
+  target->last_free.data = NULL;
 
-    /* this becomes a master list because it owns the chunks */
-    target->parent = NULL;
-    target->count = 0;
-    target->max_size = max_size;
+  /* this becomes a master list because it owns the chunks */
+  target->parent = NULL;
+  target->count = 0;
+  target->max_size = max_size;
 
-    FINALLY(list_create);
-    RETURN();
+  FINALLY(list_create);
+  RETURN();
 }
 
 /******************************************************************************/
 
-result list_create_from_data(
-    list *target,
-    data_pointer data,
-    size_t max_size,
-    size_t item_size,
-    size_t link_rate
-    )
+result list_create_from_data
+(
+  list *target,
+  data_pointer data,
+  size_t max_size,
+  size_t item_size,
+  size_t link_rate
+)
 {
-    TRY();
+  TRY();
 
-    CHECK_POINTER(target);
+  CHECK_POINTER(target);
 
-    /* link rate should be at least 1 */
-    CHECK_PARAM(link_rate > 0);
+  /* link rate should be at least 1 */
+  CHECK_PARAM(link_rate > 0);
 
-    /* allocate item chunk */
-    CHECK(chunk_create(&target->item_chunk, max_size * link_rate, sizeof(list_item)));
+  /* allocate item chunk */
+  CHECK(chunk_create(&target->item_chunk, max_size * link_rate, sizeof(list_item)));
 
-    /* instead of allocating a data chunk, appropriate the provided data array */
-    target->data_chunk.chunk = data;
-    target->data_chunk.size = max_size;
-    target->data_chunk.item_size = item_size;
-    target->data_chunk.count = max_size;
+  /* instead of allocating a data chunk, appropriate the provided data array */
+  target->data_chunk.chunk = data;
+  target->data_chunk.size = max_size;
+  target->data_chunk.item_size = item_size;
+  target->data_chunk.count = max_size;
 
-    target->first.prev = NULL;
-    target->first.next = &target->last;
-    target->first.data = NULL;
-    target->last.prev = &target->first;
-    target->last.next = NULL;
-    target->last.data = NULL;
-    target->first_free.prev = NULL;
-    target->first_free.next = &target->last_free;
-    target->first_free.data = NULL;
-    target->last_free.prev = &target->first_free;
-    target->last_free.next = NULL;
-    target->last_free.data = NULL;
+  target->first.prev = NULL;
+  target->first.next = &target->last;
+  target->first.data = NULL;
+  target->last.prev = &target->first;
+  target->last.next = NULL;
+  target->last.data = NULL;
+  target->first_free.prev = NULL;
+  target->first_free.next = &target->last_free;
+  target->first_free.data = NULL;
+  target->last_free.prev = &target->first_free;
+  target->last_free.next = NULL;
+  target->last_free.data = NULL;
 
-    /* this becomes a master list because it owns the chunks */
-    target->parent = NULL;
-    target->count = 0;
-    target->max_size = max_size;
+  /* this becomes a master list because it owns the chunks */
+  target->parent = NULL;
+  target->count = 0;
+  target->max_size = max_size;
 
-    FINALLY(list_create_from_data);
-    RETURN();
+  FINALLY(list_create_from_data);
+  RETURN();
 }
 
 /******************************************************************************/
 
-result list_destroy(
-    list *target
-    )
+result list_destroy
+(
+  list *target
+)
 {
-    TRY();
+  TRY();
 
-    CHECK_POINTER(target);
+  CHECK_POINTER(target);
 
-    /* master list can be destroyed by destroying chunks */
-    if (target->parent == NULL) {
-        chunk_destroy(&target->item_chunk);
-        chunk_destroy(&target->data_chunk);
-        target->first.next = NULL;
-        target->last.prev = NULL;
-        target->first_free.next = NULL;
-        target->last_free.prev = NULL;
-    }
-    /* sublist is destroyed by removing all items */
-    else {
-        /* TODO: implement destroying sublist */
-        ERROR(NOT_IMPLEMENTED);
-    }
+  /* master list can be destroyed by destroying chunks */
+  if (target->parent == NULL) {
+      chunk_destroy(&target->item_chunk);
+      chunk_destroy(&target->data_chunk);
+      target->first.next = NULL;
+      target->last.prev = NULL;
+      target->first_free.next = NULL;
+      target->last_free.prev = NULL;
+  }
+  /* sublist is destroyed by removing all items */
+  else {
+      /* TODO: implement destroying sublist */
+      ERROR(NOT_IMPLEMENTED);
+  }
 
-    FINALLY(list_destroy);
-    RETURN();
+  FINALLY(list_destroy);
+  RETURN();
 }
 
 /******************************************************************************/
 
-result list_nullify(
-    list *target
-    )
+result list_nullify
+(
+  list *target
+)
 {
-    TRY();
+  TRY();
 
-    CHECK_POINTER(target);
+  CHECK_POINTER(target);
 
-    target->parent = NULL;
-    CHECK(list_item_nullify(&target->first));
-    CHECK(list_item_nullify(&target->last));
-    CHECK(list_item_nullify(&target->first_free));
-    CHECK(list_item_nullify(&target->last_free));
-    target->count = 0;
-    target->max_size = 0;
-    CHECK(chunk_nullify(&target->item_chunk));
-    CHECK(chunk_nullify(&target->data_chunk));
+  target->parent = NULL;
+  CHECK(list_item_nullify(&target->first));
+  CHECK(list_item_nullify(&target->last));
+  CHECK(list_item_nullify(&target->first_free));
+  CHECK(list_item_nullify(&target->last_free));
+  target->count = 0;
+  target->max_size = 0;
+  CHECK(chunk_nullify(&target->item_chunk));
+  CHECK(chunk_nullify(&target->data_chunk));
 
-    FINALLY(list_nullify);
-    RETURN();
+  FINALLY(list_nullify);
+  RETURN();
 }
 
 /******************************************************************************/
