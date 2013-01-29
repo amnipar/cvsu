@@ -58,6 +58,13 @@ typedef struct quad_forest_segment_t
   byte color[4];
 } quad_forest_segment;
 
+typedef struct quad_forest_edge_t
+{
+  struct quad_forest_edge_t *parent;
+  uint32 rank;
+  list *links;
+} quad_forest_edge;
+
 /**
  * Stores a quad tree holding image data.
  */
@@ -74,6 +81,22 @@ typedef struct quad_tree_t {
   statistics stat;
   /** Region info used in segmentation. */
   quad_forest_segment segment;
+  /** Horizontal edge response value averaged from tree region */
+  integral_value dx;
+  /** Vertical mean edge response value averaged from tree region */
+  integral_value dy;
+  /** Temporary pool value used in propagation algorithms */
+  integral_value pool;
+  /** Temporary squared pool value used in propagation algorithms */
+  integral_value pool2;
+  /** Temporary accumulator value used in propagation algorithms */
+  integral_value acc;
+  /** Temporary squared accumulator value used in propagation algorithms */
+  integral_value acc2;
+  /** Stores the information about whether this tree contains a vertical edge */
+  truth_value has_vedge;
+  /** Stores the information about whether this tree contains a horizontal edge */
+  truth_value has_hedge;
   /** Parent tree, NULL if this is a root tree */
   struct quad_tree_t *parent;
   /* child trees, all NULL if the tree has not beed divided */
@@ -404,6 +427,15 @@ result quad_tree_get_edge_response
   integral_value *dx,
   /** Pointer where the vertical scanning result is stored. */
   integral_value *dy
+);
+
+/**
+ * Uses edge responses and graph propagation to find trees containing strong
+ * horizontal edges.
+ */
+result quad_forest_find_horizontal_edges
+(
+  quad_forest *forest
 );
 
 /*

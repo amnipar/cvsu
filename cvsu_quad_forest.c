@@ -64,6 +64,7 @@ string quad_tree_get_child_statistics_name = "quad_tree_get_child_statistics";
 string quad_tree_get_neighborhood_statistics_name = "quad_tree_get_neighborhood_statistics";
 string quad_tree_divide_with_overlap_name = "quad_tree_divide_with_overlap";
 string quad_tree_get_edge_response_name = "quad_tree_get_edge_response";
+string quad_forest_find_horizontal_edges_name = "quad_forest_find_horizontal_edges";
 /*
 string image_tree_create_neighbor_list_name = "image_tree_create_neighbor_list";
 string image_tree_add_children_as_immediate_neighbors_name = "image_tree_add_children_as_immediate_neighbors";
@@ -247,7 +248,7 @@ result quad_forest_create
 )
 {
   TRY();
-
+  
   CHECK_POINTER(target);
 
   CHECK_FALSE(pixel_image_is_null(source));
@@ -1774,7 +1775,10 @@ result quad_tree_get_edge_response
         i2A1++;
       }
     }
-    *dx = hsum;
+    tree->dx = hsum / box_width;
+    if (dx != NULL) {
+      *dx = tree->dx;
+    }
     /*printf("dx %.3f ", hsum);*/
   }
   /* calculate vertical cumulative gradient */
@@ -1799,7 +1803,10 @@ result quad_tree_get_edge_response
         i2A1 += stride;
       }
     }
-    *dy = vsum;
+    tree->dy = vsum / box_width;
+    if (dy != NULL) {
+      *dy = tree->dy;
+    }
     /*printf("dy %.3f ", vsum);*/
   }
 
@@ -1808,7 +1815,180 @@ result quad_tree_get_edge_response
 }
 
 
+/******************************************************************************/
+/* private functions for managing graph propagation algorithms                */
+
 /*******************************************************************************
+ * graph propagation is based on
+ *  a) accumulator value that holds the current state of the node
+ *  b) pool value that is the temporary state, modified by neighbors
+ *  c) four neighbors that adjust the node's pool value
+ * each node is first primed with an initial value, stored in acc; then each
+ * node is given their chance to modify their neighbors' pool values; finally
+ * the pool value is accumulated back to the acc value and possibly used in the
+ * next round of propagation.
+*******************************************************************************/
+
+/* sets the acc value to the current pool value */
+void quad_tree_prime_with_pool(quad_tree *tree)
+{
+  tree->acc = tree->pool / 2;
+  tree->pool = tree->acc;
+  /* pool value is not squared as it already contains squared values */
+  tree->acc2 = tree->pool2 / 2;
+  tree->pool2 = tree->acc2;
+}
+
+/* sets the acc value to the dy edge response value */
+void quad_tree_prime_with_dy(quad_tree *tree)
+{
+  tree->acc = tree->dy / 2;
+  tree->pool = tree->acc;
+  /* (a * a) / 2 = a * (a / 2) */
+  tree->acc2 = tree->dy * tree->acc;
+  tree->pool2 = tree->acc2;
+}
+
+/* sets the acc value to the dy edge response value */
+void quad_tree_prime_with_dx(quad_tree *tree)
+{
+  tree->acc = tree->dx / 2;
+  tree->pool = tree->acc;
+  /* (a * a) / 2 = a * (a / 2) */
+  tree->acc2 = tree->dx * tree->acc;
+  tree->pool2 = tree->acc2;
+}
+
+/* sets the acc value to horizontal difference */
+/* (dy + left and right neighbor dy - top and bottom neighbor dy) */
+void quad_tree_prime_with_hdiff(quad_tree *tree)
+{
+  integral_value acc;
+  acc += (tree->w == NULL ? 0 : tree->w->dy);
+  acc += (tree->e == NULL ? 0 : tree->e->dy);
+  acc -= (tree->n == NULL ? 0 : tree->n->dy);
+  acc -= (tree->s == NULL ? 0 : tree->s->dy);
+  tree->acc = acc / 2;
+  tree->pool = tree->acc;
+  tree->acc2 = acc * tree->acc;
+  tree->pool2 = tree->acc2;
+}
+
+void quad_tree_accumulate(quad_tree *tree)
+{
+  tree->acc = tree->pool;
+  tree->acc2 = tree->pool2;
+}
+
+/* propagates one quarter of the acc value to each of the four neighbors */
+void quad_tree_propagate(quad_tree *tree)
+{
+  integral_value pool, pool2;
+  /* effectively this is one eighth of original tree value */
+  pool = tree->acc / 4;
+  pool2 = tree->acc2 / 4;
+  if (tree->n != NULL) { tree->n->pool += pool; tree->n->pool2 += pool2; }
+  if (tree->e != NULL) { tree->e->pool += pool; tree->e->pool2 += pool2; }
+  if (tree->s != NULL) { tree->s->pool += pool; tree->s->pool2 += pool2; }
+  if (tree->w != NULL) { tree->w->pool += pool; tree->w->pool2 += pool2; }
+}
+
+/******************************************************************************/
+
+result quad_forest_find_horizontal_edges
+(
+  quad_forest *forest
+)
+{
+  TRY();
+  uint32 remaining, i, size;
+  integral_value mean, dev;
+  quad_tree *tree;
+  
+  CHECK_POINTER(forest);
+  
+  size = forest->rows * forest->cols;
+  
+  /* first get the edge responses */
+  /* TODO: add forest state to determine if this has been done already */
+  for (i = 0; i < size; i++) {
+    CHECK(quad_tree_get_edge_response(forest, forest->roots[i], NULL, NULL));
+  }
+  
+  /* before propagation, prime all trees with dy */
+  for (i = 0; i < size; i++) {
+    quad_tree_prime_with_dy(forest->roots[i]);
+  }
+  /* then, propagate three rounds */
+  for (remaining = 4; remaining--;) {
+    for (i = 0; i < size; i++) {
+      quad_tree_propagate(forest->roots[i]);
+    }
+    /* on other rounds except the last, prime for the new run */
+    if (remaining > 0) {
+      for (i = 0; i < size; i++) {
+        quad_tree_prime_with_pool(forest->roots[i]);
+      }
+    }
+  }
+  
+  for (i = 0; i < size; i++) {
+    tree = forest->roots[i];
+    mean = tree->pool;
+    dev = tree->pool2;
+    dev -= mean*mean;
+    if (dev < 0) dev = 0; else dev = sqrt(dev);
+    if (tree->dy > mean + dev) {
+      /*printf("dy %.3f mean %.3f dev %.3f\n", tree->dy, mean, dev);*/
+      tree->has_hedge = TRUE;
+    }
+    else {
+      tree->has_hedge = FALSE;
+    }
+  }
+  
+  /* first get the edge responses */
+  /* TODO: add forest state to determine if this has been done already */
+  
+  /* before propagation, prime all trees with dy */
+  for (i = 0; i < size; i++) {
+    quad_tree_prime_with_dx(forest->roots[i]);
+  }
+  /* then, propagate three rounds */
+  for (remaining = 4; remaining--;) {
+    for (i = 0; i < size; i++) {
+      quad_tree_propagate(forest->roots[i]);
+    }
+    /* on other rounds except the last, prime for the new run */
+    if (remaining > 0) {
+      for (i = 0; i < size; i++) {
+        quad_tree_prime_with_pool(forest->roots[i]);
+      }
+    }
+  }
+  
+  for (i = 0; i < size; i++) {
+    tree = forest->roots[i];
+    mean = tree->pool;
+    dev = tree->pool2;
+    dev -= mean*mean;
+    if (dev < 0) dev = 0; else dev = sqrt(dev);
+    if (tree->dx > mean + dev) {
+      /*printf("dx %.3f mean %.3f dev %.3f\n", tree->dx, mean, dev);*/
+      tree->has_vedge = TRUE;
+    }
+    else {
+      tree->has_vedge = FALSE;
+    }
+  }
+  
+  FINALLY(quad_forest_find_horizontal_edges);
+  RETURN();
+}
+
+/******************************************************************************/
+
+/*
 
 result image_tree_create_neighbor_list(
     list *target
