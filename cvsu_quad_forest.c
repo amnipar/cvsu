@@ -67,6 +67,7 @@ string quad_tree_get_edge_response_name = "quad_tree_get_edge_response";
 string quad_forest_find_edges_name = "quad_forest_find_edges";
 string quad_forest_find_vertical_edges_name = "quad_forest_find_vertical_edges";
 string quad_forest_find_horizontal_edges_name = "quad_forest_find_horizontal_edges";
+string quad_forest_segment_horizontal_edges_name = "quad_forest_segment_horizontal_edges";
 /*
 string image_tree_create_neighbor_list_name = "image_tree_create_neighbor_list";
 string image_tree_add_children_as_immediate_neighbors_name = "image_tree_add_children_as_immediate_neighbors";
@@ -419,7 +420,7 @@ result quad_forest_update
       stat->deviation = sqrt(var);
 
       /* TODO: decide where the segments are created */
-      quad_tree_segment_create(tree);
+      /*quad_tree_segment_create(tree);*/
       tree->nw = NULL;
       tree->ne = NULL;
       tree->sw = NULL;
@@ -1326,28 +1327,28 @@ result quad_tree_divide
 
         /* nw child block */
         CHECK(list_append_reveal_data(&forest->trees, (pointer)&children[0], (pointer*)&child_tree));
-        quad_tree_segment_create(child_tree);
+        /*quad_tree_segment_create(child_tree);*/
         child_tree->level = level;
         child_tree->parent = target;
         target->nw = child_tree;
 
         /* ne child block */
         CHECK(list_append_reveal_data(&forest->trees, (pointer)&children[1], (pointer*)&child_tree));
-        quad_tree_segment_create(child_tree);
+        /*quad_tree_segment_create(child_tree);*/
         child_tree->level = level;
         child_tree->parent = target;
         target->ne = child_tree;
 
         /* sw child block */
         CHECK(list_append_reveal_data(&forest->trees, (pointer)&children[2], (pointer*)&child_tree));
-        quad_tree_segment_create(child_tree);
+        /*quad_tree_segment_create(child_tree);*/
         child_tree->level = level;
         child_tree->parent = target;
         target->sw = child_tree;
 
         /* se child block */
         CHECK(list_append_reveal_data(&forest->trees, (pointer)&children[3], (pointer*)&child_tree));
-        quad_tree_segment_create(child_tree);
+        /*quad_tree_segment_create(child_tree);*/
         child_tree->level = level;
         child_tree->parent = target;
         target->se = child_tree;
@@ -1698,28 +1699,28 @@ result quad_tree_divide_with_overlap
 
         /* nw child block */
         CHECK(list_append_reveal_data(&forest->trees, (pointer)&children[0], (pointer*)&child_tree));
-        quad_tree_segment_create(child_tree);
+        /*quad_tree_segment_create(child_tree);*/
         child_tree->parent = target;
         child_tree->level = level;
         target->nw = child_tree;
 
         /* ne child block */
         CHECK(list_append_reveal_data(&forest->trees, (pointer)&children[1], (pointer*)&child_tree));
-        quad_tree_segment_create(child_tree);
+        /*quad_tree_segment_create(child_tree);*/
         child_tree->parent = target;
         child_tree->level = level;
         target->ne = child_tree;
 
         /* sw child block */
         CHECK(list_append_reveal_data(&forest->trees, (pointer)&children[2], (pointer*)&child_tree));
-        quad_tree_segment_create(child_tree);
+        /*quad_tree_segment_create(child_tree);*/
         child_tree->parent = target;
         child_tree->level = level;
         target->sw = child_tree;
 
         /* se child block */
         CHECK(list_append_reveal_data(&forest->trees, (pointer)&children[3], (pointer*)&child_tree));
-        quad_tree_segment_create(child_tree);
+        /*quad_tree_segment_create(child_tree);*/
         child_tree->parent = target;
         child_tree->level = level;
         target->se = child_tree;
@@ -1843,6 +1844,15 @@ void quad_tree_prime_with_pool(quad_tree *tree)
   tree->pool = tree->acc;
   /* pool value is not squared as it already contains squared values */
   tree->acc2 = tree->pool2 / 2;
+  tree->pool2 = tree->acc2;
+}
+
+/* sets the acc value to a constant value */
+void quad_tree_prime_with_constant(quad_tree *tree, integral_value constant)
+{
+  tree->acc = constant / 2;
+  tree->pool = tree->acc;
+  tree->acc2 = constant * tree->acc;
   tree->pool2 = tree->acc2;
 }
 
@@ -2052,7 +2062,7 @@ result quad_forest_find_horizontal_edges
     dev = tree->pool2;
     dev -= mean*mean;
     if (dev < 0) dev = 0; else dev = sqrt(dev);
-    if (tree->edge.dy > mean + bias - dev) {
+    if (tree->edge.dy > fmax(mean, mean + bias - dev)) {
       /*printf("dy %.3f mean %.3f dev %.3f\n", tree->dy, mean, dev);*/
       tree->edge.has_hedge = TRUE;
     }
@@ -2122,6 +2132,92 @@ result quad_forest_find_vertical_edges
   }
 
   FINALLY(quad_forest_find_vertical_edges);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result quad_forest_segment_horizontal_edges
+(
+  quad_forest *target,
+  uint32 rounds,
+  integral_value bias,
+  truth_value propagate_edges,
+  truth_value use_all_neighbors
+)
+{
+  TRY();
+  uint32 i, size;
+  quad_tree *tree, *neighbor;
+  
+  CHECK_POINTER(target);
+  
+  CHECK(quad_forest_find_horizontal_edges(target, rounds, bias));
+  
+  size = target->rows * target->cols;
+  
+  for (i = 0; i < size; i++) {
+    tree = target->roots[i];
+    if (IS_TRUE(tree->edge.has_hedge)) {
+      quad_tree_segment_create(tree);
+    }
+  }
+  
+  for (i = 0; i < size; i++) {
+    tree = target->roots[i];
+    if (IS_TRUE(tree->edge.has_hedge)) {
+      neighbor = tree->w;
+      if (neighbor != NULL && IS_TRUE(neighbor->edge.has_hedge)) {
+        quad_tree_segment_union(tree, neighbor);
+      }
+      neighbor = tree->e;
+      if (neighbor != NULL && IS_TRUE(neighbor->edge.has_hedge)) {
+        quad_tree_segment_union(tree, neighbor);
+      }
+      if (IS_TRUE(use_all_neighbors)) {
+        neighbor = tree->n;
+        if (neighbor != NULL && IS_TRUE(neighbor->edge.has_hedge)) {
+          quad_tree_segment_union(tree, neighbor);
+        }
+        neighbor = tree->s;
+        if (neighbor != NULL && IS_TRUE(neighbor->edge.has_hedge)) {
+          quad_tree_segment_union(tree, neighbor);
+        }
+      }
+    }
+  }
+  
+  
+  /* finally, count regions and assign colors */
+  {
+    quad_forest_segment *parent, *segment;
+    list_item *trees;
+    uint32 count;
+
+    count = 0;
+    /* initialize the random number generator for assigning the colors */
+    srand(1234);
+
+    trees = target->trees.first.next;
+    while (trees != &target->trees.last) {
+      tree = (quad_tree *)trees->data;
+      if (tree->nw == NULL) {
+        segment = &tree->segment;
+        parent = quad_tree_segment_find(tree);
+        if (parent == segment) {
+          segment->color[0] = (byte)(rand() % 256);
+          segment->color[1] = (byte)(rand() % 256);
+          segment->color[2] = (byte)(rand() % 256);
+          count++;
+        }
+      }
+      trees = trees->next;
+    }
+    target->segments = count;
+    printf("segmentation finished, %lu segments found\n", count);
+  }
+  
+  FINALLY(quad_forest_segment_horizontal_edges);
   RETURN();
 }
 

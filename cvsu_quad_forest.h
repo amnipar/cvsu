@@ -486,7 +486,7 @@ result quad_forest_find_edges
  */
 result quad_forest_find_horizontal_edges
 (
-/** Forest where edges are searched */
+  /** Forest where edges are searched */
   quad_forest *forest,
   /** How many rounds to propagate */
   uint32 rounds,
@@ -500,12 +500,30 @@ result quad_forest_find_horizontal_edges
  */
 result quad_forest_find_vertical_edges
 (
-/** Forest where edges are searched */
+  /** Forest where edges are searched */
   quad_forest *forest,
   /** How many rounds to propagate */
   uint32 rounds,
   /** Bias value added to mean, for triggering presence of edge */
   integral_value bias
+);
+
+/**
+ * Segments the forest by finding first all horizontal edges with edge
+ * propagation, then merging segments that have edges in neighboring trees.
+ */
+result quad_forest_segment_horizontal_edges
+(
+  /** Forest to be segmented */
+  quad_forest *target,
+  /** How many rounds to propagate while determining trees with edges */
+  uint32 rounds,
+  /** Bias value used in edge detection */
+  integral_value bias,
+  /** When edges have been found, should they be propagated to close gaps */
+  truth_value propagate_edges,
+  /** Should we use all neighbor or only horizontal neighbors in merging segments */
+  truth_value use_all_neighbors
 );
 
 /*
