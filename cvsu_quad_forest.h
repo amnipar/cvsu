@@ -8,20 +8,20 @@
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- *   * Redistributions of source code must retain the above copyright
- *     notice, this list of conditions and the following disclaimer.
- *   * Redistributions in binary form must reproduce the above copyright
- *     notice, this list of conditions and the following disclaimer in the
- *     documentation and/or other materials provided with the distribution.
- *   * Neither the name of the copyright holder nor the
- *     names of its contributors may be used to endorse or promote products
- *     derived from this software without specific prior written permission.
+ *   * Redistributions of source code must retain the above copyright notice,
+ *     this list of conditions and the following disclaimer.
+ *   * Redistributions in binary form must reproduce the above copyright notice,
+ *     this list of conditions and the following disclaimer in the documentation
+ *     and/or other materials provided with the distribution.
+ *   * Neither the name of the copyright holder nor the names of its
+ *     contributors may be used to endorse or promote products derived from this
+ *     software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL COPYRIGHT HOLDER BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * ARE DISCLAIMED. IN NO EVENT SHALL COPYRIGHT HOLDER BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
  * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
  * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
  * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
@@ -41,62 +41,89 @@ extern "C" {
 #include "cvsu_edges.h"
 #include "cvsu_list.h"
 
+/** Stores the forest status as a collection of bitwise flags. */
+typedef uint32 quad_forest_status;
+
+/** Forest has been initialized, but not yet updated. */
+const quad_forest_status FOREST_INITIALIZED    = 0x1;
+/** Forest has been updated, but no analysis performed. */
+const quad_forest_status FOREST_UPDATED        = 0x2;
+/** Segmentation operation has been performed. */
+const quad_forest_status FOREST_SEGMENTED      = 0x4;
+/** Edge detection operation has been performed. */
+const quad_forest_status FOREST_EDGES_DETECTED = 0x8;
+
 /**
- * Stores segment information for forest segmentation with union-find
- * disjoint set approach. In addition to id and rank information contains
- * also the segment bounding box and statistics.
+ * Stores segment information for quad_forest segmentation with union-find
+ * disjoint set approach. In addition to id and rank information contains also
+ * the segment bounding box and statistics.
  */
 typedef struct quad_forest_segment_t
 {
+  /** Parent segment, that determines the segment id (may be self) */
   struct quad_forest_segment_t *parent;
+  /** Rank value used for optimizing union-find process */
   uint32 rank;
+  /** X-coordinate of the bounding box top left corner */
   uint32 x1;
+  /** Y-coordinate of the bounding box top left corner */
   uint32 y1;
+  /** X-coordinate of the bounding box bottom right corner */
   uint32 x2;
+  /** Y-coordinate of the bounding box bottom right corner */
   uint32 y2;
+  /** Statistics of the image region covered by this segment */
   statistics stat;
+  /** Color assigned for this segment for visualizing purposes */
   byte color[4];
 } quad_forest_segment;
 
+/**
+ * Stores edge information for edge and edge chain detection in quad_forest with
+ * union-find disjoint set approach. In addition to id and rank information
+ * contains also edge response values and local variation information.
+ * TODO: Adding also edge chain links.
+ */
 typedef struct quad_forest_edge_t
 {
+  /** The parent edge, that determines the edge segment id */
   struct quad_forest_edge_t *parent;
+  /** The rank value used for optimizing union-find process */
   uint32 rank;
-  list *links;
+  /** Horizontal edge response value averaged from the tree region */
+  integral_value dx;
+  /** Vertical edge response value averaged from the tree region */
+  integral_value dy;
+  /** Magnitude of the edge response average from the tree region */
+  integral_value mag;
+  /** The estimated dominant edge direction as averaged from the tree region */
+  integral_value ang;
+  /** Stores the information about whether this tree contains a magnitude edge */
+  truth_value has_edge;
+  /** Stores the information about whether this tree contains a vertical edge */
+  truth_value has_vedge;
+  /** Stores the information about whether this tree contains a horizontal edge */
+  truth_value has_hedge;
 } quad_forest_edge;
 
 /**
  * Stores a quad tree holding image data.
  */
 typedef struct quad_tree_t {
-  /** The x coordinate of the top left corner. */
+  /** X-coordinate of the top left corner */
   uint32 x;
-  /** The y coordinate of the top left corner. */
+  /** Y-coordinate of the top left corner */
   uint32 y;
-  /** Size of the image region covered by this tree. */
+  /** Size of the image region covered by this tree */
   uint32 size;
-  /** Level of this tree in the hierarchy. Top level is 0. */
+  /** Level of this tree in the hierarchy (top level is 0) */
   uint32 level;
-  /** Statistics of the image region covered by this tree. */
+  /** Statistics of the image region covered by this tree */
   statistics stat;
-  /** Region info used in segmentation. */
+  /** Region info used in segmentation */
   quad_forest_segment segment;
-  /** Horizontal edge response value averaged from tree region */
-  integral_value dx;
-  /** Vertical mean edge response value averaged from tree region */
-  integral_value dy;
-  /** Temporary pool value used in propagation algorithms */
-  integral_value pool;
-  /** Temporary squared pool value used in propagation algorithms */
-  integral_value pool2;
-  /** Temporary accumulator value used in propagation algorithms */
-  integral_value acc;
-  /** Temporary squared accumulator value used in propagation algorithms */
-  integral_value acc2;
-  /** Stores the information about whether this tree contains a vertical edge */
-  truth_value has_vedge;
-  /** Stores the information about whether this tree contains a horizontal edge */
-  truth_value has_hedge;
+  /** Edge info used in edge detection */
+  quad_forest_edge edge;
   /** Parent tree, NULL if this is a root tree */
   struct quad_tree_t *parent;
   /* child trees, all NULL if the tree has not beed divided */
@@ -109,45 +136,55 @@ typedef struct quad_tree_t {
   /** Lower right child tree */
   struct quad_tree_t *se;
   /* direct neighbors are cached in each tree as they are determined */
-  /** Direct neighbor on the top side. */
+  /** Direct neighbor on the top side */
   struct quad_tree_t *n;
-  /** Direct neighbor on the right side. */
+  /** Direct neighbor on the right side */
   struct quad_tree_t *e;
-  /** Direct neighbor on the bottom side. */
+  /** Direct neighbor on the bottom side */
   struct quad_tree_t *s;
-  /** Direct neighbor on the left side. */
+  /** Direct neighbor on the left side */
   struct quad_tree_t *w;
+  /** Temporary pool value used in propagation algorithms */
+  integral_value pool;
+  /** Temporary squared pool value used in propagation algorithms */
+  integral_value pool2;
+  /** Temporary accumulator value used in propagation algorithms */
+  integral_value acc;
+  /** Temporary squared accumulator value used in propagation algorithms */
+  integral_value acc2;
 } quad_tree;
 
 /**
  * Stores a forest of image trees.
  */
 typedef struct quad_forest_t {
-  /** The original image from where the source data is copied. */
+  /** Status flags for ensuring the correct state of the forest structure */
+  quad_forest_status status;
+  /** Original image from where the source data is copied */
   pixel_image *original;
-  /** The source data used for updating the integral image. */
+  /** Source data used for updating the integral image */
   pixel_image *source;
-  /** The integral image used for calculating tree statistics. */
+  /** Integral image used for calculating tree statistics */
   integral_image integral;
-  /** The number of rows in the tree grid. */
+  /** Number of rows in the tree grid */
   uint32 rows;
-  /** The number of cols in the tree grid. */
+  /** Number of cols in the tree grid */
   uint32 cols;
-  /** The number of regions found from the tree (after segmentation). */
+  /** Number of regions found from the tree (after segmentation) */
   uint32 segments;
-  /** The maximum size of trees (the size of root trees). */
+  /** Maximum size of trees (the size of root trees) */
   uint32 tree_max_size;
-  /** The minimum size of trees, no tree will be divided beyond this size. */
+  /** Minimum size of trees, no tree will be divided beyond this size */
   uint32 tree_min_size;
-  /** Horizontal offset of the grid from the origin of the source image. */
+  /** Horizontal offset of the grid from the origin of the source image */
   uint32 dx;
-  /** Vertical offset of the grid from the origin of the source image. */
+  /** Vertical offset of the grid from the origin of the source image */
   uint32 dy;
-  /** List of all trees in the forest. */
+  /** List of all trees in the forest, including the root trees */
   list trees;
-  /** Pointer to the end of the root tree list for resetting the forest. */
+  /** Pointer to the last root tree in the tree list for resetting the forest */
   list_item *last_root_tree;
-  /** The array containing the root tree grid. */
+  /** Pointer array containing the root trees in the tree grid */
   quad_tree **roots;
 } quad_forest;
 
@@ -431,11 +468,44 @@ result quad_tree_get_edge_response
 
 /**
  * Uses edge responses and graph propagation to find trees containing strong
+ * magnitude edges.
+ */
+result quad_forest_find_edges
+(
+  /** Forest where edges are searched */
+  quad_forest *forest,
+  /** How many rounds to propagate */
+  uint32 rounds,
+  /** Bias value added to mean, for triggering presence of edge */
+  integral_value bias
+);
+
+/**
+ * Uses edge responses and graph propagation to find trees containing strong
  * horizontal edges.
  */
 result quad_forest_find_horizontal_edges
 (
-  quad_forest *forest
+/** Forest where edges are searched */
+  quad_forest *forest,
+  /** How many rounds to propagate */
+  uint32 rounds,
+  /** Bias value added to mean, for triggering presence of edge */
+  integral_value bias
+);
+
+/**
+ * Uses edge responses and graph propagation to find trees containing strong
+ * vertical edges.
+ */
+result quad_forest_find_vertical_edges
+(
+/** Forest where edges are searched */
+  quad_forest *forest,
+  /** How many rounds to propagate */
+  uint32 rounds,
+  /** Bias value added to mean, for triggering presence of edge */
+  integral_value bias
 );
 
 /*
