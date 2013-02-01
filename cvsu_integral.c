@@ -8,20 +8,20 @@
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- *   * Redistributions of source code must retain the above copyright
- *     notice, this list of conditions and the following disclaimer.
- *   * Redistributions in binary form must reproduce the above copyright
- *     notice, this list of conditions and the following disclaimer in the
- *     documentation and/or other materials provided with the distribution.
- *   * Neither the name of the copyright holder nor the
- *     names of its contributors may be used to endorse or promote products
- *     derived from this software without specific prior written permission.
+ *   * Redistributions of source code must retain the above copyright notice,
+ *     this list of conditions and the following disclaimer.
+ *   * Redistributions in binary form must reproduce the above copyright notice,
+ *     this list of conditions and the following disclaimer in the documentation
+ *     and/or other materials provided with the distribution.
+ *   * Neither the name of the copyright holder nor the names of its
+ *     contributors may be used to endorse or promote products derived from this
+ *     software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL COPYRIGHT HOLDER BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * ARE DISCLAIMED. IN NO EVENT SHALL COPYRIGHT HOLDER BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
  * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
  * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
  * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
@@ -36,11 +36,8 @@
 
 #include <math.h>
 
-double fmax (double __x, double __y);
-
 /******************************************************************************/
-/* constants for storing the function names                                   */
-/* used in error reporting macros                                             */
+/* constants for reporting function names in error messages                   */
 
 string integral_image_alloc_name = "integral_image_alloc";
 string integral_image_free_name = "integral_image_free";
@@ -54,13 +51,11 @@ string integral_image_threshold_sauvola_name = "integral_image_threshold_sauvola
 string integral_image_threshold_feng_name = "integral_image_threshold_feng";
 string small_integral_image_create_name = "small_integral_image_create";
 string small_integral_image_update_name = "small_integral_image_update";
-string small_integral_image_box_create_name = "small_integral_image_box_create";
-string small_integral_image_update_block_name = "small_integral_image_update_block";
 
 /******************************************************************************/
 /* constants for lookup tables                                                */
 
-bool tables_initialized = false;
+truth_value tables_initialized = FALSE;
 integral_value pixel_squared[256];
 #ifdef INTEGRAL_IMAGE_HIGHER_ORDER_STATISTICS
 integral_value pixel_cubed[256];
@@ -72,7 +67,7 @@ SI_2_t small_pixel_squared[256];
 
 void init_tables()
 {
-  if (!tables_initialized) {
+  if (IS_FALSE(tables_initialized)) {
     uint32 i;
     for (i = 0; i < 256; i++) {
       pixel_squared[i] = (integral_value)(i * i);
@@ -82,7 +77,7 @@ void init_tables()
 #endif
       small_pixel_squared[i] = (SI_2_t)(i * i);
     }
-    tables_initialized = true;
+    tables_initialized = TRUE;
   }
 }
 
@@ -91,29 +86,29 @@ void init_tables()
 integral_image *integral_image_alloc()
 {
   TRY();
-  integral_image *ptr;
+  integral_image *target;
 
-  CHECK(memory_allocate((data_pointer *)&ptr, 1, sizeof(integral_image)));
-  CHECK(integral_image_nullify(ptr));
+  CHECK(memory_allocate((data_pointer *)&target, 1, sizeof(integral_image)));
+  CHECK(integral_image_nullify(target));
 
   FINALLY(integral_image_alloc);
-  return ptr;
+  return target;
 }
 
 /******************************************************************************/
 
 void integral_image_free
-  (
-  integral_image *ptr
-  )
+(
+  integral_image *target
+)
 {
   TRY();
 
   r = SUCCESS;
 
-  if (ptr != NULL) {
-    CHECK(integral_image_destroy(ptr));
-    CHECK(memory_deallocate((data_pointer *)&ptr));
+  if (target != NULL) {
+    CHECK(integral_image_destroy(target));
+    CHECK(memory_deallocate((data_pointer *)&target));
   }
   FINALLY(integral_image_free);
 }
@@ -121,10 +116,10 @@ void integral_image_free
 /******************************************************************************/
 
 result integral_image_create
-  (
+(
   integral_image *target,
   pixel_image *source
-  )
+)
 {
   TRY();
 
@@ -160,9 +155,9 @@ result integral_image_create
 /******************************************************************************/
 
 result integral_image_destroy
-  (
+(
   integral_image *target
-  )
+)
 {
   TRY();
 
@@ -181,9 +176,9 @@ result integral_image_destroy
 /******************************************************************************/
 
 result integral_image_nullify
-  (
+(
   integral_image *target
-  )
+)
 {
   TRY();
 
@@ -206,29 +201,29 @@ result integral_image_nullify
 
 /******************************************************************************/
 
-bool integral_image_is_null
+truth_value integral_image_is_null
 (
   integral_image *target
 )
 {
   if (target != NULL) {
     if (target->original == NULL) {
-      return true;
+      return TRUE;
     }
   }
   else {
-    return true;
+    return TRUE;
   }
-  return false;
+  return FALSE;
 }
 
 /******************************************************************************/
 
 result integral_image_clone
-  (
+(
   integral_image *target,
   integral_image *source
-  )
+)
 {
   TRY();
 
@@ -256,10 +251,10 @@ result integral_image_clone
 /******************************************************************************/
 
 result integral_image_copy
-  (
+(
   integral_image *target,
   integral_image *source
-  )
+)
 {
   TRY();
 
@@ -336,9 +331,9 @@ result integral_image_copy
 /******************************************************************************/
 
 result integral_image_update
-  (
+(
   integral_image *target
-  )
+)
 {
   TRY();
   pixel_image *source;
@@ -403,15 +398,26 @@ result integral_image_update
 
 /******************************************************************************/
 
+/*
+Notes:
+-x and y are signed to allow creating regions around any pixel (cx - r, cy - r)
+-top left corner of rectangle is in reality one pixel right and up from the
+coordinates of the top left corner of the image region; but since an empty
+row and column is added to top and left, the coordinates are handled
+automatically correctly, and the real width and height of the rectangle can be
+used for dx and dy, there is no need to subtract 1
+-this takes into account multi-channel images
+*/
+
 image_rect integral_image_create_rect
-  (
+(
   integral_image *target,
   sint32 x,
   sint32 y,
   sint32 dx,
   sint32 dy,
   uint32 offset
-  )
+)
 {
   image_rect rect;
   register uint32 width, height, step, stride;
@@ -446,27 +452,17 @@ image_rect integral_image_create_rect
   return rect;
 }
 
-
-/*
-Notes:
--x and y are signed to allow creating regions around any pixel (cx - r, cy - r)
--top left corner of rectangle is in reality one pixel right and up from the
- coordinates of the top left corner of the image region; but since an empty
- row and column is added to top and left, the coordinates are handled
- automatically correctly, and the real width and height of the rectangle can be
- used for dx and dy, there is no need to subtract 1
--this takes into account multi-channel images
-*/
+/******************************************************************************/
 
 integral_value integral_image_calculate_mean
-  (
+(
   integral_image *target,
   sint32 x,
   sint32 y,
   sint32 dx,
   sint32 dy,
   uint32 offset
-  )
+)
 {
   image_rect rect;
   integral_value *iA, sum;
@@ -482,18 +478,17 @@ integral_value integral_image_calculate_mean
   }
 }
 
-/**
- * Use integral_image to calculate intensity variance within the given area.
- */
+/******************************************************************************/
+
 integral_value integral_image_calculate_variance
-  (
+(
   integral_image *target,
   sint32 x,
   sint32 y,
   sint32 dx,
   sint32 dy,
   uint32 offset
-  )
+)
 {
   image_rect rect;
   integral_value *iA, *i2A, mean, sum2, var;
@@ -513,10 +508,10 @@ integral_value integral_image_calculate_variance
   }
 }
 
-/**
- * Use integral_image to calculate intensity statistics within the given area.
- */
-void integral_image_calculate_statistics(
+/******************************************************************************/
+
+void integral_image_calculate_statistics
+(
   integral_image *target,
   statistics *stat,
   sint32 x,
@@ -524,7 +519,7 @@ void integral_image_calculate_statistics(
   sint32 dx,
   sint32 dy,
   uint32 offset
-  )
+)
 {
   image_rect rect;
   integral_value *iA, *i2A, N, sum, sum2, mean, var;
@@ -757,232 +752,124 @@ result integral_image_threshold_feng
 
 /******************************************************************************/
 
-void integral_image_box_create(
-    integral_image_box *target,
-    integral_image *source,
-    uint32 width,
-    uint32 height,
-    uint32 dx,
-    uint32 dy
-    )
+result small_integral_image_create
+(
+  integral_image *target,
+  pixel_image *source
+)
 {
-    target->I_1_data = (I_1_t *)source->I_1.data;
-    target->iA = target->I_1_data;
-    target->I_2_data = (I_2_t *)source->I_2.data;
-    target->i2A = target->I_2_data;
-    target->sum = 0;
-    target->sumsqr = 0;
-    target->offset = 0;
-    target->stride = source->stride;
-    target->B_inc = width;
-    target->C_inc = height * target->stride + width;
-    target->D_inc = height * target->stride;
-    target->N = width * height;
-    target->dx = dx;
-    target->dy = dy;
+  TRY();
+
+  CHECK_POINTER(target);
+  CHECK_POINTER(source);
+  CHECK_POINTER(source->data);
+  CHECK_PARAM(source->type == p_U8);
+
+  target->original = source;
+  target->width = source->width;
+  target->height = source->height;
+  target->step = source->step;
+  target->I_1.data = NULL;
+  target->I_2.data = NULL;
+
+  /* integral image requires one extra row and column at top and left side */
+  target->stride = (target->width + 1) * target->step;
+
+  CHECK(pixel_image_create(&target->I_1, p_SI_1, source->format,
+        target->width+1, target->height+1, target->step, target->stride));
+
+  CHECK(pixel_image_create(&target->I_2, p_SI_2, source->format,
+        target->width+1, target->height+1, target->step, target->stride));
+
+  init_tables();
+
+  FINALLY(integral_image_create);
+  RETURN();
 }
 
 /******************************************************************************/
 
-void integral_image_box_resize(
-    integral_image_box *target,
-    uint32 width,
-    uint32 height
-    )
+void small_integral_image_update_channel
+(
+  integral_image *target,
+  uint32 channel
+)
 {
-    target->B_inc = width;
-    target->C_inc = height * target->stride + width;
-    target->D_inc = height * target->stride;
-    target->N = width * height;
-}
+  pixel_image *source;
 
-/******************************************************************************/
+  source = target->original;
+  {
+    INTEGRAL_IMAGE_UPDATE_DEFINE_VARIABLES(SI_1_t, SI_2_t);
+    uint32 intensity, width, height, x, y, h, v, d;
+    SINGLE_DISCONTINUOUS_IMAGE_VARIABLES(source, byte);
 
-void integral_image_box_update(
-    integral_image_box *target,
-    uint32 x,
-    uint32 y
-    )
-{
-    target->offset = (y - target->dy) * target->stride + (x - target->dx);
-    target->iA = target->I_1_data + target->offset;
-    target->i2A = target->I_2_data + target->offset;
-    target->sum =    (I_1_t)(*(target->iA + target->C_inc) + *target->iA - *(target->iA + target->B_inc) - *(target->iA + target->D_inc));
-    target->sumsqr = (I_2_t)(*(target->i2A + target->C_inc) + *target->i2A - *(target->i2A + target->B_inc) - *(target->i2A + target->D_inc));
-}
+    width = target->width;
+    height = target->height;
+    I_1_data = (SI_1_t *)target->I_1.data;
+    I_2_data = (SI_2_t *)target->I_2.data;
 
-/******************************************************************************/
+    /* horizontal offset for integral images */
+    h = target->step;
+    /* vertical offset for integral images */
+    v = target->stride;
+    /* diagonal offset for integral images */
+    d = target->stride + target->step;
 
-result small_integral_image_create(
-    integral_image *target,
-    pixel_image *source
-    )
-{
-    TRY();
-
-    CHECK_POINTER(target);
-    CHECK_POINTER(source);
-    CHECK_POINTER(source->data);
-    CHECK_PARAM(source->type == p_U8);
-
-    target->original = source;
-    target->width = source->width;
-    target->height = source->height;
-    target->step = source->step;
-    target->I_1.data = NULL;
-    target->I_2.data = NULL;
-
-    /* integral image requires one extra row and column at top and left side */
-    target->stride = (target->width + 1) * target->step;
-
-    CHECK(pixel_image_create(&target->I_1, p_SI_1, source->format,
-            target->width+1, target->height+1, target->step, target->stride));
-
-    CHECK(pixel_image_create(&target->I_2, p_SI_2, source->format,
-            target->width+1, target->height+1, target->step, target->stride));
-
-    init_tables();
-
-    FINALLY(integral_image_create);
-    RETURN();
-}
-
-/******************************************************************************/
-
-void small_integral_image_update_channel(
-    integral_image *target,
-    uint32 channel
-    )
-{
-    pixel_image *source;
-
-    source = target->original;
+    /* initialize rest of integral images */
+    /* add value of this pixel and integrals from top and left */
+    /* subtract integral from top left diagonal */
     {
-        INTEGRAL_IMAGE_UPDATE_DEFINE_VARIABLES(SI_1_t, SI_2_t);
-        uint32 intensity, width, height, x, y, h, v, d;
-        SINGLE_DISCONTINUOUS_IMAGE_VARIABLES(source, byte);
-
-        width = target->width;
-        height = target->height;
-        I_1_data = (SI_1_t *)target->I_1.data;
-        I_2_data = (SI_2_t *)target->I_2.data;
-
-        /* horizontal offset for integral images */
-        h = target->step;
-        /* vertical offset for integral images */
-        v = target->stride;
-        /* diagonal offset for integral images */
-        d = target->stride + target->step;
-
-        /* initialize rest of integral images */
-        /* add value of this pixel and integrals from top and left */
-        /* subtract integral from top left diagonal */
-        {
-            INTEGRAL_IMAGE_SET_POS(d + channel);
-            for (y = 0; y < height; y++) {
-                for (x = width, source_pos = source_rows[y] + channel; x--; source_pos += source_step) {
-                    intensity = PIXEL_VALUE(source);
-                    I_1_SET_VALUE((I_1_GET_VALUE_WITH_OFFSET(v) -
-                                   I_1_GET_VALUE_WITH_OFFSET(d)) +
-                                   I_1_GET_VALUE_WITH_OFFSET(h) +
-                                   intensity);
-                    I_2_SET_VALUE((I_2_GET_VALUE_WITH_OFFSET(v) -
-                                   I_2_GET_VALUE_WITH_OFFSET(d)) +
-                                   I_2_GET_VALUE_WITH_OFFSET(h) +
-                                   small_pixel_squared[intensity]);
-                    INTEGRAL_IMAGE_ADVANCE_POS(h);
-                }
-                /* skip one col from the beginning of next row */
-                INTEGRAL_IMAGE_ADVANCE_POS(h);
-            }
+      INTEGRAL_IMAGE_SET_POS(d + channel);
+      for (y = 0; y < height; y++) {
+        for (x = width, source_pos = source_rows[y] + channel; x--; source_pos += source_step) {
+          intensity = PIXEL_VALUE(source);
+          I_1_SET_VALUE((I_1_GET_VALUE_WITH_OFFSET(v) -
+                         I_1_GET_VALUE_WITH_OFFSET(d)) +
+                         I_1_GET_VALUE_WITH_OFFSET(h) +
+                         intensity);
+          I_2_SET_VALUE((I_2_GET_VALUE_WITH_OFFSET(v) -
+                         I_2_GET_VALUE_WITH_OFFSET(d)) +
+                         I_2_GET_VALUE_WITH_OFFSET(h) +
+                         small_pixel_squared[intensity]);
+          INTEGRAL_IMAGE_ADVANCE_POS(h);
         }
+        /* skip one col from the beginning of next row */
+        INTEGRAL_IMAGE_ADVANCE_POS(h);
+      }
     }
+  }
 }
 
 /******************************************************************************/
 
-result small_integral_image_update(
-    integral_image *target
-    )
+result small_integral_image_update
+(
+  integral_image *target
+)
 {
-    TRY();
-    uint32 i;
+  TRY();
+  uint32 i;
 
-    CHECK_POINTER(target);
-    CHECK_POINTER(target->original);
-    CHECK_POINTER(target->I_1.data);
-    CHECK_POINTER(target->I_2.data);
-    CHECK_PARAM(target->I_1.type == p_SI_1);
-    CHECK_PARAM(target->I_2.type == p_SI_2);
+  CHECK_POINTER(target);
+  CHECK_POINTER(target->original);
+  CHECK_POINTER(target->I_1.data);
+  CHECK_POINTER(target->I_2.data);
+  CHECK_PARAM(target->I_1.type == p_SI_1);
+  CHECK_PARAM(target->I_2.type == p_SI_2);
 
-    /* set the image content to 0's */
-    /* the first row and column must contain only 0's */
-    /* otherwise the algorithm doesn't work correctly */
-    CHECK(pixel_image_clear(&target->I_1));
-    CHECK(pixel_image_clear(&target->I_2));
+  /* set the image content to 0's */
+  /* the first row and column must contain only 0's */
+  /* otherwise the algorithm doesn't work correctly */
+  CHECK(pixel_image_clear(&target->I_1));
+  CHECK(pixel_image_clear(&target->I_2));
 
-    for (i = 0; i < target->original->step; i++) {
-        small_integral_image_update_channel(target, i);
-    }
+  for (i = 0; i < target->original->step; i++) {
+    small_integral_image_update_channel(target, i);
+  }
 
-    FINALLY(small_integral_image_update);
-    RETURN();
+  FINALLY(small_integral_image_update);
+  RETURN();
 }
 
-/******************************************************************************/
-
-void small_integral_image_box_create(
-    small_integral_image_box *target,
-    integral_image *source,
-    uint32 width,
-    uint32 height,
-    uint32 dx,
-    uint32 dy
-    )
-{
-    target->I_1_data = (SI_1_t *)source->I_1.data;
-    target->iA = target->I_1_data;
-    target->I_2_data = (SI_2_t *)source->I_2.data;
-    target->i2A = target->I_2_data;
-    target->sum = 0;
-    target->sumsqr = 0;
-    target->offset = 0;
-    target->step = source->step;
-    target->stride = source->stride;
-    target->dx = dx;
-    target->dy = dy;
-    target->channel = 0;
-
-    small_integral_image_box_resize(target, width, height);
-}
-
-/******************************************************************************/
-
-void small_integral_image_box_resize(
-    small_integral_image_box *target,
-    uint32 width,
-    uint32 height
-    )
-{
-    target->B_inc = width * target->step;
-    target->C_inc = height * target->stride + width * target->step;
-    target->D_inc = height * target->stride;
-    target->N = width * height;
-}
-
-/******************************************************************************/
-
-void small_integral_image_box_update(
-    small_integral_image_box *target,
-    uint32 x,
-    uint32 y
-    )
-{
-    target->offset = (y - target->dy) * target->stride + (x - target->dx) * target->step + target->channel;
-    target->iA = target->I_1_data + target->offset;
-    target->i2A = target->I_2_data + target->offset;
-    target->sum =    (SI_1_t)(*(target->iA + target->C_inc) + *target->iA - *(target->iA + target->B_inc) - *(target->iA + target->D_inc));
-    target->sumsqr = (SI_2_t)(*(target->i2A + target->C_inc) + *target->i2A - *(target->i2A + target->B_inc) - *(target->i2A + target->D_inc));
-}
-
+/* end of file                                                                */
 /******************************************************************************/

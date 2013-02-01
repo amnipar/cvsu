@@ -8,20 +8,20 @@
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- *   * Redistributions of source code must retain the above copyright
- *     notice, this list of conditions and the following disclaimer.
- *   * Redistributions in binary form must reproduce the above copyright
- *     notice, this list of conditions and the following disclaimer in the
- *     documentation and/or other materials provided with the distribution.
- *   * Neither the name of the copyright holder nor the
- *     names of its contributors may be used to endorse or promote products
- *     derived from this software without specific prior written permission.
+ *   * Redistributions of source code must retain the above copyright notice,
+ *     this list of conditions and the following disclaimer.
+ *   * Redistributions in binary form must reproduce the above copyright notice,
+ *     this list of conditions and the following disclaimer in the documentation
+ *     and/or other materials provided with the distribution.
+ *   * Neither the name of the copyright holder nor the names of its
+ *     contributors may be used to endorse or promote products derived from this
+ *     software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL COPYRIGHT HOLDER BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * ARE DISCLAIMED. IN NO EVENT SHALL COPYRIGHT HOLDER BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
  * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
  * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
  * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
@@ -37,9 +37,6 @@
 /*#include <stdio.h>*/
 #include <sys/time.h>
 #include <math.h>
-
-double fmin (double __x, double __y);
-double fmax (double __x, double __y);
 
 /******************************************************************************/
 /* constants for reporting function names in error messages                   */
@@ -73,6 +70,19 @@ string image_tree_create_neighbor_list_name = "image_tree_create_neighbor_list";
 string image_tree_add_children_as_immediate_neighbors_name = "image_tree_add_children_as_immediate_neighbors";
 string image_tree_find_all_immediate_neighbors_name = "image_tree_find_all_immediate_neighbors";
 */
+
+/******************************************************************************/
+/* quad_forest_status possible values                                         */
+
+/* Forest has been initialized, but not yet updated. */
+const quad_forest_status FOREST_INITIALIZED;
+/* Forest has been updated, but no analysis performed. */
+const quad_forest_status FOREST_UPDATED;
+/* Segmentation operation has been performed. */
+const quad_forest_status FOREST_SEGMENTED;
+/* Edge detection operation has been performed. */
+const quad_forest_status FOREST_EDGES_DETECTED;
+
 /******************************************************************************/
 
 result quad_tree_nullify
@@ -2149,20 +2159,20 @@ result quad_forest_segment_horizontal_edges
   TRY();
   uint32 i, size;
   quad_tree *tree, *neighbor;
-  
+
   CHECK_POINTER(target);
-  
+
   CHECK(quad_forest_find_horizontal_edges(target, rounds, bias));
-  
+
   size = target->rows * target->cols;
-  
+
   for (i = 0; i < size; i++) {
     tree = target->roots[i];
     if (IS_TRUE(tree->edge.has_hedge)) {
       quad_tree_segment_create(tree);
     }
   }
-  
+
   for (i = 0; i < size; i++) {
     tree = target->roots[i];
     if (IS_TRUE(tree->edge.has_hedge)) {
@@ -2186,8 +2196,8 @@ result quad_forest_segment_horizontal_edges
       }
     }
   }
-  
-  
+
+
   /* finally, count regions and assign colors */
   {
     quad_forest_segment *parent, *segment;
@@ -2216,7 +2226,7 @@ result quad_forest_segment_horizontal_edges
     target->segments = count;
     printf("segmentation finished, %lu segments found\n", count);
   }
-  
+
   FINALLY(quad_forest_segment_horizontal_edges);
   RETURN();
 }

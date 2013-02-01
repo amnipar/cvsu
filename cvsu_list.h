@@ -8,20 +8,20 @@
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- *   * Redistributions of source code must retain the above copyright
- *     notice, this list of conditions and the following disclaimer.
- *   * Redistributions in binary form must reproduce the above copyright
- *     notice, this list of conditions and the following disclaimer in the
- *     documentation and/or other materials provided with the distribution.
- *   * Neither the name of the copyright holder nor the
- *     names of its contributors may be used to endorse or promote products
- *     derived from this software without specific prior written permission.
+ *   * Redistributions of source code must retain the above copyright notice,
+ *     this list of conditions and the following disclaimer.
+ *   * Redistributions in binary form must reproduce the above copyright notice,
+ *     this list of conditions and the following disclaimer in the documentation
+ *     and/or other materials provided with the distribution.
+ *   * Neither the name of the copyright holder nor the names of its
+ *     contributors may be used to endorse or promote products derived from this
+ *     software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL COPYRIGHT HOLDER BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * ARE DISCLAIMED. IN NO EVENT SHALL COPYRIGHT HOLDER BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
  * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
  * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
  * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
@@ -70,7 +70,7 @@ typedef int (*list_item_comparator)(const void *a, const void *b);
  * @param b A pointer to list item data
  * @return true if elements match, false otherwise
  */
-typedef bool (*list_item_indicator)(const void *a, const void *b);
+typedef truth_value (*list_item_indicator)(const void *a, const void *b);
 
 /**
  * A handler function for list iterators.
@@ -99,15 +99,15 @@ typedef result (*list_item_handler)(const list_item *item);
 */
 typedef struct chunk_t {
   /** Size of one item in the array in bytes */
-  size_t item_size;
+  uint32 item_size;
   /** Total number of items available in a current chunk */
-  size_t size;
+  uint32 size;
   /** Number of items taken in use in current chunk (including freed items) */
-  size_t count;
+  uint32 count;
   /** Number of chunks currently allocated */
-  size_t chunk_count;
+  uint32 chunk_count;
   /** Index of the current chunk from which items are distributed */
-  size_t current_chunk;
+  uint32 current_chunk;
   /** Pointer to the array holding the chunk array */
   byte **chunks;
   /** Pointer to the current chunk holding the data */
@@ -130,9 +130,9 @@ typedef struct list_t {
   /** End of the list of freed items. */
   list_item last_free;
   /** Number of items in the list */
-  size_t count;
+  uint32 count;
   /** Maximum number of items in the list */
-  size_t max_size;
+  uint32 max_size;
   /** Chunk for allocating the list items */
   chunk item_chunk;
   /** Chunk for allocating the data for list items */
@@ -149,8 +149,8 @@ typedef struct pointer_list_t {
   list data_list;
   chunk pointer_chunk;
   data_pointer *ptr;
-  size_t size;
-  size_t count;
+  uint32 size;
+  uint32 count;
 } pointer_list;
 
 typedef unsigned long list_index;
@@ -161,8 +161,8 @@ typedef unsigned long list_index;
 result chunk_create
 (
   chunk *target,
-  size_t max_size,
-  size_t item_size
+  uint32 max_size,
+  uint32 item_size
 );
 
 /**
@@ -184,7 +184,7 @@ result chunk_nullify
 /**
  * Everything that can be nullified should be able to tell if it's null
  */
-bool chunk_is_null
+truth_value chunk_is_null
 (
   chunk *target
 );
@@ -219,7 +219,7 @@ result chunk_get_item
 /**
  * Checks if a chunk contains an item or not.
  */
-bool chunk_contains_item
+truth_value chunk_contains_item
 (
   chunk *source,
   data_pointer item
@@ -246,7 +246,7 @@ result list_item_nullify
 /**
  * Everything that can be nullified should be able to tell if it's null
  */
-bool list_item_is_null
+truth_value list_item_is_null
 (
   list_item *target
 );
@@ -261,7 +261,7 @@ list *list_alloc();
  */
 void list_free
 (
-  list *ptr
+  list *target
 );
 
 /**
@@ -269,19 +269,19 @@ void list_free
  * Allows to specify, how many links are reserved for each data item.
  * TODO: should allow optionally completely dynamic lists without using chunks
  *
- * @param dst List structure to be initialized.
- * @param max_size Maximum number of data items contained, size of data chunk.
- * @param item_size Size of data items stored in the list and data chunk.
- * @param link_rate Multiplier determining the size of list item chunk.
  * @returns SUCCESS if successful, BAD_POINTER if dst is NULL, BAD_PARAM if
- *          link_rate is 0.
+ * link_rate is 0.
  */
 result list_create
 (
+  /** List structure to be initialized */
   list *target,
-  size_t max_size,
-  size_t item_size,
-  size_t link_rate
+  /** Maximum number of data items contained, size of data chunk */
+  uint32 max_size,
+   /** Size of data items stored in the list and data chunk */
+  uint32 item_size,
+   /** Multiplier determining the size of list item chunk */
+  uint32 link_rate
 );
 
 /**
@@ -294,9 +294,9 @@ result list_create_from_data
 (
   list *target,
   data_pointer data,
-  size_t max_size,
-  size_t item_size,
-  size_t link_rate
+  uint32 max_size,
+  uint32 item_size,
+  uint32 link_rate
 );
 
 /**
@@ -318,7 +318,7 @@ result list_nullify
 /**
  * Everything that can be nullified should be able to tell if it's null
  */
-bool list_is_null
+truth_value list_is_null
 (
   list *target
 );
@@ -512,10 +512,10 @@ result list_iterate_backward
 result pointer_list_create
 (
   pointer_list *target,
-  size_t max_size,
-  size_t item_size,
-  size_t link_rate,
-  size_t sparsity
+  uint32 max_size,
+  uint32 item_size,
+  uint32 link_rate,
+  uint32 sparsity
 );
 
 /**
@@ -526,7 +526,7 @@ result pointer_sublist_create
   pointer_list *target,
   pointer_list *source,
   list_index index,
-  size_t max_size
+  uint32 max_size
 );
 
 /**

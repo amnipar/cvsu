@@ -8,26 +8,26 @@
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- *   * Redistributions of source code must retain the above copyright
- *     notice, this list of conditions and the following disclaimer.
- *   * Redistributions in binary form must reproduce the above copyright
- *     notice, this list of conditions and the following disclaimer in the
- *     documentation and/or other materials provided with the distribution.
- *   * Neither the name of the copyright holder nor the
- *     names of its contributors may be used to endorse or promote products
- *     derived from this software without specific prior written permission.
+ *   * Redistributions of source code must retain the above copyright notice,
+ *     this list of conditions and the following disclaimer.
+ *   * Redistributions in binary form must reproduce the above copyright notice,
+ *     this list of conditions and the following disclaimer in the documentation
+ *     and/or other materials provided with the distribution.
+ *   * Neither the name of the copyright holder nor the names of its
+ *     contributors may be used to endorse or promote products derived from this
+ *     software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL COPYRIGHT HOLDER BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * ARE DISCLAIMED. IN NO EVENT SHALL COPYRIGHT HOLDER BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
  * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
  * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
  * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
+ */
 
 #ifndef CVSU_CONNECTED_COMPONENTS_H
 #define CVSU_CONNECTED_COMPONENTS_H
@@ -74,34 +74,76 @@ typedef struct connected_components_t
   uint32 count;
 } connected_components;
 
+/**
+ * Allocates memory for a connected_components structure.
+ */
 connected_components *connected_components_alloc();
 
-void connected_components_free(
-  connected_components *ptr
+/**
+ * Frees the memory for a connected_components structure allocated with
+ * @see connected_components_alloc. Will also destroy the structure properly
+ * using @see connected_components_destroy.
+ */
+void connected_components_free
+(
+  connected_components *target
 );
 
-result connected_components_create(
+/**
+ * Creates a connected_components structure based on a pixel_image. Allocates
+ * an array of region_info structures, one for each pixel, and makes each one
+ * point to an image pixel.
+ */
+result connected_components_create
+(
   connected_components *target,
   pixel_image *source
 );
 
-result connected_components_destroy(
+/**
+ * Destroys a connected_components structure and deallocates all memory.
+ */
+result connected_components_destroy
+(
   connected_components *target
 );
 
-result connected_components_nullify(
+/**
+ * Initializes the contents of a quad_forest to null. Does not deallocate data,
+ * @see connected_components_destroy should be used for initialized structures
+ * before calling this.
+ */
+result connected_components_nullify
+(
   connected_components *target
 );
 
-bool connected_components_is_null(
+/**
+ * Everything that can be nullified should be able to tell if it is null.
+ */
+truth_value connected_components_is_null
+(
   connected_components *target
 );
 
-result connected_components_update(
+/**
+ * Updates a connected_components structure: compares each pixel to neighbors
+ * on left and top and merges regions with those that have the same value.
+ * Assigns a color for each resulting connected region and collects all regions
+ * into the regions array.
+ */
+result connected_components_update
+(
   connected_components *target
 );
 
-result connected_components_draw_image(
+/**
+ * Draws an image of the connected_components structure, using the color
+ * assigned for each region as the color of all pixels within the region. The
+ * result is an RGB image.
+ */
+result connected_components_draw_image
+(
   connected_components *source,
   pixel_image *target
 );

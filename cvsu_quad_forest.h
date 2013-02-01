@@ -44,15 +44,6 @@ extern "C" {
 /** Stores the forest status as a collection of bitwise flags. */
 typedef uint32 quad_forest_status;
 
-/** Forest has been initialized, but not yet updated. */
-const quad_forest_status FOREST_INITIALIZED    = 0x1;
-/** Forest has been updated, but no analysis performed. */
-const quad_forest_status FOREST_UPDATED        = 0x2;
-/** Segmentation operation has been performed. */
-const quad_forest_status FOREST_SEGMENTED      = 0x4;
-/** Edge detection operation has been performed. */
-const quad_forest_status FOREST_EDGES_DETECTED = 0x8;
-
 /**
  * Stores segment information for quad_forest segmentation with union-find
  * disjoint set approach. In addition to id and rank information contains also

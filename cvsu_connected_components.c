@@ -8,20 +8,20 @@
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- *   * Redistributions of source code must retain the above copyright
- *     notice, this list of conditions and the following disclaimer.
- *   * Redistributions in binary form must reproduce the above copyright
- *     notice, this list of conditions and the following disclaimer in the
- *     documentation and/or other materials provided with the distribution.
- *   * Neither the name of the copyright holder nor the
- *     names of its contributors may be used to endorse or promote products
- *     derived from this software without specific prior written permission.
+ *   * Redistributions of source code must retain the above copyright notice,
+ *     this list of conditions and the following disclaimer.
+ *   * Redistributions in binary form must reproduce the above copyright notice,
+ *     this list of conditions and the following disclaimer in the documentation
+ *     and/or other materials provided with the distribution.
+ *   * Neither the name of the copyright holder nor the names of its
+ *     contributors may be used to endorse or promote products derived from this
+ *     software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL COPYRIGHT HOLDER BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * ARE DISCLAIMED. IN NO EVENT SHALL COPYRIGHT HOLDER BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
  * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
  * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
  * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
@@ -113,29 +113,29 @@ void region_union(region_info *region1, region_info *region2)
 connected_components *connected_components_alloc()
 {
   TRY();
-  connected_components *ptr;
+  connected_components *target;
 
-  CHECK(memory_allocate((data_pointer *)&ptr, 1, sizeof(connected_components)));
-  CHECK(connected_components_nullify(ptr));
+  CHECK(memory_allocate((data_pointer *)&target, 1, sizeof(connected_components)));
+  CHECK(connected_components_nullify(target));
 
   FINALLY(connected_components_alloc);
-  return ptr;
+  return target;
 }
 
 /******************************************************************************/
 
 void connected_components_free
 (
-  connected_components *ptr
+  connected_components *target
 )
 {
   TRY();
 
   r = SUCCESS;
 
-  if (ptr != NULL) {
-    CHECK(connected_components_destroy(ptr));
-    CHECK(memory_deallocate((data_pointer *)&ptr));
+  if (target != NULL) {
+    CHECK(connected_components_destroy(target));
+    CHECK(memory_deallocate((data_pointer *)&target));
   }
 
   FINALLY(connected_components_free);
@@ -237,32 +237,32 @@ result connected_components_nullify
 
 /******************************************************************************/
 
-bool connected_components_is_null
+truth_value connected_components_is_null
 (
   connected_components *target
 )
 {
   if (target != NULL) {
     if (target->original != NULL && target->pixels != NULL) {
-      return false;
+      return FALSE;
     }
   }
-  return true;
+  return TRUE;
 }
 
 /******************************************************************************/
 
 #define COMPARE_REGIONS()\
-  is_equal = true;\
+  is_equal = 1;\
   for (i = 0; i < channels; i++) {\
     if (pixel->value[i] != neighbor->value[i]) {\
       pixel->is_border = 1;\
       neighbor->is_border = 1;\
-      is_equal = false;\
+      is_equal = 0;\
       break;\
     }\
   }\
-  if (is_equal) {\
+  if (is_equal != 0) {\
     region_union(pixel, neighbor);\
   }
 
@@ -273,7 +273,7 @@ result connected_components_update
 {
   TRY();
   uint32 x, y, width, height, i, size, channels, count, pos;
-  bool is_equal;
+  truth_value is_equal;
   region_info *pixel, *neighbor, *id, **region;
 
   CHECK_POINTER(target);
