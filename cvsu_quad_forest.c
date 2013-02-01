@@ -1781,7 +1781,7 @@ result quad_tree_get_edge_response
         sum2 = INTEGRAL_IMAGE_SUM_2();
         sumsqr1 = INTEGRAL_IMAGE_SUMSQR_1();
         sumsqr2 = INTEGRAL_IMAGE_SUMSQR_2();
-        g = edgel_fisher_unsigned(N, sum1, sum2, sumsqr1, sumsqr2);
+        g = edgel_fisher_signed(N, sum1, sum2, sumsqr1, sumsqr2);
         hsum += g;
         col++;
         iA1++;
@@ -1810,7 +1810,7 @@ result quad_tree_get_edge_response
         sum2 = INTEGRAL_IMAGE_SUM_2();
         sumsqr1 = INTEGRAL_IMAGE_SUMSQR_1();
         sumsqr2 = INTEGRAL_IMAGE_SUMSQR_2();
-        g = edgel_fisher_unsigned(N, sum1, sum2, sumsqr1, sumsqr2);
+        g = edgel_fisher_signed(N, sum1, sum2, sumsqr1, sumsqr2);
         vsum += g;
         row++;
         iA1 += stride;
@@ -1972,15 +1972,18 @@ result quad_forest_find_edges
 (
   quad_forest *forest,
   uint32 rounds,
-  integral_value bias
+  integral_value bias,
+  direction dir
 )
 {
   TRY();
   uint32 remaining, i, size;
-  integral_value mean, dev;
+  integral_value mean, dev, value;
   quad_tree *tree;
 
   CHECK_POINTER(forest);
+  CHECK_PARAM(rounds > 0);
+  CHECK_PARAM(dir == d_H || dir == d_V || dir == d_N4);
 
   size = forest->rows * forest->cols;
 
@@ -1990,10 +1993,27 @@ result quad_forest_find_edges
     CHECK(quad_tree_get_edge_response(forest, forest->roots[i], NULL, NULL));
   }
 
-  /* before propagation, prime all trees with mag */
-  for (i = 0; i < size; i++) {
-    quad_tree_prime_with_mag(forest->roots[i]);
+  /* before propagation, prime all trees */
+  /* for finding horizontal edges, prime with dy */
+  if (dir == d_H) {
+    for (i = 0; i < size; i++) {
+      quad_tree_prime_with_dy(forest->roots[i]);
+    }
   }
+  else
+  /* for finding vertical edges, prime with dx */
+  if (dir == d_V) {
+    for (i = 0; i < size; i++) {
+      quad_tree_prime_with_dx(forest->roots[i]);
+    }
+  }
+  /* otherwise, prime with magnitude */
+  else {
+    for (i = 0; i < size; i++) {
+      quad_tree_prime_with_mag(forest->roots[i]);
+    }
+  }
+
   /* then, propagate three rounds */
   for (remaining = rounds; remaining--;) {
     for (i = 0; i < size; i++) {
@@ -2013,8 +2033,23 @@ result quad_forest_find_edges
     dev = tree->pool2;
     dev -= mean*mean;
     if (dev < 0) dev = 0; else dev = sqrt(dev);
-    if (tree->edge.mag > mean + bias - dev) {
-      /*printf("mag %.3f mean %.3f dev %.3f\n", tree->mag, mean, dev);*/
+    tree->edge.mean = mean;
+    tree->edge.deviation = dev;
+    tree->edge.dir = dir;
+
+    if (dir == d_H) {
+      value = tree->edge.dy;
+    }
+    else
+    if (dir == d_V) {
+      value = tree->edge.dx;
+    }
+    else {
+      value = tree->edge.mag;
+    }
+
+    if (value > mean + bias - dev) {
+      /*printf("value %.3f mean %.3f dev %.3f\n", tree->mag, mean, dev);*/
       tree->edge.has_edge = TRUE;
     }
     else {
@@ -2025,135 +2060,19 @@ result quad_forest_find_edges
   FINALLY(quad_forest_find_edges);
   RETURN();
 }
-/******************************************************************************/
-
-result quad_forest_find_horizontal_edges
-(
-  quad_forest *forest,
-  uint32 rounds,
-  integral_value bias
-)
-{
-  TRY();
-  uint32 remaining, i, size;
-  integral_value mean, dev;
-  quad_tree *tree;
-
-  CHECK_POINTER(forest);
-
-  size = forest->rows * forest->cols;
-
-  /* first get the edge responses */
-  /* TODO: add forest state to determine if this has been done already */
-  for (i = 0; i < size; i++) {
-    CHECK(quad_tree_get_edge_response(forest, forest->roots[i], NULL, NULL));
-  }
-
-  /* before propagation, prime all trees with dy */
-  for (i = 0; i < size; i++) {
-    quad_tree_prime_with_dy(forest->roots[i]);
-  }
-  /* then, propagate three rounds */
-  for (remaining = rounds; remaining--;) {
-    for (i = 0; i < size; i++) {
-      quad_tree_propagate(forest->roots[i]);
-    }
-    /* on other rounds except the last, prime for the new run */
-    if (remaining > 0) {
-      for (i = 0; i < size; i++) {
-        quad_tree_prime_with_pool(forest->roots[i]);
-      }
-    }
-  }
-
-  for (i = 0; i < size; i++) {
-    tree = forest->roots[i];
-    mean = tree->pool;
-    dev = tree->pool2;
-    dev -= mean*mean;
-    if (dev < 0) dev = 0; else dev = sqrt(dev);
-    if (tree->edge.dy > fmax(mean, mean + bias - dev)) {
-      /*printf("dy %.3f mean %.3f dev %.3f\n", tree->dy, mean, dev);*/
-      tree->edge.has_hedge = TRUE;
-    }
-    else {
-      tree->edge.has_hedge = FALSE;
-    }
-  }
-
-  FINALLY(quad_forest_find_horizontal_edges);
-  RETURN();
-}
 
 /******************************************************************************/
 
-result quad_forest_find_vertical_edges
-(
-  quad_forest *forest,
-  uint32 rounds,
-  integral_value bias
-)
-{
-  TRY();
-  uint32 remaining, i, size;
-  integral_value mean, dev;
-  quad_tree *tree;
-
-  CHECK_POINTER(forest);
-
-  size = forest->rows * forest->cols;
-
-  /* first get the edge responses */
-  /* TODO: add forest state to determine if this has been done already */
-  for (i = 0; i < size; i++) {
-    CHECK(quad_tree_get_edge_response(forest, forest->roots[i], NULL, NULL));
-  }
-
-  /* before propagation, prime all trees with dx */
-  for (i = 0; i < size; i++) {
-    quad_tree_prime_with_dx(forest->roots[i]);
-  }
-  /* then, propagate three rounds */
-  for (remaining = rounds; remaining--;) {
-    for (i = 0; i < size; i++) {
-      quad_tree_propagate(forest->roots[i]);
-    }
-    /* on other rounds except the last, prime for the new run */
-    if (remaining > 0) {
-      for (i = 0; i < size; i++) {
-        quad_tree_prime_with_pool(forest->roots[i]);
-      }
-    }
-  }
-
-  for (i = 0; i < size; i++) {
-    tree = forest->roots[i];
-    mean = tree->pool;
-    dev = tree->pool2;
-    dev -= mean*mean;
-    if (dev < 0) dev = 0; else dev = sqrt(dev);
-    if (tree->edge.dx > mean + bias - dev) {
-      /*printf("dy %.3f mean %.3f dev %.3f\n", tree->dy, mean, dev);*/
-      tree->edge.has_vedge = TRUE;
-    }
-    else {
-      tree->edge.has_vedge = FALSE;
-    }
-  }
-
-  FINALLY(quad_forest_find_vertical_edges);
-  RETURN();
-}
-
-/******************************************************************************/
-
-result quad_forest_segment_horizontal_edges
+result quad_forest_segment_edges
 (
   quad_forest *target,
-  uint32 rounds,
-  integral_value bias,
-  truth_value propagate_edges,
-  truth_value use_all_neighbors
+  uint32 detect_rounds,
+  integral_value detect_bias,
+  direction detect_dir,
+  uint32 propagate_rounds,
+  integral_value propagate_threshold,
+  direction propagate_dir,
+  direction merge_dir
 )
 {
   TRY();
@@ -2161,42 +2080,78 @@ result quad_forest_segment_horizontal_edges
   quad_tree *tree, *neighbor;
 
   CHECK_POINTER(target);
+  CHECK_PARAM(detect_rounds > 0);
+  CHECK_PARAM(detect_dir == d_H || detect_dir == d_V || detect_dir == d_N4);
+  CHECK_PARAM(propagate_dir == d_H || propagate_dir == d_V || propagate_dir == d_N4);
+  CHECK_PARAM(merge_dir == d_H || merge_dir == d_V || merge_dir == d_N4);
 
-  CHECK(quad_forest_find_horizontal_edges(target, rounds, bias));
+  CHECK(quad_forest_find_edges(target, detect_rounds, detect_bias, detect_dir));
 
   size = target->rows * target->cols;
 
+  /* TODO: propagate detected edges */
+
   for (i = 0; i < size; i++) {
     tree = target->roots[i];
-    if (IS_TRUE(tree->edge.has_hedge)) {
+    if (IS_TRUE(tree->edge.has_edge)) {
       quad_tree_segment_create(tree);
     }
   }
 
-  for (i = 0; i < size; i++) {
-    tree = target->roots[i];
-    if (IS_TRUE(tree->edge.has_hedge)) {
-      neighbor = tree->w;
-      if (neighbor != NULL && IS_TRUE(neighbor->edge.has_hedge)) {
-        quad_tree_segment_union(tree, neighbor);
-      }
-      neighbor = tree->e;
-      if (neighbor != NULL && IS_TRUE(neighbor->edge.has_hedge)) {
-        quad_tree_segment_union(tree, neighbor);
-      }
-      if (IS_TRUE(use_all_neighbors)) {
-        neighbor = tree->n;
-        if (neighbor != NULL && IS_TRUE(neighbor->edge.has_hedge)) {
+  if (merge_dir == d_H) {
+    for (i = 0; i < size; i++) {
+      tree = target->roots[i];
+      if (IS_TRUE(tree->edge.has_edge)) {
+        neighbor = tree->w;
+        if (neighbor != NULL && IS_TRUE(neighbor->edge.has_edge)) {
           quad_tree_segment_union(tree, neighbor);
         }
-        neighbor = tree->s;
-        if (neighbor != NULL && IS_TRUE(neighbor->edge.has_hedge)) {
+        neighbor = tree->e;
+        if (neighbor != NULL && IS_TRUE(neighbor->edge.has_edge)) {
           quad_tree_segment_union(tree, neighbor);
         }
       }
     }
   }
-
+  else
+  if (merge_dir == d_V) {
+    for (i = 0; i < size; i++) {
+      tree = target->roots[i];
+      if (IS_TRUE(tree->edge.has_edge)) {
+        neighbor = tree->n;
+        if (neighbor != NULL && IS_TRUE(neighbor->edge.has_edge)) {
+          quad_tree_segment_union(tree, neighbor);
+        }
+        neighbor = tree->s;
+        if (neighbor != NULL && IS_TRUE(neighbor->edge.has_edge)) {
+          quad_tree_segment_union(tree, neighbor);
+        }
+      }
+    }
+  }
+  else {
+    for (i = 0; i < size; i++) {
+      tree = target->roots[i];
+      if (IS_TRUE(tree->edge.has_edge)) {
+        neighbor = tree->w;
+        if (neighbor != NULL && IS_TRUE(neighbor->edge.has_edge)) {
+          quad_tree_segment_union(tree, neighbor);
+        }
+        neighbor = tree->e;
+        if (neighbor != NULL && IS_TRUE(neighbor->edge.has_edge)) {
+          quad_tree_segment_union(tree, neighbor);
+        }
+        neighbor = tree->n;
+        if (neighbor != NULL && IS_TRUE(neighbor->edge.has_edge)) {
+          quad_tree_segment_union(tree, neighbor);
+        }
+        neighbor = tree->s;
+        if (neighbor != NULL && IS_TRUE(neighbor->edge.has_edge)) {
+          quad_tree_segment_union(tree, neighbor);
+        }
+      }
+    }
+  }
 
   /* finally, count regions and assign colors */
   {

@@ -74,15 +74,36 @@ typedef uint32 truth_value;
 #define TRUE ((truth_value) 1)
 
 typedef enum direction_t {
-    d_NULL = 0,
-    d_N,
-    d_NE,
-    d_E,
-    d_SE,
-    d_S,
-    d_SW,
-    d_W,
-    d_NW
+  /** Unspecified direction */
+  d_NULL = 0,
+  /** Direction north / up */
+  d_N,
+  /** Direction northeast / up&right */
+  d_NE,
+  /** Direction east / right */
+  d_E,
+  /** Direction southeast / down&right */
+  d_SE,
+  /** Direction south / down */
+  d_S,
+  /** Direction southwest / down&left */
+  d_SW,
+  /** Direction west / left */
+  d_W,
+  /** Direction northwest / up&left */
+  d_NW,
+  /** Combined horizontal directions (E+W) */
+  d_H,
+  /** Combined vertical directions (N+S) */
+  d_V,
+  /** Combined 'rising' directions (SW+NE) */
+  d_R,
+  /** Combined 'falling' directions (NW+SE) */
+  d_F,
+  /** Combined 4-neighborhood directions (N+E+S+W) */
+  d_N4,
+  /** Combined 8-neighborhood directions */
+  d_N8
 } direction;
 
 typedef sint16 coord;
