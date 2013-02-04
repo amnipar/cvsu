@@ -360,13 +360,24 @@ result list_append
   pointer data
 );
 
-result list_append_reveal_data
+/**
+ * Appends data to the end of the list, and returns a pointer to the actual
+ * data element within the list. This is useful for lists of structures, less
+ * useful for lists of pointers.
+ */
+result list_append_return_pointer
 (
+  /** List where data is appended */
   list *target,
+  /** Pointer to the data to be inserted */
   pointer data,
-  pointer *list_data
+  /** Return parameter containing a pointer to the newly appended data */
+  pointer *data_pointer
 );
 
+/**
+ * Appends data to the end of a sublist.
+ */
 result sublist_append
 (
   list *target,
@@ -396,7 +407,7 @@ result list_prepend
 
 /**
  * Prepends data to the beginning of the list.
- * Uses the item pointed to by list index.
+ * Links to the item pointed to by list index.
  */
 result list_prepend_index
 (
@@ -404,6 +415,9 @@ result list_prepend_index
   list_index index
 );
 
+/**
+ * Inserts before the given item.
+ */
 result list_insert_at
 (
   list *target,
@@ -411,6 +425,9 @@ result list_insert_at
   pointer data
 );
 
+/**
+ * Inserts into a sublist before the given item.
+ */
 result sublist_insert_at
 (
   list *target,
@@ -430,7 +447,8 @@ result list_insert_sorted
 
 /**
  * Inserts data to list in correct sorted order, determined by comparator.
- * Uses the item pointed to by list index.
+ * Links to the item pointed to by list index. The item may reside in the master
+ * list only, or in some sublist, even this one.
  */
 result list_insert_sorted_index
 (
@@ -440,7 +458,32 @@ result list_insert_sorted_index
 );
 
 /**
- * Finds and removes a data item from the list
+ * Inserts data to list in correct sorted order, determined by comparator, but
+ * only if the equal data does not already exist.
+ */
+result list_insert_unique
+(
+  list *target,
+  pointer data,
+  list_item_comparator comparator
+);
+
+/**
+ * Inserts data to list in correct sorted order, determined by comparator, but
+ * only if the equal data does not already exist.
+ * Links to the item pointed to by list index. This is applicable to sublists
+ * only, as the item must by unique in the list. The same item may exist in the
+ * master list, but not in this particular sublist.
+ */
+result list_insert_unique_index
+(
+  list *target,
+  list_index index,
+  list_item_comparator comparator
+);
+
+/**
+ * Finds and removes a data item from the list. 
  */
 result list_remove
 (
@@ -450,7 +493,7 @@ result list_remove
 );
 
 /**
- * Removes an item from the list
+ * Removes an item from the list.
  */
 result list_remove_item
 (
@@ -458,6 +501,12 @@ result list_remove_item
   list_item *item
 );
 
+/**
+ * Removes all items between two given items, excluding the given items. The
+ * two given items will be next to each other in the result. If the end item is
+ * not found following the sequence starting from the start item, a NOT_FOUND
+ * error is generated.
+ */
 result list_remove_between
 (
   list *target,
@@ -465,18 +514,29 @@ result list_remove_between
   list_item *end
 );
 
+/**
+ * Removes all items that come after a given item. The given item will be the
+ * last item of the list after the operation. If the given item is not found in
+ * the list, a NOT_FOUND error is generated.
+ */
 result list_remove_rest
 (
   list *target,
   list_item *last
 );
 
+/**
+ * Removes the first item of the list.
+ */
 result list_remove_first
 (
   list *target,
   list_item *item
 );
 
+/**
+ * Removes the last item of the list.
+ */
 result list_remove_last
 (
   list *target,

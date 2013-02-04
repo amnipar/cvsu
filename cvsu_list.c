@@ -64,7 +64,7 @@ string item_insert_after_name = "item_insert_after";
 string item_remove_name = "item_remove";
 
 string list_append_name = "list_append";
-string list_append_reveal_data_name = "list_append_reveal_data";
+string list_append_return_pointer_name = "list_append_return_pointer";
 string list_append_index_name = "list_append_index";
 string sublist_append_name = "sublist_append";
 string list_prepend_name = "list_prepend";
@@ -72,6 +72,8 @@ string list_prepend_index_name = "list_prepend_index";
 string list_insert_at_name = "list_insert_at";
 string list_insert_sorted_name = "list_insert_sorted";
 string list_insert_sorted_index_name = "list_insert_sorted_index";
+string list_insert_unique_name = "list_insert_unique";
+string list_insert_unique_index_name = "list_insert_unique_index";
 string list_remove_name = "list_remove";
 string list_remove_between_name = "list_remove_between";
 string list_remove_rest_name = "list_remove_rest";
@@ -225,7 +227,6 @@ result chunk_allocate_item
   }
   /* if current chunk is full, allocate a new one */
   else {
-    printf("need to allocate a new chunk\n");
     CHECK(memory_allocate(&new_chunk, source->size, source->item_size));
     CHECK(memory_clear(new_chunk, source->size, source->item_size));
 
@@ -233,7 +234,6 @@ result chunk_allocate_item
     /* if the chunk array is full, need to allocate a bigger one */
     if (!(source->current_chunk < source->chunk_count)) {
       uint32 new_count, i;
-      printf("need to allocate a bigger chunk array\n");
 
       new_count = source->chunk_count + 10;
       CHECK(memory_allocate((data_pointer*)&new_chunks, new_count, sizeof(byte*)));
@@ -857,7 +857,7 @@ result list_append
 
 /******************************************************************************/
 
-result list_append_reveal_data
+result list_append_return_pointer
 (
   list *target,
   pointer data,
@@ -873,7 +873,7 @@ result list_append_reveal_data
   CHECK(item_insert_before(&target->last, item));
   *list_data = item->data;
 
-  FINALLY(list_append_reveal_data);
+  FINALLY(list_append_return_pointer);
   RETURN();
 }
 
@@ -998,7 +998,7 @@ result sublist_insert_at
 
   /* for sublists, append first to the parent list */
   if (target->parent != NULL) {
-    CHECK(list_append_reveal_data(target->parent, data, (pointer)&new_data));
+    CHECK(list_append_return_pointer(target->parent, data, (pointer)&new_data));
     CHECK(list_insert_at(target, at, new_data));
   }
   /* for master lists, append directly to the list itself */
@@ -1070,6 +1070,93 @@ result list_insert_sorted_index
   CHECK(item_insert_before(i, item));
 
   FINALLY(list_insert_sorted_index);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result list_insert_unique
+(
+  list *target,
+  pointer data,
+  list_item_comparator comparator
+)
+{
+  TRY();
+  list_item *item;
+  list_item *i;
+  int comparison;
+  
+  i = target->first.next;
+  while (i != &target->last) {
+    if (i == NULL) {
+      /* iteration finished without encountering the end item */
+      ERROR(NOT_FOUND);
+    }
+    comparison = comparator(data, i->data);
+    /* if equal item already exists, abort */
+    if (comparison == 0) {
+      TERMINATE(SUCCESS);
+    }
+    else
+    /* otherwise, if larger item was found, insert before that */
+    if (comparison < 0) {
+      break;
+    }
+    i = i->next;
+  }
+  CHECK(list_create_item(target, &item, data));
+  CHECK(item_insert_before(i, item));
+  
+  FINALLY(list_insert_unique);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result list_insert_unique_index
+(
+  list *target,
+  list_index index,
+  list_item_comparator comparator
+)
+{
+  TRY();
+  byte *chunk_item;
+  list *master;
+  list_item *item;
+  list_item *i;
+  int comparison;
+
+  master = target->parent;
+  if (master == NULL) {
+    ERROR(BAD_PARAM);
+  }
+  else {
+    chunk_item = chunk_return_item(&master->data_chunk, index);
+
+    i = target->first.next;
+    while (i != &target->last) {
+      if (i == NULL) {
+        /* iteration finished without encountering the end item */
+        ERROR(NOT_FOUND);
+      }
+      comparison = comparator(item->data, i->data);
+      /* if equal item already exists, abort */
+      if (comparison == 0) {
+        TERMINATE(SUCCESS);
+      }
+      else
+      /* otherwise, if larger item was found, insert before that */
+      if (comparison < 0) {
+        break;
+      }
+      i = i->next;
+    }
+    CHECK(list_link_item(master, &item, index));
+    CHECK(item_insert_before(i, item));
+  }
+  FINALLY(list_insert_unique_index);
   RETURN();
 }
 
