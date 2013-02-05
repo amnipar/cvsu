@@ -309,6 +309,15 @@ void quad_tree_segment_create
 );
 
 /**
+ * Creates a union of two segments.
+ */
+void quad_forest_segment_union
+(
+  quad_forest_segment *segment1,
+  quad_forest_segment *segment2
+);
+
+/**
  * Creates a union of the two segments these two quad_trees belong to.
  * Part of the Union-Find implementation for quad_trees.
  */
@@ -396,6 +405,15 @@ result quad_forest_reload
 result quad_forest_destroy
 (
   /** The quad_forest structure to be destroyed. */
+  quad_forest *target
+);
+
+/**
+ * Refreshes the segment count and colors. MUST be called after segmentation and
+ * BEFORE calling @see quad_forest_get_segments.
+ */
+result quad_forest_refresh_segments
+(
   quad_forest *target
 );
 

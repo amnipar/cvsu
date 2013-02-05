@@ -1086,7 +1086,7 @@ result list_insert_unique
   list_item *item;
   list_item *i;
   int comparison;
-  
+
   i = target->first.next;
   while (i != &target->last) {
     if (i == NULL) {
@@ -1107,7 +1107,7 @@ result list_insert_unique
   }
   CHECK(list_create_item(target, &item, data));
   CHECK(item_insert_before(i, item));
-  
+
   FINALLY(list_insert_unique);
   RETURN();
 }

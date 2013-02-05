@@ -60,6 +60,7 @@ string quad_forest_alloc_name = "quad_forest_alloc";
 string quad_forest_free_name = "quad_forest_free";
 string quad_forest_create_name = "quad_forest_create";
 string quad_forest_reload_name = "quad_forest_reload";
+string quad_forest_refresh_segments_name = "quad_forest_refresh_segments";
 string quad_forest_destroy_name = "quad_forest_destroy";
 string quad_forest_nullify_name = "quad_forest_nullify";
 string quad_forest_update_name = "quad_forest_update";
@@ -1068,58 +1069,58 @@ void quad_tree_segment_union
   quad_tree *tree2
 )
 {
-  if (tree1 != NULL && tree2 != NULL) {
-    quad_forest_segment *segment1, *segment2;
+  quad_forest_segment_union(
+      quad_tree_segment_find(tree1), quad_tree_segment_find(tree2));
+}
 
-    segment1 = quad_tree_segment_find(tree1);
-    segment2 = quad_tree_segment_find(tree2);
-    if (segment1 == NULL || segment2 == NULL) {
-      return;
-    }
-    /* if the trees are already in the same class, no need for union */
-    if (segment1 == segment2) {
-      return;
-    }
+/******************************************************************************/
+
+void quad_forest_segment_union
+(
+  quad_forest_segment *segment1,
+  quad_forest_segment *segment2
+)
+{
+  /* if the segments are already in the same class, no need for union */
+  if (segment1 != NULL && segment2 != NULL && segment1 != segment2) {
     /* otherwise set the tree with higher class rank as id of the union */
+    statistics *stat;
+    integral_value N, mean, variance;
+    if (segment1->rank < segment2->rank) {
+      segment1->parent = segment2;
+      segment2->x1 = (segment1->x1 < segment2->x1) ? segment1->x1 : segment2->x1;
+      segment2->y1 = (segment1->y1 < segment2->y1) ? segment1->y1 : segment2->y1;
+      segment2->x2 = (segment1->x2 > segment2->x2) ? segment1->x2 : segment2->x2;
+      segment2->y2 = (segment1->y2 > segment2->y2) ? segment1->y2 : segment2->y2;
+      stat = &segment2->stat;
+      N = (stat->N += segment1->stat.N);
+      stat->sum += segment1->stat.sum;
+      stat->sum2 += segment1->stat.sum2;
+      mean = stat->mean = stat->sum / N;
+      variance = stat->sum2 / N - mean*mean;
+      if (variance < 0) variance = 0;
+      stat->variance = variance;
+      stat->deviation = sqrt(variance);
+    }
     else {
-      statistics *stat;
-      integral_value N, mean, variance;
-      if (segment1->rank < segment2->rank) {
-        segment1->parent = segment2;
-        segment2->x1 = (segment1->x1 < segment2->x1) ? segment1->x1 : segment2->x1;
-        segment2->y1 = (segment1->y1 < segment2->y1) ? segment1->y1 : segment2->y1;
-        segment2->x2 = (segment1->x2 > segment2->x2) ? segment1->x2 : segment2->x2;
-        segment2->y2 = (segment1->y2 > segment2->y2) ? segment1->y2 : segment2->y2;
-        stat = &segment2->stat;
-        N = (stat->N += segment1->stat.N);
-        stat->sum += segment1->stat.sum;
-        stat->sum2 += segment1->stat.sum2;
-        mean = stat->mean = stat->sum / N;
-        variance = stat->sum2 / N - mean*mean;
-        if (variance < 0) variance = 0;
-        stat->variance = variance;
-        stat->deviation = sqrt(variance);
+      segment2->parent = segment1;
+      /* when equal rank trees are combined, the root tree's rank is increased */
+      if (segment1->rank == segment2->rank) {
+        segment1->rank += 1;
       }
-      else {
-        segment2->parent = segment1;
-        /* when equal rank trees are combined, the root tree's rank is increased */
-        if (segment1->rank == segment2->rank) {
-          segment1->rank += 1;
-        }
-        segment1->x1 = (segment1->x1 < segment2->x1) ? segment1->x1 : segment2->x1;
-        segment1->y1 = (segment1->y1 < segment2->y1) ? segment1->y1 : segment2->y1;
-        segment1->x2 = (segment1->x2 > segment2->x2) ? segment1->x2 : segment2->x2;
-        segment1->y2 = (segment1->y2 > segment2->y2) ? segment1->y2 : segment2->y2;
-        stat = &segment1->stat;
-        N = (stat->N += segment2->stat.N);
-        stat->sum += segment2->stat.sum;
-        stat->sum2 += segment2->stat.sum2;
-        mean = stat->mean = stat->sum / N;
-        variance = stat->sum2 / N - mean*mean;
-        if (variance < 0) variance = 0;
-        stat->variance = variance;
-        stat->deviation = sqrt(variance);
-      }
+      segment1->x1 = (segment1->x1 < segment2->x1) ? segment1->x1 : segment2->x1;
+      segment1->y1 = (segment1->y1 < segment2->y1) ? segment1->y1 : segment2->y1;
+      segment1->x2 = (segment1->x2 > segment2->x2) ? segment1->x2 : segment2->x2;
+      segment1->y2 = (segment1->y2 > segment2->y2) ? segment1->y2 : segment2->y2;
+      stat = &segment1->stat;
+      N = (stat->N += segment2->stat.N);
+      stat->sum += segment2->stat.sum;
+      stat->sum2 += segment2->stat.sum2;
+      mean = stat->mean = stat->sum / N;
+      variance = stat->sum2 / N - mean*mean;
+      if (variance < 0) variance = 0;
+      stat->variance = variance;
+      stat->deviation = sqrt(variance);
     }
   }
 }
@@ -1370,6 +1371,47 @@ result quad_forest_reload
 
 /******************************************************************************/
 
+result quad_forest_refresh_segments
+(
+  quad_forest *target
+)
+{
+  TRY();
+  list_item *trees, *end;
+  quad_tree *tree;
+  quad_forest_segment *parent, *segment;
+  uint32 count;
+
+  count = 0;
+  /* initialize the random number generator for assigning the colors */
+  srand(1234);
+
+  trees = target->trees.first.next;
+  end = &target->trees.last;
+  while (trees != end) {
+    tree = (quad_tree *)trees->data;
+    if (tree->nw == NULL) {
+      segment = &tree->segment;
+      if (segment != NULL) {
+        parent = quad_tree_segment_find(tree);
+        if (parent == segment) {
+          segment->color[0] = (byte)(rand() % 256);
+          segment->color[1] = (byte)(rand() % 256);
+          segment->color[2] = (byte)(rand() % 256);
+          count++;
+        }
+      }
+    }
+    trees = trees->next;
+  }
+  target->segments = count;
+
+  FINALLY(quad_forest_refresh_segments);
+  RETURN();
+}
+
+/******************************************************************************/
+
 result quad_forest_destroy
 (
   quad_forest *target
@@ -1520,7 +1562,7 @@ result quad_forest_segment_with_deviation
 )
 {
   TRY();
-  list_item *trees;
+  list_item *trees, *end;
   quad_tree *tree, *neighbor, *best_neighbor;
   quad_forest_segment *tree_segment, *neighbor_segment;
   statistics *stat;
@@ -1535,7 +1577,8 @@ result quad_forest_segment_with_deviation
 
   /* first, divide until all trees are consistent */
   trees = target->trees.first.next;
-  while (trees != &target->trees.last) {
+  end = &target->trees.last;
+  while (trees != end) {
     tree = (quad_tree *)trees->data;
     if (tree->size >= 2 * min_size) {
       if (tree->stat.deviation > threshold) {
@@ -1680,32 +1723,7 @@ result quad_forest_segment_with_deviation
   }
 
   /* finally, count regions and assign colors */
-  {
-    quad_forest_segment *parent, *segment;
-    uint32 count;
-
-    count = 0;
-    /* initialize the random number generator for assigning the colors */
-    srand(1234);
-
-    trees = target->trees.first.next;
-    while (trees != &target->trees.last) {
-      tree = (quad_tree *)trees->data;
-      if (tree->nw == NULL) {
-        segment = &tree->segment;
-        parent = quad_tree_segment_find(tree);
-        if (parent == segment) {
-          segment->color[0] = (byte)(rand() % 256);
-          segment->color[1] = (byte)(rand() % 256);
-          segment->color[2] = (byte)(rand() % 256);
-          count++;
-        }
-      }
-      trees = trees->next;
-    }
-    target->segments = count;
-    /*printf("segmentation finished, %lu segments found\n", count);*/
-  }
+  CHECK(quad_forest_refresh_segments(target));
 
   FINALLY(quad_forest_segment_with_deviation);
   RETURN();
@@ -1746,7 +1764,7 @@ result quad_forest_segment_with_overlap
 )
 {
   TRY();
-  list_item *trees;
+  list_item *trees, *end;
   quad_tree *tree, *neighbor, *best_neighbor;
   quad_forest_segment *tree_segment, *neighbor_segment;
   statistics *stat;
@@ -1769,7 +1787,8 @@ result quad_forest_segment_with_overlap
   /* then, merge each tree with the best neighboring tree that is close enough */
   /*printf("starting to merge trees\n");*/
   trees = target->trees.first.next;
-  while (trees != &target->trees.last) {
+  end = &target->trees.last;
+  while (trees != end) {
     tree = (quad_tree *)trees->data;
     tree_segment = quad_tree_segment_find(tree);
     /* only consider consistent trees (those that have not been divided) */
@@ -1839,7 +1858,8 @@ result quad_forest_segment_with_overlap
   /* then, merge those neighboring regions that are consistent together */
   /*printf("starting to merge regions\n");*/
   trees = target->trees.first.next;
-  while (trees != &target->trees.last) {
+  end = &target->trees.last;
+  while (trees != end) {
     tree = (quad_tree *)trees->data;
     tree_segment = quad_tree_segment_find(tree);
     /* only consider consistent trees (those that have not been divided) */
@@ -1897,32 +1917,7 @@ result quad_forest_segment_with_overlap
   }
 
   /* finally, count regions and assign colors */
-  {
-    quad_forest_segment *parent, *segment;
-    uint32 count;
-
-    count = 0;
-    /* initialize the random number generator for assigning the colors */
-    srand(1234);
-
-    trees = target->trees.first.next;
-    while (trees != &target->trees.last) {
-      tree = (quad_tree *)trees->data;
-      if (tree->nw == NULL) {
-        segment = &tree->segment;
-        parent = quad_tree_segment_find(tree);
-        if (parent == segment) {
-          segment->color[0] = (byte)(rand() % 256);
-          segment->color[1] = (byte)(rand() % 256);
-          segment->color[2] = (byte)(rand() % 256);
-          count++;
-        }
-      }
-      trees = trees->next;
-    }
-    target->segments = count;
-    /*printf("segmentation finished, %lu segments found\n", count);*/
-  }
+  CHECK(quad_forest_refresh_segments(target));
 
   FINALLY(quad_forest_segment_with_overlap);
   RETURN();
@@ -1937,7 +1932,7 @@ result quad_forest_get_segments
 )
 {
   TRY();
-  list_item *trees;
+  list_item *trees, *end;
   quad_tree *tree;
   quad_forest_segment *segment, *parent;
   uint32 count;
@@ -1945,10 +1940,15 @@ result quad_forest_get_segments
   CHECK_POINTER(source);
   CHECK_POINTER(target);
 
+  if (source->segments == 0) {
+    TERMINATE(SUCCESS);
+  }
+
   /* collect all segments to the array */
   count = 0;
   trees = source->trees.first.next;
-  while (trees != &source->trees.last) {
+  end = &source->trees.last;
+  while (trees != end) {
     tree = (quad_tree *)trees->data;
     if (tree->nw == NULL) {
       segment = &tree->segment;
@@ -2113,15 +2113,16 @@ void quad_tree_add_neighbor_segments
       quad_forest_segment *segment;
 
       segment = quad_tree_segment_find(tree);
-
-      /* loop through all segments, if the tree doesn't belong to any of them, add to list */
-      for (i = 0; i < segment_count; i++) {
-        if (segment == segments[i]) {
-          goto found;
+      if (segment != NULL) {
+        /* loop through all segments, if the tree doesn't belong to any of them, add to list */
+        for (i = 0; i < segment_count; i++) {
+          if (segment == segments[i]) {
+            goto found;
+          }
         }
+        /* segment was not found, it is a neighboring segment */
+        list_insert_unique(target, &segment, &compare_segments);
       }
-      /* segment was not found, it is a neighboring segment */
-      list_insert_unique(target, &segment, &compare_segments);
       found: ;
       /* otherwise the neighbor belongs to same collection of segments, don't add it */
     }
