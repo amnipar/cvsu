@@ -756,12 +756,12 @@ void skip_single_whitespace(FILE *file)
 {
   char c;
 
-  c = getc(file);
+  c = ((char)getc(file));
   if (c != ' ' && c != '\t' && c != '\n' && c != '\r') {
     ungetc(c, file);
   }
   if (c == '\r') {
-    c = getc(file);
+    c = ((char)getc(file));
     if (c != '\n') {
       ungetc(c, file);
     }
@@ -772,9 +772,9 @@ void skip_all_whitespace(FILE *file)
 {
   char c;
 
-  c = getc(file);
+  c = ((char)getc(file));
   while (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
-    c = getc(file);
+    c = ((char)getc(file));
   }
   ungetc(c, file);
 }
@@ -782,11 +782,11 @@ void skip_all_whitespace(FILE *file)
 void skip_comment(FILE *file)
 {
   char c;
-  c = getc(file);
+  c = ((char)getc(file));
 
   if (c == '#') {
     while (c != '\n' && c != '\r') {
-      c = getc(file);
+      c = ((char)getc(file));
     }
   }
   ungetc(c, file);
@@ -833,8 +833,8 @@ result pixel_image_read
 {
   TRY();
   FILE* file;
-  int read_count, value;
-  uint32 number, width, height, maxval;
+  int value;
+  uint32 read_count, number, width, height, maxval;
   pixel_format format;
   pixel_type type;
 
@@ -1001,7 +1001,7 @@ result pixel_image_read
     read_count = fread(target->data, sizeof(byte), target->size, file);
     if (read_count != target->size) {
       printf("Error: reading pnm image data failed\n");
-      printf("%d %lu\n", read_count, target->size);
+      printf("%lu %lu\n", read_count, target->size);
       ERROR(INPUT_ERROR);
     }
   }
@@ -1024,7 +1024,7 @@ result pixel_image_write
 {
   TRY();
   FILE* file;
-  int write_count, number, maxval;
+  uint32 write_count, number, maxval;
 
   CHECK_POINTER(target);
   CHECK_POINTER(source);
@@ -1070,20 +1070,20 @@ result pixel_image_write
     maxval = 65535;
   }
 
-  fprintf(file, "P%d\n# Created by cvsu\n", number);
+  fprintf(file, "P%lu\n# Created by cvsu\n", number);
   if (number == 1 || number == 4) {
     fprintf(file, "%lu %lu", source->width, source->height);
   }
   else {
-    fprintf(file, "%lu %lu %d\n", source->width, source->height, maxval);
+    fprintf(file, "%lu %lu %lu\n", source->width, source->height, maxval);
   }
 
   if (number < 4) {
-    int x, y, width, height, stride, pos;
+    uint32 x, y, width, height, stride, pos;
     width = source->width * source->step;
     height = source->height;
     stride = source->stride;
-    if (maxval = 255) {
+    if (maxval == 255) {
       byte *source_data;
       source_data = (byte *)source->data;
       for (y = 0; y < height; y++) {
@@ -2004,13 +2004,13 @@ image_rect pixel_image_create_rect
   uint32 offset
 )
 {
-  image_rect rect;
+  image_rect irect;
   register uint32 width, height, step, stride;
 
   width = target->width;
   height = target->height;
 
-  rect.valid = 0;
+  irect.valid = 0;
   if (x < 0) {
     dx = dx + x;
     x = 0;
@@ -2021,20 +2021,20 @@ image_rect pixel_image_create_rect
   }
   if ((unsigned)x < width && (unsigned)y < height) {
     if (dx > 0 && dy > 0) {
-      if (x + dx > width) dx = width - x;
-      if (y + dy > height) dy = height - y;
+      if (((unsigned)(x + dx)) > width) dx = ((signed)width) - x;
+      if (((unsigned)(y + dy)) > height) dy = ((signed)height) - y;
 
       step = target->step;
       stride = target->stride;
-      rect.valid = 1;
-      rect.offset = ((unsigned)y) * stride + ((unsigned)x) * step + offset;
-      rect.hstep = ((unsigned)dx);
-      rect.vstep = ((unsigned)dy);
-      rect.N = ((unsigned)dx) * ((unsigned)dy);
+      irect.valid = 1;
+      irect.offset = ((unsigned)y) * stride + ((unsigned)x) * step + offset;
+      irect.hstep = ((unsigned)dx);
+      irect.vstep = ((unsigned)dy);
+      irect.N = ((unsigned)dx) * ((unsigned)dy);
     }
   }
 
-  return rect;
+  return irect;
 }
 
 /******************************************************************************/
@@ -2042,24 +2042,25 @@ image_rect pixel_image_create_rect
 integral_value pixel_image_find_min_byte
 (
   pixel_image *target,
-  sint32 x,
-  sint32 y,
+  sint32 rx,
+  sint32 ry,
   sint32 dx,
   sint32 dy,
   uint32 offset
 )
 {
-  image_rect rect;
+  image_rect irect;
+  uint32 x, y;
   integral_value min, value;
 
-  rect = pixel_image_create_rect(target, x, y, dx, dy, offset);
-  if (rect.valid == 0) {
+  irect = pixel_image_create_rect(target, rx, ry, dx, dy, offset);
+  if (irect.valid == 0) {
     return 0;
   }
   else {
-    IMAGE_RECT_VARIABLES(target, byte, rect);
+    IMAGE_RECT_VARIABLES(target, byte, irect);
     min = 255;
-    FOR_IMAGE_RECT_BEGIN(target, rect)
+    FOR_IMAGE_RECT_BEGIN(target, irect)
       value = (integral_value)PIXEL_VALUE(target);
       if (value < min) min = value;
     FOR_IMAGE_RECT_END(target);
@@ -2072,24 +2073,25 @@ integral_value pixel_image_find_min_byte
 integral_value pixel_image_find_max_byte
 (
   pixel_image *target,
-  sint32 x,
-  sint32 y,
+  sint32 rx,
+  sint32 ry,
   sint32 dx,
   sint32 dy,
   uint32 offset
 )
 {
-  image_rect rect;
+  image_rect irect;
+  uint32 x, y;
   integral_value max, value;
 
-  rect = pixel_image_create_rect(target, x, y, dx, dy, offset);
-  if (rect.valid == 0) {
+  irect = pixel_image_create_rect(target, rx, ry, dx, dy, offset);
+  if (irect.valid == 0) {
     return 0;
   }
   else {
-    IMAGE_RECT_VARIABLES(target, byte, rect);
+    IMAGE_RECT_VARIABLES(target, byte, irect);
     max = 0;
-    FOR_IMAGE_RECT_BEGIN(target, rect)
+    FOR_IMAGE_RECT_BEGIN(target, irect)
       value = (integral_value)PIXEL_VALUE(target);
       if (value > max) max = value;
     FOR_IMAGE_RECT_END(target);
@@ -2102,27 +2104,28 @@ integral_value pixel_image_find_max_byte
 integral_value pixel_image_calculate_mean_byte
 (
   pixel_image *target,
-  sint32 x,
-  sint32 y,
+  sint32 rx,
+  sint32 ry,
   sint32 dx,
   sint32 dy,
   uint32 offset
 )
 {
-  image_rect rect;
+  image_rect irect;
+  uint32 x, y;
   integral_value sum, mean;
 
-  rect = pixel_image_create_rect(target, x, y, dx, dy, offset);
-  if (rect.valid == 0) {
+  irect = pixel_image_create_rect(target, rx, ry, dx, dy, offset);
+  if (irect.valid == 0) {
     return 0;
   }
   else {
-    IMAGE_RECT_VARIABLES(target, byte, rect);
+    IMAGE_RECT_VARIABLES(target, byte, irect);
     sum = 0;
-    FOR_IMAGE_RECT_BEGIN(target, rect)
+    FOR_IMAGE_RECT_BEGIN(target, irect)
       sum += (integral_value)PIXEL_VALUE(target);
     FOR_IMAGE_RECT_END(target);
-    mean = sum / ((integral_value)rect.N);
+    mean = sum / ((integral_value)irect.N);
     return mean;
   }
 }
@@ -2132,30 +2135,31 @@ integral_value pixel_image_calculate_mean_byte
 integral_value pixel_image_calculate_variance_byte
 (
   pixel_image *target,
-  sint32 x,
-  sint32 y,
+  sint32 rx,
+  sint32 ry,
   sint32 dx,
   sint32 dy,
   uint32 offset
 )
 {
-  image_rect rect;
+  image_rect irect;
+  uint32 x, y;
   integral_value value, sum1, sum2, N, mean, variance;
 
-  rect = pixel_image_create_rect(target, x, y, dx, dy, offset);
-  if (rect.valid == 0) {
+  irect = pixel_image_create_rect(target, rx, ry, dx, dy, offset);
+  if (irect.valid == 0) {
     return 0;
   }
   else {
-    IMAGE_RECT_VARIABLES(target, byte, rect);
+    IMAGE_RECT_VARIABLES(target, byte, irect);
     sum1 = 0;
     sum2 = 0;
-    FOR_IMAGE_RECT_BEGIN(target, rect)
+    FOR_IMAGE_RECT_BEGIN(target, irect)
       value = (integral_value)PIXEL_VALUE(target);
       sum1 += value;
       sum2 += value*value;
     FOR_IMAGE_RECT_END(target);
-    N = (integral_value)rect.N;
+    N = (integral_value)irect.N;
     mean = sum1 / N;
     variance = sum2 / N - mean*mean;
     return variance;

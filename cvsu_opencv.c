@@ -53,15 +53,14 @@ result pixel_image_create_from_ipl_image
 )
 {
   TRY();
-  int depth;
-  int channels;
+  uint32 depth, channels;
   pixel_type type;
 
   CHECK_POINTER(target);
   CHECK_POINTER(source);
   CHECK_PARAM(format == RGB || format == GREY);
 
-  channels = source->nChannels;
+  channels = ((unsigned)source->nChannels);
 
   if (format == RGB) {
     CHECK_PARAM(channels == 3);
@@ -70,7 +69,7 @@ result pixel_image_create_from_ipl_image
     CHECK_PARAM(channels == 1);
   }
 
-  depth = source->depth;
+  depth = ((unsigned)source->depth);
   switch (depth) {
     case IPL_DEPTH_8U:
       type = p_U8;
@@ -97,8 +96,10 @@ result pixel_image_create_from_ipl_image
       ERROR(BAD_TYPE);
   }
 
-  CHECK(pixel_image_create_from_data(target, source->imageData, type, format,
-        source->width, source->height, channels, source->widthStep));
+  CHECK(pixel_image_create_from_data(target, ((void*)source->imageData), type,
+                                     format, ((unsigned)source->width),
+                                     ((unsigned)source->height), channels,
+                                     ((unsigned)source->widthStep)));
 
   FINALLY(pixel_image_create_from_ipl_image);
   RETURN();
@@ -123,6 +124,10 @@ result ipl_image_create_from_pixel_image
 
   size.width = (signed)source->width;
   size.height = (signed)source->height;
+
+  /* TODO: convert format (and type) based on parameters */
+  /* this reflects the 'expected' type and format at the calling side */
+  (void)format;
   switch (source->format) {
     case RGB:
       temp = cvCreateImageHeader(size, IPL_DEPTH_8U, 3);
@@ -154,9 +159,8 @@ result pixel_image_create_from_file
 )
 {
   TRY();
-  int depth;
-  int channels;
-  IplImage *src, *dst;
+  uint32 /*depth,*/ channels;
+  IplImage *src; /*, *dst;*/
 
   CHECK_POINTER(target);
   CHECK_PARAM(format == RGB || format == GREY);
@@ -203,8 +207,10 @@ result pixel_image_create_from_file
   dst = cvCreateImage(cvGetSize(src),depth,channels);
   */
   /*printf("width=%d,height=%d,step=%d\n",src->width,src->height,src->widthStep);*/
-  CHECK(pixel_image_create_from_data(target, src->imageData, type, format,
-                                     src->width, src->height, channels, src->widthStep));
+  CHECK(pixel_image_create_from_data(target, ((void*)src->imageData), type,
+                                     format, ((unsigned)src->width),
+                                     ((unsigned)src->height), channels,
+                                     ((unsigned)src->widthStep)));
 
   FINALLY(pixel_image_create_from_file);
   cvReleaseImage(&src);

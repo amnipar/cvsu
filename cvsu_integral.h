@@ -231,7 +231,7 @@ result integral_image_threshold_sauvola
   integral_image *source,
   pixel_image *target,
   truth_value invert,
-  uint32 radius,
+  sint32 radius,
   integral_value k,
   truth_value calculate_max,
   integral_value max,
@@ -247,7 +247,7 @@ result integral_image_threshold_feng
   integral_image *source,
   pixel_image *target,
   truth_value invert,
-  uint32 radius1,
+  sint32 radius1,
   integral_value multiplier,
   truth_value estimate_min,
   integral_value alpha

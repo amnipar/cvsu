@@ -295,13 +295,13 @@ finally:
   const I_1_t *I_1_data, *iA;\
   const I_2_t *I_2_data, *i2A;\
   uint32 B_inc, C_inc, D_inc;\
-  integral_value N, sum, sumsqr;\
+  integral_value N, sum, sumsqr\
 
 #define INTEGRAL_IMAGE_2BOX_VARIABLES()\
   const I_1_t *I_1_data, *iA1;\
   const I_2_t *I_2_data, *i2A1;\
   uint32 step, stride, B1_inc, C1_inc, D1_inc, A2_inc, B2_inc, C2_inc, D2_inc;\
-  integral_value N, sum1, sum2, sumsqr1, sumsqr2, g;
+  integral_value N, sum1, sum2, sumsqr1, sumsqr2, g
 
 #define INTEGRAL_IMAGE_INIT_1BOX(I, box_length, box_width)\
   I_1_data = (I_1_t *)(I)->I_1.data;\

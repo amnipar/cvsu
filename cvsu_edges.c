@@ -278,51 +278,55 @@ result edge_image_update
   edges = &target->vedges;
   {
     uint32 x, y, rows, startcol, endcol;
-    long prev;
+    integral_value prev;
     INTEGRAL_IMAGE_2BOX_VARIABLES();
-    SINGLE_DISCONTINUOUS_IMAGE_VARIABLES(edges, char);
     INTEGRAL_IMAGE_INIT_HBOX(&target->I, target->box_length, target->box_width);
 
     target_stride = target->vedges.stride;
     rows = target->vedges.height;
     startcol = target->box_length;
     endcol = width - target->box_length;
-    pixel_image_clear(edges);
-    for (y = 0; y < rows; y++ ) {
-      iA1 = I_1_data + ((target->vmargin + target->dy + y * target->vstep) * stride);
-      i2A1 = I_2_data + ((target->vmargin + target->dy + y * target->vstep) * stride);
 
-      rising = FALSE;
-      falling = FALSE;
-      edges_pos = edges_rows[y] + startcol * edges_step;
-      for (x = startcol; x < endcol; x++,
-           iA1++, i2A1++, edges_pos += edges_step) {
-        sum1 = INTEGRAL_IMAGE_SUM_1();
-        sum2 = INTEGRAL_IMAGE_SUM_2();
-        sumsqr1 = INTEGRAL_IMAGE_SUMSQR_1();
-        sumsqr2 = INTEGRAL_IMAGE_SUMSQR_2();
+    {
+      SINGLE_DISCONTINUOUS_IMAGE_VARIABLES(edges, char);
 
-        g = edgel_fisher_signed(N, sum1, sum2, sumsqr1, sumsqr2);
+      pixel_image_clear(edges);
+      for (y = 0; y < rows; y++ ) {
+        iA1 = I_1_data + ((target->vmargin + target->dy + y * target->vstep) * stride);
+        i2A1 = I_2_data + ((target->vmargin + target->dy + y * target->vstep) * stride);
 
-        if (x > startcol) {
-          if (g < prev) {
-            /* found maximum at previous column */
-            if (IS_TRUE(rising)) {
-              PIXEL_VALUE_MINUS(edges, 1) = (char)prev;
-              rising = FALSE;
+        rising = FALSE;
+        falling = FALSE;
+        edges_pos = edges_rows[y] + startcol * edges_step;
+        for (x = startcol; x < endcol; x++,
+             iA1++, i2A1++, edges_pos += edges_step) {
+          sum1 = INTEGRAL_IMAGE_SUM_1();
+          sum2 = INTEGRAL_IMAGE_SUM_2();
+          sumsqr1 = INTEGRAL_IMAGE_SUMSQR_1();
+          sumsqr2 = INTEGRAL_IMAGE_SUMSQR_2();
+
+          g = edgel_fisher_signed(N, sum1, sum2, sumsqr1, sumsqr2);
+
+          if (x > startcol) {
+            if (g < prev) {
+              /* found maximum at previous column */
+              if (IS_TRUE(rising)) {
+                PIXEL_VALUE_MINUS(edges, 1) = (char)prev;
+                rising = FALSE;
+              }
+              falling = TRUE;
             }
-            falling = TRUE;
-          }
-          else if (g > prev) {
-            /* found minimum at previous column */
-            if (IS_TRUE(falling)) {
-              PIXEL_VALUE_MINUS(edges, 1) = (char)prev;
-              falling = FALSE;
+            else if (g > prev) {
+              /* found minimum at previous column */
+              if (IS_TRUE(falling)) {
+                PIXEL_VALUE_MINUS(edges, 1) = (char)prev;
+                falling = FALSE;
+              }
+              rising = TRUE;
             }
-            rising = TRUE;
           }
+          prev = g;
         }
-        prev = g;
       }
     }
   }
@@ -330,9 +334,8 @@ result edge_image_update
   edges = &target->hedges;
   {
     uint32 x, y, cols, startrow, endrow, edges_stride;
-    long prev;
+    integral_value prev;
     INTEGRAL_IMAGE_2BOX_VARIABLES();
-    SINGLE_DISCONTINUOUS_IMAGE_VARIABLES(edges, char);
     INTEGRAL_IMAGE_INIT_VBOX(&target->I, target->box_length, target->box_width);
 
     edges_stride = target->hedges.stride;
@@ -340,42 +343,46 @@ result edge_image_update
     startrow = target->box_length;
     endrow = height - target->box_length;
 
-    pixel_image_clear(edges);
-    for (x = 0; x < cols; x++) {
-      iA1 = I_1_data + target->hmargin + target->dx + x * target->hstep;
-      i2A1 = I_2_data + target->hmargin + target->dx + x * target->hstep;
+    {
+      SINGLE_DISCONTINUOUS_IMAGE_VARIABLES(edges, char);
 
-      rising = FALSE;
-      falling = FALSE;
-      edges_pos = edges_rows[startrow] + x * edges_step;
-      for (y = startrow; y < endrow; y++,
-           iA1 += stride, i2A1 += stride, edges_pos += edges_stride) {
-        sum1 = INTEGRAL_IMAGE_SUM_1();
-        sum2 = INTEGRAL_IMAGE_SUM_2();
-        sumsqr1 = INTEGRAL_IMAGE_SUMSQR_1();
-        sumsqr2 = INTEGRAL_IMAGE_SUMSQR_2();
+      pixel_image_clear(edges);
+      for (x = 0; x < cols; x++) {
+        iA1 = I_1_data + target->hmargin + target->dx + x * target->hstep;
+        i2A1 = I_2_data + target->hmargin + target->dx + x * target->hstep;
 
-        g = edgel_fisher_signed(N, sum1, sum2, sumsqr1, sumsqr2);
+        rising = FALSE;
+        falling = FALSE;
+        edges_pos = edges_rows[startrow] + x * edges_step;
+        for (y = startrow; y < endrow; y++,
+             iA1 += stride, i2A1 += stride, edges_pos += edges_stride) {
+          sum1 = INTEGRAL_IMAGE_SUM_1();
+          sum2 = INTEGRAL_IMAGE_SUM_2();
+          sumsqr1 = INTEGRAL_IMAGE_SUMSQR_1();
+          sumsqr2 = INTEGRAL_IMAGE_SUMSQR_2();
 
-        if (y > startrow) {
-          if (g < prev) {
-            /* found maximum at previous row */
-            if (IS_TRUE(rising)) {
-              PIXEL_VALUE_MINUS(edges, edges_stride) = (char)prev;
-              rising = FALSE;
+          g = edgel_fisher_signed(N, sum1, sum2, sumsqr1, sumsqr2);
+
+          if (y > startrow) {
+            if (g < prev) {
+              /* found maximum at previous row */
+              if (IS_TRUE(rising)) {
+                PIXEL_VALUE_MINUS(edges, edges_stride) = (char)prev;
+                rising = FALSE;
+              }
+              falling = TRUE;
             }
-            falling = TRUE;
-          }
-          else if (g > prev) {
-            /* found minimum at previous row */
-            if (IS_TRUE(falling)) {
-              PIXEL_VALUE_MINUS(edges, edges_stride) = (char)prev;
-              falling = FALSE;
+            else if (g > prev) {
+              /* found minimum at previous row */
+              if (IS_TRUE(falling)) {
+                PIXEL_VALUE_MINUS(edges, edges_stride) = (char)prev;
+                falling = FALSE;
+              }
+              rising = TRUE;
             }
-            rising = TRUE;
           }
+          prev = g;
         }
-        prev = g;
       }
     }
   }
@@ -597,10 +604,9 @@ result edgel_response_x
   edgel_criterion_calculator criterion
 )
 {
-  TRY();
   INTEGRAL_IMAGE_2BOX_VARIABLES();
   uint32 i, x, y, width, height, target_stride;
-  SINGLE_DISCONTINUOUS_IMAGE_VARIABLES(target, long);
+  TRY();
 
   CHECK_POINTER(I);
   CHECK_POINTER(target);
@@ -617,21 +623,24 @@ result edgel_response_x
 
   INTEGRAL_IMAGE_INIT_HBOX(I, hsize, vsize);
   pixel_image_clear(target);
+  {
+    SINGLE_DISCONTINUOUS_IMAGE_VARIABLES(target, long);
 
-  for (y = 0; y < height - vsize; y += vsize) {
-    iA1 = I_1_data + (y * width);
-    i2A1 = I_2_data + (y * width);
-    target_pos = target_rows[y] + hsize + 1;
-    for (x = hsize + 1; x < width - hsize; x++,
-         iA1++, i2A1++, target_pos += target_step) {
-      sum1 = INTEGRAL_IMAGE_SUM_1();
-      sum2 = INTEGRAL_IMAGE_SUM_2();
-      sumsqr1 = INTEGRAL_IMAGE_SUMSQR_1();
-      sumsqr2 = INTEGRAL_IMAGE_SUMSQR_2();
+    for (y = 0; y < height - vsize; y += vsize) {
+      iA1 = I_1_data + (y * width);
+      i2A1 = I_2_data + (y * width);
+      target_pos = target_rows[y] + hsize + 1;
+      for (x = hsize + 1; x < width - hsize; x++,
+           iA1++, i2A1++, target_pos += target_step) {
+        sum1 = INTEGRAL_IMAGE_SUM_1();
+        sum2 = INTEGRAL_IMAGE_SUM_2();
+        sumsqr1 = INTEGRAL_IMAGE_SUMSQR_1();
+        sumsqr2 = INTEGRAL_IMAGE_SUMSQR_2();
 
-      g = criterion(N, sum1, sum2, sumsqr1, sumsqr2);
-      for (i = 0; i < vsize; i++) {
-        PIXEL_VALUE_PLUS(target, i * target_stride) = g;
+        g = criterion(N, sum1, sum2, sumsqr1, sumsqr2);
+        for (i = 0; i < vsize; i++) {
+          PIXEL_VALUE_PLUS(target, i * target_stride) = ((long)g);
+        }
       }
     }
   }

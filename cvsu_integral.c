@@ -386,7 +386,7 @@ result integral_image_update
           I_1_SET_VALUE((I_1_GET_VALUE_WITH_OFFSET(v) -
                          I_1_GET_VALUE_WITH_OFFSET(d)) +
                          I_1_GET_VALUE_WITH_OFFSET(h) +
-                         intensity);
+                         ((integral_value)intensity));
           I_2_SET_VALUE((I_2_GET_VALUE_WITH_OFFSET(v) -
                          I_2_GET_VALUE_WITH_OFFSET(d)) +
                          I_2_GET_VALUE_WITH_OFFSET(h) +
@@ -426,13 +426,13 @@ image_rect integral_image_create_rect
   uint32 offset
 )
 {
-  image_rect rect;
+  image_rect irect;
   register uint32 width, height, step, stride;
 
   width = target->width;
   height = target->height;
 
-  rect.valid = 0;
+  irect.valid = 0;
   if (x < 0) {
     dx = dx + x;
     x = 0;
@@ -443,20 +443,20 @@ image_rect integral_image_create_rect
   }
   if ((unsigned)x < width && (unsigned)y < height) {
     if (dx > 0 && dy > 0) {
-      if (x + dx > width) dx = width - x;
-      if (y + dy > height) dy = height - y;
+      if (((unsigned)(x + dx)) > width) dx = ((signed)width) - x;
+      if (((unsigned)(y + dy)) > height) dy = ((signed)height) - y;
 
       step = target->step;
       stride = target->stride;
-      rect.valid = 1;
-      rect.offset = ((unsigned)y) * stride + ((unsigned)x) * step + offset;
-      rect.hstep = ((unsigned)dx) * step;
-      rect.vstep = ((unsigned)dy) * stride;
-      rect.N = ((unsigned)dx) * ((unsigned)dy);
+      irect.valid = 1;
+      irect.offset = ((unsigned)y) * stride + ((unsigned)x) * step + offset;
+      irect.hstep = ((unsigned)dx) * step;
+      irect.vstep = ((unsigned)dy) * stride;
+      irect.N = ((unsigned)dx) * ((unsigned)dy);
     }
   }
 
-  return rect;
+  return irect;
 }
 
 /******************************************************************************/
@@ -471,17 +471,17 @@ integral_value integral_image_calculate_mean
   uint32 offset
 )
 {
-  image_rect rect;
+  image_rect irect;
   integral_value *iA, sum;
 
-  rect = integral_image_create_rect(target, x, y, dx, dy, offset);
-  if (rect.valid == 0) {
+  irect = integral_image_create_rect(target, x, y, dx, dy, offset);
+  if (irect.valid == 0) {
     return 0;
   }
   else {
-    iA = ((integral_value *)target->I_1.data) + rect.offset;
-    sum = *(iA + rect.vstep + rect.hstep) + *iA - *(iA + rect.hstep) - *(iA + rect.vstep);
-    return sum / ((integral_value)rect.N);
+    iA = ((integral_value *)target->I_1.data) + irect.offset;
+    sum = *(iA + irect.vstep + irect.hstep) + *iA - *(iA + irect.hstep) - *(iA + irect.vstep);
+    return sum / ((integral_value)irect.N);
   }
 }
 
@@ -497,19 +497,19 @@ integral_value integral_image_calculate_variance
   uint32 offset
 )
 {
-  image_rect rect;
+  image_rect irect;
   integral_value *iA, *i2A, mean, sum2, var;
 
-  rect = integral_image_create_rect(target, x, y, dx, dy, offset);
-  if (rect.valid == 0) {
+  irect = integral_image_create_rect(target, x, y, dx, dy, offset);
+  if (irect.valid == 0) {
     return 0;
   }
   else {
-    iA = ((integral_value *)target->I_1.data) + rect.offset;
-    i2A = ((integral_value *)target->I_2.data) + rect.offset;
-    mean = (*(iA + rect.vstep + rect.hstep) + *iA - *(iA + rect.hstep) - *(iA + rect.vstep)) / ((integral_value)rect.N);
-    sum2 = *(i2A + rect.vstep + rect.hstep) + *i2A - *(i2A + rect.hstep) - *(i2A + rect.vstep);
-    var = (sum2 / ((integral_value)rect.N)) - mean*mean;
+    iA = ((integral_value *)target->I_1.data) + irect.offset;
+    i2A = ((integral_value *)target->I_2.data) + irect.offset;
+    mean = (*(iA + irect.vstep + irect.hstep) + *iA - *(iA + irect.hstep) - *(iA + irect.vstep)) / ((integral_value)irect.N);
+    sum2 = *(i2A + irect.vstep + irect.hstep) + *i2A - *(i2A + irect.hstep) - *(i2A + irect.vstep);
+    var = (sum2 / ((integral_value)irect.N)) - mean*mean;
     if (var < 0) var = 0;
     return var;
   }
@@ -528,20 +528,20 @@ void integral_image_calculate_statistics
   uint32 offset
 )
 {
-  image_rect rect;
+  image_rect irect;
   integral_value *iA, *i2A, N, sum, sum2, mean, var;
 
   statistics_init(stat);
-  rect = integral_image_create_rect(target, x, y, dx, dy, offset);
-  if (rect.valid == 0) {
+  irect = integral_image_create_rect(target, x, y, dx, dy, offset);
+  if (irect.valid == 0) {
     return;
   }
   else {
-    iA = ((integral_value *)target->I_1.data) + rect.offset;
-    i2A = ((integral_value *)target->I_2.data) + rect.offset;
-    N = ((integral_value)rect.N);
-    sum = *(iA + rect.vstep + rect.hstep) + *iA - *(iA + rect.hstep) - *(iA + rect.vstep);
-    sum2 = *(i2A + rect.vstep + rect.hstep) + *i2A - *(i2A + rect.hstep) - *(i2A + rect.vstep);
+    iA = ((integral_value *)target->I_1.data) + irect.offset;
+    i2A = ((integral_value *)target->I_2.data) + irect.offset;
+    N = ((integral_value)irect.N);
+    sum = *(iA + irect.vstep + irect.hstep) + *iA - *(iA + irect.hstep) - *(iA + irect.vstep);
+    sum2 = *(i2A + irect.vstep + irect.hstep) + *i2A - *(i2A + irect.hstep) - *(i2A + irect.vstep);
     mean = sum / N;
     var = (sum2 / N) - mean*mean;
     if (var < 0) var = 0;
@@ -562,7 +562,7 @@ result integral_image_threshold_sauvola
   integral_image *source,
   pixel_image *target,
   truth_value invert,
-  uint32 radius,
+  sint32 radius,
   integral_value k,
   truth_value calculate_max,
   integral_value max,
@@ -573,7 +573,8 @@ result integral_image_threshold_sauvola
   pixel_image temp_mean, temp_dev;
   byte *source_data, *target_data, source_value, t, value1, value2;
   integral_value *mean_data, *dev_data, mean, dev, R, dev_max, dev_sum;
-  uint32 x, y, width, height, step, stride, offset, size, pos;
+  sint32 x, y, width, height, step, stride, size, pos;
+  uint32 offset;
   statistics stat;
 
   CHECK_POINTER(source);
@@ -582,10 +583,10 @@ result integral_image_threshold_sauvola
 
   CHECK(pixel_image_clone(target, source->original));
 
-  width = target->width;
-  height = target->height;
-  step = target->step;
-  stride = target->stride;
+  width = ((signed)target->width);
+  height = ((signed)target->height);
+  step = ((signed)target->step);
+  stride = ((signed)target->stride);
   offset = target->offset;
 
   if (IS_TRUE(invert)) {
@@ -597,8 +598,12 @@ result integral_image_threshold_sauvola
     value2 = 0;
   }
 
-  CHECK(pixel_image_create(&temp_mean, p_I, target->format, width, height, step, stride));
-  CHECK(pixel_image_create(&temp_dev, p_I, target->format, width, height, step, stride));
+  CHECK(pixel_image_create(&temp_mean, p_I, target->format, ((unsigned)width),
+                           ((unsigned)height), ((unsigned)step),
+                           ((unsigned)stride)));
+  CHECK(pixel_image_create(&temp_dev, p_I, target->format, ((unsigned)width),
+                           ((unsigned)height), ((unsigned)step),
+                           ((unsigned)stride)));
 
   source_data = (byte *)source->original->data;
   target_data = (byte *)target->data;
@@ -612,7 +617,8 @@ result integral_image_threshold_sauvola
       pos = y * stride;
       for (x = 0; x < width; x++, pos += step) {
         source_value = source_data[pos];
-        integral_image_calculate_statistics(source, &stat, x-radius, y-radius, size, size, offset);
+        integral_image_calculate_statistics(source, &stat, x-radius, y-radius,
+                                            size, size, offset);
         t = (byte)floor(stat.mean * (1.0 + k * ((stat.deviation / R) - 1.0)));
         if (source_value > t) {
           target_data[pos] = value1;
@@ -629,7 +635,8 @@ result integral_image_threshold_sauvola
       for (y = 0; y < height; y++) {
         pos = y * stride;
         for (x = 0; x < width; x++, pos += step) {
-          integral_image_calculate_statistics(source, &stat, x-radius, y-radius, size, size, offset);
+          integral_image_calculate_statistics(source, &stat, x-radius, y-radius,
+                                              size, size, offset);
           mean_data[pos] = stat.mean;
           dev = stat.deviation;
           dev_data[pos] = dev;
@@ -643,7 +650,8 @@ result integral_image_threshold_sauvola
       for (y = 0; y < height; y++) {
         pos = y * stride;
         for (x = 0; x < width; x++, pos += step) {
-          integral_image_calculate_statistics(source, &stat, x-radius, y-radius, size, size, offset);
+          integral_image_calculate_statistics(source, &stat, x-radius, y-radius,
+                                              size, size, offset);
           mean_data[pos] = stat.mean;
           dev_sum += dev_data[pos] = stat.deviation;
         }
@@ -681,7 +689,7 @@ result integral_image_threshold_feng
   integral_image *source,
   pixel_image *target,
   truth_value invert,
-  uint32 radius1,
+  sint32 radius1,
   integral_value multiplier,
   truth_value estimate_min,
   integral_value alpha
@@ -690,7 +698,8 @@ result integral_image_threshold_feng
   TRY();
   byte *source_data, *target_data, source_value, t, value1, value2;
   integral_value min, mean, dev1, dev2, as, a1, a2, a3, k1, k2, g, asg;
-  uint32 x, y, width, height, step, stride, offset, radius2, size1, size2, pos;
+  sint32 x, y, width, height, step, stride, radius2, size1, size2, pos;
+  uint32 offset;
   statistics stat;
 
   CHECK_POINTER(source);
@@ -699,10 +708,10 @@ result integral_image_threshold_feng
 
   CHECK(pixel_image_clone(target, source->original));
 
-  width = target->width;
-  height = target->height;
-  step = target->step;
-  stride = target->stride;
+  width = ((signed)target->width);
+  height = ((signed)target->height);
+  step = ((signed)target->step);
+  stride = ((signed)target->stride);
   offset = target->offset;
 
   g = 2;
@@ -721,24 +730,27 @@ result integral_image_threshold_feng
 
   source_data = (byte *)source->original->data;
   target_data = (byte *)target->data;
-  size1 = 2 * radius1 + 1;
-  radius2 = (uint32)(multiplier * radius1);
+  size1 = 2 * ((signed)radius1) + 1;
+  radius2 = (sint32)(multiplier * ((integral_value)radius1));
   size2 = 2 * radius2 + 1;
 
   for (y = 0; y < height; y++) {
     pos = y * stride;
     for (x = 0; x < width; x++, pos += step) {
       source_value = source_data[pos];
-      integral_image_calculate_statistics(source, &stat, x-radius1, y-radius1, size1, size1, offset);
+      integral_image_calculate_statistics(source, &stat, x-radius1,y-radius1,
+                                          size1, size1, offset);
       mean = stat.mean;
       dev1 = stat.deviation;
       if (IS_TRUE(estimate_min)) {
         min = fmax(0, mean - alpha * dev1);
       }
       else {
-        min = pixel_image_find_min_byte(source->original, x-radius1, y-radius1, size1, size1, offset);
+        min = pixel_image_find_min_byte(source->original, x-radius1, y-radius1,
+                                        size1, size1, offset);
       }
-      dev2 = sqrt(integral_image_calculate_variance(source, x-radius2, y-radius2, size2, size2, offset));
+      dev2 = sqrt(integral_image_calculate_variance(source, x-radius2, y-radius2,
+                                                    size2, size2, offset));
       as = dev1 / fmax(1,dev2);
       asg = pow(as, g);
       a2 = k1 * asg;

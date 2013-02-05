@@ -272,7 +272,7 @@ result connected_components_update
 )
 {
   TRY();
-  uint32 x, y, width, height, i, size, channels, count, pos;
+  uint32 x, y, width, height, i, channels, count;
   truth_value is_equal;
   region_info *pixel, *neighbor, *id, **region;
 

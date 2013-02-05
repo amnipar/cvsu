@@ -106,7 +106,7 @@ typedef enum direction_t {
   d_N8
 } direction;
 
-typedef sint16 coord;
+typedef sint32 coord;
 
 typedef struct point_t {
     coord x;

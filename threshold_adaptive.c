@@ -38,9 +38,17 @@
 
 string main_name = "threshold_adaptive";
 
-/*
- * Usage: threshold_adaptive radius multiplier alpha source_file target_file
- */
+void print_usage()
+{
+  printf("threshold_adaptive\n");
+  printf("Segments images using Feng's improved Sauvola adaptive thresholding.\n\n");
+  printf("Usage:\n\n");
+  printf("threshold_adaptive radius multiplier source target\n");
+  printf("  radius: size of neighborhood used for determining threshold (>= 1)\n");
+  printf("  multiplier: size of the larger neighborhood is multiplier*radius (> 1)\n");
+  printf("  source: source image file to process\n");
+  printf("  target: target image file to generate\n\n");
+}
 
 int main(int argc, char *argv[])
 {
@@ -54,11 +62,52 @@ int main(int argc, char *argv[])
   integral_value multiplier, alpha;
   string source_file, target_file;
 
-  radius = 7;
-  multiplier = 3;
+  if (argc < 5) {
+    printf("\nError: wrong number of parameters\n\n");
+    print_usage();
+    return 1;
+  }
+  else {
+    int scan_result;
+
+    scan_result = sscanf(argv[1], "%lu", &radius);
+    if (scan_result != 1) {
+      printf("\nError: failed to parse parameter radius\n\n");
+      print_usage();
+      return 1;
+    }
+    scan_result = sscanf(argv[2], "%lf", &multiplier);
+    if (scan_result != 1) {
+      printf("\nError: failed to parse parameter multiplier\n\n");
+      print_usage();
+      return 1;
+    }
+    source_file = argv[3];
+    target_file = argv[4];
+    if (radius < 1) {
+      printf("\nError: radius may not be smaller than 1\n\n");
+      print_usage();
+      return 1;
+    }
+    if (multiplier <= 1) {
+      printf("\nError: multiplier must be at least 1\n\n");
+      print_usage();
+      return 1;
+    }
+
+    {
+      FILE *source;
+      source = fopen(source_file, "r");
+      if (source == NULL) {
+        printf("\nError: the source file does not exist\n\n");
+        print_usage();
+        return 1;
+      }
+      fclose(source);
+    }
+  }
+
   alpha = 3;
-  source_file = "smallLena.jpg";
-  target_file = "thresholded.png";
 
   printf("load image...\n");
   CHECK(pixel_image_create_from_file(&src_image, source_file, p_U8, GREY));
@@ -67,7 +116,8 @@ int main(int argc, char *argv[])
   printf("updating integral...\n");
   CHECK(integral_image_update(&integral));
   printf("thresholding...\n");
-  CHECK(integral_image_threshold_feng(&integral, &tmp_image, TRUE, radius, multiplier, TRUE, alpha));
+  CHECK(integral_image_threshold_feng(&integral, &tmp_image, TRUE,
+                                      ((signed)radius), multiplier, TRUE, alpha));
   printf("creating connected components...\n");
   CHECK(connected_components_create(&components, &tmp_image));
   printf("updating connected components...\n");

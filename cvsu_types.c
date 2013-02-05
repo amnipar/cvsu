@@ -47,6 +47,8 @@ integral_value cast_none
   uint32 offset
 )
 {
+  (void)data;
+  (void)offset;
   return 0;
 }
 

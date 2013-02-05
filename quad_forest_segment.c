@@ -37,10 +37,20 @@
 
 string main_name = "quad_forest_segment";
 
-/*
- * Usage: quad_forest_segment max_size min_size alpha tree_overlap
- *        segment_overlap source_file target_file
- */
+void print_usage()
+{
+  printf("quad_forest_segment\n");
+  printf("Segments images using quad forests with range overlap measures.\n\n");
+  printf("Usage:\n\n");
+  printf("quad_forest_segment max min alpha toverlap soverlap source target\n");
+  printf("  max: maximum size for trees; suggested value 16 (larger than min)\n");
+  printf("  min: minimum size for tree;  suggested value 4 (smaller than max)\n");
+  printf("  alpha: deviation multiplier for range generation, suggested value 3 (0..5]\n");
+  printf("  toverlap: required overlap for trees, suggested value 0.5 (0..1)\n");
+  printf("  soverlap: required overlap for segments, suggested value 0.5 (0..1)\n");
+  printf("  source: source image file to process\n");
+  printf("  target: target image file to generate\n\n");
+}
 
 int main(int argc, char *argv[])
 {
@@ -52,13 +62,78 @@ int main(int argc, char *argv[])
   integral_value alpha, tree_overlap, segment_overlap;
   string source_file, target_file;
 
-  max_size = 16;
-  min_size = 4;
-  alpha = 3;
-  tree_overlap = 0.5;
-  segment_overlap = 0.5;
-  source_file = "smallLena.jpg";
-  target_file = "segmented.png";
+  if (argc < 8) {
+    printf("\nError: wrong number of parameters\n\n");
+    print_usage();
+    return 1;
+  }
+  else {
+    int scan_result;
+
+    scan_result = sscanf(argv[1], "%lu", &max_size);
+    if (scan_result != 1) {
+      printf("\nError: failed to parse parameter max\n\n");
+      print_usage();
+      return 1;
+    }
+    scan_result = sscanf(argv[2], "%lu", &min_size);
+    if (scan_result != 1) {
+      printf("\nError: failed to parse parameter min\n\n");
+      print_usage();
+      return 1;
+    }
+    scan_result = sscanf(argv[3], "%lf", &alpha);
+    if (scan_result != 1) {
+      printf("\nError: failed to parse parameter alpha\n\n");
+      print_usage();
+      return 1;
+    }
+    scan_result = sscanf(argv[4], "%lf", &tree_overlap);
+    if (scan_result != 1) {
+      printf("\nError: failed to parse parameter toverlap\n\n");
+      print_usage();
+      return 1;
+    }
+    scan_result = sscanf(argv[5], "%lf", &segment_overlap);
+    if (scan_result != 1) {
+      printf("\nError: failed to parse parameter soverlap\n\n");
+      print_usage();
+      return 1;
+    }
+    source_file = argv[6];
+    target_file = argv[7];
+    if (max_size < min_size) {
+      printf("\nError: max may not be smaller than min\n\n");
+      print_usage();
+      return 1;
+    }
+    if (alpha <= 0 || alpha > 5) {
+      printf("\nError: alpha must be in range (0..5]\n\n");
+      print_usage();
+      return 1;
+    }
+    if (tree_overlap <= 0 || tree_overlap >= 1) {
+      printf("\nError: toverlap must be in range (0..1)\n\n");
+      print_usage();
+      return 1;
+    }
+    if (segment_overlap <= 0 || segment_overlap >= 1) {
+      printf("\nError: soverlap must be in range (0..1)\n\n");
+      print_usage();
+      return 1;
+    }
+
+    {
+      FILE *source;
+      source = fopen(source_file, "r");
+      if (source == NULL) {
+        printf("\nError: the source file does not exist\n\n");
+        print_usage();
+        return 1;
+      }
+      fclose(source);
+    }
+  }
 
   printf("load image...\n");
   CHECK(pixel_image_create_from_file(&src_image, source_file, p_U8, GREY));
