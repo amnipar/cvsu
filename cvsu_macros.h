@@ -85,14 +85,14 @@ finally:
   } } while (0)
 
 #define CHECK_TRUE(expr) do {\
-  r == SUCCESS;\
+  r = SUCCESS;\
   if ((expr) == 0) {\
     r = BAD_PARAM;\
     goto finally;\
   } } while (0)
 
 #define CHECK_FALSE(expr) do {\
-  r == SUCCESS;\
+  r = SUCCESS;\
   if ((expr) != 0) {\
     r = BAD_PARAM;\
     goto finally;\

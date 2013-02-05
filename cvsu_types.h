@@ -125,11 +125,6 @@ typedef struct rect_t {
     coord bottom;
 } rect;
 
-typedef struct dir_t {
-    sint16 h;
-    sint16 v;
-} dir;
-
 typedef enum result_t {
     SUCCESS = 0,
     FATAL,

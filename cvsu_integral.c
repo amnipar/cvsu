@@ -37,6 +37,13 @@
 #include <math.h>
 
 /******************************************************************************/
+/* some gcc versions seem to require these definitions to work properly       */
+/* remove them if they cause problems with other compilers                    */
+
+double fmin (double __x, double __y);
+double fmax (double __x, double __y);
+
+/******************************************************************************/
 /* constants for reporting function names in error messages                   */
 
 string integral_image_alloc_name = "integral_image_alloc";

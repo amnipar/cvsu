@@ -68,6 +68,7 @@ int main(int argc, char *argv[])
   CHECK(quad_forest_update(&forest));
   printf("segmenting...\n");
   CHECK(quad_forest_segment_with_overlap(&forest, alpha, tree_overlap, segment_overlap));
+  printf("found %lu segments!\n", forest.segments);
   printf("drawing result...\n");
   CHECK(quad_forest_draw_image(&forest, &dst_image, TRUE, TRUE));
   printf("writing result to file...\n");

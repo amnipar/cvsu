@@ -39,6 +39,13 @@
 #include <math.h>
 
 /******************************************************************************/
+/* some gcc versions seem to require these definitions to work properly       */
+/* remove them if they cause problems with other compilers                    */
+
+double fmin (double __x, double __y);
+double fmax (double __x, double __y);
+
+/******************************************************************************/
 /* constants for reporting function names in error messages                   */
 
 string quad_tree_nullify_name = "quad_tree_nullify";
@@ -512,15 +519,16 @@ result quad_tree_get_neighborhood_statistics
 )
 {
   TRY();
-  sint32 x, y, s;
+  sint32 size, x, y, s;
 
   CHECK_POINTER(forest);
   CHECK_POINTER(tree);
   CHECK_PARAM(multiplier > 0);
 
-  x = tree->x - (uint32)(multiplier * tree->size);
-  y = tree->y - (uint32)(multiplier * tree->size);
-  s = tree->size + (uint32)(2 * multiplier * tree->size);
+  size = ((sint32)(multiplier * ((integral_value)tree->size)));
+  x = ((signed)tree->x) - size;
+  y = ((signed)tree->y) - size;
+  s = ((signed)tree->size) + 2 * size;
 
   integral_image_calculate_statistics(&forest->integral, target, x, y, s, s, 0);
 
@@ -651,9 +659,9 @@ result quad_tree_get_edge_response
 )
 {
   TRY();
-  uint32 box_width, box_length, endrow, endcol;
-  sint32 row, col;
-  integral_value hsum, vsum, mag;
+  uint32 box_width, box_length, row, col, endrow, endcol;
+  sint32 srow, scol;
+  integral_value hsum, vsum;
   INTEGRAL_IMAGE_2BOX_VARIABLES();
 
   CHECK_POINTER(forest);
@@ -665,11 +673,12 @@ result quad_tree_get_edge_response
   /* calculate horizontal cumulative gradient */
   {
     INTEGRAL_IMAGE_INIT_HBOX(&forest->integral, box_length, box_width);
-    col = tree->x - box_length;
-    endcol = col + box_width;
+    scol = ((signed)tree->x) - ((signed)box_length);
+    endcol = ((unsigned)(scol + ((signed)box_width)));
     hsum = 0;
     /*printf("col %lu endcol %lu ", col, endcol);*/
-    if (col >= 0 && endcol + box_width + 1 <= forest->integral.width) {
+    if (scol >= 0 && endcol + box_width + 1 <= forest->integral.width) {
+      col = ((unsigned)scol);
       iA1 = I_1_data + tree->y * stride + col;
       i2A1 = I_2_data + tree->y * stride + col;
       while (col < endcol) {
@@ -684,7 +693,7 @@ result quad_tree_get_edge_response
         i2A1++;
       }
     }
-    hsum /= box_width;
+    hsum /= ((integral_value)box_width);
     tree->edge.dx = hsum;
     if (dx != NULL) {
       *dx = hsum;
@@ -694,11 +703,12 @@ result quad_tree_get_edge_response
   /* calculate vertical cumulative gradient */
   {
     INTEGRAL_IMAGE_INIT_VBOX(&forest->integral, box_length, box_width);
-    row = tree->y - box_length;
-    endrow = row + box_width;
+    srow = ((signed)tree->y) - ((signed)box_length);
+    endrow = ((unsigned)(srow + ((signed)box_width)));
     vsum = 0;
     /*printf("row %lu endrow %lu ", row, endrow);*/
-    if (row >= 0 && endrow + box_width + 1 <= forest->integral.height) {
+    if (srow >= 0 && endrow + box_width + 1 <= forest->integral.height) {
+      row = ((unsigned)srow);
       iA1 = I_1_data + row * stride + tree->x;
       i2A1 = I_2_data + row * stride + tree->x;
       while (row < endrow) {
@@ -713,7 +723,7 @@ result quad_tree_get_edge_response
         i2A1 += stride;
       }
     }
-    vsum /= box_width;
+    vsum /= ((integral_value)box_width);
     tree->edge.dy = vsum;
     if (dy != NULL) {
       *dy = vsum;
@@ -1019,7 +1029,7 @@ result quad_tree_get_neighbors
   CHECK_POINTER(tree);
 
   CHECK(list_create(target, 100, sizeof(quad_tree*), 1));
-  
+
   quad_tree_add_neighbors(target, tree, d_N4);
 
   FINALLY(quad_tree_get_neighbors);
@@ -1366,17 +1376,13 @@ result quad_forest_destroy
 )
 {
   TRY();
-  uint32 pos, size;
 
   CHECK_POINTER(target);
 
   CHECK(list_destroy(&target->trees));
-
   CHECK(memory_deallocate((data_pointer*)&target->roots));
-
   CHECK(integral_image_destroy(&target->integral));
   pixel_image_free(target->source);
-
   CHECK(quad_forest_nullify(target));
 
   FINALLY(quad_forest_destroy);
@@ -1980,9 +1986,9 @@ void quad_forest_collect_trees
   else {
     uint32 i;
     quad_forest_segment *segment;
-    
+
     segment = quad_tree_segment_find(tree);
-    
+
     /* loop through all segments, if the tree belongs to one of them, add to list */
     for (i = 0; i < segment_count; i++) {
       if (segment == segments[i]) {
@@ -2004,17 +2010,17 @@ result quad_forest_get_segment_trees
 )
 {
   TRY();
-  uint32 i, x1, y1, x2, y2, width, height;
+  uint32 i, x1, y1, x2, y2;
   uint32 pos, col, firstcol, lastcol, row, firstrow, lastrow;
 
   CHECK_POINTER(forest);
   CHECK_POINTER(target);
   CHECK_POINTER(segments);
-  
+
   if (segment_count == 0) {
     TERMINATE(SUCCESS);
   }
-  
+
   CHECK(list_create(target, 100, sizeof(quad_tree*), 1));
 
   /* find bounding box of the collection */
@@ -2028,13 +2034,13 @@ result quad_forest_get_segment_trees
     if (segments[i]->x2 > x2) x2 = segments[i]->x2;
     if (segments[i]->y2 > y2) y2 = segments[i]->y2;
   }
-  
+
   /* determine which root trees are within the bounding box */
   firstcol = (uint32)((x1 - forest->dx) / forest->tree_max_size);
   lastcol = (uint32)((x2 - forest->dx) / forest->tree_max_size);
   firstrow = (uint32)((y1 - forest->dy) / forest->tree_max_size);
   lastrow = (uint32)((y2 - forest->dy) / forest->tree_max_size);
-  
+
   /* loop through the root trees */
   for (row = firstrow; row <= lastrow; row++) {
     pos = row * forest->cols + firstcol;
@@ -2043,7 +2049,7 @@ result quad_forest_get_segment_trees
       pos++;
     }
   }
-  
+
   FINALLY(quad_forest_get_segment_trees);
   RETURN();
 }
@@ -2053,24 +2059,23 @@ result quad_forest_get_segment_trees
 
 int compare_segments(const void *a, const void *b)
 {
-  quad_forest_segment *sa, *sb;
-  sa = *((quad_forest_segment**)a);
-  if (sa != NULL) {
-    sa = sa->parent;
-  }
-  else {
-    printf("tree is null in compare_segments\n");
+  const quad_forest_segment *sa, *sb;
+
+  sa = *((const quad_forest_segment* const *)a);
+  if (sa == NULL) {
+    printf("warning: tree is null in compare_segments\n");
     return -1;
   }
-  sb = *((quad_forest_segment**)b);
-  if (sb != NULL) {
-    sb = sb->parent;
-  }
-  else {
-    printf("tree is null in compare_segments\n");
+  sb = *((const quad_forest_segment* const *)b);
+
+  if (sb == NULL) {
+    printf("warning: tree is null in compare_segments\n");
     return -1;
   }
-  return (sa - sb); /*(()->parent) - (()->parent);*/
+
+  if (sa > sb) return 1;
+  else if (sa < sb) return -1;
+  else return 0;
 }
 
 /******************************************************************************/
@@ -2106,7 +2111,7 @@ void quad_tree_add_neighbor_segments
     if (tree->nw == NULL) {
       uint32 i;
       quad_forest_segment *segment;
-      
+
       segment = quad_tree_segment_find(tree);
 
       /* loop through all segments, if the tree doesn't belong to any of them, add to list */
@@ -2169,28 +2174,28 @@ result quad_forest_get_segment_neighbors
   list tree_list;
   list_item *trees;
   quad_tree *tree;
-  
+
   CHECK_POINTER(forest);
   CHECK_POINTER(target);
   CHECK_POINTER(segments);
-  
+
   list_nullify(&tree_list);
-  
+
   if (segment_count == 0) {
     TERMINATE(SUCCESS);
   }
-  
+
   CHECK(list_create(target, 100, sizeof(quad_forest_segment*), 1));
-  
+
   CHECK(quad_forest_get_segment_trees(&tree_list, forest, segments, segment_count));
-  
+
   trees = tree_list.first.next;
   while (trees != &tree_list.last) {
     tree = *((quad_tree **)trees->data);
     quad_tree_add_neighbor_segments(target, tree, segments, segment_count, d_N4);
     trees = trees->next;
   }
-  
+
   FINALLY(quad_forest_get_segment_neighbors);
   if (IS_FALSE(list_is_null(&tree_list))) {
     list_destroy(&tree_list);
@@ -2287,11 +2292,11 @@ result quad_forest_get_segment_mask
   CHECK_POINTER(forest);
   CHECK_POINTER(target);
   CHECK_POINTER(segments);
-  
+
   if (segment_count == 0) {
     TERMINATE(SUCCESS);
   }
-  
+
   /*
   loop all root trees under the segment bounding box
   recurse to leaf trees
@@ -2360,16 +2365,16 @@ result quad_forest_highlight_segments
 )
 {
   TRY();
-  uint32 i, x1, y1, x2, y2, width, height;
+  uint32 i, x1, y1, x2, y2;
 
   CHECK_POINTER(forest);
   CHECK_POINTER(target);
   CHECK_POINTER(segments);
-  
+
   if (segment_count == 0) {
     TERMINATE(SUCCESS);
   }
-  
+
   /* find bounding box of the collection */
   x1 = segments[0]->x1;
   y1 = segments[0]->y1;
@@ -2381,7 +2386,7 @@ result quad_forest_highlight_segments
     if (segments[i]->x2 > x2) x2 = segments[i]->x2;
     if (segments[i]->y2 > y2) y2 = segments[i]->y2;
   }
-  
+
   {
     uint32 pos, col, firstcol, lastcol, row, firstrow, lastrow;
 
@@ -2390,7 +2395,7 @@ result quad_forest_highlight_segments
     lastcol = (uint32)((x2 - forest->dx) / forest->tree_max_size);
     firstrow = (uint32)((y1 - forest->dy) / forest->tree_max_size);
     lastrow = (uint32)((y2 - forest->dy) / forest->tree_max_size);
-    
+
     /* loop through the root trees */
     for (row = firstrow; row <= lastrow; row++) {
       pos = row * forest->cols + firstcol;
@@ -2456,7 +2461,7 @@ result quad_forest_draw_image
             *target_pos = color0;
             target_pos++;
             *target_pos = color0;
-            *target_pos++;
+            target_pos++;
           }
         }
       }
@@ -2486,7 +2491,7 @@ result quad_forest_draw_image
                 *target_pos = color1;
                 target_pos++;
                 *target_pos = color2;
-                *target_pos++;
+                target_pos++;
               }
             }
           }
@@ -2516,7 +2521,7 @@ result quad_forest_draw_image
                 *target_pos = color1;
                 target_pos++;
                 *target_pos = color2;
-                *target_pos++;
+                target_pos++;
               }
             }
           }
@@ -2657,7 +2662,7 @@ result quad_forest_segment_edges
   for (i = 0; i < size; i++) {
     quad_tree_prime_with_edge(target->roots[i], 10);
   }
-  
+
   /* propagate in desired direction */
   for (remaining = propagate_rounds; remaining--;) {
     if (propagate_dir == d_H) {
@@ -2682,7 +2687,7 @@ result quad_forest_segment_edges
       }
     }
   }
-  
+
   /* now trees with pool value higher than threshold have edge */
   for (i = 0; i < size; i++) {
     tree = target->roots[i];
