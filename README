@@ -1,0 +1,13 @@
+cvsu v.0.1.0
+
+Library of computer vision algorithms for scene understanding.
+
+This library contains research-grade code for analyzing images, and it is under
+constant development. It may be useful for others, but no guarantees are given.
+Versions in the master branch will hopefully be usable most of the time, the
+dev branch contains more experimental features. The interface should remain
+constant during each minor release (*.x.*), each new minor release should only
+add new interfaces, while major releases may also remove them.
+
+The most up-to-date version will be kept in repository
+git@github.com:amnipar/cvsu.git
