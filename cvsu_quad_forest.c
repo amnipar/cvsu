@@ -2437,6 +2437,7 @@ result quad_forest_draw_image
   height = forest->source->height;
 
   CHECK(pixel_image_create(target, p_U8, RGB, width, height, 3, 3 * width));
+  CHECK(pixel_image_clear(target));
 
   stride = target->stride;
   target_data = (byte*)target->data;
