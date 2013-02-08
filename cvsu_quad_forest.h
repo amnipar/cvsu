@@ -285,6 +285,22 @@ result quad_tree_get_edge_response
 );
 
 /**
+ * Generates the edge responses of the four child trees without dividing the
+ * tree. Useful for determining consistency before deciding to divide.
+ */
+result quad_tree_get_child_edge_response
+(
+  /** The quad_forest where the tree resides. */
+  quad_forest *forest,
+  /** The quad_tree that will will be examined. */
+  quad_tree *source,
+  /** Array where the horizontal scanning results are stored: must fit 4. */
+  integral_value dx[],
+  /** Array where the vertical scanning results are stored: must fit 4. */
+  integral_value dy[]
+);
+
+/**
  * Adds all immediate neighbors of a quad_tree to a list.
  * The neighbor links point to the direct neighbors, or to those trees that are
  * directly adjacent at the same or lower level, thus of the same or larger
