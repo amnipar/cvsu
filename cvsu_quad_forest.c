@@ -671,7 +671,7 @@ result quad_tree_get_edge_response
 
   box_width = tree->size;
   /* box length should be at least 4 to get proper result */
-  box_length = (uint32)(fmin(box_width / 2, 4));
+  box_length = (uint32)(fmax(((integral_value)box_width) / 2.0, 4.0));
 
   /* calculate horizontal cumulative gradient */
   {
@@ -696,7 +696,7 @@ result quad_tree_get_edge_response
         i2A1++;
       }
     }
-    hsum /= ((integral_value)box_width);
+    /*hsum /= ((integral_value)box_width);*/
     tree->edge.dx = hsum;
     if (dx != NULL) {
       *dx = hsum;
@@ -726,7 +726,7 @@ result quad_tree_get_edge_response
         i2A1 += stride;
       }
     }
-    vsum /= ((integral_value)box_width);
+    /*vsum /= ((integral_value)box_width);*/
     tree->edge.dy = vsum;
     if (dy != NULL) {
       *dy = vsum;
@@ -734,7 +734,7 @@ result quad_tree_get_edge_response
     /*printf("dy %.3f ", vsum);*/
   }
 
-  tree->edge.mag = sqrt(hsum*hsum + vsum * vsum);
+  tree->edge.mag = sqrt(hsum*hsum + vsum*vsum);
   tree->edge.ang = atan2(vsum, hsum);
 
   FINALLY(quad_tree_get_edge_response);
@@ -762,9 +762,9 @@ result quad_tree_get_child_edge_response
   CHECK_POINTER(dx);
   CHECK_POINTER(dy);
 
-  box_width = (uint32)(tree->size / 2);
+  box_width = (uint32)(((integral_value)tree->size) / 2.0);
   /* box length should be at least 4 to get proper result */
-  box_length = (uint32)(fmin(box_width / 2, 4));
+  box_length = (uint32)(fmax(((integral_value)box_width) / 2.0, 4.0));
 
   x[0] = x[2] = tree->x;
   x[1] = x[3] = tree->x + box_width;
@@ -788,14 +788,15 @@ result quad_tree_get_child_edge_response
           sum2 = INTEGRAL_IMAGE_SUM_2();
           sumsqr1 = INTEGRAL_IMAGE_SUMSQR_1();
           sumsqr2 = INTEGRAL_IMAGE_SUMSQR_2();
-          g = edgel_fisher_signed(N, sum1, sum2, sumsqr1, sumsqr2);
+          /* when comparing children, only interested in magnitude -> unsigned */
+          g = edgel_fisher_unsigned(N, sum1, sum2, sumsqr1, sumsqr2);
           hsum += g;
           col++;
           iA1++;
           i2A1++;
         }
       }
-      hsum /= ((integral_value)box_width);
+      /*hsum /= ((integral_value)box_width);*/
       dx[i] = hsum;
     }
   }
@@ -816,14 +817,15 @@ result quad_tree_get_child_edge_response
           sum2 = INTEGRAL_IMAGE_SUM_2();
           sumsqr1 = INTEGRAL_IMAGE_SUMSQR_1();
           sumsqr2 = INTEGRAL_IMAGE_SUMSQR_2();
-          g = edgel_fisher_signed(N, sum1, sum2, sumsqr1, sumsqr2);
+          /* when comparing children, only interested in magnitude -> unsigned */
+          g = edgel_fisher_unsigned(N, sum1, sum2, sumsqr1, sumsqr2);
           vsum += g;
           row++;
           iA1 += stride;
           i2A1 += stride;
         }
       }
-      vsum /= ((integral_value)box_width);
+      /*vsum /= ((integral_value)box_width);*/
       dy[i] = vsum;
     }
   }
