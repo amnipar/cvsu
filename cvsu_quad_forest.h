@@ -65,6 +65,9 @@ typedef struct quad_forest_segment_t
   uint32 y2;
   /** Statistics of the image region covered by this segment */
   statistics stat;
+  integral_value devmean;
+  integral_value devdev;
+  truth_value has_boundary;
   /** Color assigned for this segment for visualizing purposes */
   byte color[4];
 } quad_forest_segment;
@@ -590,6 +593,16 @@ result quad_forest_find_edges
   integral_value bias,
   /** Direction of edges to search (H,V,N4) */
   direction dir
+);
+
+/**
+ * Uses deviation propagation to find potential segment boundaries.
+ */
+result quad_forest_find_boundaries
+(
+  quad_forest *forest,
+  uint32 rounds,
+  integral_value bias
 );
 
 /**
