@@ -290,28 +290,6 @@ result integral_image_copy
 /******************************************************************************/
 /* private macros for generating the integral_image_update function           */
 
-#if (IMAGE_ACCESS_METHOD == IMAGE_ACCESS_BY_INDEX)
-
-#define INTEGRAL_IMAGE_UPDATE_DEFINE_VARIABLES(I_1_type, I_2_type)\
-    I_1_type *I_1_data;\
-    I_2_type *I_2_data;\
-    uint32 current_pos
-
-#define INTEGRAL_IMAGE_SET_POS(offset)\
-    current_pos = (offset)
-
-#define INTEGRAL_IMAGE_ADVANCE_POS(offset)\
-    current_pos += (offset)
-
-#define I_1_GET_VALUE() (I_1_data[current_pos])
-#define I_1_SET_VALUE(value) I_1_data[current_pos] = (value)
-#define I_1_GET_VALUE_WITH_OFFSET(offset) (I_1_data[current_pos - (offset)])
-#define I_2_GET_VALUE() (I_2_data[current_pos])
-#define I_2_SET_VALUE(value) I_2_data[current_pos] = (value)
-#define I_2_GET_VALUE_WITH_OFFSET(offset) (I_2_data[current_pos - (offset)])
-
-#elif (IMAGE_ACCESS_METHOD == IMAGE_ACCESS_BY_POINTER)
-
 #define INTEGRAL_IMAGE_UPDATE_DEFINE_VARIABLES(I_1_type, I_2_type)\
     I_1_type *I_1_data, *I_1_pos;\
     I_2_type *I_2_data, *I_2_pos
@@ -331,9 +309,6 @@ result integral_image_copy
 #define I_2_SET_VALUE(value) *I_2_pos = (value)
 #define I_2_GET_VALUE_WITH_OFFSET(offset) (*(I_2_pos - (offset)))
 
-#else
-#error "Image access method not defined"
-#endif
 
 /******************************************************************************/
 
@@ -354,7 +329,8 @@ result integral_image_update
   /* TODO: handle multiple channels, and higher powers */
   {
     INTEGRAL_IMAGE_UPDATE_DEFINE_VARIABLES(integral_value, integral_value);
-    uint32 intensity, width, height, x, y, h, v, d;
+    uint32 width, height, x, y, h, v, d;
+    byte intensity;
     SINGLE_DISCONTINUOUS_IMAGE_VARIABLES(source, byte);
 
     /* set the image content to 0's */
@@ -365,16 +341,16 @@ result integral_image_update
 
     width = target->width;
     height = target->height;
-    I_1_data = (integral_value *)target->I_1.data;
-    I_2_data = (integral_value *)target->I_2.data;
-
+    I_1_data = (integral_value*)target->I_1.data;
+    I_2_data = (integral_value*)target->I_2.data;
+    
     /* horizontal offset for integral images */
     h = target->step;
     /* vertical offset for integral images */
     v = target->stride;
     /* diagonal offset for integral images */
     d = target->stride + target->step;
-
+    
     /* initialize rest of integral images */
     /* add value of this pixel and integrals from top and left */
     /* subtract integral from top left diagonal */

@@ -535,6 +535,16 @@ result quad_forest_get_segment_neighbors
 );
 
 /**
+ * Draw tree values over an rgb image.
+ */
+result quad_forest_draw_trees
+(
+  quad_forest *forest,
+  pixel_image *target,
+  truth_value use_segments
+);
+
+/**
  * Collects all trees contained in a list of segments and generates a
  * pixel_image where all pixels within the segments are white (or black if the
  * invert parameter is set to true)
@@ -546,6 +556,13 @@ result quad_forest_get_segment_mask
   quad_forest_segment **segments,
   uint32 segment_count,
   truth_value invert
+);
+
+result quad_forest_get_segment_boundary
+(
+  quad_forest *forest,
+  quad_forest_segment *segment,
+  list *boundary
 );
 
 /**
@@ -627,6 +644,11 @@ result quad_forest_segment_edges
   direction propagate_dir,
   /** The direction in which to merge segments */
   direction merge_dir
+);
+
+result quad_forest_segment_with_boundaries
+(
+  quad_forest *forest
 );
 
 #ifdef __cplusplus

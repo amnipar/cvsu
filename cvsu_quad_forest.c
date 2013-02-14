@@ -71,13 +71,14 @@ string quad_forest_get_segments_name = "quad_forest_get_regions";
 string quad_forest_get_segment_trees_name = "quad_forest_get_segment_trees";
 string quad_forest_get_segment_neighbors_name = "quad_forest_get_segment_neighbors";
 string quad_forest_get_segment_mask_name = "quad_forest_get_segment_mask";
+string quad_forest_get_segment_boundary_name = "quad_forest_get_segment_boundary";
+string quad_forest_draw_trees_name =  "quad_forest_draw_trees";
 string quad_forest_highlight_segments_name = "quad_forest_highlight_segments";
 string quad_forest_draw_image_name = "quad_forest_draw_image";
 string quad_forest_find_edges_name = "quad_forest_find_edges";
 string quad_forest_find_boundaries_name = "quad_forest_find_boundaries";
-string quad_forest_find_vertical_edges_name = "quad_forest_find_vertical_edges";
-string quad_forest_find_horizontal_edges_name = "quad_forest_find_horizontal_edges";
-string quad_forest_segment_horizontal_edges_name = "quad_forest_segment_horizontal_edges";
+string quad_forest_segment_edges_name = "quad_forest_segment_edges";
+string quad_forest_segment_with_boundaries_name = "quad_forest_segment_with_boundaries";
 
 /******************************************************************************/
 /* quad_forest_status possible values                                         */
@@ -1558,7 +1559,9 @@ result quad_forest_refresh_segments
   quad_tree *tree;
   quad_forest_segment *parent, *segment;
   uint32 count;
-
+  
+  CHECK_POINTER(target);
+  
   count = 0;
   /* initialize the random number generator for assigning the colors */
   srand(1234);
@@ -1601,7 +1604,9 @@ result quad_forest_destroy
   CHECK(list_destroy(&target->trees));
   CHECK(memory_deallocate((data_pointer*)&target->roots));
   CHECK(integral_image_destroy(&target->integral));
-  pixel_image_free(target->source);
+  if (target->source != NULL) {
+    pixel_image_free(target->source);
+  }
   CHECK(quad_forest_nullify(target));
 
   FINALLY(quad_forest_destroy);
@@ -1684,6 +1689,7 @@ result quad_forest_update
 
   rows = target->rows;
   cols = target->cols;
+  
   pos = 0;
   for (row = 0; row < rows; row++) {
     tree = target->roots[pos];
@@ -2382,6 +2388,93 @@ result quad_forest_get_segment_neighbors
 }
 
 /******************************************************************************/
+
+result quad_forest_draw_trees
+(
+  quad_forest *forest,
+  pixel_image *target,
+  truth_value use_segments
+)
+{
+  TRY();
+  list_item *trees, *end;
+  quad_tree *tree;
+  uint32 count, x, y, width, height, row_step, pos_step;
+  integral_value mean, dev;
+  byte *target_pos, value, value0, value1, value2;
+  
+  CHECK_POINTER(forest);
+  CHECK_POINTER(target);
+  CHECK_PARAM(target->type == p_U8);
+  CHECK_PARAM(target->format == RGB);
+  
+  trees = forest->trees.first.next;
+  end = &forest->trees.last;
+  count = 0;
+  while (trees != end) {
+    tree = (quad_tree*)trees->data;
+    if (tree->nw == NULL) {
+      width = tree->size;
+      height = width;
+      row_step = target->stride - width * target->step;
+      if (target->step <= 3) {
+        pos_step = 1;
+      }
+      else {
+        pos_step = target->step - 2;
+      }
+      
+      if (IS_FALSE(use_segments)) {
+        mean = tree->stat.mean;
+        if (mean < 0) mean = 0;
+        if (mean > 255) mean = 255;
+        value1 = value2 = (byte)mean;
+        dev = mean + tree->stat.deviation;
+        if (dev < 0) dev = 0;
+        if (dev > 255) dev = 255;
+        value0 = (byte)dev;
+      }
+      else {
+        if (IS_TRUE(tree->segment.has_boundary)) {
+          value0 = 255;
+          value1 = 255;
+          value2 = 0;
+        }
+        else {
+          quad_forest_segment *segment;
+          segment = quad_tree_segment_find(tree);
+          if (segment != NULL) {
+            value0 = segment->color[0];
+            value1 = segment->color[1];
+            value2 = segment->color[2];
+          }
+          else {
+            value0 = value1 = value2 = 0;
+          }
+        }
+      }
+      
+      target_pos = (byte*)target->data + tree->y * target->stride + tree->x * target->step;
+      for (y = height; y--; target_pos += row_step) {
+        for (x = width; x--; ) {
+          *target_pos = value0;
+          target_pos++;
+          *target_pos = value1;
+          target_pos++;
+          *target_pos = value2;
+          target_pos += pos_step;
+        }
+      }
+      count++;
+    }
+    trees = trees->next;
+  }
+  
+  FINALLY(quad_forest_draw_trees);
+  RETURN();
+}
+
+/******************************************************************************/
 /* private function for drawing recursively the trees into the bitmask        */
 
 void quad_forest_draw_segments
@@ -2528,6 +2621,466 @@ result quad_forest_get_segment_mask
   }
 
   FINALLY(quad_forest_get_segment_mask);
+  RETURN();
+}
+
+/******************************************************************************/
+
+#define TRY_SW()\
+  if (tree->s != NULL && tree->s->w != NULL) {\
+    new_tree = tree->s->w;\
+    new_segment = quad_tree_segment_find(new_tree);\
+    if (new_segment == segment) {\
+      *next_tree = new_tree;\
+      *next_dir = d_SW;\
+      break;\
+    }\
+  }
+
+#define TRY_W()\
+  if (tree->w != NULL) {\
+    new_tree = tree->w;\
+    new_segment = quad_tree_segment_find(new_tree);\
+    if (new_segment == segment) {\
+      *next_tree = new_tree;\
+      *next_dir = d_W;\
+      break;\
+    }\
+  }
+
+#define TRY_NW()\
+  if (tree->n != NULL && tree->n->w != NULL) {\
+    new_tree = tree->n->w;\
+    new_segment = quad_tree_segment_find(new_tree);\
+    if (new_segment == segment) {\
+      *next_tree = new_tree;\
+      *next_dir = d_NW;\
+      break;\
+    }\
+  }
+
+#define TRY_N()\
+  if (tree->n != NULL) {\
+    new_tree = tree->n;\
+    new_segment = quad_tree_segment_find(new_tree);\
+    if (new_segment == segment) {\
+      *next_tree = new_tree;\
+      *next_dir = d_N;\
+      break;\
+    }\
+  }
+
+#define TRY_NE()\
+  if (tree->n != NULL && tree->n->e != NULL) {\
+    new_tree = tree->n->e;\
+    new_segment = quad_tree_segment_find(new_tree);\
+    if (new_segment == segment) {\
+      *next_tree = new_tree;\
+      *next_dir = d_NE;\
+      break;\
+    }\
+  }
+
+#define TRY_E()\
+  if (tree->e != NULL) {\
+    new_tree = tree->e;\
+    new_segment = quad_tree_segment_find(new_tree);\
+    if (new_segment == segment) {\
+      *next_tree = new_tree;\
+      *next_dir = d_E;\
+      break;\
+    }\
+  }
+
+#define TRY_SE()\
+  if (tree->s != NULL && tree->s->e != NULL) {\
+    new_tree = tree->s->e;\
+    new_segment = quad_tree_segment_find(new_tree);\
+    if (new_segment == segment) {\
+      *next_tree = new_tree;\
+      *next_dir = d_SE;\
+      break;\
+    }\
+  }
+
+#define TRY_S()\
+  if (tree->s != NULL) {\
+    new_tree = tree->s;\
+    new_segment = quad_tree_segment_find(new_tree);\
+    if (new_segment == segment) {\
+      *next_tree = new_tree;\
+      *next_dir = d_S;\
+      break;\
+    }\
+  }
+
+void get_next
+(
+  quad_tree *tree,
+  quad_forest_segment *segment,
+  direction arrival_dir,
+  quad_tree **next_tree, 
+  direction *next_dir
+)
+{
+  quad_tree *new_tree;
+  quad_forest_segment *new_segment;
+  
+  switch (arrival_dir) {
+    case d_NW:
+    {
+      TRY_SW()
+      TRY_W()
+      TRY_NW()
+      TRY_N()
+      TRY_NE()
+      TRY_E()
+      TRY_SE()
+      TRY_S()
+      PRINT0("not found: nw");
+      break;
+    }
+    case d_N:
+    {
+      TRY_NW()
+      TRY_N()
+      TRY_NE()
+      TRY_E()
+      TRY_SE()
+      TRY_S()
+      TRY_SW()
+      TRY_W()
+      PRINT0("not found: w");
+      break;
+    }
+    case d_NE:
+    {
+      TRY_NW()
+      TRY_N()
+      TRY_NE()
+      TRY_E()
+      TRY_SE()
+      TRY_S()
+      TRY_SW()
+      TRY_W()
+      PRINT0("not found: nw");
+      break;
+    }
+    case d_E:
+    {
+      TRY_NE()
+      TRY_E()
+      TRY_SE()
+      TRY_S()
+      TRY_SW()
+      TRY_W()
+      TRY_NW()
+      TRY_N()
+      PRINT0("not found: e");
+      break;
+    }
+    case d_SE:
+    {
+      TRY_NE()
+      TRY_E()
+      TRY_SE()
+      TRY_S()
+      TRY_SW()
+      TRY_W()
+      TRY_NW()
+      TRY_N()
+      PRINT0("not found: se");
+      break;
+    }
+    case d_S:
+    {
+      TRY_SE()
+      TRY_S()
+      TRY_SW()
+      TRY_W()
+      TRY_NW()
+      TRY_N()
+      TRY_NE()
+      TRY_E()
+      PRINT0("not found: s");
+      break;
+    }
+    case d_SW:
+    {
+      TRY_SE()
+      TRY_S()
+      TRY_SW()
+      TRY_W()
+      TRY_NW()
+      TRY_N()
+      TRY_NE()
+      TRY_E()
+      PRINT0("not found: sw");
+      break;
+    }
+    case d_W:
+    {
+      TRY_SW()
+      TRY_W()
+      TRY_NW()
+      TRY_N()
+      TRY_NE()
+      TRY_E()
+      TRY_SE()
+      TRY_S()
+      PRINT0("not found: w");
+      break;
+    }
+    default:
+      PRINT0("wrong direction!");
+  }
+}
+
+#define POINT_LEFT(tree) {\
+  point_b.x = (signed)tree->x;\
+  point_b.y = (signed)tree->y + ((sint32)(tree->size / 2));\
+  new_line.start = point_a;\
+  new_line.end = point_b;\
+  list_append(boundary, (pointer)&new_line);\
+  point_a = point_b;}
+
+#define POINT_TOP(tree) {\
+  point_b.x = (signed)tree->x + ((sint32)(tree->size / 2));\
+  point_b.y = (signed)tree->y;\
+  new_line.start = point_a;\
+  new_line.end = point_b;\
+  list_append(boundary, (pointer)&new_line);\
+  point_a = point_b;}
+
+#define POINT_RIGHT(tree) {\
+  point_b.x = (signed)(tree->x + tree->size);\
+  point_b.y = (signed)tree->y + ((sint32)(tree->size / 2));\
+  new_line.start = point_a;\
+  new_line.end = point_b;\
+  list_append(boundary, (pointer)&new_line);\
+  point_a = point_b;}
+
+#define POINT_BOTTOM(tree) {\
+  point_b.x = (signed)tree->x + ((sint32)(tree->size / 2));\
+  point_b.y = (signed)(tree->y + tree->size);\
+  new_line.start = point_a;\
+  new_line.end = point_b;\
+  list_append(boundary, (pointer)&new_line);\
+  point_a = point_b;}
+
+result quad_forest_get_segment_boundary
+(
+  quad_forest *forest,
+  quad_forest_segment *segment,
+  list *boundary
+)
+{
+  uint32 row, col, pos;
+  quad_tree *tree, *next_tree, *end_tree;
+  quad_forest_segment *tree_segment;
+  direction prev_dir, next_dir;
+  point start_point, point_a, point_b;
+  line new_line;
+  TRY();
+  
+  CHECK_POINTER(forest);
+  CHECK_POINTER(segment);
+  CHECK_POINTER(boundary);
+  
+  CHECK(list_create(boundary, 100, sizeof(line), 1));
+  
+  if (segment->x2 - segment->x1 > 33 && segment->y2 - segment->y1 > 32) {
+    /* find the tree in center left of bounding box */
+    col = (uint32)((segment->x1 - forest->dx) / forest->tree_max_size);
+    row = (uint32)((((uint32)((segment->y1 + segment->y2) / 2)) - forest->dy) / forest->tree_max_size);
+    pos = row * forest->cols + col;
+    
+    tree = forest->roots[pos];
+    tree_segment = quad_tree_segment_find(tree);
+    while (tree_segment != segment) {
+      if (tree->e != NULL) {
+        tree = tree->e;
+        tree_segment = quad_tree_segment_find(tree);
+      }
+      else {
+        TERMINATE(NOT_FOUND);
+      }
+    }
+    
+    point_a.x = (signed)tree->x;
+    point_a.y = (signed)tree->y + ((sint32)(tree->size / 2));
+    start_point = point_a;
+    end_tree = tree;
+    /* use nw as first dir to get the correct direction for searching */
+    prev_dir = d_NE;
+    /*get_next(tree, segment, prev_dir, &next_tree, &next_dir);*/
+    /*prev_dir = next_dir;*/
+    do {
+      get_next(tree, segment, prev_dir, &next_tree, &next_dir);
+      switch (next_dir) {
+        case d_NW:
+        {
+          switch (prev_dir) {
+            case d_S:
+              POINT_RIGHT(tree);
+            case d_SW:
+            case d_W:
+              POINT_BOTTOM(tree);
+              break;
+            case d_NW:
+            case d_N:
+            case d_NE:
+              POINT_LEFT(tree);
+              break;
+            /*default:*/
+              /*PRINT1("incorrect prev_dir with d_NW: %d", prev_dir);*/
+          }
+        }
+        break;
+        case d_N:
+        {
+          switch (prev_dir) {
+            case d_S:
+              POINT_RIGHT(tree);
+            case d_SW:
+            case d_W:
+              POINT_BOTTOM(tree);
+            case d_NW:
+            case d_N:
+            case d_NE:
+              POINT_LEFT(tree);
+              break;
+            /*default:*/
+              /*PRINT1("incorrect prev_dir with d_N: %d", prev_dir);*/
+              /* TODO: maybe add d_E creating a sharp corner? */
+          }
+        }
+        break;
+        case d_NE:
+        {
+          switch (prev_dir) {
+            case d_W:
+              POINT_BOTTOM(tree);
+            case d_NW:
+            case d_N:
+            case d_NE:
+              POINT_LEFT(tree);
+              break;
+            case d_E:
+            case d_SE:
+              POINT_TOP(tree);
+              break;
+            /*default:*/
+              /*PRINT1("incorrect prev_dir with d_NE: %d", prev_dir);*/
+          }
+        }
+        break;
+        case d_E:
+        {
+          switch (prev_dir) {
+            case d_W:
+              POINT_BOTTOM(tree);
+            case d_NW:
+            case d_N:
+              POINT_LEFT(tree);
+            case d_NE:
+            case d_E:
+            case d_SE:
+              POINT_TOP(tree);
+              break;
+            /*default:*/
+              /*PRINT1("incorrect prev_dir with d_E: %d", prev_dir);*/
+              /* maybe add d_S creating a sharp corner? */
+          }
+        }
+        break;
+        case d_SE:
+        {
+          switch (prev_dir) {
+            case d_N:
+              POINT_LEFT(tree);
+            case d_NE:
+            case d_E:
+            case d_SE:
+              POINT_TOP(tree);
+              break;
+            case d_S:
+            case d_SW:
+              POINT_RIGHT(tree);
+              break;
+            /*default:*/
+              /*PRINT1("incorrect prev_dir with d_SE: %d", prev_dir);*/
+          }
+        }
+        break;
+        case d_S:
+        {
+          switch (prev_dir) {
+            case d_N:
+              POINT_LEFT(tree);
+            case d_NE:
+            case d_E:
+              POINT_TOP(tree);
+            case d_SE:
+            case d_S:
+            case d_SW:
+              POINT_RIGHT(tree);
+              break;
+            /*default:*/
+              /*PRINT1("incorrect prev_dir with d_S: %d", prev_dir);*/
+          }
+        }
+        break;
+        case d_SW:
+        {
+          switch (prev_dir) {
+            case d_E:
+              POINT_TOP(tree);
+            case d_SE:
+            case d_S:
+            case d_SW:
+              POINT_RIGHT(tree);
+              break;
+            case d_W:
+            case d_NW:
+              POINT_BOTTOM(tree);
+              break;
+            /*default:*/
+              /*PRINT1("incorrect prev_dir with d_SW: %d", prev_dir);*/
+          }
+        }
+        break;
+        case d_W:
+        {
+          switch (prev_dir) {
+            case d_E:
+              POINT_TOP(tree);
+            case d_SE:
+            case d_S:
+              POINT_RIGHT(tree);
+            case d_SW:
+            case d_W:
+            case d_NW:
+              POINT_BOTTOM(tree);
+              break;
+            /*default:*/
+              /*PRINT1("incorrect prev_dir with d_W: %d", prev_dir);*/
+          }
+        }
+        break;
+        /*default:*/
+          /*PRINT1("incorrect next_dir: %d", next_dir);*/
+      }
+      
+      tree = next_tree;
+      prev_dir = next_dir;
+    } while (tree != end_tree);
+    
+    new_line.start = point_a;
+    new_line.end = start_point;
+    list_append(boundary, (pointer)&new_line);
+  }
+  FINALLY(quad_forest_get_segment_boundary);
   RETURN();
 }
 
@@ -3049,7 +3602,178 @@ result quad_forest_segment_edges
   /* finally, count regions and assign colors */
   quad_forest_refresh_segments(target);
 
-  FINALLY(quad_forest_segment_horizontal_edges);
+  FINALLY(quad_forest_segment_edges);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result quad_forest_segment_with_boundaries
+(
+  quad_forest *forest
+)
+{
+  TRY();
+  list_item *trees, *end;
+  quad_tree *tree, *neighbor;
+  quad_forest_segment *tree_segment, *neighbor_segment;
+  integral_value dev, tree_dev, tree_mean, neighbor_dev, neighbor_mean, dist;
+  
+  CHECK_POINTER(forest);
+  
+  /* first find boundaries (and establish devmean and devdev) */
+  CHECK(quad_forest_find_boundaries(forest, 3, 5));
+  
+  /* then merge consistent non-boundary neighbors */
+  trees = forest->trees.first.next;
+  end = &forest->trees.last;
+  while (trees != end) {
+    tree = (quad_tree*)trees->data;
+    if (IS_FALSE(tree->segment.has_boundary)) {
+      tree_segment = quad_tree_segment_find(tree);
+      if (tree_segment == NULL) {
+        tree_mean = tree->stat.mean;
+        tree_dev = fmaxf(1, tree->segment.devmean + tree->segment.devdev);
+        
+        neighbor = tree->n;
+        if (neighbor != NULL && IS_FALSE(neighbor->segment.has_boundary)) {
+          /*neighbor_segment = quad_tree_segment_find(neighbor);
+          if (neighbor_segment == NULL) {*/
+            neighbor_mean = neighbor->stat.mean;
+            neighbor_dev = fmaxf(1, neighbor->segment.devmean + neighbor->segment.devdev);
+            
+            dev = fminf(tree_dev, neighbor_dev);
+            dist = abs(tree_mean - neighbor_mean);
+            if (dist < 2 * dev) {
+              quad_tree_segment_create(tree);
+              quad_tree_segment_create(neighbor);
+              quad_tree_segment_union(tree, neighbor);
+            }
+          /*}*/
+        }
+        neighbor = tree->e;
+        if (neighbor != NULL && IS_FALSE(neighbor->segment.has_boundary)) {
+          /*neighbor_segment = quad_tree_segment_find(neighbor);
+          if (neighbor_segment == NULL) {*/
+            neighbor_mean = neighbor->stat.mean;
+            neighbor_dev = fmaxf(1, neighbor->segment.devmean + neighbor->segment.devdev);
+            
+            dev = fminf(tree_dev, neighbor_dev);
+            dist = abs(tree_mean - neighbor_mean);
+            if (dist < 2 * dev) {
+              quad_tree_segment_create(tree);
+              quad_tree_segment_create(neighbor);
+              quad_tree_segment_union(tree, neighbor);
+            }
+          /*}*/
+        }
+        neighbor = tree->s;
+        if (neighbor != NULL && IS_FALSE(neighbor->segment.has_boundary)) {
+          /*neighbor_segment = quad_tree_segment_find(neighbor);
+          if (neighbor_segment == NULL) {*/
+            neighbor_mean = neighbor->stat.mean;
+            neighbor_dev = fmaxf(1, neighbor->segment.devmean + neighbor->segment.devdev);
+            
+            dev = fminf(tree_dev, neighbor_dev);
+            dist = abs(tree_mean - neighbor_mean);
+            if (dist < 2 * dev) {
+              quad_tree_segment_create(tree);
+              quad_tree_segment_create(neighbor);
+              quad_tree_segment_union(tree, neighbor);
+            }
+          /*}*/
+        }
+        neighbor = tree->w;
+        if (neighbor != NULL && IS_FALSE(neighbor->segment.has_boundary)) {
+          /*neighbor_segment = quad_tree_segment_find(neighbor);
+          if (neighbor_segment == NULL) {*/
+            neighbor_mean = neighbor->stat.mean;
+            neighbor_dev = fmaxf(1, neighbor->segment.devmean + neighbor->segment.devdev);
+            
+            dev = fminf(tree_dev, neighbor_dev);
+            dist = abs(tree_mean - neighbor_mean);
+            if (dist < 2 * dev) {
+              quad_tree_segment_create(tree);
+              quad_tree_segment_create(neighbor);
+              quad_tree_segment_union(tree, neighbor);
+            }
+          /*}*/
+        }
+      }
+    }
+    trees = trees->next;
+  }
+
+  /* then merge consistent segments */
+  trees = forest->trees.first.next;
+  end = &forest->trees.last;
+  while (trees != end) {
+    tree = (quad_tree *)trees->data;
+    tree_segment = quad_tree_segment_find(tree);
+    if (tree->nw == NULL && tree_segment != NULL) {
+      tree_mean = tree_segment->stat.mean;
+      tree_dev = fmaxf(1, tree_segment->stat.deviation);
+
+      neighbor = tree->n;
+      if (neighbor != NULL && neighbor->nw == NULL) {
+        neighbor_segment = quad_tree_segment_find(neighbor);
+        if (neighbor_segment != NULL && tree_segment != neighbor_segment) {
+          neighbor_mean = neighbor_segment->stat.mean;
+          neighbor_dev = fmaxf(1, neighbor_segment->stat.deviation);
+          dev = fminf(tree_dev, neighbor_dev);
+          dist = abs(tree_mean - neighbor_mean);
+          if (dist < 3 * dev) {
+            quad_tree_segment_union(tree, neighbor);
+          }
+        }
+      }
+      neighbor = tree->e;
+      if (neighbor != NULL && neighbor->nw == NULL) {
+        neighbor_segment = quad_tree_segment_find(neighbor);
+        if (neighbor_segment != NULL && tree_segment != neighbor_segment) {
+          neighbor_mean = neighbor_segment->stat.mean;
+          neighbor_dev = fmaxf(1, neighbor_segment->stat.deviation);
+          dev = fminf(tree_dev, neighbor_dev);
+          dist = abs(tree_mean - neighbor_mean);
+          if (dist < 3 * dev) {
+            quad_tree_segment_union(tree, neighbor);
+          }
+        }
+      }
+      neighbor = tree->s;
+      if (neighbor != NULL && neighbor->nw == NULL) {
+        neighbor_segment = quad_tree_segment_find(neighbor);
+        if (neighbor_segment != NULL && tree_segment != neighbor_segment) {
+          neighbor_mean = neighbor_segment->stat.mean;
+          neighbor_dev = fmaxf(1, neighbor_segment->stat.deviation);
+          dev = fminf(tree_dev, neighbor_dev);
+          dist = abs(tree_mean - neighbor_mean);
+          if (dist < 3 * dev) {
+            quad_tree_segment_union(tree, neighbor);
+          }
+        }
+      }
+      neighbor = tree->w;
+      if (neighbor != NULL && neighbor->nw == NULL) {
+        neighbor_segment = quad_tree_segment_find(neighbor);
+        if (neighbor_segment != NULL && tree_segment != neighbor_segment) {
+          neighbor_mean = neighbor_segment->stat.mean;
+          neighbor_dev = fmaxf(1, neighbor_segment->stat.deviation);
+          dev = fminf(tree_dev, neighbor_dev);
+          dist = abs(tree_mean - neighbor_mean);
+          if (dist < 3 * dev) {
+            quad_tree_segment_union(tree, neighbor);
+          }
+        }
+      }
+    }
+    trees = trees->next;
+  }
+  
+  /* finally refresh segments and assign colors */
+  CHECK(quad_forest_refresh_segments(forest));
+  
+  FINALLY(quad_forest_segment_with_boundaries);
   RETURN();
 }
 
