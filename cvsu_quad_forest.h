@@ -535,7 +535,11 @@ result quad_forest_get_segment_neighbors
 );
 
 /**
- * Draw tree values over an rgb image.
+ * Draw tree values over an rgb image. For segmented images, use_segments
+ * can be set to true and segment colors will be used for trees, otherwise
+ * mean value with deviation encoded into the red component is used. In this
+ * case, also draws the boundary trees with yellow color, if boundaries have
+ * been detected.
  */
 result quad_forest_draw_trees
 (
@@ -558,6 +562,9 @@ result quad_forest_get_segment_mask
   truth_value invert
 );
 
+/**
+ * Generates a list of lines that surrounds a segment, rounding the corners.
+ */
 result quad_forest_get_segment_boundary
 (
   quad_forest *forest,

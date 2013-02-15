@@ -40,8 +40,21 @@
 /* some gcc versions seem to require these definitions to work properly       */
 /* remove them if they cause problems with other compilers                    */
 
-double fmin (double __x, double __y);
-double fmax (double __x, double __y);
+#ifdef NEED_MINMAX
+#if INTEGRAL_IMAGE_DATA_TYPE == INTEGRAL_IMAGE_USING_FLOAT
+float fminf(float __x, float __y);
+float fmaxf(float __x, float __y);
+#define getmin fminf
+#define getmax fmaxf
+#elif INTEGRAL_IMAGE_DATA_TYPE == INTEGRAL_IMAGE_USING_DOUBLE
+double fmin(double __x, double __y);
+double fmax(double __x, double __y);
+#define getmin fmin
+#define getmax fmax
+#else
+#error "integral image data type not defined"
+#endif
+#endif
 
 /******************************************************************************/
 /* constants for reporting function names in error messages                   */
@@ -343,14 +356,14 @@ result integral_image_update
     height = target->height;
     I_1_data = (integral_value*)target->I_1.data;
     I_2_data = (integral_value*)target->I_2.data;
-    
+
     /* horizontal offset for integral images */
     h = target->step;
     /* vertical offset for integral images */
     v = target->stride;
     /* diagonal offset for integral images */
     d = target->stride + target->step;
-    
+
     /* initialize rest of integral images */
     /* add value of this pixel and integrals from top and left */
     /* subtract integral from top left diagonal */

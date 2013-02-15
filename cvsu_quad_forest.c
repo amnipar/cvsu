@@ -42,8 +42,21 @@
 /* some gcc versions seem to require these definitions to work properly       */
 /* remove them if they cause problems with other compilers                    */
 
-double fmin (double __x, double __y);
-double fmax (double __x, double __y);
+#ifdef NEED_MINMAX
+#if INTEGRAL_IMAGE_DATA_TYPE == INTEGRAL_IMAGE_USING_FLOAT
+float fminf(float __x, float __y);
+float fmaxf(float __x, float __y);
+#define getmin fminf
+#define getmax fmaxf
+#elif INTEGRAL_IMAGE_DATA_TYPE == INTEGRAL_IMAGE_USING_DOUBLE
+double fmin(double __x, double __y);
+double fmax(double __x, double __y);
+#define getmin fmin
+#define getmax fmax
+#else
+#error "integral image data type not defined"
+#endif
+#endif
 
 /******************************************************************************/
 /* constants for reporting function names in error messages                   */
@@ -571,17 +584,17 @@ result quad_tree_divide_with_overlap
 
       stat = &children[0].stat;
       m = stat->mean;
-      s = fmax(alpha, alpha * stat->deviation);
-      x1min = fmax(0, m - s);
+      s = getmax(alpha, alpha * stat->deviation);
+      x1min = getmax(0, m - s);
       x1max = x1min;
-      x2min = fmin(255, m + s);
+      x2min = getmin(255, m + s);
       x2max = x2min;
       for (i = 1; i < 4; i++) {
         stat = &children[i].stat;
         m = stat->mean;
-        s = fmax(alpha, alpha * stat->deviation);
-        x1 = fmax(0, m - s);
-        x2 = fmin(255, m + s);
+        s = getmax(alpha, alpha * stat->deviation);
+        x1 = getmax(0, m - s);
+        x2 = getmin(255, m + s);
         if (x1 < x1min) x1min = x1;
         else if (x1 > x1max) x1max = x1;
         if (x2 < x2min) x2min = x2;
@@ -673,7 +686,7 @@ result quad_tree_get_edge_response
 
   box_width = tree->size;
   /* box length should be at least 4 to get proper result */
-  box_length = (uint32)(fmax(((integral_value)box_width) / 2.0, 4.0));
+  box_length = (uint32)(getmax(((integral_value)box_width) / 2.0, 4.0));
 
   /* calculate horizontal cumulative gradient */
   {
@@ -766,7 +779,7 @@ result quad_tree_get_child_edge_response
 
   box_width = (uint32)(((integral_value)tree->size) / 2.0);
   /* box length should be at least 4 to get proper result */
-  box_length = (uint32)(fmax(((integral_value)box_width) / 2.0, 4.0));
+  box_length = (uint32)(getmax(((integral_value)box_width) / 2.0, 4.0));
 
   x[0] = x[2] = tree->x;
   x[1] = x[3] = tree->x + box_width;
@@ -1068,8 +1081,8 @@ void quad_tree_propagate_m(quad_tree *tree)
 {
   integral_value pool, pool2, dx, dy, m, mx, my;
 
-  dx = abs(tree->edge.dx);
-  dy = abs(tree->edge.dy);
+  dx = fabs(tree->edge.dx);
+  dy = fabs(tree->edge.dy);
   m = dx + dy;
   if (m < 0.01) {
     mx = my = 0.5;
@@ -1079,7 +1092,7 @@ void quad_tree_propagate_m(quad_tree *tree)
     my = dy / m;
   }
 
-  /* divide only by two, as the value is further divided in proportion of dx/dy
+  /* divide only by two, as the value is further divided in proportion of dx/dy */
   /* effectively this is one fourth of original tree value */
   pool = tree->acc / 2;
   pool2 = tree->acc2 / 2;
@@ -1559,9 +1572,9 @@ result quad_forest_refresh_segments
   quad_tree *tree;
   quad_forest_segment *parent, *segment;
   uint32 count;
-  
+
   CHECK_POINTER(target);
-  
+
   count = 0;
   /* initialize the random number generator for assigning the colors */
   srand(1234);
@@ -1689,7 +1702,7 @@ result quad_forest_update
 
   rows = target->rows;
   cols = target->cols;
-  
+
   pos = 0;
   for (row = 0; row < rows; row++) {
     tree = target->roots[pos];
@@ -1918,13 +1931,13 @@ result quad_forest_segment_with_deviation
 #define EVALUATE_NEIGHBOR_OVERLAP(neighbor)\
   stat = neighbor;\
   nm = stat->mean;\
-  ns = fmax(alpha, alpha * stat->deviation);\
-  x1min = fmax(0, tm - ts);\
+  ns = getmax(alpha, alpha * stat->deviation);\
+  x1min = getmax(0, tm - ts);\
   x1max = x1min;\
-  x2min = fmin(255, tm + ts);\
+  x2min = getmin(255, tm + ts);\
   x2max = x2min;\
-  x1 = fmax(0, nm - ns);\
-  x2 = fmin(255, nm + ns);\
+  x1 = getmax(0, nm - ns);\
+  x2 = getmin(255, nm + ns);\
   if (x1 < x1min) x1min = x1; else x1max = x1;\
   if (x2 < x2min) x2min = x2; else x2max = x2;\
   if (x1max > x2min) {\
@@ -1978,7 +1991,7 @@ result quad_forest_segment_with_overlap
     if (tree->nw == NULL) {
       stat = &tree->stat;
       tm = stat->mean;
-      ts = fmax(alpha, alpha * stat->deviation);
+      ts = getmax(alpha, alpha * stat->deviation);
 
       best_overlap = 0;
       best_neighbor = NULL;
@@ -2049,7 +2062,7 @@ result quad_forest_segment_with_overlap
     if (tree->nw == NULL) {
       stat = &tree_segment->stat;
       tm = stat->mean;
-      ts = fmax(alpha, alpha * stat->deviation);
+      ts = getmax(alpha, alpha * stat->deviation);
 
       /* neighbor n */
       neighbor = tree->n;
@@ -2401,13 +2414,13 @@ result quad_forest_draw_trees
   quad_tree *tree;
   uint32 count, x, y, width, height, row_step, pos_step;
   integral_value mean, dev;
-  byte *target_pos, value, value0, value1, value2;
-  
+  byte *target_pos, value0, value1, value2;
+
   CHECK_POINTER(forest);
   CHECK_POINTER(target);
   CHECK_PARAM(target->type == p_U8);
   CHECK_PARAM(target->format == RGB);
-  
+
   trees = forest->trees.first.next;
   end = &forest->trees.last;
   count = 0;
@@ -2423,7 +2436,7 @@ result quad_forest_draw_trees
       else {
         pos_step = target->step - 2;
       }
-      
+
       if (IS_FALSE(use_segments)) {
         mean = tree->stat.mean;
         if (mean < 0) mean = 0;
@@ -2453,7 +2466,7 @@ result quad_forest_draw_trees
           }
         }
       }
-      
+
       target_pos = (byte*)target->data + tree->y * target->stride + tree->x * target->step;
       for (y = height; y--; target_pos += row_step) {
         for (x = width; x--; ) {
@@ -2469,7 +2482,7 @@ result quad_forest_draw_trees
     }
     trees = trees->next;
   }
-  
+
   FINALLY(quad_forest_draw_trees);
   RETURN();
 }
@@ -2719,13 +2732,13 @@ void get_next
   quad_tree *tree,
   quad_forest_segment *segment,
   direction arrival_dir,
-  quad_tree **next_tree, 
+  quad_tree **next_tree,
   direction *next_dir
 )
 {
   quad_tree *new_tree;
   quad_forest_segment *new_segment;
-  
+
   switch (arrival_dir) {
     case d_NW:
     {
@@ -2882,19 +2895,19 @@ result quad_forest_get_segment_boundary
   point start_point, point_a, point_b;
   line new_line;
   TRY();
-  
+
   CHECK_POINTER(forest);
   CHECK_POINTER(segment);
   CHECK_POINTER(boundary);
-  
+
   CHECK(list_create(boundary, 100, sizeof(line), 1));
-  
+
   if (segment->x2 - segment->x1 > 33 && segment->y2 - segment->y1 > 32) {
     /* find the tree in center left of bounding box */
     col = (uint32)((segment->x1 - forest->dx) / forest->tree_max_size);
     row = (uint32)((((uint32)((segment->y1 + segment->y2) / 2)) - forest->dy) / forest->tree_max_size);
     pos = row * forest->cols + col;
-    
+
     tree = forest->roots[pos];
     tree_segment = quad_tree_segment_find(tree);
     while (tree_segment != segment) {
@@ -2906,7 +2919,7 @@ result quad_forest_get_segment_boundary
         TERMINATE(NOT_FOUND);
       }
     }
-    
+
     point_a.x = (signed)tree->x;
     point_a.y = (signed)tree->y + ((sint32)(tree->size / 2));
     start_point = point_a;
@@ -2932,7 +2945,7 @@ result quad_forest_get_segment_boundary
             case d_NE:
               POINT_LEFT(tree);
               break;
-            /*default:*/
+            default: ;
               /*PRINT1("incorrect prev_dir with d_NW: %d", prev_dir);*/
           }
         }
@@ -2950,7 +2963,7 @@ result quad_forest_get_segment_boundary
             case d_NE:
               POINT_LEFT(tree);
               break;
-            /*default:*/
+            default: ;
               /*PRINT1("incorrect prev_dir with d_N: %d", prev_dir);*/
               /* TODO: maybe add d_E creating a sharp corner? */
           }
@@ -2970,7 +2983,7 @@ result quad_forest_get_segment_boundary
             case d_SE:
               POINT_TOP(tree);
               break;
-            /*default:*/
+            default: ;
               /*PRINT1("incorrect prev_dir with d_NE: %d", prev_dir);*/
           }
         }
@@ -2988,7 +3001,7 @@ result quad_forest_get_segment_boundary
             case d_SE:
               POINT_TOP(tree);
               break;
-            /*default:*/
+            default: ;
               /*PRINT1("incorrect prev_dir with d_E: %d", prev_dir);*/
               /* maybe add d_S creating a sharp corner? */
           }
@@ -3008,7 +3021,7 @@ result quad_forest_get_segment_boundary
             case d_SW:
               POINT_RIGHT(tree);
               break;
-            /*default:*/
+            default: ;
               /*PRINT1("incorrect prev_dir with d_SE: %d", prev_dir);*/
           }
         }
@@ -3026,7 +3039,7 @@ result quad_forest_get_segment_boundary
             case d_SW:
               POINT_RIGHT(tree);
               break;
-            /*default:*/
+            default: ;
               /*PRINT1("incorrect prev_dir with d_S: %d", prev_dir);*/
           }
         }
@@ -3045,7 +3058,7 @@ result quad_forest_get_segment_boundary
             case d_NW:
               POINT_BOTTOM(tree);
               break;
-            /*default:*/
+            default: ;
               /*PRINT1("incorrect prev_dir with d_SW: %d", prev_dir);*/
           }
         }
@@ -3063,19 +3076,19 @@ result quad_forest_get_segment_boundary
             case d_NW:
               POINT_BOTTOM(tree);
               break;
-            /*default:*/
+            default: ;
               /*PRINT1("incorrect prev_dir with d_W: %d", prev_dir);*/
           }
         }
         break;
-        /*default:*/
+        default: ;
           /*PRINT1("incorrect next_dir: %d", next_dir);*/
       }
-      
+
       tree = next_tree;
       prev_dir = next_dir;
     } while (tree != end_tree);
-    
+
     new_line.start = point_a;
     new_line.end = start_point;
     list_append(boundary, (pointer)&new_line);
@@ -3349,7 +3362,7 @@ result quad_forest_find_edges
       value = tree->edge.mag;
     }
 
-    if (value > fmax(mean, mean + bias - dev)) {
+    if (value > getmax(mean, mean + bias - dev)) {
       /*printf("value %.3f mean %.3f dev %.3f\n", tree->mag, mean, dev);*/
       tree->edge.has_edge = TRUE;
     }
@@ -3373,7 +3386,7 @@ result quad_forest_find_boundaries
 {
   TRY();
   uint32 remaining, i, size;
-  integral_value mean, dev, value, a1, a2, b1, b2, I, U;
+  integral_value mean, dev, value;
   quad_tree *tree;
 
   CHECK_POINTER(forest);
@@ -3411,7 +3424,7 @@ result quad_forest_find_boundaries
 
     value = tree->stat.deviation;
 
-    if (value > fmax(mean, mean + bias - dev)) {
+    if (value > getmax(mean, mean + bias - dev)) {
       /*printf("value %.3f mean %.3f dev %.3f\n", value, mean, dev);*/
       tree->segment.has_boundary = TRUE;
     }
@@ -3439,21 +3452,21 @@ result quad_forest_find_boundaries
   for (i = 0; i < size; i++) {
     tree = forest->roots[i];
     mean = tree->pool;
-    dev = fmax(1, tree->segment.devmean);
+    dev = getmax(1, tree->segment.devmean);
     a1 = mean - dev;
     if (a1 < 0) a1 = 0;
     a2 = mean + dev;
     if (a2 > 255) a2 = 255;
     mean = tree->stat.mean;
-    dev = fmax(1, tree->stat.deviation);
+    dev = getmax(1, tree->stat.deviation);
     b1 = mean - dev;
     if (b1 < 0) b1 = 0;
     b2 = mean + dev;
     if (b2 > 255) b2 = 255;
 
-    I = fmin(a2,b2) - fmax(a1,b1);
+    I = getmin(a2,b2) - getmax(a1,b1);
     if (I < 0) I = 0;
-    U = fmax(a2,b2) - fmin(a1,b1);
+    U = getmax(a2,b2) - getmin(a1,b1);
 
     value = I / U;
 
@@ -3618,12 +3631,12 @@ result quad_forest_segment_with_boundaries
   quad_tree *tree, *neighbor;
   quad_forest_segment *tree_segment, *neighbor_segment;
   integral_value dev, tree_dev, tree_mean, neighbor_dev, neighbor_mean, dist;
-  
+
   CHECK_POINTER(forest);
-  
+
   /* first find boundaries (and establish devmean and devdev) */
   CHECK(quad_forest_find_boundaries(forest, 3, 5));
-  
+
   /* then merge consistent non-boundary neighbors */
   trees = forest->trees.first.next;
   end = &forest->trees.last;
@@ -3633,17 +3646,17 @@ result quad_forest_segment_with_boundaries
       tree_segment = quad_tree_segment_find(tree);
       if (tree_segment == NULL) {
         tree_mean = tree->stat.mean;
-        tree_dev = fmaxf(1, tree->segment.devmean + tree->segment.devdev);
-        
+        tree_dev = getmax(1, tree->segment.devmean + tree->segment.devdev);
+
         neighbor = tree->n;
         if (neighbor != NULL && IS_FALSE(neighbor->segment.has_boundary)) {
           /*neighbor_segment = quad_tree_segment_find(neighbor);
           if (neighbor_segment == NULL) {*/
             neighbor_mean = neighbor->stat.mean;
-            neighbor_dev = fmaxf(1, neighbor->segment.devmean + neighbor->segment.devdev);
-            
-            dev = fminf(tree_dev, neighbor_dev);
-            dist = abs(tree_mean - neighbor_mean);
+            neighbor_dev = getmax(1, neighbor->segment.devmean + neighbor->segment.devdev);
+
+            dev = getmin(tree_dev, neighbor_dev);
+            dist = fabs(tree_mean - neighbor_mean);
             if (dist < 2 * dev) {
               quad_tree_segment_create(tree);
               quad_tree_segment_create(neighbor);
@@ -3656,10 +3669,10 @@ result quad_forest_segment_with_boundaries
           /*neighbor_segment = quad_tree_segment_find(neighbor);
           if (neighbor_segment == NULL) {*/
             neighbor_mean = neighbor->stat.mean;
-            neighbor_dev = fmaxf(1, neighbor->segment.devmean + neighbor->segment.devdev);
-            
-            dev = fminf(tree_dev, neighbor_dev);
-            dist = abs(tree_mean - neighbor_mean);
+            neighbor_dev = getmax(1, neighbor->segment.devmean + neighbor->segment.devdev);
+
+            dev = getmin(tree_dev, neighbor_dev);
+            dist = fabs(tree_mean - neighbor_mean);
             if (dist < 2 * dev) {
               quad_tree_segment_create(tree);
               quad_tree_segment_create(neighbor);
@@ -3672,10 +3685,10 @@ result quad_forest_segment_with_boundaries
           /*neighbor_segment = quad_tree_segment_find(neighbor);
           if (neighbor_segment == NULL) {*/
             neighbor_mean = neighbor->stat.mean;
-            neighbor_dev = fmaxf(1, neighbor->segment.devmean + neighbor->segment.devdev);
-            
-            dev = fminf(tree_dev, neighbor_dev);
-            dist = abs(tree_mean - neighbor_mean);
+            neighbor_dev = getmax(1, neighbor->segment.devmean + neighbor->segment.devdev);
+
+            dev = getmin(tree_dev, neighbor_dev);
+            dist = fabs(tree_mean - neighbor_mean);
             if (dist < 2 * dev) {
               quad_tree_segment_create(tree);
               quad_tree_segment_create(neighbor);
@@ -3688,10 +3701,10 @@ result quad_forest_segment_with_boundaries
           /*neighbor_segment = quad_tree_segment_find(neighbor);
           if (neighbor_segment == NULL) {*/
             neighbor_mean = neighbor->stat.mean;
-            neighbor_dev = fmaxf(1, neighbor->segment.devmean + neighbor->segment.devdev);
-            
-            dev = fminf(tree_dev, neighbor_dev);
-            dist = abs(tree_mean - neighbor_mean);
+            neighbor_dev = getmax(1, neighbor->segment.devmean + neighbor->segment.devdev);
+
+            dev = getmin(tree_dev, neighbor_dev);
+            dist = fabs(tree_mean - neighbor_mean);
             if (dist < 2 * dev) {
               quad_tree_segment_create(tree);
               quad_tree_segment_create(neighbor);
@@ -3712,16 +3725,16 @@ result quad_forest_segment_with_boundaries
     tree_segment = quad_tree_segment_find(tree);
     if (tree->nw == NULL && tree_segment != NULL) {
       tree_mean = tree_segment->stat.mean;
-      tree_dev = fmaxf(1, tree_segment->stat.deviation);
+      tree_dev = getmax(1, tree_segment->stat.deviation);
 
       neighbor = tree->n;
       if (neighbor != NULL && neighbor->nw == NULL) {
         neighbor_segment = quad_tree_segment_find(neighbor);
         if (neighbor_segment != NULL && tree_segment != neighbor_segment) {
           neighbor_mean = neighbor_segment->stat.mean;
-          neighbor_dev = fmaxf(1, neighbor_segment->stat.deviation);
-          dev = fminf(tree_dev, neighbor_dev);
-          dist = abs(tree_mean - neighbor_mean);
+          neighbor_dev = getmax(1, neighbor_segment->stat.deviation);
+          dev = getmin(tree_dev, neighbor_dev);
+          dist = fabs(tree_mean - neighbor_mean);
           if (dist < 3 * dev) {
             quad_tree_segment_union(tree, neighbor);
           }
@@ -3732,9 +3745,9 @@ result quad_forest_segment_with_boundaries
         neighbor_segment = quad_tree_segment_find(neighbor);
         if (neighbor_segment != NULL && tree_segment != neighbor_segment) {
           neighbor_mean = neighbor_segment->stat.mean;
-          neighbor_dev = fmaxf(1, neighbor_segment->stat.deviation);
-          dev = fminf(tree_dev, neighbor_dev);
-          dist = abs(tree_mean - neighbor_mean);
+          neighbor_dev = getmax(1, neighbor_segment->stat.deviation);
+          dev = getmin(tree_dev, neighbor_dev);
+          dist = fabs(tree_mean - neighbor_mean);
           if (dist < 3 * dev) {
             quad_tree_segment_union(tree, neighbor);
           }
@@ -3745,9 +3758,9 @@ result quad_forest_segment_with_boundaries
         neighbor_segment = quad_tree_segment_find(neighbor);
         if (neighbor_segment != NULL && tree_segment != neighbor_segment) {
           neighbor_mean = neighbor_segment->stat.mean;
-          neighbor_dev = fmaxf(1, neighbor_segment->stat.deviation);
-          dev = fminf(tree_dev, neighbor_dev);
-          dist = abs(tree_mean - neighbor_mean);
+          neighbor_dev = getmax(1, neighbor_segment->stat.deviation);
+          dev = getmin(tree_dev, neighbor_dev);
+          dist = fabs(tree_mean - neighbor_mean);
           if (dist < 3 * dev) {
             quad_tree_segment_union(tree, neighbor);
           }
@@ -3758,9 +3771,9 @@ result quad_forest_segment_with_boundaries
         neighbor_segment = quad_tree_segment_find(neighbor);
         if (neighbor_segment != NULL && tree_segment != neighbor_segment) {
           neighbor_mean = neighbor_segment->stat.mean;
-          neighbor_dev = fmaxf(1, neighbor_segment->stat.deviation);
-          dev = fminf(tree_dev, neighbor_dev);
-          dist = abs(tree_mean - neighbor_mean);
+          neighbor_dev = getmax(1, neighbor_segment->stat.deviation);
+          dev = getmin(tree_dev, neighbor_dev);
+          dist = fabs(tree_mean - neighbor_mean);
           if (dist < 3 * dev) {
             quad_tree_segment_union(tree, neighbor);
           }
@@ -3769,10 +3782,10 @@ result quad_forest_segment_with_boundaries
     }
     trees = trees->next;
   }
-  
+
   /* finally refresh segments and assign colors */
   CHECK(quad_forest_refresh_segments(forest));
-  
+
   FINALLY(quad_forest_segment_with_boundaries);
   RETURN();
 }

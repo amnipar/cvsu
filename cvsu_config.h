@@ -107,10 +107,14 @@
 #define OUTPUT_LEVEL OUTPUT_LEVEL_ERRORS
 
 /**
+ * If fmin and fmax functions are not needed by your compiler, undef this
+ */
+#define NEED_MINMAX 1
+
+/**
  * Define integral image data type.
  * Can use either single or double precision floating point numbers.
  */
-
 #define INTEGRAL_IMAGE_USING_FLOAT  0
 #define INTEGRAL_IMAGE_USING_DOUBLE 1
 /* #define INTEGRAL_IMAGE_DATA_TYPE INTEGRAL_IMAGE_USING_FLOAT */
