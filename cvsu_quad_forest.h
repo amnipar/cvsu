@@ -630,6 +630,20 @@ result quad_forest_find_boundaries
 );
 
 /**
+ * Uses deviation propagation to find strong boundary trees, calculates edge
+ * response for the found points, and then uses hysteresis guided by edge
+ * direction to continue boundary chains from their endpoints, hopefully closing
+ * gaps. Weak boundary trees are removed.
+ */
+result quad_forest_find_boundaries_with_hysteresis
+(
+  quad_forest *forest,
+  uint32 rounds,
+  integral_value high_bias,
+  integral_value low_bias
+);
+
+/**
  * Segments the forest by finding first all horizontal edges with edge
  * propagation, then merging segments that have edges in neighboring trees.
  */
