@@ -3538,11 +3538,15 @@ result quad_forest_find_boundaries_with_hysteresis
   integral_value mean, dev, value, dx, dy;
   truth_value has_a, has_b;
   quad_tree *tree, *neighbor, *best_a, *best_b;
+  list boundary_list;
+  list_item *boundaries, *end;
 
   CHECK_POINTER(forest);
   CHECK_PARAM(rounds > 0);
   CHECK_PARAM(low_bias > 0);
   CHECK_PARAM(high_bias > low_bias);
+  
+  CHECK(list_create(&boundary_list, 1000, sizeof(quad_tree*), 1));
 
   size = forest->rows * forest->cols;
 
@@ -3581,17 +3585,20 @@ result quad_forest_find_boundaries_with_hysteresis
       /*printf("value %.3f mean %.3f dev %.3f\n", value, mean, dev);*/
       tree->segment.has_boundary = TRUE;
       /* at this point, get the edge responses for strong boundaries */
-      quad_tree_get_edge_response(forest, tree, NULL, NULL);
+      CHECK(quad_tree_get_edge_response(forest, tree, NULL, NULL));
+      CHECK(list_append(&boundary_list, (pointer)&tree));
     }
     else {
       tree->segment.has_boundary = FALSE;
     }
   }
-
+  
+  boundaries = boundary_list.first.next;
+  end = &boundary_list.last;
   /* check neighboring trees in the direction of edge and discard those that */
   /* do not have at least one strong neighbor in correct direction */
-  for (i = 0; i < size; i++) {
-    tree = forest->roots[i];
+  while (boundaries != end) {
+    tree = *(quad_tree**)boundaries->data;
     if (IS_TRUE(tree->segment.has_boundary)) {
       dx = tree->edge.dx;
       dy = tree->edge.dy;
@@ -3728,13 +3735,20 @@ result quad_forest_find_boundaries_with_hysteresis
       }
       else {
         if (IS_FALSE(has_a) && best_a != NULL) {
+          PRINT0("found new tree a\n");
           best_a->segment.has_boundary = TRUE;
+          CHECK(quad_tree_get_edge_response(forest, best_a, NULL, NULL));
+          CHECK(list_append(&boundary_list, (pointer)&best_a));
         }
         if (IS_FALSE(has_b) && best_b != NULL) {
+          PRINT0("found new tree b\n");
           best_b->segment.has_boundary = TRUE;
+          CHECK(quad_tree_get_edge_response(forest, best_b, NULL, NULL));
+          CHECK(list_append(&boundary_list, (pointer)&best_b));
         }
       }
     }
+    boundaries = boundaries->next;
   }
 
   FINALLY(quad_forest_find_boundaries_with_hysteresis);
