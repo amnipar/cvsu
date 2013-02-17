@@ -640,7 +640,7 @@ result quad_forest_find_boundaries_with_hysteresis
   quad_forest *forest,
   uint32 rounds,
   integral_value high_bias,
-  integral_value low_bias
+  integral_value low_factor
 );
 
 /**
@@ -667,9 +667,18 @@ result quad_forest_segment_edges
   direction merge_dir
 );
 
+/**
+ * Segments the forest by using boundaries found using deviation propagation
+ * and hysteresis to limit the expansion of segments.
+ */
 result quad_forest_segment_with_boundaries
 (
-  quad_forest *forest
+  quad_forest *forest,
+  uint32 rounds,
+  integral_value high_bias,
+  integral_value low_factor,
+  integral_value tree_alpha,
+  integral_value segment_alpha
 );
 
 #ifdef __cplusplus
