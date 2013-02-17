@@ -356,14 +356,14 @@ result integral_image_update
     height = target->height;
     I_1_data = (integral_value*)target->I_1.data;
     I_2_data = (integral_value*)target->I_2.data;
-
+    
     /* horizontal offset for integral images */
     h = target->step;
     /* vertical offset for integral images */
     v = target->stride;
     /* diagonal offset for integral images */
     d = target->stride + target->step;
-
+    
     /* initialize rest of integral images */
     /* add value of this pixel and integrals from top and left */
     /* subtract integral from top left diagonal */

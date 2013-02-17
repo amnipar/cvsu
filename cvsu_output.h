@@ -41,6 +41,8 @@ extern "C" {
 
 #if (OUTPUT_METHOD == OUTPUT_WITH_STDIO)
 #include <stdio.h>
+#elif (OUTPUT_METHOD == OUTPUT_WITH_JNI_LOG)
+#include <android/log.h>
 #endif
 
 void report_result(result r, string func);
@@ -53,9 +55,15 @@ void report_result(result r, string func);
 
 #elif (OUTPUT_METHOD == OUTPUT_WITH_STDIO)
 
-#define PRINT0(f)       printf(f)
-#define PRINT1(f, a)    printf(f, a)
-#define PRINT2(f, a, b) printf(f, a, b)
+#define PRINT0(f)     printf(f)
+#define PRINT1(f,a)   printf(f,a)
+#define PRINT2(f,a,b) printf(f,a,b)
+
+#elif (OUTPUT_METHOD == OUTPUT_WITH_JNI_LOG)
+
+#define PRINT0(f)     __android_log_print(ANDROID_LOG_INFO,"cvsu",f)
+#define PRINT1(f,a)   __android_log_print(ANDROID_LOG_INFO,"cvsu",f,a)
+#define PRINT2(f,a,b) __android_log_print(ANDROID_LOG_INFO,"cvsu",f,a,b)
 
 #else
 #error "Output method not specified"
