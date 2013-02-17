@@ -643,6 +643,11 @@ result quad_forest_find_boundaries_with_hysteresis
   integral_value low_factor
 );
 
+result quad_forest_prune_boundaries
+(
+  quad_forest *forest
+);
+
 /**
  * Segments the forest by finding first all horizontal edges with edge
  * propagation, then merging segments that have edges in neighboring trees.

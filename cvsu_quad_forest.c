@@ -91,6 +91,7 @@ string quad_forest_draw_image_name = "quad_forest_draw_image";
 string quad_forest_find_edges_name = "quad_forest_find_edges";
 string quad_forest_find_boundaries_name = "quad_forest_find_boundaries";
 string quad_forest_find_boundaries_with_hysteresis_name = "quad_forest_find_boundaries_with_hysteresis";
+string quad_forest_prune_boundaries_name = "quad_forest_prune_boundaries";
 string quad_forest_segment_edges_name = "quad_forest_segment_edges";
 string quad_forest_segment_with_boundaries_name = "quad_forest_segment_with_boundaries";
 
@@ -1573,7 +1574,7 @@ result quad_forest_refresh_segments
   quad_tree *tree;
   quad_forest_segment *parent, *segment;
   uint32 count;
-
+  
   CHECK_POINTER(target);
 
   count = 0;
@@ -2917,7 +2918,8 @@ result quad_forest_get_segment_boundary
         tree_segment = quad_tree_segment_find(tree);
       }
       else {
-        TERMINATE(NOT_FOUND);
+        printf("%lu %lu %lu %lu %lu %lu\n", segment->x1, segment->y1, segment->x2, segment->y2, row, col);
+        TERMINATE(SUCCESS); /*NOT_FOUND*/
       }
     }
 
@@ -3758,6 +3760,84 @@ result quad_forest_find_boundaries_with_hysteresis
 
 /******************************************************************************/
 
+result quad_forest_prune_boundaries
+(
+  quad_forest *forest
+)
+{
+  TRY();
+  uint32 i, size;
+  truth_value has_diff_segment;
+  quad_tree *tree, *neighbor, *prev_neighbor;
+  quad_forest_segment *prev_segment, *neighbor_segment;
+  
+  CHECK_POINTER(forest);
+  
+  size = forest->rows * forest->cols;
+
+  for (i = 0; i < size; i++) {
+    tree = forest->roots[i];
+    if (IS_TRUE(tree->segment.has_boundary)) {
+      prev_segment = NULL;
+      prev_neighbor = NULL;
+      has_diff_segment = FALSE;
+      neighbor = tree->n;
+      if (neighbor != NULL && IS_FALSE(neighbor->segment.has_boundary)) {
+        neighbor_segment = quad_tree_segment_find(neighbor);
+        if (neighbor_segment != NULL) {
+          prev_segment = neighbor_segment;
+          prev_neighbor = neighbor;
+        }
+      }
+      neighbor = tree->e;
+      if (neighbor != NULL && IS_FALSE(neighbor->segment.has_boundary)) {
+        neighbor_segment = quad_tree_segment_find(neighbor);
+        if (neighbor_segment != NULL) {
+          if (prev_segment != NULL && prev_segment != neighbor_segment) {
+            has_diff_segment = TRUE;
+          }
+          prev_segment = neighbor_segment;
+          prev_neighbor = neighbor;
+        }
+      }
+      neighbor = tree->s;
+      if (neighbor != NULL && IS_FALSE(neighbor->segment.has_boundary)) {
+        neighbor_segment = quad_tree_segment_find(neighbor);
+        if (neighbor_segment != NULL) {
+          if (prev_segment != NULL && prev_segment != neighbor_segment) {
+            has_diff_segment = TRUE;
+          }
+          prev_segment = neighbor_segment;
+          prev_neighbor = neighbor;
+        }
+      }
+      neighbor = tree->w;
+      if (neighbor != NULL && IS_FALSE(neighbor->segment.has_boundary)) {
+        neighbor_segment = quad_tree_segment_find(neighbor);
+        if (neighbor_segment != NULL) {
+          if (prev_segment != NULL && prev_segment != neighbor_segment) {
+            has_diff_segment = TRUE;
+          }
+          prev_segment = neighbor_segment;
+          prev_neighbor = neighbor;
+        }
+      }
+      if (IS_FALSE(has_diff_segment)) {
+        tree->segment.has_boundary = FALSE;
+        if (prev_neighbor != NULL) {
+          quad_tree_segment_create(tree);
+          quad_tree_segment_union(tree, prev_neighbor);
+        }
+      }
+    }
+  }
+  
+  FINALLY(quad_forest_prune_boundaries);
+  RETURN();
+}
+
+/******************************************************************************/
+
 result quad_forest_segment_edges
 (
   quad_forest *target,
@@ -4049,6 +4129,8 @@ result quad_forest_segment_with_boundaries
     }
     trees = trees->next;
   }
+  
+  CHECK(quad_forest_prune_boundaries(forest));
 
   /* finally refresh segments and assign colors */
   CHECK(quad_forest_refresh_segments(forest));
