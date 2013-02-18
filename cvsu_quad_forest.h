@@ -683,7 +683,9 @@ result quad_forest_segment_with_boundaries
   integral_value high_bias,
   integral_value low_factor,
   integral_value tree_alpha,
-  integral_value segment_alpha
+  integral_value segment_alpha,
+  truth_value use_hysteresis,
+  truth_value use_pruning
 );
 
 #ifdef __cplusplus

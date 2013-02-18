@@ -1574,7 +1574,7 @@ result quad_forest_refresh_segments
   quad_tree *tree;
   quad_forest_segment *parent, *segment;
   uint32 count;
-  
+
   CHECK_POINTER(target);
 
   count = 0;
@@ -3547,7 +3547,7 @@ result quad_forest_find_boundaries_with_hysteresis
   CHECK_PARAM(rounds > 0);
   CHECK_PARAM(high_bias > 0);
   CHECK_PARAM(0 < low_factor && low_factor < 1);
-  
+
   CHECK(list_create(&boundary_list, 1000, sizeof(quad_tree*), 1));
 
   size = forest->rows * forest->cols;
@@ -3594,7 +3594,7 @@ result quad_forest_find_boundaries_with_hysteresis
       tree->segment.has_boundary = FALSE;
     }
   }
-  
+
   boundaries = boundary_list.first.next;
   end = &boundary_list.last;
   /* check neighboring trees in the direction of edge and discard those that */
@@ -3770,9 +3770,9 @@ result quad_forest_prune_boundaries
   truth_value has_diff_segment;
   quad_tree *tree, *neighbor, *prev_neighbor;
   quad_forest_segment *prev_segment, *neighbor_segment;
-  
+
   CHECK_POINTER(forest);
-  
+
   size = forest->rows * forest->cols;
 
   for (i = 0; i < size; i++) {
@@ -3831,7 +3831,7 @@ result quad_forest_prune_boundaries
       }
     }
   }
-  
+
   FINALLY(quad_forest_prune_boundaries);
   RETURN();
 }
@@ -3982,7 +3982,9 @@ result quad_forest_segment_with_boundaries
   integral_value high_bias,
   integral_value low_factor,
   integral_value tree_alpha,
-  integral_value segment_alpha
+  integral_value segment_alpha,
+  truth_value use_hysteresis,
+  truth_value use_pruning
 )
 {
   TRY();
@@ -3994,7 +3996,12 @@ result quad_forest_segment_with_boundaries
   CHECK_POINTER(forest);
 
   /* first find boundaries (and establish devmean and devdev) */
-  CHECK(quad_forest_find_boundaries_with_hysteresis(forest, rounds, high_bias, low_factor));
+  if (IS_TRUE(use_hysteresis)) {
+    CHECK(quad_forest_find_boundaries_with_hysteresis(forest, rounds, high_bias, low_factor));
+  }
+  else {
+    CHECK(quad_forest_find_boundaries(forest, rounds, high_bias));
+  }
 
   /* then merge consistent non-boundary neighbors */
   trees = forest->trees.first.next;
@@ -4129,8 +4136,10 @@ result quad_forest_segment_with_boundaries
     }
     trees = trees->next;
   }
-  
-  CHECK(quad_forest_prune_boundaries(forest));
+
+  if (IS_TRUE(use_pruning)) {
+    CHECK(quad_forest_prune_boundaries(forest));
+  }
 
   /* finally refresh segments and assign colors */
   CHECK(quad_forest_refresh_segments(forest));
