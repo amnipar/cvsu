@@ -82,6 +82,14 @@ typedef struct quad_forest_edge_t
 {
   /** The parent edge, that determines the edge segment id */
   struct quad_forest_edge_t *parent;
+  /** The previous edge in the edge chain */
+  struct quad_forest_edge_t *prev;
+  /** The next edge in the edge chain */
+  struct quad_forest_edge_t *next;
+  /** TODO: temp - later will be tree pointer after establishing annotation struct */
+  void *tree;
+  /** length of the edge chain - initially 1 */
+  uint32 length;
   /** The rank value used for optimizing union-find process */
   uint32 rank;
   /** Horizontal edge response value averaged from the tree region */

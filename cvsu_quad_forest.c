@@ -3380,6 +3380,11 @@ result quad_forest_find_edges
 
 /******************************************************************************/
 
+int compare_edges_descending(const void *a, const void *b)
+{
+
+}
+
 result quad_forest_find_boundaries
 (
   quad_forest *forest,
@@ -3391,9 +3396,14 @@ result quad_forest_find_boundaries
   uint32 remaining, i, size;
   integral_value mean, dev, value;
   quad_tree *tree;
+  list edge_list;
+  list_item *edges, *end;
+  quad_forest_edge *edge;
 
   CHECK_POINTER(forest);
   CHECK_PARAM(rounds > 0);
+
+  CHECK(list_create(&edge_list, 1000, sizeof(quad_forest_edge*), 1));
 
   size = forest->rows * forest->cols;
 
@@ -3430,10 +3440,25 @@ result quad_forest_find_boundaries
     if (value > getmax(mean, mean + bias - dev)) {
       /*printf("value %.3f mean %.3f dev %.3f\n", value, mean, dev);*/
       tree->segment.has_boundary = TRUE;
+      /* at this point, get the edge responses for strong boundaries */
+      CHECK(quad_tree_get_edge_response(forest, tree, NULL, NULL));
+      edge = &tree->edge;
+      edge->parent = edge;
+      edge->tree = (pointer)tree;
+      edge->length = 1;
+      CHECK(list_insert_sorted(&edge_list, (pointer)&edge, &compare_edges_descending));
     }
     else {
       tree->segment.has_boundary = FALSE;
     }
+  }
+
+  edges = edge_list.first.next;
+  end = &edge_list.last;
+  while (edges != end) {
+    edge = *(quad_forest_edge**)edges->data;
+
+    edges = edges->next;
   }
 
   /* interesting code for finding boundaries with overlap
@@ -3482,6 +3507,7 @@ result quad_forest_find_boundaries
   }
   */
   FINALLY(quad_forest_find_boundaries);
+  list_destroy(&edge_list);
   RETURN();
 }
 
@@ -3755,6 +3781,7 @@ result quad_forest_find_boundaries_with_hysteresis
   }
 
   FINALLY(quad_forest_find_boundaries_with_hysteresis);
+  list_destroy(&boundary_list);
   RETURN();
 }
 
