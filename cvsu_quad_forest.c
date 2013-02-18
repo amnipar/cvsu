@@ -3380,9 +3380,83 @@ result quad_forest_find_edges
 
 /******************************************************************************/
 
+#define GET_NEIGHBOR_N()\
+  neighbor = tree->n;
+
+#define GET_NEIGHBOR_NE()\
+  neighbor = tree->n != NULL ? tree->n->e : NULL;
+
+#define GET_NEIGHBOR_E()\
+  neighbor = tree->e;
+
+#define GET_NEIGHBOR_SE()\
+  neighbor = tree->s != NULL ? tree->s->e : NULL;
+
+#define GET_NEIGHBOR_S()\
+  neighbor = tree->s;
+
+#define GET_NEIGHBOR_SW()\
+  neighbor = tree->s != NULL ? tree->s->w : NULL;
+
+#define GET_NEIGHBOR_W()\
+  neighbor = tree->w;
+
+#define GET_NEIGHBOR_NW()\
+  neighbor = tree->n != NULL ? tree->n->w : NULL;
+
+#define CHECK_NEIGHBOR(tree, value, has_next, max)\
+  if (neighbor != NULL) {\
+    if (IS_TRUE(neighbor->segment.has_boundary)) {\
+      has_next = TRUE;\
+      if (max == NULL) {\
+        max = neighbor;\
+      }\
+      else if (neighbor->stat.deviation > max->stat.deviation) {\
+        max = neighbor;\
+      }\
+    }\
+  }
+
+#define CHECK_NEIGHBOR_HYSTERESIS(tree, value, has_next, max)\
+  if (neighbor != NULL) {\
+    if (IS_TRUE(neighbor->segment.has_boundary)) {\
+      has_next = TRUE;\
+    }\
+    else\
+    if (neighbor->stat.deviation > value) {\
+      if (max == NULL) {\
+        max = neighbor;\
+      }\
+      else if (neighbor->stat.deviation > max->stat.deviation) {\
+        max = neighbor;\
+      }\
+    }\
+  }
+
 int compare_edges_descending(const void *a, const void *b)
 {
+  const quad_forest_edge *sa, *sb;
+  integral_value deva, devb;
 
+  sa = *((const quad_forest_edge* const *)a);
+  if (sa == NULL) {
+    /* should never get here TODO: add some assert or similar.. */
+    PRINT0("warning: null pointer in compare_edges_descending\n");
+    return 1;
+  }
+  sb = *((const quad_forest_edge* const *)b);
+  if (sb == NULL) {
+    /* should never get here TODO: add some assert or similar.. */
+    printf("warning: null pointer in compare_edges_descending\n");
+    return 1;
+  }
+
+  deva = ((quad_tree*)sa->tree)->stat.deviation;
+  devb = ((quad_tree*)sb->tree)->stat.deviation;
+  /* opposite values than normally, as we wish to sort in descending order */
+  if (deva > devb) return -1;
+  else if (deva < devb) return 1;
+  else return 0;
 }
 
 result quad_forest_find_boundaries
@@ -3394,7 +3468,7 @@ result quad_forest_find_boundaries
 {
   TRY();
   uint32 remaining, i, size;
-  integral_value mean, dev, value;
+  integral_value mean, dev, value, dx, dy;
   quad_tree *tree;
   list edge_list;
   list_item *edges, *end;
@@ -3457,7 +3531,160 @@ result quad_forest_find_boundaries
   end = &edge_list.last;
   while (edges != end) {
     edge = *(quad_forest_edge**)edges->data;
-
+    tree = (quad_tree*)edge->tree;
+    dx = edge->dx;
+    dy = edge->dy;
+    has_a = FALSE;
+    has_b = FALSE;
+    best_a = NULL;
+    best_b = NULL;
+    /* decide which neighbors to check based on edge direction */
+    if (fabs(dx) > fabs(dy)) {
+      if (dy == 0) {
+        GET_NEIGHBOR_N();
+        CHECK_NEIGHBOR(tree, value, has_a, best_a);
+        GET_NEIGHBOR_S();
+        CHECK_NEIGHBOR(tree, value, has_b, best_b);
+      }
+      else
+      if ((dx > 0 && dy > 0) || (dx < 0 && dy < 0)) {
+        if (fabs(dx) < 2 * fabs(dy)) {
+          GET_NEIGHBOR_N();
+          CHECK_NEIGHBOR(tree, value, has_a, best_a);
+          GET_NEIGHBOR_NE();
+          CHECK_NEIGHBOR(tree, value, has_a, best_a);
+          GET_NEIGHBOR_E();
+          CHECK_NEIGHBOR(tree, value, has_a, best_a);
+          GET_NEIGHBOR_S();
+          CHECK_NEIGHBOR(tree, value, has_b, best_b);
+          GET_NEIGHBOR_SW();
+          CHECK_NEIGHBOR(tree, value, has_b, best_b);
+          GET_NEIGHBOR_W();
+          CHECK_NEIGHBOR(tree, value, has_b, best_b);
+        }
+        else {
+          GET_NEIGHBOR_N();
+          CHECK_NEIGHBOR(tree, value, has_a, best_a);
+          GET_NEIGHBOR_NE();
+          CHECK_NEIGHBOR(tree, value, has_a, best_a);
+          GET_NEIGHBOR_S();
+          CHECK_NEIGHBOR(tree, value, has_b, best_b);
+          GET_NEIGHBOR_SW();
+          CHECK_NEIGHBOR(tree, value, has_b, best_b);
+        }
+      }
+      else {
+        if (fabs(dx) < 2 * fabs(dy)) {
+          GET_NEIGHBOR_W();
+          CHECK_NEIGHBOR(tree, value, has_a, best_a);
+          GET_NEIGHBOR_NW();
+          CHECK_NEIGHBOR(tree, value, has_a, best_a);
+          GET_NEIGHBOR_N();
+          CHECK_NEIGHBOR(tree, value, has_a, best_a);
+          GET_NEIGHBOR_E();
+          CHECK_NEIGHBOR(tree, value, has_b, best_b);
+          GET_NEIGHBOR_SE();
+          CHECK_NEIGHBOR(tree, value, has_b, best_b);
+          GET_NEIGHBOR_S();
+          CHECK_NEIGHBOR(tree, value, has_b, best_b);
+        }
+        else {
+          GET_NEIGHBOR_NW();
+          CHECK_NEIGHBOR(tree, value, has_a, best_a);
+          GET_NEIGHBOR_N();
+          CHECK_NEIGHBOR(tree, value, has_a, best_a);
+          GET_NEIGHBOR_SE();
+          CHECK_NEIGHBOR(tree, value, has_b, best_b);
+          GET_NEIGHBOR_S();
+          CHECK_NEIGHBOR(tree, value, has_b, best_b);
+        }
+      }
+    }
+    else {
+      if (dx == 0) {
+        GET_NEIGHBOR_W();
+        CHECK_NEIGHBOR(tree, value, has_a, best_a);
+        GET_NEIGHBOR_E();
+        CHECK_NEIGHBOR(tree, value, has_b, best_b);
+      }
+      else
+      if ((dx > 0 && dy > 0) || (dx < 0 && dy < 0)) {
+        if (fabs(dx) < 2 * fabs(dy)) {
+          GET_NEIGHBOR_N();
+          CHECK_NEIGHBOR(tree, value, has_a, best_a);
+          GET_NEIGHBOR_NE();
+          CHECK_NEIGHBOR(tree, value, has_a, best_a);
+          GET_NEIGHBOR_E();
+          CHECK_NEIGHBOR(tree, value, has_a, best_a);
+          GET_NEIGHBOR_S();
+          CHECK_NEIGHBOR(tree, value, has_b, best_b);
+          GET_NEIGHBOR_SW();
+          CHECK_NEIGHBOR(tree, value, has_b, best_b);
+          GET_NEIGHBOR_W();
+          CHECK_NEIGHBOR(tree, value, has_b, best_b);
+        }
+        else {
+          GET_NEIGHBOR_W();
+          CHECK_NEIGHBOR(tree, value, has_a, best_a);
+          GET_NEIGHBOR_SW();
+          CHECK_NEIGHBOR(tree, value, has_a, best_a);
+          GET_NEIGHBOR_E();
+          CHECK_NEIGHBOR(tree, value, has_b, best_b);
+          GET_NEIGHBOR_NE();
+          CHECK_NEIGHBOR(tree, value, has_b, best_b);
+        }
+      }
+      else {
+        if (fabs(dx) < 2 * fabs(dy)) {
+          GET_NEIGHBOR_W();
+          CHECK_NEIGHBOR(tree, value, has_a, best_a);
+          GET_NEIGHBOR_NW();
+          CHECK_NEIGHBOR(tree, value, has_a, best_a);
+          GET_NEIGHBOR_N();
+          CHECK_NEIGHBOR(tree, value, has_a, best_a);
+          GET_NEIGHBOR_E();
+          CHECK_NEIGHBOR(tree, value, has_b, best_b);
+          GET_NEIGHBOR_SE();
+          CHECK_NEIGHBOR(tree, value, has_b, best_b);
+          GET_NEIGHBOR_S();
+          CHECK_NEIGHBOR(tree, value, has_b, best_b);
+        }
+        else {
+          GET_NEIGHBOR_NW();
+          CHECK_NEIGHBOR(tree, value, has_a, best_a);
+          GET_NEIGHBOR_W();
+          CHECK_NEIGHBOR(tree, value, has_a, best_a);
+          GET_NEIGHBOR_SE();
+          CHECK_NEIGHBOR(tree, value, has_b, best_b);
+          GET_NEIGHBOR_E();
+          CHECK_NEIGHBOR(tree, value, has_b, best_b);
+        }
+      }
+    }
+    /*
+     * if has neighbor a and a does not have prev, add as next
+     * 
+     * 
+     * 
+     */
+    if (IS_FALSE(has_a) && IS_FALSE(has_b)) {
+      tree->segment.has_boundary = FALSE;
+      /*PRINT0("discard\n");*/
+    }
+    else {
+      if (IS_FALSE(has_a) && best_a != NULL) {
+        /*PRINT0("found new tree a\n");*/
+        best_a->segment.has_boundary = TRUE;
+        CHECK(quad_tree_get_edge_response(forest, best_a, NULL, NULL));
+        CHECK(list_append(&boundary_list, (pointer)&best_a));
+      }
+      if (IS_FALSE(has_b) && best_b != NULL) {
+        /*PRINT0("found new tree b\n");*/
+        best_b->segment.has_boundary = TRUE;
+        CHECK(quad_tree_get_edge_response(forest, best_b, NULL, NULL));
+        CHECK(list_append(&boundary_list, (pointer)&best_b));
+      }
+    }
     edges = edges->next;
   }
 
@@ -3512,46 +3739,6 @@ result quad_forest_find_boundaries
 }
 
 /******************************************************************************/
-
-#define GET_NEIGHBOR_N()\
-  neighbor = tree->n;
-
-#define GET_NEIGHBOR_NE()\
-  neighbor = tree->n != NULL ? tree->n->e : NULL;
-
-#define GET_NEIGHBOR_E()\
-  neighbor = tree->e;
-
-#define GET_NEIGHBOR_SE()\
-  neighbor = tree->s != NULL ? tree->s->e : NULL;
-
-#define GET_NEIGHBOR_S()\
-  neighbor = tree->s;
-
-#define GET_NEIGHBOR_SW()\
-  neighbor = tree->s != NULL ? tree->s->w : NULL;
-
-#define GET_NEIGHBOR_W()\
-  neighbor = tree->w;
-
-#define GET_NEIGHBOR_NW()\
-  neighbor = tree->n != NULL ? tree->n->w : NULL;
-
-#define CHECK_NEIGHBOR(tree, value, has_next, max)\
-  if (neighbor != NULL) {\
-    if (IS_TRUE(neighbor->segment.has_boundary)) {\
-      has_next = TRUE;\
-    }\
-    else\
-    if (neighbor->stat.deviation > value) {\
-      if (max == NULL) {\
-        max = neighbor;\
-      }\
-      else if (neighbor->stat.deviation > max->stat.deviation) {\
-        max = neighbor;\
-      }\
-    }\
-  }
 
 result quad_forest_find_boundaries_with_hysteresis
 (
