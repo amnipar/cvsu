@@ -1034,6 +1034,7 @@ result list_insert_sorted
     if (comparator(data, i->data) <= 0) {
       break;
     }
+    i = i -> next;
   }
   CHECK(item_insert_before(i, item));
 
