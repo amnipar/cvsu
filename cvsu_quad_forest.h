@@ -92,6 +92,8 @@ typedef struct quad_forest_edge_t
   uint32 length;
   /** The rank value used for optimizing union-find process */
   uint32 rank;
+  /** Edge strength used in forming edge chains */
+  integral_value strength;
   /** Horizontal edge response value averaged from the tree region */
   integral_value dx;
   /** Vertical edge response value averaged from the tree region */
@@ -106,9 +108,19 @@ typedef struct quad_forest_edge_t
   integral_value deviation;
   /** Stores the information about whether this tree contains an edge */
   truth_value has_edge;
+  /** Temporary flag to annotate this edge node as a potential corner/intersection */
+  truth_value is_intersection;
   /** Direction in which edge was determined (H,V,N4) */
   direction dir;
 } quad_forest_edge;
+
+typedef struct quad_forest_edge_chain_t
+{
+  quad_forest_edge *parent;
+  quad_forest_edge *first;
+  quad_forest_edge *last;
+  uint32 length;
+} quad_forest_edge_chain;
 
 /**
  * Stores a quad tree holding image data.
@@ -186,6 +198,8 @@ typedef struct quad_forest_t {
   uint32 dy;
   /** List of all trees in the forest, including the root trees */
   list trees;
+  /** List of edge chains found from the forest */
+  list edges;
   /** Pointer to the last root tree in the tree list for resetting the forest */
   list_item *last_root_tree;
   /** Pointer array containing the root trees in the tree grid */

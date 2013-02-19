@@ -3411,7 +3411,7 @@ result quad_forest_find_edges
       if (max == NULL) {\
         max = neighbor;\
       }\
-      else if (neighbor->stat.deviation > max->stat.deviation) {\
+      else if (neighbor->edge.strength > max->edge.strength) {\
         max = neighbor;\
       }\
     }\
@@ -3433,10 +3433,107 @@ result quad_forest_find_edges
     }\
   }
 
+void edge_chain_create
+(
+  quad_forest_edge *edge
+)
+{
+  if (edge != NULL && edge->parent == NULL) {
+    edge->parent = edge;
+    edge->prev = NULL;
+    edge->next = NULL;
+    edge->rank = 0;
+    edge->length = 1;
+  }
+}
+
+quad_forest_edge *edge_chain_find
+(
+  quad_forest_edge *edge
+)
+{
+  if (edge != NULL) {
+    if (edge->parent != NULL && edge->parent != edge) {
+      edge->parent = edge_chain_find(edge->parent);
+    }
+    return edge->parent;
+  }
+  return NULL;
+}
+
+void edge_chain_union
+(
+  quad_forest_edge *edge1,
+  quad_forest_edge *edge2
+)
+{
+  quad_forest_edge *parent1, *parent2;
+
+  parent1 = edge_chain_find(edge1);
+  parent2 = edge_chain_find(edge2);
+  if (parent1 != NULL && parent2 != NULL && parent1 != parent2) {
+    if (parent1->rank < parent2->rank) {
+      parent1->parent = parent2;
+      parent2->length += parent1->length;
+    }
+    else {
+      parent2->parent = parent1;
+      if (parent1->rank == parent2->rank) {
+        parent1->rank += 1;
+      }
+      parent1->length += parent2->length;
+    }
+  }
+}
+
+quad_forest_edge *edge_chain_follow_forward
+(
+  quad_forest_edge *parent,
+  quad_forest_edge *prev,
+  quad_forest_edge *next
+)
+{
+  if (next->next == prev) {
+    next->next = next->prev;
+    next->prev = prev;
+  }
+  if (next->prev == prev) {
+    edge_chain_union(parent, next);
+    if (next->next != NULL) {
+      return edge_chain_follow_forward(parent, next, next->next);
+    }
+    else {
+      return next;
+    }
+  }
+}
+
+quad_forest_edge *edge_chain_follow_backward
+(
+  quad_forest_edge *parent,
+  quad_forest_edge *next,
+  quad_forest_edge *prev
+)
+{
+  if (prev->prev == next) {
+    prev->prev = prev->next;
+    prev->next = next;
+  }
+  if (prev->next == next) {
+    edge_chain_union(parent, prev);
+    if (prev->prev != NULL) {
+      return edge_chain_follow_backward(parent, prev, prev->prev);
+    }
+    else {
+      return prev;
+    }
+  }
+}
+
 int compare_edges_descending(const void *a, const void *b)
 {
   const quad_forest_edge *sa, *sb;
-  integral_value deva, devb;
+  integral_value sta, stb;
 
   sa = *((const quad_forest_edge* const *)a);
   if (sa == NULL) {
@@ -3451,11 +3548,11 @@ int compare_edges_descending(const void *a, const void *b)
     return 1;
   }
 
-  deva = ((quad_tree*)sa->tree)->stat.deviation;
-  devb = ((quad_tree*)sb->tree)->stat.deviation;
+  sta = sa->strength;
+  stb = sb->strength;
   /* opposite values than normally, as we wish to sort in descending order */
-  if (deva > devb) return -1;
-  else if (deva < devb) return 1;
+  if (sta > stb) return -1;
+  else if (sta < stb) return 1;
   else return 0;
 }
 
@@ -3472,7 +3569,8 @@ result quad_forest_find_boundaries
   quad_tree *tree;
   list edge_list;
   list_item *edges, *end;
-  quad_forest_edge *edge;
+  quad_forest_edge *edge, *parent;
+  quad_forest_edge_chain chain;
 
   CHECK_POINTER(forest);
   CHECK_PARAM(rounds > 0);
@@ -3516,10 +3614,11 @@ result quad_forest_find_boundaries
       tree->segment.has_boundary = TRUE;
       /* at this point, get the edge responses for strong boundaries */
       CHECK(quad_tree_get_edge_response(forest, tree, NULL, NULL));
-      edge = &tree->edge;
-      edge->parent = edge;
+      edge_chain_create(&tree->edge);
       edge->tree = (pointer)tree;
-      edge->length = 1;
+      /* using devdev as edge strength measure */
+      edge->strength = dev;
+      edge->is_intersection = FALSE;
       CHECK(list_insert_sorted(&edge_list, (pointer)&edge, &compare_edges_descending));
     }
     else {
@@ -3661,34 +3760,50 @@ result quad_forest_find_boundaries
         }
       }
     }
-    /*
-     * if has neighbor a and a does not have prev, add as next
-     * 
-     * 
-     * 
-     */
-    if (IS_FALSE(has_a) && IS_FALSE(has_b)) {
-      tree->segment.has_boundary = FALSE;
-      /*PRINT0("discard\n");*/
+    /* at this stage, each node sets its own predecessor and successor */
+    if (IS_TRUE(has_a)) {
+      edge->next = &best_a->edge;
     }
-    else {
-      if (IS_FALSE(has_a) && best_a != NULL) {
-        /*PRINT0("found new tree a\n");*/
-        best_a->segment.has_boundary = TRUE;
-        CHECK(quad_tree_get_edge_response(forest, best_a, NULL, NULL));
-        CHECK(list_append(&boundary_list, (pointer)&best_a));
-      }
-      if (IS_FALSE(has_b) && best_b != NULL) {
-        /*PRINT0("found new tree b\n");*/
-        best_b->segment.has_boundary = TRUE;
-        CHECK(quad_tree_get_edge_response(forest, best_b, NULL, NULL));
-        CHECK(list_append(&boundary_list, (pointer)&best_b));
-      }
+    if (IS_TRUE(has_b)) {
+      edge->prev = &best_b->edge;
     }
     edges = edges->next;
   }
 
-  /* interesting code for finding boundaries with overlap
+  /* then go through the list again, and merge edge chains where the nodes agree */
+  edges = edge_list.first.next;
+  end = &edge_list.last;
+  while (edges != end) {
+    edge = *(quad_forest_edge**)edges->data;
+    parent = edge_chain_find(edge);
+    /* if parent is different than self, the edge already belongs to a chain */
+    if (parent == edge) {
+      chain.parent = parent;
+      if (edge->prev != NULL) {
+        chain.first = edge_chain_follow_backward(edge, edge, edge->prev);
+      }
+      if (edge->next != NULL) {
+        chain.last = edge_chain_follow_forward(edge, edge, edge->next);
+      }
+      chain.length = parent->length;
+      CHECK(list_append(&forest->edges, (pointer)&chain));
+    }
+    /* my next has me as prev or next? */
+    /* follow the path, inverting the links if necessary */
+    /* my prev has me as prev or next? */
+
+    /* if not, label as potential intersection */
+    edges = edges->next;
+  }
+
+  CHECK(quad_forest_refresh_edges(forest));
+
+  FINALLY(quad_forest_find_boundaries);
+  list_destroy(&edge_list);
+  RETURN();
+}
+
+/* interesting code for finding boundaries with overlap
   for (i = 0; i < size; i++) {
     quad_tree_prime_with_mean(forest->roots[i]);
   }
@@ -3732,12 +3847,7 @@ result quad_forest_find_boundaries
       tree->segment.has_boundary = FALSE;
     }
   }
-  */
-  FINALLY(quad_forest_find_boundaries);
-  list_destroy(&edge_list);
-  RETURN();
-}
-
+*/
 /******************************************************************************/
 
 result quad_forest_find_boundaries_with_hysteresis
