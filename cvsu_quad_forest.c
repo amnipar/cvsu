@@ -85,6 +85,7 @@ string quad_forest_get_segment_trees_name = "quad_forest_get_segment_trees";
 string quad_forest_get_segment_neighbors_name = "quad_forest_get_segment_neighbors";
 string quad_forest_get_segment_mask_name = "quad_forest_get_segment_mask";
 string quad_forest_get_segment_boundary_name = "quad_forest_get_segment_boundary";
+string quad_forest_get_edge_chain_name = "quad_forest_get_edge_chain";
 string quad_forest_draw_trees_name =  "quad_forest_draw_trees";
 string quad_forest_highlight_segments_name = "quad_forest_highlight_segments";
 string quad_forest_draw_image_name = "quad_forest_draw_image";
@@ -1417,6 +1418,12 @@ result quad_forest_init
       CHECK(list_destroy(&target->trees));
     }
     CHECK(list_create(&target->trees, 8 * size, sizeof(quad_tree), 1));
+    
+    if (!list_is_null(&target->edges)) {
+      CHECK(list_destroy(&target->edges));
+    }
+    CHECK(list_create(&target->edges, 100, sizeof(quad_forest_edge_chain), 1));
+    
   }
   else {
     rows = target->rows;
@@ -1650,6 +1657,7 @@ result quad_forest_nullify
   target->dx = 0;
   target->dy = 0;
   CHECK(list_nullify(&target->trees));
+  CHECK(list_nullify(&target->edges));
   target->last_root_tree = NULL;
   target->roots = NULL;
 
@@ -3102,6 +3110,46 @@ result quad_forest_get_segment_boundary
 
 /******************************************************************************/
 
+result quad_forest_get_edge_chain
+(
+  quad_forest_edge_chain *edge,
+  list *chain
+)
+{
+  TRY();
+  quad_tree *tree;
+  quad_forest_edge *current;
+  point point_a, point_b;
+  line new_line;
+  
+  CHECK_POINTER(edge);
+  
+  CHECK(list_create(chain, edge->length, sizeof(line), 1));
+  
+  current = edge->first;
+  if (current != NULL) {
+    tree = (quad_tree*)current->tree;
+    point_a.x = tree->x + (uint32)(tree->size / 2);
+    point_a.y = tree->y + (uint32)(tree->size / 2);
+    current = current->next;
+    while (current != NULL) {
+      tree = (quad_tree*)current->tree;
+      point_b.x = tree->x + (uint32)(tree->size / 2);
+      point_b.y = tree->y + (uint32)(tree->size / 2);
+      new_line.start = point_a;
+      new_line.end = point_b;
+      CHECK(list_append(chain, (pointer)&new_line));
+      point_a = point_b;
+      current = current->next;
+    }
+  }
+  
+  FINALLY(quad_forest_get_edge_chain);
+  RETURN();
+}
+
+/******************************************************************************/
+
 result quad_forest_highlight_segments
 (
   quad_forest *forest,
@@ -3497,6 +3545,9 @@ quad_forest_edge *edge_chain_follow_forward
     next->next = next->prev;
     next->prev = prev;
   }
+  if (next->next == parent) {
+    return next;
+  }
   if (next->prev == prev) {
     edge_chain_union(parent, next);
     if (next->next != NULL) {
@@ -3505,6 +3556,9 @@ quad_forest_edge *edge_chain_follow_forward
     else {
       return next;
     }
+  }
+  else {
+    return prev;
   }
 }
 
@@ -3519,6 +3573,9 @@ quad_forest_edge *edge_chain_follow_backward
     prev->prev = prev->next;
     prev->next = next;
   }
+  if (prev->prev == parent) {
+    return prev;
+  }
   if (prev->next == next) {
     edge_chain_union(parent, prev);
     if (prev->prev != NULL) {
@@ -3527,6 +3584,9 @@ quad_forest_edge *edge_chain_follow_backward
     else {
       return prev;
     }
+  }
+  else {
+    return next;
   }
 }
 
@@ -3566,7 +3626,8 @@ result quad_forest_find_boundaries
   TRY();
   uint32 remaining, i, size;
   integral_value mean, dev, value, dx, dy;
-  quad_tree *tree;
+  truth_value has_a, has_b;
+  quad_tree *tree, *neighbor, *best_a, *best_b;
   list edge_list;
   list_item *edges, *end;
   quad_forest_edge *edge, *parent;
@@ -3598,6 +3659,7 @@ result quad_forest_find_boundaries
     }
   }
 
+  /*PRINT0("start finding edges\n");*/
   for (i = 0; i < size; i++) {
     tree = forest->roots[i];
     mean = tree->pool;
@@ -3614,7 +3676,8 @@ result quad_forest_find_boundaries
       tree->segment.has_boundary = TRUE;
       /* at this point, get the edge responses for strong boundaries */
       CHECK(quad_tree_get_edge_response(forest, tree, NULL, NULL));
-      edge_chain_create(&tree->edge);
+      edge = &tree->edge;
+      edge_chain_create(edge);
       edge->tree = (pointer)tree;
       /* using devdev as edge strength measure */
       edge->strength = dev;
@@ -3625,7 +3688,7 @@ result quad_forest_find_boundaries
       tree->segment.has_boundary = FALSE;
     }
   }
-
+  /*PRINT0("start checking neighbors\n");*/
   edges = edge_list.first.next;
   end = &edge_list.last;
   while (edges != end) {
@@ -3764,12 +3827,19 @@ result quad_forest_find_boundaries
     if (IS_TRUE(has_a)) {
       edge->next = &best_a->edge;
     }
+    else {
+      edge->next = NULL;
+    }
     if (IS_TRUE(has_b)) {
       edge->prev = &best_b->edge;
+    }
+    else {
+      edge->prev = NULL;
     }
     edges = edges->next;
   }
 
+  /*PRINT0("starting to merge edge chains\n");*/
   /* then go through the list again, and merge edge chains where the nodes agree */
   edges = edge_list.first.next;
   end = &edge_list.last;
@@ -3780,10 +3850,12 @@ result quad_forest_find_boundaries
     if (parent == edge) {
       chain.parent = parent;
       if (edge->prev != NULL) {
-        chain.first = edge_chain_follow_backward(edge, edge, edge->prev);
+        chain.first = edge_chain_follow_backward(parent, edge, edge->prev);
+        chain.first->prev = NULL;
       }
       if (edge->next != NULL) {
-        chain.last = edge_chain_follow_forward(edge, edge, edge->next);
+        chain.last = edge_chain_follow_forward(parent, edge, edge->next);
+        chain.last->next = NULL;
       }
       chain.length = parent->length;
       CHECK(list_append(&forest->edges, (pointer)&chain));
@@ -3795,9 +3867,10 @@ result quad_forest_find_boundaries
     /* if not, label as potential intersection */
     edges = edges->next;
   }
-
-  CHECK(quad_forest_refresh_edges(forest));
-
+  /*PRINT1("found %lu edge chains\n", forest->edges.count);*/
+  
+  /*CHECK(quad_forest_refresh_edges(forest));*/
+  /*PRINT0("finished\n");*/
   FINALLY(quad_forest_find_boundaries);
   list_destroy(&edge_list);
   RETURN();

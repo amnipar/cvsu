@@ -595,6 +595,15 @@ result quad_forest_get_segment_boundary
 );
 
 /**
+ * Generates a list of lines corresponding to an edge chain
+ */
+result quad_forest_get_edge_chain
+(
+  quad_forest_edge_chain *edge,
+  list *chain
+);
+
+/**
 * Collects all trees contained in a list of segments and draws them on a
 * pixel_image with a red color (TODO: add parameter for selecting color)
 */
