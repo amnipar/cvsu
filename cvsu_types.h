@@ -64,14 +64,19 @@ typedef double         real64;
 
 typedef uint32 truth_value;
 
+#ifdef UNDEF
+#undef UNDEF
+#endif
+#define UNDEF 0
 #ifdef FALSE
 #undef FALSE
 #endif
+/* TODO: change to -1 */
 #define FALSE ((truth_value) 0)
 #ifdef TRUE
 #undef TRUE
 #endif
-#define TRUE ((truth_value) 1)
+#define TRUE ((truth_value) +1)
 
 typedef enum direction_t {
   /** Unspecified direction */
@@ -107,6 +112,31 @@ typedef enum direction_t {
 } direction;
 
 typedef sint32 coord;
+
+typedef enum type_label_t {
+  t_UNDEF = 0,
+  t_TYPE,
+  t_TRUTH,
+  t_POINTER,
+  t_TPOINTER,
+  t_STRING,
+  t_S8,
+  t_U8,
+  t_S16,
+  t_U16,
+  t_S32,
+  t_U32,
+  t_S64,
+  t_U64,
+  t_F32,
+  t_F64,
+} type_label;
+
+typedef struct typed_pointer_t {
+  type_label type;
+  uint32 count;
+  pointer value;
+} typed_pointer;
 
 typedef struct point_t {
     coord x;
