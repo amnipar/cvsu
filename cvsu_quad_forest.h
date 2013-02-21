@@ -114,6 +114,9 @@ typedef struct quad_forest_edge_t
   direction dir;
 } quad_forest_edge;
 
+/**
+ * Stores an edge chain by its endpoints. Also stores the edge chain length.
+ */
 typedef struct quad_forest_edge_chain_t
 {
   quad_forest_edge *parent;
@@ -121,6 +124,57 @@ typedef struct quad_forest_edge_chain_t
   quad_forest_edge *last;
   uint32 length;
 } quad_forest_edge_chain;
+
+/**
+ * Context value for accumulating neighborhood statistics.
+ */
+typedef stat_accumulator_t {
+  integral_value pool;
+  integral_value acc;
+} stat_accumulator;
+
+result make_stat_accumulator
+(
+  typed_pointer *target,
+  stat_accumulator *source
+);
+
+result expect_stat_accumulator
+(
+  stat_accumulator *target,
+  typed_pointer *tptr
+);
+
+/**
+ * Context value for sniffing shortest paths between line endpoints.
+ */
+typedef path_sniffer_t {
+  quad_forest_edge_chain *chain,
+  quad_forest_edge *endpoint,
+  integral_value height;
+  integral_value cost;
+  uint32 distance;
+  uint32 dir_start;
+  uint32 dir_end;
+} path_sniffer;
+
+result make_path_sniffer
+(
+  typed_pointer *target,
+  path_sniffer *source
+);
+
+result expect_path_sniffer
+(
+  path_sniffer *target,
+  typed_pointer *tptr
+);
+
+typedef struct parse_context_t {
+  uint32 token;
+  uint32 round;
+  typed_pointer data;
+} parse_context;
 
 /**
  * Stores a quad tree holding image data.
@@ -168,6 +222,7 @@ typedef struct quad_tree_t {
   integral_value acc;
   /** Temporary squared accumulator value used in propagation algorithms */
   integral_value acc2;
+  parse_context context;
 } quad_tree;
 
 /**
@@ -656,8 +711,12 @@ result quad_forest_find_edges
 result quad_forest_find_boundaries
 (
   quad_forest *forest,
+  /** How many propagation rounds to use for determining devmean and devdev */
   uint32 rounds,
-  integral_value bias
+  /** The bias value used for determining devdev threshold for boundary */
+  integral_value bias,
+  /** The minimum length of edge chains _before_ starting to fill gaps */
+  uint32 min_length
 );
 
 /**

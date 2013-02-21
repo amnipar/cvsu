@@ -130,13 +130,32 @@ typedef enum type_label_t {
   t_U64,
   t_F32,
   t_F64,
+  t_STAT_ACCUMULATOR,
+  t_PATH_SNIFFER
 } type_label;
 
+/**
+ * Stores a generic pointer value, with attached type label and possibility of
+ * storing multiple values (arrays or tuples) in one object. Intended to be
+ * used with 'expect_x' functions that cast the pointer to the expected value
+ * and generate an error if the type doesn't match.
+ */
 typedef struct typed_pointer_t {
   type_label type;
   uint32 count;
   pointer value;
 } typed_pointer;
+
+/** 
+ * A convenience function for initializing the fields of a typed_pointer.
+ */
+void create_typed_pointer
+(
+  typed_pointer *tptr,
+  type_label type,
+  uint32 count,
+  pointer value
+);
 
 typedef struct point_t {
     coord x;

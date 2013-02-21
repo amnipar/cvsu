@@ -186,6 +186,23 @@ integral_value cast_pixel_value
 
 /******************************************************************************/
 
+void create_typed_pointer
+(
+  typed_pointer *tptr,
+  type_label type,
+  uint32 count,
+  pointer value
+)
+{
+  if (tptr != NULL) {
+    tptr->type = type;
+    tptr->count = count;
+    tptr->value = value;
+  }
+}
+
+/******************************************************************************/
+
 void statistics_init
 (
   statistics *stat

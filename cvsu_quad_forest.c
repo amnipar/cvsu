@@ -61,6 +61,11 @@ double fmax(double __x, double __y);
 /******************************************************************************/
 /* constants for reporting function names in error messages                   */
 
+string make_stat_accumulator_name = "make_stat_accumulator";
+string expect_stat_accumulator_name = "expect_stat_accumulator";
+string make_path_sniffer_name = "make_path_sniffer";
+string expect_path_sniffer_name = "expect_path_sniffer";
+
 string quad_tree_nullify_name = "quad_tree_nullify";
 string quad_tree_divide_name = "quad_tree_divide";
 string quad_tree_get_child_statistics_name = "quad_tree_get_child_statistics";
@@ -107,6 +112,95 @@ const quad_forest_status FOREST_UPDATED;
 const quad_forest_status FOREST_SEGMENTED;
 /* Edge detection operation has been performed. */
 const quad_forest_status FOREST_EDGES_DETECTED;
+
+/******************************************************************************/
+/* TODO: these should be moved to some other file, along with the structs...  */
+
+result make_stat_accumulator
+(
+  typed_pointer *target,
+  stat_accumulator *source
+)
+{
+  TRY();
+  
+  CHECK_POINTER(target);
+  CHECK_POINTER(source);
+  
+  tptr->type = t_STAT_ACCUMULATOR;
+  tptr->count = 1;
+  tptr->value = (pointer)source;
+  
+  FINALLY(make_stat_accumulator);
+  RETURN();
+}
+
+result expect_stat_accumulator
+(
+  stat_accumulator **target,
+  typed_pointer *tptr
+)
+{
+  TRY();
+  
+  CHECK_POINTER(target);
+  CHECK_POINTER(tptr);
+  CHECK_POINTER(tptr->value);
+  
+  if (tptr->type == t_STAT_ACCUMULATOR) {
+    *target = (stat_accumulator *)tptr->value;
+  }
+  else {
+    ERROR(BAD_TYPE);
+  }
+  
+  FINALLY(expect_stat_accumulator);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result make_path_sniffer
+(
+  typed_pointer *target,
+  path_sniffer *source
+)
+{
+  TRY();
+  
+  CHECK_POINTER(target);
+  CHECK_POINTER(source);
+  
+  tptr->type = t_PATH_SNIFFER;
+  tptr->count = 1;
+  tptr->value = (pointer)source;
+  
+  FINALLY(make_path_sniffer);
+  RETURN();
+}
+
+result expect_path_sniffer
+(
+  path_sniffer *target,
+  typed_pointer *tptr
+)
+{
+  TRY();
+  
+  CHECK_POINTER(target);
+  CHECK_POINTER(tptr);
+  CHECK_POINTER(tptr->value);
+  
+  if (tptr->type == t_PATH_SNIFFER) {
+    *target = (stat_accumulator *)tptr->value;
+  }
+  else {
+    ERROR(BAD_TYPE);
+  }
+  
+  FINALLY(expect_path_sniffer);
+  RETURN();
+}
 
 /******************************************************************************/
 
@@ -3616,11 +3710,24 @@ int compare_edges_descending(const void *a, const void *b)
   else return 0;
 }
 
+typedef struct edge_connection_t {
+  quad_forest_edge *endpoint_a;
+  quad_forest_edge *endpoint_b;
+  quad_tree *connection_a;
+  quad_tree *connection_b;
+} edge_connection;
+
+int compare_connection(void *a, void *b)
+{
+  
+}
+
 result quad_forest_find_boundaries
 (
   quad_forest *forest,
   uint32 rounds,
-  integral_value bias
+  integral_value bias,
+  uint32 min_length
 )
 {
   TRY();
@@ -3858,7 +3965,10 @@ result quad_forest_find_boundaries
         chain.last->next = NULL;
       }
       chain.length = parent->length;
-      CHECK(list_append(&forest->edges, (pointer)&chain));
+      /* add only long enough chains to the list */
+      if (chain.length >= min_length) {
+        CHECK(list_append(&forest->edges, (pointer)&chain));
+      }
     }
     /* my next has me as prev or next? */
     /* follow the path, inverting the links if necessary */
@@ -3870,6 +3980,67 @@ result quad_forest_find_boundaries
   /*PRINT1("found %lu edge chains\n", forest->edges.count);*/
   
   /*CHECK(quad_forest_refresh_edges(forest));*/
+  
+  /* then try connecting individual pieces of edge chains */
+  {
+    uint32 token;
+    list endpoint_list, context_list;
+    list_item *edges, *end;
+    quad_forest_edge_chain *chain;
+    path_sniffer new_sniffer, *sniffer;
+    
+    CHECK(list_create(&context_list, 10 * forest->edges.count, sizeof(path_sniffer), 1));
+    CHECK(list_create(&endpoint_list, 10 * forest->edges.count, sizeof(quad_forest*), 1));
+    
+    /* TODO: later use randomly generated tokens to identify parsing phases */
+    token = 1;
+    
+    edges = forest->edges.first.next;
+    end = &forest->edges.last;
+    while (edges != end) {
+      chain = (quad_forest_edge_chain*)edges->data;
+      
+      /* create context for the first endpoint */
+      tree = (quad_tree*)chain->first->tree;
+      tree->context.token = token;
+      tree->context.round = 0;
+      new_sniffer.chain = chain;
+      new_sniffer.endpoint = chain->first;
+      new_sniffer.height = tree->segment.devdev;
+      new_sniffer.cost = 0;
+      new_sniffer.distance = 0;
+      /* determine directions */
+      CHECK(list_append_return_pointer(&context_list, &new_sniffer, &sniffer));
+      CHECK(make_path_sniffer(&tree->context.data, sniffer));
+      CHECK(list_append(&endpoint_list, &tree));
+      
+      /* create context for the second endpoint */
+      tree = (quad_tree*)chain->last->tree;
+      tree->context.token = token;
+      tree->context.round = 0;
+      new_sniffer.chain = chain;
+      new_sniffer.endpoint = chain->last;
+      new_sniffer.height = tree->segment.devdev;
+      new_sniffer.cost = 0;
+      new_sniffer.distance = 0;
+      /* determine directions */
+      CHECK(list_append_return_pointer(&context_list, &new_sniffer, &sniffer));
+      CHECK(make_path_sniffer(&tree->context.data, sniffer));
+      CHECK(list_append(&endpoint_list, &tree));
+      
+      edges = edges->next;
+    }
+    
+    /* start checking contexts */
+    /* look at neighbors in given directions */
+    /* if token is different, create context */
+    /* if token is same, check is the context for the same endpoint */
+    /* if yes, check the cost difference */
+    /* if no, we have a connection to another edge chain */
+    /* add to unique list of connection structures (endpoints and the two trees */
+    
+  }
+  
   /*PRINT0("finished\n");*/
   FINALLY(quad_forest_find_boundaries);
   list_destroy(&edge_list);
