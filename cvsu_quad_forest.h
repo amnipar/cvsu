@@ -141,7 +141,7 @@ result make_stat_accumulator
 
 result expect_stat_accumulator
 (
-  stat_accumulator *target,
+  stat_accumulator **target,
   typed_pointer *tptr
 );
 
@@ -166,7 +166,7 @@ result make_path_sniffer
 
 result expect_path_sniffer
 (
-  path_sniffer *target,
+  path_sniffer **target,
   typed_pointer *tptr
 );
 

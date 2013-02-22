@@ -3710,17 +3710,24 @@ int compare_edges_descending(const void *a, const void *b)
   else return 0;
 }
 
-const direction path_directions[] =
 {
-  d_NW,
-  d_N,
-  d_NE,
-  d_E,
-  d_SE,
-  d_S,
-  d_SW,
-  d_W,
-  d_
+  if (neighbor->context.token == token) {
+    CHECK(expect_path_sniffer(&neighbor_sniffer, &neighbor->context.data));
+    if (sniffer->endpoint == neighbor_sniffer->endpoint) {
+      /* update cost if necessary */
+    }
+    else {
+      /* add potential connection */
+    }
+  }
+  else {
+    if (neighbor->edge.has_edge) {
+      /* add potential intersection */
+    }
+    else {
+      /* add token and sniffer, add neighbor to tree list */
+    }
+  }
 }
 
 void path_sniffer_determine_directions(path_sniffer *sniffer)
@@ -4064,7 +4071,7 @@ result quad_forest_find_boundaries
     list endpoint_list, context_list;
     list_item *items, *end;
     quad_forest_edge_chain *chain;
-    path_sniffer new_sniffer, *sniffer;
+    path_sniffer new_sniffer, *sniffer, *neighbor_sniffer;
 
     CHECK(list_create(&context_list, 10 * forest->edges.count, sizeof(path_sniffer), 1));
     CHECK(list_create(&endpoint_list, 10 * forest->edges.count, sizeof(quad_forest*), 1));
