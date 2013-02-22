@@ -123,14 +123,14 @@ result make_stat_accumulator
 )
 {
   TRY();
-  
+
   CHECK_POINTER(target);
   CHECK_POINTER(source);
-  
+
   tptr->type = t_STAT_ACCUMULATOR;
   tptr->count = 1;
   tptr->value = (pointer)source;
-  
+
   FINALLY(make_stat_accumulator);
   RETURN();
 }
@@ -142,18 +142,18 @@ result expect_stat_accumulator
 )
 {
   TRY();
-  
+
   CHECK_POINTER(target);
   CHECK_POINTER(tptr);
   CHECK_POINTER(tptr->value);
-  
+
   if (tptr->type == t_STAT_ACCUMULATOR) {
     *target = (stat_accumulator *)tptr->value;
   }
   else {
     ERROR(BAD_TYPE);
   }
-  
+
   FINALLY(expect_stat_accumulator);
   RETURN();
 }
@@ -167,14 +167,14 @@ result make_path_sniffer
 )
 {
   TRY();
-  
+
   CHECK_POINTER(target);
   CHECK_POINTER(source);
-  
+
   tptr->type = t_PATH_SNIFFER;
   tptr->count = 1;
   tptr->value = (pointer)source;
-  
+
   FINALLY(make_path_sniffer);
   RETURN();
 }
@@ -186,18 +186,18 @@ result expect_path_sniffer
 )
 {
   TRY();
-  
+
   CHECK_POINTER(target);
   CHECK_POINTER(tptr);
   CHECK_POINTER(tptr->value);
-  
+
   if (tptr->type == t_PATH_SNIFFER) {
     *target = (stat_accumulator *)tptr->value;
   }
   else {
     ERROR(BAD_TYPE);
   }
-  
+
   FINALLY(expect_path_sniffer);
   RETURN();
 }
@@ -1512,12 +1512,12 @@ result quad_forest_init
       CHECK(list_destroy(&target->trees));
     }
     CHECK(list_create(&target->trees, 8 * size, sizeof(quad_tree), 1));
-    
+
     if (!list_is_null(&target->edges)) {
       CHECK(list_destroy(&target->edges));
     }
     CHECK(list_create(&target->edges, 100, sizeof(quad_forest_edge_chain), 1));
-    
+
   }
   else {
     rows = target->rows;
@@ -3215,11 +3215,11 @@ result quad_forest_get_edge_chain
   quad_forest_edge *current;
   point point_a, point_b;
   line new_line;
-  
+
   CHECK_POINTER(edge);
-  
+
   CHECK(list_create(chain, edge->length, sizeof(line), 1));
-  
+
   current = edge->first;
   if (current != NULL) {
     tree = (quad_tree*)current->tree;
@@ -3237,7 +3237,7 @@ result quad_forest_get_edge_chain
       current = current->next;
     }
   }
-  
+
   FINALLY(quad_forest_get_edge_chain);
   RETURN();
 }
@@ -3710,6 +3710,83 @@ int compare_edges_descending(const void *a, const void *b)
   else return 0;
 }
 
+const direction path_directions[] =
+{
+  d_NW,
+  d_N,
+  d_NE,
+  d_E,
+  d_SE,
+  d_S,
+  d_SW,
+  d_W,
+  d_
+}
+
+void path_sniffer_determine_directions(path_sniffer *sniffer)
+{
+  quad_forest_edge *this, *other;
+
+  this = sniffer->endpoint;
+  if (this->next == NULL) {
+    other = this->prev;
+  }
+  else
+  if (this->prev == NULL) {
+    other = this->next;
+  }
+  if (this != NULL && other != NULL) {
+    sint32 xdiff, ydiff;
+    xdiff = ((quad_tree*)this->tree)->x - ((quad_tree*)other->tree)->x;
+    ydiff = ((quad_tree*)this->tree)->y - ((quad_tree*)other->tree)->y;
+    if (xdiff > 0) {
+      if (ydiff > 0) {
+        sniffer->dir_start = d_W;
+        sniffer->dir_end = d_N;
+      }
+      else
+      if (ydiff == 0) {
+        sniffer->dir_start = d_SW;
+        sniffer->dir_end = d_NW;
+      }
+      else { /* ydiff < 0 */
+        sniffer->dir_start = d_S;
+        sniffer->dir_end = d_W;
+      }
+    }
+    else
+    if (xdiff == 0) {
+      if (ydiff > 0) {
+        sniffer->dir_start = d_NW;
+        sniffer->dir_end = d_NE;
+      }
+      else { /* ydiff < 0, not possible that also ydiff == 0 */
+        sniffer->dir_start = d_SE;
+        sniffer->dir_end = d_SW;
+      }
+    }
+    else { /* xdiff < 0 */
+      if (ydiff > 0) {
+        sniffer->dir_start = d_N;
+        sniffer->dir_end = d_E;
+      }
+      else
+      if (ydiff == 0) {
+        sniffer->dir_start = d_NE;
+        sniffer->dir_end = d_SE;
+      }
+      else { /* ydiff < 0 */
+        sniffer->dir_start = d_E;
+        sniffer->dir_end = d_S;
+      }
+    }
+  }
+  else {
+    sniffer->dir_start = d_NULL;
+    sniffer->dir_end = d_NULL;
+  }
+}
+
 typedef struct edge_connection_t {
   quad_forest_edge *endpoint_a;
   quad_forest_edge *endpoint_b;
@@ -3719,7 +3796,7 @@ typedef struct edge_connection_t {
 
 int compare_connection(void *a, void *b)
 {
-  
+
 }
 
 result quad_forest_find_boundaries
@@ -3978,28 +4055,28 @@ result quad_forest_find_boundaries
     edges = edges->next;
   }
   /*PRINT1("found %lu edge chains\n", forest->edges.count);*/
-  
+
   /*CHECK(quad_forest_refresh_edges(forest));*/
-  
+
   /* then try connecting individual pieces of edge chains */
   {
     uint32 token;
     list endpoint_list, context_list;
-    list_item *edges, *end;
+    list_item *items, *end;
     quad_forest_edge_chain *chain;
     path_sniffer new_sniffer, *sniffer;
-    
+
     CHECK(list_create(&context_list, 10 * forest->edges.count, sizeof(path_sniffer), 1));
     CHECK(list_create(&endpoint_list, 10 * forest->edges.count, sizeof(quad_forest*), 1));
-    
+
     /* TODO: later use randomly generated tokens to identify parsing phases */
     token = 1;
-    
-    edges = forest->edges.first.next;
+
+    items = forest->edges.first.next;
     end = &forest->edges.last;
-    while (edges != end) {
-      chain = (quad_forest_edge_chain*)edges->data;
-      
+    while (items != end) {
+      chain = (quad_forest_edge_chain*)items->data;
+
       /* create context for the first endpoint */
       tree = (quad_tree*)chain->first->tree;
       tree->context.token = token;
@@ -4010,10 +4087,11 @@ result quad_forest_find_boundaries
       new_sniffer.cost = 0;
       new_sniffer.distance = 0;
       /* determine directions */
+      path_sniffer_determine_directions(&new_sniffer);
       CHECK(list_append_return_pointer(&context_list, &new_sniffer, &sniffer));
       CHECK(make_path_sniffer(&tree->context.data, sniffer));
       CHECK(list_append(&endpoint_list, &tree));
-      
+
       /* create context for the second endpoint */
       tree = (quad_tree*)chain->last->tree;
       tree->context.token = token;
@@ -4024,13 +4102,87 @@ result quad_forest_find_boundaries
       new_sniffer.cost = 0;
       new_sniffer.distance = 0;
       /* determine directions */
+      path_sniffer_determine_directions(&new_sniffer);
       CHECK(list_append_return_pointer(&context_list, &new_sniffer, &sniffer));
       CHECK(make_path_sniffer(&tree->context.data, sniffer));
       CHECK(list_append(&endpoint_list, &tree));
-      
-      edges = edges->next;
+
+      items = items->next;
     }
-    
+
+    items = endpoint_list.first.next;
+    end = &endpoint_list.last;
+    while (items != end) {
+      tree = *(quad_tree**)items->data;
+      CHECK(expect_path_sniffer(sniffer, &tree->context.data));
+      switch (sniffer->dir_start) {
+        case d_NW:
+        {
+          GET_NEIGHBOR_NW();
+          /*
+           * sniffing a neighbor:
+           * if has edge, create intersection (must wait before splitting chain)
+           * if has token, add connection point (must wait to determine best one)
+           * if does not have token, add sniffer and token
+           */
+        }
+        case d_N:
+        {
+          GET_NEIGHBOR_N();
+        }
+        case d_NE:
+        {
+          GET_NEIGHBOR_NE();
+          if (sniffer->dir_end == d_NE) {
+            break;
+          }
+        }
+        case d_E:
+        {
+          GET_NEIGHBOR_E();
+          if (sniffer->dir_end == d_E) {
+            break;
+          }
+        }
+        case d_SE:
+        {
+          GET_NEIGHBOR_SE();
+          if (sniffer->dir_end == d_SE) {
+            break;
+          }
+        }
+        case d_S:
+        {
+          GET_NEIGHBOR_S();
+          if (sniffer->dir_end == d_S) {
+            break;
+          }
+        }
+        case d_SW:
+        {
+          GET_NEIGHBOR_SW();
+          if (sniffer->dir_end == d_SW) {
+            break;
+          }
+        }
+        case d_W:
+        {
+          GET_NEIGHBOR_W();
+          if (sniffer->dir_end == d_W) {
+            break;
+          }
+          GET_NEIGHBOR_NW();
+          if (sniffer->dir_end == d_NW) {
+            break;
+          }
+          GET_NEIGHBOR_N();
+          if (sniffer->dir_end == d_N) {
+            break;
+          }
+        }
+      }
+    }
+
     /* start checking contexts */
     /* look at neighbors in given directions */
     /* if token is different, create context */
@@ -4038,9 +4190,9 @@ result quad_forest_find_boundaries
     /* if yes, check the cost difference */
     /* if no, we have a connection to another edge chain */
     /* add to unique list of connection structures (endpoints and the two trees */
-    
+
   }
-  
+
   /*PRINT0("finished\n");*/
   FINALLY(quad_forest_find_boundaries);
   list_destroy(&edge_list);

@@ -154,8 +154,8 @@ typedef path_sniffer_t {
   integral_value height;
   integral_value cost;
   uint32 distance;
-  uint32 dir_start;
-  uint32 dir_end;
+  direction dir_start;
+  direction dir_end;
 } path_sniffer;
 
 result make_path_sniffer
@@ -176,6 +176,34 @@ typedef struct parse_context_t {
   typed_pointer data;
 } parse_context;
 
+typedef struct tree_annotation_t {
+  typed_pointer data;
+} tree_annotation;
+
+typedef struct quad_forest_potential_intersection_t {
+  void *tree;
+  integral_value cost;
+  path_sniffer *sniffer;
+} quad_forest_potential_intersection;
+
+typedef struct quad_forest_potential_connection_t {
+  void *tree;
+  integral_value cost;
+  path_sniffer *sniffer1;
+  path_sniffer *sniffer2;
+} quad_forest_potential_connection;
+
+typedef struct quad_forest_intersection_t {
+  void *tree;
+  list edges;
+  list edge_chains;
+} quad_forest_intersection;
+
+typedef struct quad_forest_edge_influence_t {
+  void *tree;
+  quad_forest_edge *edge;
+} quad_forest_edge_influence;
+
 /**
  * Stores a quad tree holding image data.
  */
@@ -190,10 +218,14 @@ typedef struct quad_tree_t {
   uint32 level;
   /** Statistics of the image region covered by this tree */
   statistics stat;
+  /* TODO: move all three of these into annotation structure */
   /** Region info used in segmentation */
   quad_forest_segment segment;
   /** Edge info used in edge detection */
   quad_forest_edge edge;
+  /** Intersection info used in edge chain detection */
+  quad_forest_intersection intersection;
+  tree_annotation annotation;
   /** Parent tree, NULL if this is a root tree */
   struct quad_tree_t *parent;
   /* child trees, all NULL if the tree has not beed divided */

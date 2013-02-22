@@ -115,6 +115,7 @@ typedef sint32 coord;
 
 typedef enum type_label_t {
   t_UNDEF = 0,
+  /* basic types */
   t_TYPE,
   t_TRUTH,
   t_POINTER,
@@ -130,6 +131,11 @@ typedef enum type_label_t {
   t_U64,
   t_F32,
   t_F64,
+  /* tree annotation types */
+  t_SEGMENT,
+  t_BOUNDARY,
+  t_INTERSECTION,
+  /* parsing context types */
   t_STAT_ACCUMULATOR,
   t_PATH_SNIFFER
 } type_label;
@@ -146,7 +152,7 @@ typedef struct typed_pointer_t {
   pointer value;
 } typed_pointer;
 
-/** 
+/**
  * A convenience function for initializing the fields of a typed_pointer.
  */
 void create_typed_pointer
