@@ -4068,7 +4068,7 @@ result quad_forest_find_boundaries
   /* then try connecting individual pieces of edge chains */
   {
     uint32 token;
-    list endpoint_list, context_list;
+    list endpoint_list, context_list, intersection_list, connection_list;
     list_item *items, *end;
     quad_forest_edge_chain *chain;
     path_sniffer new_sniffer, *sniffer, *neighbor_sniffer;
