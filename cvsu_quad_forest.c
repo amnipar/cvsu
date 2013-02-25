@@ -4189,15 +4189,6 @@ result quad_forest_find_boundaries
         }
       }
     }
-
-    /* start checking contexts */
-    /* look at neighbors in given directions */
-    /* if token is different, create context */
-    /* if token is same, check is the context for the same endpoint */
-    /* if yes, check the cost difference */
-    /* if no, we have a connection to another edge chain */
-    /* add to unique list of connection structures (endpoints and the two trees */
-
   }
 
   /*PRINT0("finished\n");*/

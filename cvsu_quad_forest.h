@@ -180,8 +180,14 @@ typedef struct tree_annotation_t {
   typed_pointer data;
 } tree_annotation;
 
+/**
+ * Indicates a location for a potential intersection between an edge chain
+ * endpoint and an edge chain.
+ */
 typedef struct quad_forest_potential_intersection_t {
   void *tree;
+  quad_forest_edge *endpoint;
+  quad_forest_edge_chain *chain;
   integral_value cost;
   path_sniffer *sniffer;
 } quad_forest_potential_intersection;
