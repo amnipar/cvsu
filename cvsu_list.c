@@ -1115,6 +1115,40 @@ result list_insert_unique
 
 /******************************************************************************/
 
+result list_append_unique_return_pointer
+(
+  list *target,
+  pointer data,
+  pointer *list_data
+  list_item_indicator indicator
+)
+{
+  TRY();
+  list_item *i;
+  truth_value equals;
+
+  i = target->first.next;
+  while (i != &target->last) {
+    if (i == NULL) {
+      /* iteration finished without encountering the end item */
+      ERROR(NOT_FOUND);
+    }
+    equals = indicator(data, i->data);
+    /* if equal item already exists, abort */
+    if (IS_TRUE(equals)) {
+      *list_data = i->data;
+      TERMINATE(SUCCESS);
+    }
+    i = i->next;
+  }
+  CHECK(list_append_return_pointer(target, data, list_data));
+
+  FINALLY(list_insert_unique);
+  RETURN();
+}
+
+/******************************************************************************/
+
 result list_insert_unique_index
 (
   list *target,

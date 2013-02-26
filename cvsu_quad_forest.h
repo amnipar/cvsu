@@ -44,6 +44,8 @@ extern "C" {
 /** Stores the forest status as a collection of bitwise flags. */
 typedef uint32 quad_forest_status;
 
+struct quad_tree_t;
+
 /**
  * Stores segment information for quad_forest segmentation with union-find
  * disjoint set approach. In addition to id and rank information contains also
@@ -87,7 +89,7 @@ typedef struct quad_forest_edge_t
   /** The next edge in the edge chain */
   struct quad_forest_edge_t *next;
   /** TODO: temp - later will be tree pointer after establishing annotation struct */
-  void *tree;
+  struct quad_tree_t *tree;
   /** length of the edge chain - initially 1 */
   uint32 length;
   /** The rank value used for optimizing union-find process */
@@ -148,9 +150,11 @@ result expect_stat_accumulator
 /**
  * Context value for sniffing shortest paths between line endpoints.
  */
-typedef path_sniffer_t {
-  quad_forest_edge_chain *chain,
-  quad_forest_edge *endpoint,
+typedef struct path_sniffer_t {
+  struct path_sniffer_t *prev;
+  struct quad_tree_t *tree;
+  quad_forest_edge_chain *chain;
+  quad_forest_edge *endpoint;
   integral_value height;
   integral_value cost;
   uint32 distance;
@@ -158,6 +162,9 @@ typedef path_sniffer_t {
   direction dir_end;
 } path_sniffer;
 
+/**
+ * Creates a typed_pointer from a path_sniffer pointer
+ */
 result make_path_sniffer
 (
   typed_pointer *target,
@@ -260,6 +267,7 @@ typedef struct quad_tree_t {
   integral_value acc;
   /** Temporary squared accumulator value used in propagation algorithms */
   integral_value acc2;
+  /** Context data used in image parsing operations */
   parse_context context;
 } quad_tree;
 

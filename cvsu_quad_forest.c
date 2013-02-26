@@ -3710,6 +3710,39 @@ int compare_edges_descending(const void *a, const void *b)
   else return 0;
 }
 
+/*
+ * comparison function used for inserting sniffer contexts into a list
+ * sorted by cost, smallest first
+ */
+int path_sniffer_compare_by_cost(const void *a, const void *b)
+{
+  const path_sniffer *sa, *sb;
+  integral_value ca, ba;
+
+  sa = *((const path_sniffer * const *)a);
+  if (sa == NULL) return 1;
+  sb = *((const path_sniffer * const *)b);
+  if (sb == NULL) return -1;
+
+  ca = sa->cost;
+  cb = sb->cost;
+
+  if (ca < cb) return -1;
+  if (ca > cb) return 1;
+  return 0;
+}
+
+int path_sniffer_equals(const void *a, const void *b)
+{
+  const path_sniffer *sa, *sb;
+  integral_value ca, ba;
+
+  sa = *((const path_sniffer * const *)a);
+  sb = *((const path_sniffer * const *)b);
+  if (sa == NULL || sb == NULL) return FALSE;
+  if (sa == sb) return TRUE;
+}
+
 {
   if (neighbor->context.token == token) {
     CHECK(expect_path_sniffer(&neighbor_sniffer, &neighbor->context.data));

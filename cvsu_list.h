@@ -372,7 +372,7 @@ result list_append_return_pointer
   /** Pointer to the data to be inserted */
   pointer data,
   /** Return parameter containing a pointer to the newly appended data */
-  pointer *data_pointer
+  pointer *list_data
 );
 
 /**
@@ -469,6 +469,19 @@ result list_insert_unique
 );
 
 /**
+ * Appends data to the end of the list, but only if the equal data (determined
+ * by the indicator) does not already exist. A pointer is returned to the data
+ * that will actually exist in the list after this operation.
+ */
+result list_append_unique_return_pointer
+(
+  list *target,
+  pointer data,
+  pointer *list_data
+  list_item_indicator indicator
+);
+
+/**
  * Inserts data to list in correct sorted order, determined by comparator, but
  * only if the equal data does not already exist.
  * Links to the item pointed to by list index. This is applicable to sublists
@@ -483,7 +496,7 @@ result list_insert_unique_index
 );
 
 /**
- * Finds and removes a data item from the list. 
+ * Finds and removes a data item from the list.
  */
 result list_remove
 (
