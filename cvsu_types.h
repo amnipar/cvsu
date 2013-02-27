@@ -155,13 +155,37 @@ typedef struct typed_pointer_t {
 /**
  * A convenience function for initializing the fields of a typed_pointer.
  */
-void create_typed_pointer
+void typed_pointer_create
 (
   typed_pointer *tptr,
   type_label type,
   uint32 count,
   pointer value
 );
+
+/**
+ * Deallocates the memory and sets the pointer to NULL.
+ */
+void typed_pointer_destroy
+(
+  typed_pointer *tptr
+);
+
+/**
+ * A convenience macro for creating pointers, ensures that the possible previous
+ * value is deallocated first. Requires that a make_x function exists for the
+ * given type x, taking typed_pointer and x* as parameters.
+ * Note: it is important that typed_pointers are always allocated to NULL.
+ */
+#define CREATE_POINTER(ptr,t,c) {\
+  t *temp_ptr;\
+  if ((ptr)->value != NULL) {\
+    CHECK(memory_deallocate((data_pointer*)&((ptr)->value)));\
+  }\
+  CHECK(memory_allocate((data_pointer*)&temp_ptr, (c), sizeof(t)));\
+  make_##t((ptr), temp_ptr);\
+  (ptr)->count = (c);\
+}
 
 typedef struct point_t {
     coord x;
@@ -252,6 +276,14 @@ typedef real64 I_2_t;
 #else
 #error "integral image data type not defined"
 #endif
+
+/**
+ * Determine the sign of an integral value.
+ */
+sint32 signum
+(
+  integral_value value
+);
 
 typedef uint32 SI_1_t;
 typedef uint32 SI_2_t;

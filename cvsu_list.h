@@ -477,7 +477,7 @@ result list_append_unique_return_pointer
 (
   list *target,
   pointer data,
-  pointer *list_data
+  pointer *list_data,
   list_item_indicator indicator
 );
 
@@ -576,6 +576,33 @@ result list_iterate_backward
   const list_item *begin,
   const list_item *end,
   list_item_handler operation
+);
+
+/**
+ * Unlinks an item from the list and returns the next item.
+ */
+list_item *list_pop_item
+(
+  list *target,
+  list_item *item
+);
+
+/**
+ * Returns the first item of the list without removing it. If the list is empty,
+ * returns NULL.
+ */
+list_item *list_peek_first
+(
+  list *target
+);
+
+/**
+ * Returns the last item of the list without removing it. If the list is empty,
+ * returns NULL.
+ */
+list_item *list_peek_last
+(
+  list *target
 );
 
 /**

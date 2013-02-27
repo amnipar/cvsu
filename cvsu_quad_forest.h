@@ -44,6 +44,7 @@ extern "C" {
 /** Stores the forest status as a collection of bitwise flags. */
 typedef uint32 quad_forest_status;
 
+/* forward declaration */
 struct quad_tree_t;
 
 /**
@@ -74,6 +75,9 @@ typedef struct quad_forest_segment_t
   byte color[4];
 } quad_forest_segment;
 
+/* forward declaration */
+struct quad_forest_edge_chain_t;
+
 /**
  * Stores edge information for edge and edge chain detection in quad_forest with
  * union-find disjoint set approach. In addition to id and rank information
@@ -82,6 +86,7 @@ typedef struct quad_forest_segment_t
  */
 typedef struct quad_forest_edge_t
 {
+  struct quad_forest_edge_chain_t *chain;
   /** The parent edge, that determines the edge segment id */
   struct quad_forest_edge_t *parent;
   /** The previous edge in the edge chain */
@@ -121,24 +126,35 @@ typedef struct quad_forest_edge_t
  */
 typedef struct quad_forest_edge_chain_t
 {
+  /** Parent node of the edge chain */
   quad_forest_edge *parent;
+  /** First node of the edge chain */
   quad_forest_edge *first;
+  /** Last node of the edge chain */
   quad_forest_edge *last;
+  /** Chain length in nodes */
   uint32 length;
+  /** Total cost of traversing the chain (up-down movement in cost space) */
+  integral_value cost;
 } quad_forest_edge_chain;
 
 /**
  * Context value for accumulating neighborhood statistics.
  */
-typedef stat_accumulator_t {
+typedef struct stat_accumulator_t {
   integral_value pool;
   integral_value acc;
 } stat_accumulator;
 
-result make_stat_accumulator
+void make_stat_accumulator
 (
-  typed_pointer *target,
+  typed_pointer *tptr,
   stat_accumulator *source
+);
+
+truth_value is_stat_accumulator
+(
+  typed_pointer *tptr
 );
 
 result expect_stat_accumulator
@@ -151,71 +167,78 @@ result expect_stat_accumulator
  * Context value for sniffing shortest paths between line endpoints.
  */
 typedef struct path_sniffer_t {
+  /** Previous node along the shortest path to this node */
   struct path_sniffer_t *prev;
+  /** Quad tree associated with this node */
   struct quad_tree_t *tree;
+  /** Edge chain that we attempt to extend */
   quad_forest_edge_chain *chain;
+  /** Edge chain endpoint where starting to extend */
   quad_forest_edge *endpoint;
-  integral_value height;
+  /** Strength of edge at this point */
+  integral_value strength;
+  /** Cost of this path so far */
   integral_value cost;
-  uint32 distance;
+  /** Length of this path so far */
+  uint32 length;
+  /** First direction where to propagate this path */
   direction dir_start;
+  /** Last direction where to propagate this path */
   direction dir_end;
 } path_sniffer;
 
 /**
  * Creates a typed_pointer from a path_sniffer pointer
  */
-result make_path_sniffer
+void make_path_sniffer
 (
-  typed_pointer *target,
+  typed_pointer *tptr,
   path_sniffer *source
 );
 
+/**
+ * Checks that the pointer has the correct type label for path_sniffer.
+ */
+truth_value is_path_sniffer
+(
+  typed_pointer *tptr
+);
+
+/**
+ * Expects a path_sniffer and casts the pointer if the type label is correct;
+ * if not, creates a BAD_TYPE error.
+ */
 result expect_path_sniffer
 (
   path_sniffer **target,
   typed_pointer *tptr
 );
 
+/**
+ * Parsing context for image parsing operations.
+ */
 typedef struct parse_context_t {
+  /** Token identifying this specific parsing operation */
   uint32 token;
+  /** Number of the current parsing round */
   uint32 round;
+  /** Actual context data that depends on operation */
   typed_pointer data;
 } parse_context;
 
+/**
+ * Generic tree annotation. Can be edge, segment, intersection.
+ */
 typedef struct tree_annotation_t {
+  /** Actual annotation data */
   typed_pointer data;
 } tree_annotation;
 
-/**
- * Indicates a location for a potential intersection between an edge chain
- * endpoint and an edge chain.
- */
-typedef struct quad_forest_potential_intersection_t {
-  void *tree;
-  quad_forest_edge *endpoint;
-  quad_forest_edge_chain *chain;
-  integral_value cost;
-  path_sniffer *sniffer;
-} quad_forest_potential_intersection;
-
-typedef struct quad_forest_potential_connection_t {
-  void *tree;
-  integral_value cost;
-  path_sniffer *sniffer1;
-  path_sniffer *sniffer2;
-} quad_forest_potential_connection;
-
 typedef struct quad_forest_intersection_t {
-  void *tree;
+  struct quad_tree_t *tree;
   list edges;
-  list edge_chains;
+  list chains;
 } quad_forest_intersection;
-
-typedef struct quad_forest_edge_influence_t {
-  void *tree;
-  quad_forest_edge *edge;
-} quad_forest_edge_influence;
 
 /**
  * Stores a quad tree holding image data.
@@ -702,6 +725,15 @@ result quad_forest_get_edge_chain
 (
   quad_forest_edge_chain *edge,
   list *chain
+);
+
+/**
+ * Generates a list of lines corresponding to path sniffer prev links
+ */
+result quad_forest_get_path_sniffers
+(
+  quad_forest *forest,
+  list *sniffers
 );
 
 /**

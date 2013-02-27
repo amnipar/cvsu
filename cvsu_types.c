@@ -30,6 +30,19 @@
  */
 
 #include "cvsu_types.h"
+#include "cvsu_memory.h"
+
+/******************************************************************************/
+
+sint32 signum
+(
+  integral_value value
+)
+{
+  if (value < 0) return -1;
+  if (value > 0) return +1;
+  return 0;
+}
 
 /******************************************************************************/
 
@@ -186,7 +199,7 @@ integral_value cast_pixel_value
 
 /******************************************************************************/
 
-void create_typed_pointer
+void typed_pointer_create
 (
   typed_pointer *tptr,
   type_label type,
@@ -198,6 +211,20 @@ void create_typed_pointer
     tptr->type = type;
     tptr->count = count;
     tptr->value = value;
+  }
+}
+
+/******************************************************************************/
+
+void typed_pointer_destroy
+(
+  typed_pointer *tptr
+)
+{
+  if (tptr != NULL && tptr->value != NULL) {
+    memory_deallocate((data_pointer*)&tptr->value);
+    tptr->type = t_UNDEF;
+    tptr->count = 0;
   }
 }
 

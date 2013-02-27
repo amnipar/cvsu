@@ -1119,7 +1119,7 @@ result list_append_unique_return_pointer
 (
   list *target,
   pointer data,
-  pointer *list_data
+  pointer *list_data,
   list_item_indicator indicator
 )
 {
@@ -1357,6 +1357,62 @@ result list_iterate_forward
 
   FINALLY(list_iterate_forward);
   RETURN();
+}
+
+/******************************************************************************/
+
+list_item *list_pop_item
+(
+  list *target,
+  list_item *item
+)
+{
+  list_item *next;
+  
+  next = NULL;
+  if (target != NULL && item != NULL) {
+    next = item->next;
+    list_remove_item(target, item);
+  }
+  return next;
+}
+
+/******************************************************************************/
+
+list_item *list_peek_first
+(
+  list *target
+)
+{
+  list_item *first;
+  
+  first = NULL;
+  if (target != NULL) {
+    first = target->first.next;
+    if (first == &target->last) {
+      first = NULL;
+    }
+  }
+  return first;
+}
+
+/******************************************************************************/
+
+list_item *list_peek_last
+(
+  list *target
+)
+{
+  list_item *last;
+  
+  last = NULL;
+  if (target != NULL) {
+    last = target->last.prev;
+    if (last == &target->first) {
+      last = NULL;
+    }
+  }
+  return last;
 }
 
 /******************************************************************************/
