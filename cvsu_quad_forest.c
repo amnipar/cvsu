@@ -3761,8 +3761,7 @@ quad_forest_edge *edge_chain_follow_forward
 (
   quad_forest_edge *parent,
   quad_forest_edge *prev,
-  quad_forest_edge *next,
-  integral_value *cost
+  quad_forest_edge *next
 )
 {
   if (next->next == prev) {
@@ -3774,9 +3773,8 @@ quad_forest_edge *edge_chain_follow_forward
   }
   if (next->prev == prev) {
     edge_chain_union(parent, next);
-    *cost += fabs(next->strength - prev->strength);
     if (next->next != NULL) {
-      return edge_chain_follow_forward(parent, next, next->next, cost);
+      return edge_chain_follow_forward(parent, next, next->next);
     }
     else {
       return next;
@@ -3791,8 +3789,7 @@ quad_forest_edge *edge_chain_follow_backward
 (
   quad_forest_edge *parent,
   quad_forest_edge *next,
-  quad_forest_edge *prev,
-  integral_value *cost
+  quad_forest_edge *prev
 )
 {
   if (prev->prev == next) {
@@ -3804,9 +3801,8 @@ quad_forest_edge *edge_chain_follow_backward
   }
   if (prev->next == next) {
     edge_chain_union(parent, prev);
-    *cost += fabs(next->strength - prev->strength);
     if (prev->prev != NULL) {
-      return edge_chain_follow_backward(parent, prev, prev->prev, cost);
+      return edge_chain_follow_backward(parent, prev, prev->prev);
     }
     else {
       return prev;
@@ -3825,6 +3821,9 @@ void edge_set_chain
 {
   if (node != NULL) {
     node->chain = chain;
+    if (node->next != NULL) {
+      chain->cost += fabs(node->strength - node->next->strength);
+    }
     edge_set_chain(node->next, chain);
   }
 }
@@ -4076,6 +4075,7 @@ result quad_forest_find_boundaries
     }
   }
 
+  PRINT0("calculate devmean and devdev\n");
   /* calculate devmean and devdev, and determine the boundary trees */
   for (i = 0; i < size; i++) {
     tree = forest->roots[i];
@@ -4098,6 +4098,7 @@ result quad_forest_find_boundaries
       /* using devdev as edge strength measure */
       edge->strength = dev;
       edge->is_intersection = FALSE;
+      edge->chain = NULL;
       CHECK(list_insert_sorted(&edge_list, (pointer)&edge, &compare_edges_descending));
     }
     else {
@@ -4105,6 +4106,7 @@ result quad_forest_find_boundaries
     }
   }
   
+  PRINT0("check relevant neighbors\n");
   /* check relevant neighbors of boundary trees and create edge nodes */
   edges = edge_list.first.next;
   end = &edge_list.last;
@@ -4256,6 +4258,7 @@ result quad_forest_find_boundaries
     edges = edges->next;
   }
 
+  PRINT0("merge edge chains\n");
   /* then go through the list again, and merge edge chains where the nodes agree */
   edges = edge_list.first.next;
   end = &edge_list.last;
@@ -4265,31 +4268,32 @@ result quad_forest_find_boundaries
     /* if parent is different than self, the edge already belongs to a chain */
     if (parent == edge) {
       new_chain.parent = parent;
-      /* cost must be initialized to null, it is updated at each follow step */
-      new_chain.cost = 0;
       
       if (edge->prev != NULL) {
-        new_chain.first = edge_chain_follow_backward(parent, edge, edge->prev, &new_chain.cost);
+        new_chain.first = edge_chain_follow_backward(parent, edge, edge->prev);
         new_chain.first->prev = NULL;
       }
       if (edge->next != NULL) {
-        new_chain.last = edge_chain_follow_forward(parent, edge, edge->next, &new_chain.cost);
+        new_chain.last = edge_chain_follow_forward(parent, edge, edge->next);
         new_chain.last->next = NULL;
       }
       new_chain.length = parent->length;
+      
       /* add only long enough chains to the list */
       if (new_chain.length >= min_length) {
-        CHECK(list_append_return_pointer(&forest->edges, (pointer)&new_chain, (pointer*)chain));
+        CHECK(list_append_return_pointer(&forest->edges, (pointer)&new_chain, (pointer*)&chain));
+        /* cost must be initialized to null, it is updated during next operation */
+        chain->cost = 0;
         edge_set_chain(chain->first, chain);
       }
     }
-
     edges = edges->next;
   }
-  /*PRINT1("found %lu edge chains\n", forest->edges.count);*/
+  PRINT1("found %lu edge chains\n", forest->edges.count);
 
   /*CHECK(quad_forest_refresh_edges(forest));*/
 
+  
   /* then try connecting individual pieces of edge chains */
   {
     uint32 token;
@@ -4305,6 +4309,7 @@ result quad_forest_find_boundaries
     /* TODO: later use randomly generated tokens to identify parsing phases */
     token = 1948572362;
 
+    PRINT0("init context list\n");
     items = forest->edges.first.next;
     end = &forest->edges.last;
     while (items != end) {
@@ -4351,6 +4356,7 @@ result quad_forest_find_boundaries
       items = items->next;
     }
 
+    PRINT0("start to process contexts\n");
     items = context_list.first.next;
     end = &context_list.last;
     while (items != NULL && items != end) {
@@ -4435,7 +4441,7 @@ result quad_forest_find_boundaries
     }
   }
 
-  /*PRINT0("finished\n");*/
+  PRINT0("finished\n");
   FINALLY(quad_forest_find_boundaries);
   list_destroy(&edge_list);
   list_destroy(&context_list);
