@@ -1085,11 +1085,12 @@ result list_insert_unique
 {
   TRY();
   list_item *item;
-  list_item *i;
+  list_item *i, *end;
   int comparison;
 
   i = target->first.next;
-  while (i != &target->last) {
+  end = &target->last;
+  while (i != end) {
     if (i == NULL) {
       /* iteration finished without encountering the end item */
       ERROR(NOT_FOUND);
@@ -1120,22 +1121,21 @@ result list_append_unique_return_pointer
   list *target,
   pointer data,
   pointer *list_data,
-  list_item_indicator indicator
+  list_item_indicator equals
 )
 {
   TRY();
-  list_item *i;
-  truth_value equals;
+  list_item *i, *end;
 
   i = target->first.next;
-  while (i != &target->last) {
+  end = &target->last;
+  while (i != end) {
     if (i == NULL) {
       /* iteration finished without encountering the end item */
       ERROR(NOT_FOUND);
     }
-    equals = indicator(data, i->data);
     /* if equal item already exists, abort */
-    if (IS_TRUE(equals)) {
+    if (IS_TRUE(equals(data, i->data))) {
       *list_data = i->data;
       TERMINATE(SUCCESS);
     }

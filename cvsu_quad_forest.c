@@ -3684,8 +3684,11 @@ result quad_forest_find_edges
         cost = sniffer->cost + neighbor_sniffer->cost + \
             fabs(sniffer->strength - neighbor_sniffer->strength);\
         if (connection->cost > cost) {\
+          PRINT0("...updating...");\
+          /*\
           connection->endpoint1 = sniffer->endpoint;\
           connection->endpoint2 = neighbor_sniffer->endpoint;\
+          */\
           connection->sniffer1 = sniffer;\
           connection->sniffer2 = neighbor_sniffer;\
           connection->cost = cost;\
@@ -3700,6 +3703,7 @@ result quad_forest_find_edges
       else {\
         if (sniffer->length < 4) {\
           /*PRINT0("add next...");*/\
+          neighbor->context.token = token;\
           CREATE_POINTER(&neighbor->context.data, path_sniffer, 1);\
           CHECK(expect_path_sniffer(&neighbor_sniffer, &neighbor->context.data));\
           neighbor_sniffer->prev = sniffer;\
@@ -3843,6 +3847,18 @@ void edge_set_chain
   }
 }
 
+void edge_chain_clear(quad_forest_edge *edge) {
+  quad_forest_edge *next;
+  if (edge != NULL) {
+    next = edge->next;
+    edge->prev = NULL;
+    edge->next = NULL;
+    edge->parent = NULL;
+    edge->length = 1;
+    edge_chain_clear(next);
+  }
+}
+
 /* keeping these functions cleaner by just creating the edge chain */
 /* need to determine elsewhere what has to be done with the endpoints */
 void path_follow_extend_edge(path_sniffer *sniffer)
@@ -3851,12 +3867,13 @@ void path_follow_extend_edge(path_sniffer *sniffer)
   if (sniffer->prev != NULL) {
     path_follow_extend_edge(sniffer->prev);
     end = sniffer->prev->endpoint;
-    if (end->next == NULL) {
+    if (end->next == NULL && end->prev != NULL) {
       prev = end;
       next = &sniffer->tree->edge;
       next->parent = NULL;
       edge_chain_create(next);
       next->tree = sniffer->tree;
+      next->strength = next->tree->segment.devdev;
       next->chain = prev->chain;
       next->chain->last = next;
       prev->next = next;
@@ -3867,7 +3884,7 @@ void path_follow_extend_edge(path_sniffer *sniffer)
       end = next;
     }
     else
-    if (end->prev == NULL) {
+    if (end->prev == NULL && end->next != NULL) {
       next = end;
       prev = &sniffer->tree->edge;
       prev->parent = NULL;
@@ -3884,9 +3901,26 @@ void path_follow_extend_edge(path_sniffer *sniffer)
     }
     else {
       PRINT0("not an endpoint in path_follow_extend_edge\n");
+      return;
     }
     sniffer->endpoint = end;
   }
+}
+
+quad_forest_edge *find_first(quad_forest_edge *edge)
+{
+  if (edge->prev != NULL) {
+    return find_first(edge->prev);
+  }
+  return edge;
+}
+
+quad_forest_edge *find_last(quad_forest_edge *edge)
+{
+  if (edge->next != NULL) {
+    return find_last(edge->next);
+  }
+  return edge;
 }
 
 void path_merge_edge_chains(path_sniffer *sniffer1, path_sniffer *sniffer2)
@@ -3894,15 +3928,17 @@ void path_merge_edge_chains(path_sniffer *sniffer1, path_sniffer *sniffer2)
   quad_forest_edge *prev, *next, *end, *parent;
   quad_forest_edge_chain *chain;
   end = sniffer1->endpoint;
-  if (end->next == NULL) {
+  if (end->next == NULL && end->prev != NULL) {
     prev = end;
     next = sniffer2->endpoint;
     chain = prev->chain;
     if (chain->first == NULL && chain->last == NULL) {
-      chain->first = prev;
+      PRINT0("recreating removed chain\n");
+      chain->first = find_first(prev);
     }
     parent = edge_chain_find(prev);
     chain->parent = parent;
+    prev->next = next;
     if (next->prev == NULL) {
       next->prev = prev;
     }
@@ -3920,15 +3956,17 @@ void path_merge_edge_chains(path_sniffer *sniffer1, path_sniffer *sniffer2)
     edge_set_chain(chain->first, chain);
   }
   else
-  if (end->prev == NULL) {
+  if (end->prev == NULL && end->next != NULL) {
     next = end;
     prev = sniffer2->endpoint;
     chain = next->chain;
     if (chain->first == NULL && chain->last == NULL) {
-      chain->last = next;
+      PRINT0("recreating removed chain\n");
+      chain->last = find_last(next);
     }
     parent = edge_chain_find(next);
     chain->parent = parent;
+    next->prev = prev;
     if (prev->next == NULL) {
       prev->next = next;
     }
@@ -3946,7 +3984,7 @@ void path_merge_edge_chains(path_sniffer *sniffer1, path_sniffer *sniffer2)
     edge_set_chain(chain->first, chain);
   }
   else {
-    PRINT0("not and endpoint in path_merge_edge_chains\n");
+    PRINT0("not an endpoint in path_merge_edge_chains\n");
   }
 }
 
@@ -4106,8 +4144,8 @@ truth_value connection_equals_by_endpoints(const void *a, const void *b)
   sa = ((const edge_connection*)a);
   sb = ((const edge_connection*)b);
   if (sa == NULL || sb == NULL) return FALSE;
-  if ((sa->endpoint1 == sb->endpoint1 || sa->endpoint1 == sb->endpoint2) ||
-      (sa->endpoint2 == sb->endpoint2 || sa->endpoint2 == sb->endpoint1)) {
+  if ((sa->endpoint1 == sb->endpoint1 && sa->endpoint2 == sb->endpoint2) ||
+      (sa->endpoint1 == sb->endpoint2 && sa->endpoint2 == sb->endpoint1)) {
     return TRUE;
   }
   return FALSE;
@@ -4375,6 +4413,9 @@ result quad_forest_find_boundaries
         chain->cost = 0;
         edge_set_chain(chain->first, chain);
       }
+      else {
+        edge_chain_clear(new_chain.first);
+      }
     }
     edges = edges->next;
   }
@@ -4554,8 +4595,13 @@ result quad_forest_find_boundaries
         PRINT0("merge\n");
         chain = connection->sniffer2->endpoint->chain;
         path_merge_edge_chains(connection->sniffer1, connection->sniffer2);
+        
         chain->first = NULL;
         chain->last = NULL;
+        
+      }
+      else {
+        PRINT0("trying to merge chain with itself\n");
       }
 
       items = items->next;
