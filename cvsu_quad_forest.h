@@ -241,6 +241,37 @@ typedef struct quad_forest_intersection_t {
 } quad_forest_intersection;
 
 /**
+ * Describes one head of a link between two quad trees. Each head has a link
+ * to the other head for accessing that head's values (read-only).
+ */
+typedef quad_tree_link_head_t {
+  const struct quad_tree_link_head_t *other;
+  struct quad_tree *tree;
+  parse_context context;
+} quad_tree_link_head;
+
+/**
+ * Describes a link between two quad trees. Both heads of the link have their
+ * own separate structure and context that they can update on their own. Each
+ * link between two trees should occur only once, meaning that the two trees
+ * should share the same structure and each store a pointer to the same link.
+ */
+typedef quad_tree_link_t {
+  /** Head A of the link */
+  quad_tree_link_head a;
+  /** Head B of the link */
+  quad_tree_link_head b;
+  /** Distance between the heads */
+  integral_value distance;
+  /** Angle of the line connecting the heads */
+  integral_value angle;
+  /** Strength of the link */
+  integral_value strength;
+  /** Context used in parsing operations */
+  parse_context context;
+} quad_tree_link;
+
+/**
  * Stores a quad tree holding image data.
  */
 typedef struct quad_tree_t {
@@ -290,6 +321,8 @@ typedef struct quad_tree_t {
   integral_value acc;
   /** Temporary squared accumulator value used in propagation algorithms */
   integral_value acc2;
+  /** List of links to neighboring and nearby nodes */
+  list links;
   /** Context data used in image parsing operations */
   parse_context context;
 } quad_tree;
@@ -324,6 +357,8 @@ typedef struct quad_forest_t {
   list trees;
   /** List of edge chains found from the forest */
   list edges;
+  /** List of all links between the trees of the forest */
+  list links;
   /** Pointer to the last root tree in the tree list for resetting the forest */
   list_item *last_root_tree;
   /** Pointer array containing the root trees in the tree grid */

@@ -1583,6 +1583,10 @@ result quad_forest_init
   target->last_root_tree = target->trees.last.prev;
 
   /* add neighbors to roots */
+  /* TODO: create the neighbor links (first-rate 8-neighborhood) */
+  /* then implement a simple edge propagation algorithm */
+  /* collect links to list and visualize on image (with blue color?) */
+  /* then visualize tree values ('height') also (with red color?) */
   for (row = 0, pos = 0; row < rows; row++) {
     for (col = 0; col < cols; col++, pos++) {
       /* add neighbor to west */
