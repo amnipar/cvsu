@@ -3253,6 +3253,7 @@ result quad_forest_get_edge_chain
 )
 {
   TRY();
+  uint32 token;
   quad_tree *tree;
   quad_forest_edge *current;
   point point_a, point_b;
@@ -3263,10 +3264,12 @@ result quad_forest_get_edge_chain
   CHECK(list_create(chain, edge->length, sizeof(line), 1));
 
   current = edge->first;
+  token = current->token + 1;
   if (current != NULL) {
     tree = (quad_tree*)current->tree;
     point_a.x = tree->x + (uint32)(tree->size / 2);
     point_a.y = tree->y + (uint32)(tree->size / 2);
+    current->token = token;
     current = current->next;
     while (current != NULL) {
       tree = (quad_tree*)current->tree;
@@ -3276,7 +3279,13 @@ result quad_forest_get_edge_chain
       new_line.end = point_b;
       CHECK(list_append(chain, (pointer)&new_line));
       point_a = point_b;
-      current = current->next;
+      if (current->token != token) {
+        current->token = token;
+        current = current->next;
+      }
+      else {
+        current = NULL;
+      }
     }
   }
 
@@ -3844,10 +3853,21 @@ void edge_set_chain
 {
   if (node != NULL) {
     node->chain = chain;
+    node->token = chain->token;
     if (node->next != NULL) {
       chain->cost += fabs(node->strength - node->next->strength);
+      if (node->next->token != chain->token) {
+        edge_set_chain(node->next, chain);
+      }
+      else {
+        chain->last = node;
+        node->next->prev = NULL;
+        node->next = NULL;
+      }
     }
-    edge_set_chain(node->next, chain);
+    else {
+      chain->last = node;
+    }
   }
 }
 
@@ -3911,18 +3931,46 @@ void path_follow_extend_edge(path_sniffer *sniffer)
   }
 }
 
-quad_forest_edge *find_first(quad_forest_edge *edge)
+quad_forest_edge *find_first
+(
+  quad_forest_edge *edge,
+  uint32 token
+)
 {
-  if (edge->prev != NULL) {
-    return find_first(edge->prev);
+  if (edge != NULL) {
+    edge->token = token;
+    if (edge->prev != NULL) {
+      if (edge->prev->token != token) {
+        return find_first(edge->prev, token);
+      }
+      else {
+        edge->prev->next = NULL;
+        edge->prev = NULL;
+        return edge;
+      }
+    }
   }
   return edge;
 }
 
-quad_forest_edge *find_last(quad_forest_edge *edge)
+quad_forest_edge *find_last
+(
+  quad_forest_edge *edge,
+  uint32 token
+)
 {
-  if (edge->next != NULL) {
-    return find_last(edge->next);
+  if (edge != NULL) {
+    edge->token = token;
+    if (edge->next != NULL) {
+      if (edge->next->token != token) {
+        return find_last(edge->next, token);
+      }
+      else {
+        edge->next->prev = NULL;
+        edge->next = NULL;
+        return edge;
+      }
+    }
   }
   return edge;
 }
@@ -3938,7 +3986,8 @@ void path_merge_edge_chains(path_sniffer *sniffer1, path_sniffer *sniffer2)
     chain = prev->chain;
     if (chain->first == NULL && chain->last == NULL) {
       PRINT0("recreating removed chain\n");
-      chain->first = find_first(prev);
+      chain->token = rand();
+      chain->first = find_first(prev, chain->token);
     }
     parent = edge_chain_find(prev);
     chain->parent = parent;
@@ -3953,10 +4002,13 @@ void path_merge_edge_chains(path_sniffer *sniffer1, path_sniffer *sniffer2)
     else {
       PRINT0("not endpoint in path_merge_edge_chains\n");
     }
+    PRINT0("follow a\n");
     end = edge_chain_follow_forward(parent, prev, next);
     chain->last = end;
     chain->length = parent->length;
     chain->cost = 0;
+    PRINT0("set a\n");
+    chain->token = rand();
     edge_set_chain(chain->first, chain);
   }
   else
@@ -3966,7 +4018,8 @@ void path_merge_edge_chains(path_sniffer *sniffer1, path_sniffer *sniffer2)
     chain = next->chain;
     if (chain->first == NULL && chain->last == NULL) {
       PRINT0("recreating removed chain\n");
-      chain->last = find_last(next);
+      chain->token = rand();
+      chain->last = find_last(next, chain->token);
     }
     parent = edge_chain_find(next);
     chain->parent = parent;
@@ -3981,10 +4034,13 @@ void path_merge_edge_chains(path_sniffer *sniffer1, path_sniffer *sniffer2)
     else {
       PRINT0("not endpoint in path_merge_edge_chains\n");
     }
+    PRINT0("follow b\n");
     end = edge_chain_follow_backward(parent, next, prev);
     chain->first = end;
     chain->length = parent->length;
     chain->cost = 0;
+    PRINT0("set b\n");
+    chain->token = rand();
     edge_set_chain(chain->first, chain);
   }
   else {
@@ -4384,6 +4440,7 @@ result quad_forest_find_boundaries
   }
 
   PRINT0("merge edge chains\n");
+  srand(38374);
   /* then go through the list again, and merge edge chains where the nodes agree */
   edges = edge_list.first.next;
   end = &edge_list.last;
@@ -4415,6 +4472,7 @@ result quad_forest_find_boundaries
         CHECK(list_append_return_pointer(&forest->edges, (pointer)&new_chain, (pointer*)&chain));
         /* cost must be initialized to null, it is updated during next operation */
         chain->cost = 0;
+        chain->token = rand();
         edge_set_chain(chain->first, chain);
       }
       else {
@@ -4588,21 +4646,28 @@ result quad_forest_find_boundaries
     }
 
     PRINT0("check connections\n");
+    srand(token);
     items = connection_list.first.next;
     end = &connection_list.last;
-    while (items != end) {
+    while (items != NULL && items != end) {
       connection = (edge_connection*)items->data;
+
+      PRINT0("follow 1...");
       path_follow_extend_edge(connection->sniffer1);
+      PRINT0("done, follow 2...");
       path_follow_extend_edge(connection->sniffer2);
+      PRINT0("done\n");
 
       if (connection->sniffer1->endpoint->chain != connection->sniffer2->endpoint->chain) {
-        PRINT0("merge\n");
+
         chain = connection->sniffer2->endpoint->chain;
+        PRINT0("merge...\n");
         path_merge_edge_chains(connection->sniffer1, connection->sniffer2);
-        
+        PRINT0("done\n");
+        /*
         chain->first = NULL;
         chain->last = NULL;
-        
+        */
       }
       else {
         PRINT0("trying to merge chain with itself\n");
@@ -4611,6 +4676,7 @@ result quad_forest_find_boundaries
       items = items->next;
     }
 
+    PRINT0("removing extra edges...\n");
     items = forest->edges.first.next;
     end = &forest->edges.last;
     while (items != end) {
@@ -4621,6 +4687,7 @@ result quad_forest_find_boundaries
         CHECK(list_remove_item(&forest->edges, items->prev));
       }
     }
+    PRINT0("remove finished\n");
   }
 
   FINALLY(quad_forest_find_boundaries);

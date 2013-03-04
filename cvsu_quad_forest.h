@@ -119,6 +119,7 @@ typedef struct quad_forest_edge_t
   truth_value is_intersection;
   /** Direction in which edge was determined (H,V,N4) */
   direction dir;
+  uint32 token;
 } quad_forest_edge;
 
 /**
@@ -136,6 +137,7 @@ typedef struct quad_forest_edge_chain_t
   uint32 length;
   /** Total cost of traversing the chain (up-down movement in cost space) */
   integral_value cost;
+  uint32 token;
 } quad_forest_edge_chain;
 
 /**
