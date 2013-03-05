@@ -242,13 +242,21 @@ typedef struct quad_forest_intersection_t {
   list chains;
 } quad_forest_intersection;
 
+/* forward declaration */
+struct quad_tree_link_t;
+
 /**
  * Describes one head of a link between two quad trees. Each head has a link
  * to the other head for accessing that head's values (read-only).
  */
-typedef quad_tree_link_head_t {
+typedef struct quad_tree_link_head_t {
+  struct quad_tree_link_t *link;
   const struct quad_tree_link_head_t *other;
-  struct quad_tree *tree;
+  struct quad_tree_t *tree;
+  /** Angle of the line going away from this head */
+  integral_value angle;
+  integral_value cost;
+  uint32 length;
   parse_context context;
 } quad_tree_link_head;
 
@@ -258,15 +266,13 @@ typedef quad_tree_link_head_t {
  * link between two trees should occur only once, meaning that the two trees
  * should share the same structure and each store a pointer to the same link.
  */
-typedef quad_tree_link_t {
+typedef struct quad_tree_link_t {
   /** Head A of the link */
   quad_tree_link_head a;
   /** Head B of the link */
   quad_tree_link_head b;
   /** Distance between the heads */
   integral_value distance;
-  /** Angle of the line connecting the heads */
-  integral_value angle;
   /** Strength of the link */
   integral_value strength;
   /** Context used in parsing operations */
@@ -774,6 +780,15 @@ result quad_forest_get_path_sniffers
 );
 
 /**
+* Generates a list of weighted lines corresponding to links between trees
+*/
+result quad_forest_get_links
+(
+  quad_forest *forest,
+  list *links
+);
+
+/**
 * Collects all trees contained in a list of segments and draws them on a
 * pixel_image with a red color (TODO: add parameter for selecting color)
 */
@@ -891,6 +906,20 @@ result quad_forest_segment_with_boundaries
   integral_value segment_alpha,
   truth_value use_hysteresis,
   truth_value use_pruning
+);
+
+/**
+ * Uses deviation propagation to find potential segment boundaries.
+ */
+result quad_forest_parse
+(
+  quad_forest *forest,
+  /** How many propagation rounds to use for determining devmean and devdev */
+  uint32 rounds,
+  /** The bias value used for determining devdev threshold for boundary */
+  integral_value bias,
+  /** The minimum length of edge chains _before_ starting to fill gaps */
+  uint32 min_length
 );
 
 #ifdef __cplusplus

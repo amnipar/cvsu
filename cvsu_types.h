@@ -131,13 +131,16 @@ typedef enum type_label_t {
   t_U64,
   t_F32,
   t_F64,
+  t_PAIR,
   /* tree annotation types */
   t_SEGMENT,
   t_BOUNDARY,
   t_INTERSECTION,
   /* parsing context types */
   t_STAT_ACCUMULATOR,
-  t_PATH_SNIFFER
+  t_PATH_SNIFFER,
+  t_EDGE_PARSER,
+  t_SEGMENT_PARSER
 } type_label;
 
 /**
@@ -196,6 +199,12 @@ typedef struct line_t {
     point start;
     point end;
 } line;
+
+typedef struct weighted_line_t {
+  point start;
+  point end;
+  double weight;
+} weighted_line;
 
 typedef struct rect_t {
     coord left;

@@ -58,11 +58,16 @@ double fmax(double __x, double __y);
 #endif
 #endif
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 /******************************************************************************/
 /* constants for reporting function names in error messages                   */
 
 string expect_stat_accumulator_name = "expect_stat_accumulator";
 string expect_path_sniffer_name = "expect_path_sniffer";
+string expect_edge_parser_name = "expect_edge_parser";
 
 string quad_tree_destroy_name = "quad_tree_destroy";
 string quad_tree_nullify_name = "quad_tree_nullify";
@@ -100,6 +105,7 @@ string quad_forest_find_boundaries_with_hysteresis_name = "quad_forest_find_boun
 string quad_forest_prune_boundaries_name = "quad_forest_prune_boundaries";
 string quad_forest_segment_edges_name = "quad_forest_segment_edges";
 string quad_forest_segment_with_boundaries_name = "quad_forest_segment_with_boundaries";
+string quad_forest_parse_name = "quad_forest_parse";
 
 /******************************************************************************/
 /* quad_forest_status possible values                                         */
@@ -224,6 +230,8 @@ result quad_tree_destroy
   /* later will need a special function for destroying annotation and context */
   CHECK(list_destroy(&tree->intersection.edges));
   CHECK(list_destroy(&tree->intersection.chains));
+
+  CHECK(list_destroy(&tree->links));
 
   CHECK(quad_tree_nullify(tree));
 
@@ -804,7 +812,7 @@ result quad_tree_get_edge_response
   TRY();
   uint32 box_width, box_length, row, col, endrow, endcol;
   sint32 srow, scol;
-  integral_value hsum, vsum;
+  integral_value hsum, vsum, ang;
   INTEGRAL_IMAGE_2BOX_VARIABLES();
 
   CHECK_POINTER(forest);
@@ -876,7 +884,9 @@ result quad_tree_get_edge_response
   }
 
   tree->edge.mag = sqrt(hsum*hsum + vsum*vsum);
-  tree->edge.ang = atan2(vsum, hsum);
+  ang = atan2(hsum, vsum);
+  if (ang < 0) ang = ang + 2 * M_PI;
+  tree->edge.ang = ang;
 
   FINALLY(quad_tree_get_edge_response);
   RETURN();
@@ -1502,6 +1512,36 @@ truth_value quad_tree_is_segment_parent
 /* a private function for initializing quad_forest structure                  */
 /* used in create and in reload                                               */
 
+#define ADD_LINK(neighbor) \
+  new_link.b.tree = (neighbor);\
+  CHECK(list_append_unique_return_pointer(&target->links, (pointer)&new_link,\
+                                          (pointer*)&link, quad_tree_link_equals));\
+  link->a.link = link;\
+  link->a.other = &link->b;\
+  link->b.link = link;\
+  link->b.other = &link->a;\
+  if (link->a.tree == tree) {\
+    head = &link->a;\
+  }\
+  else {\
+    head = &link->b;\
+  }\
+  head->angle = angle;\
+  CHECK(list_append(&tree->links, (pointer)&head));\
+
+truth_value quad_tree_link_equals(const void *a, const void *b)
+{
+  const quad_tree_link *sa, *sb;
+  if (a == NULL || b == NULL) return FALSE;
+  sa = (const quad_tree_link *)a;
+  sb = (const quad_tree_link *)b;
+  if ((sa->a.tree == sb->a.tree && sa->b.tree == sb->b.tree) ||
+      (sa->a.tree == sb->b.tree && sa->b.tree == sb->a.tree)) {
+    return TRUE;
+  }
+  return FALSE;
+}
+
 result quad_forest_init
 (
   quad_forest *target,
@@ -1511,7 +1551,10 @@ result quad_forest_init
 {
   TRY();
   uint32 row, col, rows, cols, pos, size, width, height;
-  quad_tree new_tree, *tree_ptr;
+  integral_value angle;
+  quad_tree new_tree, *tree;
+  quad_tree_link new_link, *link;
+  quad_tree_link_head *head;
 
   /* not necessary to check target pointer, calling function should handle that */
   width = target->original->width;
@@ -1547,6 +1590,10 @@ result quad_forest_init
     }
     CHECK(list_create(&target->edges, 100, sizeof(quad_forest_edge_chain), 1));
 
+    if (!list_is_null(&target->links)) {
+      CHECK(list_destroy(&target->links));
+    }
+    CHECK(list_create(&target->links, 8 * size, sizeof(quad_tree_link), 1));
   }
   else {
     rows = target->rows;
@@ -1576,12 +1623,26 @@ result quad_forest_init
     new_tree.y = (uint32)(target->dy + row * tree_max_size);
     new_tree.x = (uint32)(target->dx);
     for (col = 0; col < cols; col++, pos++, new_tree.x += tree_max_size) {
-      CHECK(list_append_return_pointer(&target->trees, (pointer)&new_tree, (pointer*)&tree_ptr));
-      target->roots[pos] = tree_ptr;
+      CHECK(list_append_return_pointer(&target->trees, (pointer)&new_tree, (pointer*)&tree));
+      CHECK(list_create(&tree->links, 8, sizeof(quad_tree_link_head*), 1));
+      target->roots[pos] = tree;
     }
   }
   target->last_root_tree = target->trees.last.prev;
 
+  new_link.a.context.data.type = t_UNDEF;
+  new_link.a.context.data.count = 0;
+  new_link.a.context.data.value = NULL;
+  new_link.b.context.data.type = t_UNDEF;
+  new_link.b.context.data.count = 0;
+  new_link.b.context.data.value = NULL;
+  new_link.distance = 0;
+  new_link.strength = 0;
+  new_link.context.token = 0;
+  new_link.context.round = 0;
+  new_link.context.data.type = t_UNDEF;
+  new_link.context.data.count = 0;
+  new_link.context.data.value = NULL;
   /* add neighbors to roots */
   /* TODO: create the neighbor links (first-rate 8-neighborhood) */
   /* then implement a simple edge propagation algorithm */
@@ -1589,21 +1650,51 @@ result quad_forest_init
   /* then visualize tree values ('height') also (with red color?) */
   for (row = 0, pos = 0; row < rows; row++) {
     for (col = 0; col < cols; col++, pos++) {
+      tree = target->roots[pos];
+      new_link.a.tree = tree;
       /* add neighbor to west */
       if (col > 0) {
-        target->roots[pos]->w = target->roots[pos - 1];
+        tree->w = target->roots[pos - 1];
+        angle = M_PI;
+        ADD_LINK(tree->w);
+        /* nw neighbor */
+        if (row > 0) {
+          angle = 3 * M_PI / 4;
+          ADD_LINK(target->roots[pos - cols - 1]);
+        }
+        /* sw neighbor */
+        if (row < (unsigned)(rows - 1)) {
+          angle = 5 * M_PI / 4;
+          ADD_LINK(target->roots[pos + cols - 1]);
+        }
       }
       /* add neighbor to north */
       if (row > 0) {
-        target->roots[pos]->n = target->roots[pos - cols];
+        tree->n = target->roots[pos - cols];
+        angle = M_PI / 2;
+        ADD_LINK(tree->n);
       }
       /* add neighbor to east */
       if (col < (unsigned)(cols - 1)) {
-        target->roots[pos]->e = target->roots[pos + 1];
+        tree->e = target->roots[pos + 1];
+        angle = 0;
+        ADD_LINK(tree->e);
+        /* ne neighbor */
+        if (row > 0) {
+          angle = M_PI / 4;
+          ADD_LINK(target->roots[pos - cols + 1]);
+        }
+        /* se neighbor */
+        if (row < (unsigned)(rows - 1)) {
+          angle = 7 * M_PI / 4;
+          ADD_LINK(target->roots[pos + cols + 1]);
+        }
       }
       /* add neighbor to south */
       if (row < (unsigned)(rows - 1)) {
-        target->roots[pos]->s = target->roots[pos + cols];
+        tree->s = target->roots[pos + cols];
+        angle = 3 * M_PI / 2;
+        ADD_LINK(tree->s);
       }
     }
   }
@@ -1747,19 +1838,31 @@ result quad_forest_destroy
 )
 {
   TRY();
-  list_item *trees, *end;
+  list_item *items, *end;
+  quad_tree_link *link;
 
   CHECK_POINTER(target);
 
   /* it is necessary to destroy the trees, as they may contain typed pointers */
-  trees = target->trees.first.next;
+  items = target->trees.first.next;
   end = &target->trees.last;
-  while (trees != end) {
-    CHECK(quad_tree_destroy((quad_tree *)trees->data));
-    trees = trees->next;
+  while (items != end) {
+    CHECK(quad_tree_destroy((quad_tree *)items->data));
+    items = items->next;
   }
-
   CHECK(list_destroy(&target->trees));
+
+  items = target->links.first.next;
+  end = &target->links.last;
+  while (items != end) {
+    link = (quad_tree_link*)items->data;
+    typed_pointer_destroy(&link->a.context.data);
+    typed_pointer_destroy(&link->b.context.data);
+    typed_pointer_destroy(&link->context.data);
+    items = items->next;
+  }
+  CHECK(list_destroy(&target->links));
+  CHECK(list_destroy(&target->edges));
   CHECK(memory_deallocate((data_pointer*)&target->roots));
   CHECK(integral_image_destroy(&target->integral));
   if (target->source != NULL) {
@@ -3327,6 +3430,81 @@ result quad_forest_get_path_sniffers
         CHECK(list_append(sniffers, (pointer)&new_line));
       }
     }
+  }
+
+  FINALLY(quad_forest_get_path_sniffers);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result quad_forest_get_links
+(
+  quad_forest *forest,
+  list *links
+)
+{
+  TRY();
+  list_item *items, *end;
+  quad_tree *tree;
+  quad_tree_link *link;
+  integral_value d;
+  weighted_line new_line;
+
+  CHECK_POINTER(forest);
+
+  CHECK(list_create(links, forest->links.count * 2, sizeof(weighted_line), 1));
+
+  items = forest->links.first.next;
+  end = &forest->links.last;
+  while (items != end) {
+    link = (quad_tree_link*)items->data;
+    tree = link->a.tree;
+    new_line.start.x = tree->x + (uint32)(tree->size / 2);
+    new_line.start.y = tree->y + (uint32)(tree->size / 2);
+    tree = link->b.tree;
+    new_line.end.x = tree->x + (uint32)(tree->size / 2);
+    new_line.end.y = tree->y + (uint32)(tree->size / 2);
+    new_line.weight = link->strength;
+    CHECK(list_append(links, (pointer)&new_line));
+
+    /*
+    new_line.start.x = tree->x + (uint32)(tree->size / 2);
+    new_line.start.y = tree->y + (uint32)(tree->size / 2);
+    d = (integral_value)(tree->size / 2);
+    new_line.end.x = new_line.start.x + (uint32)(d * cos(link->a.angle));
+    new_line.end.y = new_line.start.y - (uint32)(d * sin(link->a.angle));
+
+    new_line.weight = 1;
+    CHECK(list_append(links, (pointer)&new_line));
+
+    tree = link->b.tree;
+    new_line.start.x = tree->x + (uint32)(tree->size / 2);
+    new_line.start.y = tree->y + (uint32)(tree->size / 2);
+    d = (integral_value)(tree->size / 2);
+    new_line.end.x = new_line.start.x + (uint32)(d * cos(link->b.angle));
+    new_line.end.y = new_line.start.y - (uint32)(d * sin(link->b.angle));
+
+    new_line.weight = 0.5;
+    CHECK(list_append(links, (pointer)&new_line));
+    */
+    items = items->next;
+  }
+
+  items = forest->trees.first.next;
+  end = &forest->trees.last;
+  while (items != end) {
+    tree = (quad_tree*)items->data;
+    if (IS_TRUE(tree->segment.has_boundary)) {
+      new_line.start.x = tree->x + (uint32)(tree->size / 2);
+      new_line.start.y = tree->y + (uint32)(tree->size / 2);
+      d = (integral_value)(tree->size / 2);
+      new_line.end.x = new_line.start.x + (uint32)(d * cos(tree->edge.ang));
+      new_line.end.y = new_line.start.y - (uint32)(d * sin(tree->edge.ang));
+      new_line.weight = 1;
+      CHECK(list_append(links, (pointer)&new_line));
+    }
+    items = items->next;
   }
 
   FINALLY(quad_forest_get_path_sniffers);
@@ -5364,6 +5542,326 @@ result quad_forest_segment_with_boundaries
   CHECK(quad_forest_refresh_segments(forest));
 
   FINALLY(quad_forest_segment_with_boundaries);
+  RETURN();
+}
+
+/******************************************************************************/
+
+typedef struct edge_parser_t {
+  integral_value cost;
+  uint32 count;
+} edge_parser;
+
+void make_edge_parser
+(
+  typed_pointer *tptr,
+  edge_parser *parser
+)
+{
+  tptr->type = t_EDGE_PARSER;
+  tptr->value = (pointer)source;
+}
+
+truth_value is_edge_parser
+(
+  typed_pointer *tptr
+)
+{
+  if (tptr->type == t_EDGE_PARSER) {
+    return TRUE;
+  }
+  return FALSE;
+}
+
+result expect_edge_parser
+(
+  edge_parser **target,
+  typed_pointer *tptr
+)
+{
+  TRY();
+
+  CHECK_POINTER(target);
+  CHECK_POINTER(tptr);
+  CHECK_POINTER(tptr->value);
+
+  if (tptr->type == t_EDGE_PARSER) {
+    *target = (edge_parser*)tptr->value;
+  }
+  else {
+    ERROR(BAD_TYPE);
+  }
+
+  FINALLY(expect_edge_parser);
+  RETURN();
+}
+
+result quad_forest_parse
+(
+  quad_forest *forest,
+  uint32 rounds,
+  integral_value bias,
+  uint32 min_length
+)
+{
+  TRY();
+  uint32 remaining, i, size, count, token;
+  integral_value mean, dev, value, dx, dy, strength, min, max, cost, cost1, cost2;
+  integral_value angle1, angle2, anglediff;
+  quad_tree *tree1, *tree2;
+  quad_tree_link_head *head, *head1, *head2;
+  quad_tree_link *link;
+  list treelist;
+  list_item *trees, *endtrees, *links, *endlinks;
+  edge_parser *eparser;
+
+  CHECK_POINTER(forest);
+  CHECK_PARAM(rounds > 0);
+
+  size = forest->rows * forest->cols;
+
+  CHECK(list_create(&treelist, size, sizeof(quad_tree*), 1));
+
+  /* before propagation, prime all trees */
+  /* for finding boundaries, prime with deviation */
+  for (i = 0; i < size; i++) {
+    quad_tree_prime_with_dev(forest->roots[i]);
+  }
+
+  /* then, propagate the requested number of rounds */
+  for (remaining = rounds; remaining--;) {
+    for (i = 0; i < size; i++) {
+      quad_tree_propagate(forest->roots[i]);
+    }
+    /* on other rounds except the last, prime for the new run */
+    if (remaining > 0) {
+      for (i = 0; i < size; i++) {
+        quad_tree_prime_with_pool(forest->roots[i]);
+      }
+    }
+  }
+
+  PRINT0("calculate devmean and devdev\n");
+  /* calculate devmean and devdev, and determine the boundary trees */
+  for (i = 0; i < size; i++) {
+    tree1 = forest->roots[i];
+    mean = tree1->pool;
+    dev = tree1->pool2;
+    dev -= mean*mean;
+    if (dev < 0) dev = 0; else dev = sqrt(dev);
+    tree1->segment.devmean = mean;
+    tree1->segment.devdev = dev;
+
+    value = tree1->stat.deviation;
+
+    if (value > getmax(mean, mean + bias - dev)) {
+      tree1->segment.has_boundary = TRUE;
+      /* at this point, get the edge responses for strong boundaries */
+      CHECK(quad_tree_get_edge_response(forest, tree1, NULL, NULL));
+      CHECK(list_append(&treelist, &tree1));
+    }
+    else {
+      tree1->segment.has_boundary = FALSE;
+    }
+  }
+
+  PRINT0("update links\n");
+  token = 384746272;
+  count = 0;
+
+  trees = treelist.first.next;
+  endtrees = &treelist.last;
+  while (trees != endtrees) {
+    tree1 = *((quad_tree**)trees->data);
+    tree1->context.token = token;
+    tree1->context.round = 0;
+    CREATE_POINTER(&tree1->context.data, edge_parser, 1);
+    CHECK(expect_edge_parser(&eparser, &tree1->context.data));
+    eparser->cost = 0;
+    eparser->count = 0;
+
+    head1 = NULL;
+    cost1 = 0;
+    head2 = NULL;
+    cost2 = 0;
+    links = tree1->links.first.next;
+    endlinks = &tree1->links.last;
+    while (links != endlinks) {
+      head = *((quad_tree_link_head**)links->data);
+      if (head->link->context.token != token) {
+        CREATE_POINTER(&head->link->context.data, edge_parser, 1);
+        CHECK(expect_edge_parser(&eparser, &head->link->context.data));
+        eparser->cost = 0;
+        eparser->count = 0;
+        head->link->strength = 0;
+      }
+      if (head->context.token != token {
+        angle1 = head->angle;
+        if (angle1 > M_PI) angle1 -= M_PI;
+        angle2 = tree1->edge.ang;
+        if (angle2 > M_PI) angle2 -= M_PI;
+        anglediff = fabs(angle1 - angle2);
+        if (anglediff > M_PI / 2) anglediff = (M_PI / 2) - anglediff;
+        anglediff /= (M_PI / 2);
+        tree2 = head->other->tree;
+        cost = anglediff * fabs(tree1->segment.devdev - tree2->segment.devdev);
+        head->context.token = token;
+        head->context.round = 1;
+        head->cost = cost;
+        CREATE_POINTER(&head->context.data, edge_parser, 1);
+        CHECK(expect_edge_parser(&eparser, &head->context.data));
+        eparser->cost = cost;
+        eparser->count = 0;
+        if (head1 == NULL) {
+          head1 = head;
+          cost1 = cost;
+        }
+        else {
+          if (cost < cost1) {
+            head2 = head1;
+            cost2 = cost1;
+            head1 = head;
+            cost1 = cost;
+          }
+          else {
+            if (head2 == NULL) {
+              head2 = head;
+              cost2 = cost;
+            }
+            else {
+              if (cost < cost2) {
+                head2 = head;
+                cost2 = cost;
+              }
+            }
+          }
+        }
+
+        if (tree2->context.token != token) {
+          tree2->context.token = token;
+          tree2->context.round = 0;
+          CREATE_POINTER(&tree2->context.data, edge_parser, 1);
+          CHECK(expect_edge_parser(&eparser, &tree->context.data));
+          eparser->cost = 0;
+          eparser->count = 0;
+          CHECK(quad_tree_get_edge_response(forest, tree2, NULL, NULL));
+          CHECK(list_append(&treelist, &tree2));
+        }
+
+      }
+      links = links->next;
+    }
+
+    /* finish propagation round */
+    links = tree1->links.first.next;
+    endlinks = &tree1->links.last;
+    while (links != endlinks) {
+      head = *((quad_tree_link_head**)links->data);
+      CHECK(expect_edge_parser(&eparser, &head->context.data));
+      if (head == head1) {
+        eparser->cost = cost2 + cost1;
+      }
+      else {
+        eparser->cost = cost1 + cost2;
+      }
+      links = links->next;
+    }
+    head1->count++;
+    head2->count++;
+
+    trees = trees->next;
+  }
+
+  /* accumulation round */
+  head1 = NULL;
+  cost1 = 0;
+  head2 = NULL;
+  cost2 = 0;
+  trees = treelist.first.next;
+  endtrees = &treelist.last;
+  while (trees != endtrees) {
+    tree1 = *((quad_tree**)trees->data);
+    links = tree1->links.first.next;
+    endlinks = &tree1->links.last;
+    while (links != endlinks) {
+      head = *((quad_tree_link_head**)links->data);
+      CHECK(expect_edge_parser(&eparser, &head->other->context.data));
+      cost = eparser->cost;
+      CHECK(expect_edge_parser(&eparser, &head->context.data));
+      cost += eparser->cost;
+      if (head1 == NULL) {
+        head1 = head;
+        cost1 = cost;
+      }
+      else {
+        if (cost < cost1) {
+          head2 = head1;
+          cost2 = cost1;
+          head1 = head;
+          cost1 = cost;
+        }
+        else {
+          if (head2 == NULL) {
+            head2 = head;
+            cost2 = cost;
+          }
+          else {
+            if (cost < cost2) {
+              head2 = head;
+              cost2 = cost;
+            }
+          }
+        }
+      }
+    }
+    links = tree1->links.first.next;
+    endlinks = &tree1->links.last;
+    while (links != endlinks) {
+      head = *((quad_tree_link_head**)links->data);
+      CHECK(expect_edge_parser(&eparser, &head->context.data));
+      if (head == head1) {
+        eparser->cost = cost2 + cost1;
+      }
+      else {
+        eparser->cost = cost1 + cost2;
+      }
+      links = links->next;
+    }
+    head1->count++;
+    head2->count++;
+    trees = trees->next;
+  }
+
+  PRINT0("normalize links\n");
+  /*
+        if (count == 0) {
+          min = strength;
+          max = strength;
+        }
+        else {
+          if (strength < min) min = strength;
+          if (strength > max) max = strength;
+        }
+        count++;
+  */
+  /*
+  links = forest->links.first.next;
+  endlinks = &forest->links.last;
+  while (links != endlinks) {
+    link = (quad_tree_link*)links->data;
+    if (link->strength < 0.0000001) {
+      link->strength = 0;
+    }
+    else {
+      link->strength = 1 - ((link->strength - min) / (max - min));
+    }
+    links = links->next;
+  }
+  */
+
+  PRINT0("finished\n");
+  FINALLY(quad_forest_parse);
+  list_destroy(&treelist);
   RETURN();
 }
 
