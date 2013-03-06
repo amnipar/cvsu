@@ -1630,9 +1630,17 @@ result quad_forest_init
   }
   target->last_root_tree = target->trees.last.prev;
 
+  new_link.a.angle = 0;
+  new_link.a.cost = 0;
+  new_link.a.context.token = 0;
+  new_link.a.context.round = 0;
   new_link.a.context.data.type = t_UNDEF;
   new_link.a.context.data.count = 0;
   new_link.a.context.data.value = NULL;
+  new_link.b.angle = 0;
+  new_link.b.cost = 0;
+  new_link.b.context.token = 0;
+  new_link.b.context.round = 0;
   new_link.b.context.data.type = t_UNDEF;
   new_link.b.context.data.count = 0;
   new_link.b.context.data.value = NULL;
@@ -1897,6 +1905,7 @@ result quad_forest_nullify
   target->dy = 0;
   CHECK(list_nullify(&target->trees));
   CHECK(list_nullify(&target->edges));
+  CHECK(list_nullify(&target->links));
   target->last_root_tree = NULL;
   target->roots = NULL;
 
@@ -3490,23 +3499,28 @@ result quad_forest_get_links
     */
     items = items->next;
   }
-
+/*
   items = forest->trees.first.next;
   end = &forest->trees.last;
   while (items != end) {
     tree = (quad_tree*)items->data;
-    if (IS_TRUE(tree->segment.has_boundary)) {
+    if (tree->context.token != 0) {
       new_line.start.x = tree->x + (uint32)(tree->size / 2);
       new_line.start.y = tree->y + (uint32)(tree->size / 2);
-      d = (integral_value)(tree->size / 2);
+      d = (integral_value)(tree->size);
       new_line.end.x = new_line.start.x + (uint32)(d * cos(tree->edge.ang));
       new_line.end.y = new_line.start.y - (uint32)(d * sin(tree->edge.ang));
-      new_line.weight = 1;
+      if (tree->stat.deviation < getmax(1, tree->segment.devmean)) {
+        new_line.weight = 0;
+      }
+      else {
+        new_line.weight = 1;
+      }
       CHECK(list_append(links, (pointer)&new_line));
     }
     items = items->next;
   }
-
+*/
   FINALLY(quad_forest_get_path_sniffers);
   RETURN();
 }
@@ -5548,9 +5562,13 @@ result quad_forest_segment_with_boundaries
 /******************************************************************************/
 
 typedef struct edge_parser_t {
-  integral_value cost;
-  uint32 count;
+  integral_value pool_cost;
+  integral_value acc_cost;
+  uint32 pool_length;
+  uint32 acc_length;
 } edge_parser;
+
+/******************************************************************************/
 
 void make_edge_parser
 (
@@ -5559,8 +5577,10 @@ void make_edge_parser
 )
 {
   tptr->type = t_EDGE_PARSER;
-  tptr->value = (pointer)source;
+  tptr->value = (pointer)parser;
 }
+
+/******************************************************************************/
 
 truth_value is_edge_parser
 (
@@ -5573,10 +5593,12 @@ truth_value is_edge_parser
   return FALSE;
 }
 
+/******************************************************************************/
+
 result expect_edge_parser
 (
   edge_parser **target,
-  typed_pointer *tptr
+  const typed_pointer *tptr
 )
 {
   TRY();
@@ -5596,6 +5618,185 @@ result expect_edge_parser
   RETURN();
 }
 
+/******************************************************************************/
+
+string init_edge_parsers_name = "init_edge_parsers";
+string pool_edge_parsers_name = "pool_edge_parsers";
+string acc_edge_parsers_name = "acc_edge_parsers";
+
+/******************************************************************************/
+
+result init_edge_parsers(quad_forest *forest, quad_tree *tree, uint32 token)
+{
+  TRY();
+  integral_value angle1, angle2, anglediff, cost;
+  list_item *links, *endlinks;
+  quad_tree_link_head *head;
+  edge_parser *eparser;
+  
+  /* set token and set round to 0 */
+  tree->context.token = token;
+  tree->context.round = 0;
+  /* calculate edge response */
+  CHECK(quad_tree_get_edge_response(forest, tree, NULL, NULL));
+  /* initialize link heads */
+  links = tree->links.first.next;
+  endlinks = &tree->links.last;
+  while (links != endlinks) {
+    head = *((quad_tree_link_head**)links->data);
+    if (head->context.token != token) {
+      /* create context, add token, set round to 0 */
+      head->context.token = token;
+      head->context.round = 0;
+      CREATE_POINTER(&head->context.data, edge_parser, 1);
+      CHECK(expect_edge_parser(&eparser, &head->context.data));
+      eparser->acc_cost = 0;
+      eparser->pool_cost = 0;
+      eparser->acc_length = 0;
+      eparser->pool_length = 0;
+      
+      /* calculate half-step cost */
+      angle1 = head->angle;
+      if (angle1 > M_PI) angle1 -= M_PI;
+      angle2 = tree->edge.ang;
+      if (angle2 > M_PI) angle2 -= M_PI;
+      anglediff = fabs(angle1 - angle2);
+      if (anglediff > (M_PI / 2)) anglediff = M_PI - anglediff;
+      anglediff /= (M_PI / 2);
+      
+      if (tree->stat.deviation < tree->segment.devmean && 
+          head->other->tree->stat.deviation < head->other->tree->segment.devmean) {
+        cost = tree->segment.devmean - fabs(tree->stat.deviation - head->other->tree->stat.deviation);
+        if (cost < 0) cost = 0;
+      }
+      else {
+        cost = anglediff * fabs(tree->segment.devdev - head->other->tree->segment.devdev);
+      }
+      
+      if (cost < 0.0000001) cost = 0.001;
+    
+      head->cost = cost;
+    }
+    links = links->next;
+  }
+  
+  FINALLY(init_edge_parsers);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result pool_edge_parsers(quad_tree *tree, uint32 round)
+{
+  TRY();
+  uint32 length, length1, length2;
+  integral_value cost, cost1, cost2;
+  list_item *links, *endlinks;
+  quad_tree_link_head *head, *head1, *head2;
+  edge_parser *eparser;
+  
+  head1 = NULL;
+  cost1 = 0;
+  length1 = 0;
+  head2 = NULL;
+  cost2 = 0;
+  length2 = 0;
+  
+  links = tree->links.first.next;
+  endlinks = &tree->links.last;
+  while (links != endlinks) {
+    head = *((quad_tree_link_head**)links->data);
+    CHECK(expect_edge_parser(&eparser, &head->context.data));
+    cost = eparser->acc_cost;
+    length = eparser->acc_length;
+    /* find best paths with at least length 1, NULL if not found */
+    if (length > 0) {
+      if (head1 == NULL || cost < cost1) {
+        head2 = head1;
+        cost2 = cost1;
+        length2 = length1;
+        head1 = head;
+        cost1 = cost;
+        length1 = length;
+      }
+      else {
+        if (head2 == NULL || cost < cost2) {
+          head2 = head;
+          cost2 = cost;
+          length2 = length;
+        }
+      }
+    }
+    links = links->next;
+  }
+  
+  links = tree->links.first.next;
+  endlinks = &tree->links.last;
+  while (links != endlinks) {
+    head = *((quad_tree_link_head**)links->data);
+    cost = 0;
+    length = 0;
+    if (head1 != NULL) {
+      if (head != head1) {
+        cost = cost1;
+        length = length1;
+      }
+      else {
+        cost = cost2;
+        length = length2;
+      }
+    }
+    
+    /* pool the cost of best path, length, plus cost of own half-step */
+    CHECK(expect_edge_parser(&eparser, &head->context.data));
+    eparser->pool_cost = cost + head->cost;
+    eparser->pool_length = length;
+    head->context.round = round;
+    
+    links = links->next;
+  }
+  if (head1 != NULL) {
+    head1->link->strength = 1;
+  }
+  if (head2 != NULL) {
+    head2->link->strength = 1;
+  }
+  
+  tree->context.round = round;
+  
+  FINALLY(pool_edge_parsers);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result acc_edge_parsers(quad_tree *tree, uint32 token)
+{
+  TRY();
+  list_item *links, *endlinks;
+  quad_tree_link_head *head;
+  edge_parser *eparser1, *eparser2;
+  
+  /* add pooled cost of other end of each link to own half-step cost, increase length by 1 */
+  links = tree->links.first.next;
+  endlinks = &tree->links.last;
+  while (links != endlinks) {
+    head = *((quad_tree_link_head**)links->data);
+    if (head->other->context.token == token) {
+      CHECK(expect_edge_parser(&eparser1, &head->context.data));
+      CHECK(expect_edge_parser(&eparser2, &head->other->context.data));
+      eparser1->acc_cost = head->cost + eparser2->pool_cost;
+      eparser1->acc_length = eparser2->pool_length + 1;
+    }
+    links = links->next;
+  }
+  
+  FINALLY(acc_edge_parsers);
+  RETURN();
+}
+
+/******************************************************************************/
+
 result quad_forest_parse
 (
   quad_forest *forest,
@@ -5605,7 +5806,7 @@ result quad_forest_parse
 )
 {
   TRY();
-  uint32 remaining, i, size, count, token;
+  uint32 remaining, i, size, count, token, round, length1, length2;
   integral_value mean, dev, value, dx, dy, strength, min, max, cost, cost1, cost2;
   integral_value angle1, angle2, anglediff;
   quad_tree *tree1, *tree2;
@@ -5629,7 +5830,7 @@ result quad_forest_parse
   }
 
   /* then, propagate the requested number of rounds */
-  for (remaining = rounds; remaining--;) {
+  for (remaining = rounds+1; remaining--;) {
     for (i = 0; i < size; i++) {
       quad_tree_propagate(forest->roots[i]);
     }
@@ -5641,6 +5842,9 @@ result quad_forest_parse
     }
   }
 
+  srand(384746272);
+  token = rand();
+  
   PRINT0("calculate devmean and devdev\n");
   /* calculate devmean and devdev, and determine the boundary trees */
   for (i = 0; i < size; i++) {
@@ -5654,185 +5858,118 @@ result quad_forest_parse
 
     value = tree1->stat.deviation;
 
+    tree1->segment.has_boundary = FALSE;
     if (value > getmax(mean, mean + bias - dev)) {
-      tree1->segment.has_boundary = TRUE;
+      /*tree1->segment.has_boundary = TRUE;*/
+      CHECK(init_edge_parsers(forest, tree1, token));
+      /* do the round 0 for seed nodes here */
       /* at this point, get the edge responses for strong boundaries */
+      /*
       CHECK(quad_tree_get_edge_response(forest, tree1, NULL, NULL));
       CHECK(list_append(&treelist, &tree1));
+      */
     }
     else {
-      tree1->segment.has_boundary = FALSE;
+      /* init segment parser */
+      tree1->context.token = 0;
+      /*tree1->segment.has_boundary = FALSE;*/
     }
   }
-
-  PRINT0("update links\n");
-  token = 384746272;
-  count = 0;
-
-  trees = treelist.first.next;
-  endtrees = &treelist.last;
-  while (trees != endtrees) {
-    tree1 = *((quad_tree**)trees->data);
-    tree1->context.token = token;
-    tree1->context.round = 0;
-    CREATE_POINTER(&tree1->context.data, edge_parser, 1);
-    CHECK(expect_edge_parser(&eparser, &tree1->context.data));
-    eparser->cost = 0;
-    eparser->count = 0;
-
-    head1 = NULL;
-    cost1 = 0;
-    head2 = NULL;
-    cost2 = 0;
-    links = tree1->links.first.next;
-    endlinks = &tree1->links.last;
+  
+  /* parse propagation loop, start with round 1 */
+  PRINT0("running propagate loop\n");
+  for (round = 1; round <= rounds; round++) {
+    PRINT1("round %lu\n", round);
+    links = forest->links.first.next;
+    endlinks = &forest->links.last;
     while (links != endlinks) {
-      head = *((quad_tree_link_head**)links->data);
-      if (head->link->context.token != token) {
-        CREATE_POINTER(&head->link->context.data, edge_parser, 1);
-        CHECK(expect_edge_parser(&eparser, &head->link->context.data));
-        eparser->cost = 0;
-        eparser->count = 0;
-        head->link->strength = 0;
-      }
-      if (head->context.token != token {
-        angle1 = head->angle;
-        if (angle1 > M_PI) angle1 -= M_PI;
-        angle2 = tree1->edge.ang;
-        if (angle2 > M_PI) angle2 -= M_PI;
-        anglediff = fabs(angle1 - angle2);
-        if (anglediff > M_PI / 2) anglediff = (M_PI / 2) - anglediff;
-        anglediff /= (M_PI / 2);
-        tree2 = head->other->tree;
-        cost = anglediff * fabs(tree1->segment.devdev - tree2->segment.devdev);
-        head->context.token = token;
-        head->context.round = 1;
-        head->cost = cost;
-        CREATE_POINTER(&head->context.data, edge_parser, 1);
-        CHECK(expect_edge_parser(&eparser, &head->context.data));
-        eparser->cost = cost;
-        eparser->count = 0;
-        if (head1 == NULL) {
-          head1 = head;
-          cost1 = cost;
-        }
-        else {
-          if (cost < cost1) {
-            head2 = head1;
-            cost2 = cost1;
-            head1 = head;
-            cost1 = cost;
-          }
-          else {
-            if (head2 == NULL) {
-              head2 = head;
-              cost2 = cost;
-            }
-            else {
-              if (cost < cost2) {
-                head2 = head;
-                cost2 = cost;
-              }
-            }
-          }
-        }
-
-        if (tree2->context.token != token) {
-          tree2->context.token = token;
-          tree2->context.round = 0;
-          CREATE_POINTER(&tree2->context.data, edge_parser, 1);
-          CHECK(expect_edge_parser(&eparser, &tree->context.data));
-          eparser->cost = 0;
-          eparser->count = 0;
-          CHECK(quad_tree_get_edge_response(forest, tree2, NULL, NULL));
-          CHECK(list_append(&treelist, &tree2));
-        }
-
-      }
+      link = (quad_tree_link*)links->data;
+      link->strength = 0;
       links = links->next;
     }
-
-    /* finish propagation round */
-    links = tree1->links.first.next;
-    endlinks = &tree1->links.last;
-    while (links != endlinks) {
-      head = *((quad_tree_link_head**)links->data);
-      CHECK(expect_edge_parser(&eparser, &head->context.data));
-      if (head == head1) {
-        eparser->cost = cost2 + cost1;
+    link = (quad_tree_link*)links->data;
+    for (i = 0; i < size; i++) {
+      tree1 = forest->roots[i];
+      /* if tree context has token and smaller round number than current */
+      if (tree1->context.token == token && tree1->context.round < round) {
+        /* then pool */
+        pool_edge_parsers(tree1, round);
+        /* check all neighbors for token */
+        links = tree1->links.first.next;
+        endlinks = &tree1->links.last;
+        while (links != endlinks) {
+          head = *((quad_tree_link_head**)links->data);
+          tree2 = head->other->tree;
+          /* if don't have token, init and then pool with current round */
+          if (tree2->context.token != token) {
+            CHECK(init_edge_parsers(forest, tree2, token));
+            CHECK(pool_edge_parsers(tree2, round));
+          }
+          links = links->next;
+        }
+        tree1->context.round = round;
       }
-      else {
-        eparser->cost = cost1 + cost2;
-      }
-      links = links->next;
     }
-    head1->count++;
-    head2->count++;
-
-    trees = trees->next;
+    /* after pooling all trees, acc trees that have the token */
+    for (i = 0; i < size; i++) {
+      tree1 = forest->roots[i];
+      if (tree1->context.token == token) {
+        CHECK(acc_edge_parsers(tree1, token));
+      }
+    }
   }
-
-  /* accumulation round */
-  head1 = NULL;
-  cost1 = 0;
-  head2 = NULL;
-  cost2 = 0;
-  trees = treelist.first.next;
-  endtrees = &treelist.last;
-  while (trees != endtrees) {
-    tree1 = *((quad_tree**)trees->data);
-    links = tree1->links.first.next;
-    endlinks = &tree1->links.last;
-    while (links != endlinks) {
-      head = *((quad_tree_link_head**)links->data);
-      CHECK(expect_edge_parser(&eparser, &head->other->context.data));
-      cost = eparser->cost;
-      CHECK(expect_edge_parser(&eparser, &head->context.data));
-      cost += eparser->cost;
-      if (head1 == NULL) {
-        head1 = head;
-        cost1 = cost;
-      }
-      else {
-        if (cost < cost1) {
-          head2 = head1;
-          cost2 = cost1;
-          head1 = head;
-          cost1 = cost;
-        }
-        else {
-          if (head2 == NULL) {
-            head2 = head;
-            cost2 = cost;
-          }
-          else {
-            if (cost < cost2) {
-              head2 = head;
-              cost2 = cost;
-            }
-          }
-        }
-      }
-    }
-    links = tree1->links.first.next;
-    endlinks = &tree1->links.last;
-    while (links != endlinks) {
-      head = *((quad_tree_link_head**)links->data);
-      CHECK(expect_edge_parser(&eparser, &head->context.data));
-      if (head == head1) {
-        eparser->cost = cost2 + cost1;
-      }
-      else {
-        eparser->cost = cost1 + cost2;
-      }
-      links = links->next;
-    }
-    head1->count++;
-    head2->count++;
-    trees = trees->next;
-  }
-
+  
   PRINT0("normalize links\n");
+  count = 0;
+  links = forest->links.first.next;
+  endlinks = &forest->links.last;
+  while (links != endlinks) {
+    link = (quad_tree_link*)links->data;
+    if (link->a.context.token == token && link->b.context.token == token) {
+      CHECK(expect_edge_parser(&eparser, &link->a.context.data));
+      /*cost1 = link->a.cost;*/
+      cost1 = eparser->acc_cost;
+      length1 = eparser->acc_length;
+      CHECK(expect_edge_parser(&eparser, &link->b.context.data));
+      /*cost2 = link->b.cost;*/
+      cost2 = eparser->acc_cost;
+      length2 = eparser->acc_length;
+      
+      strength = (cost1 + cost2) / ((integral_value)(length1 + length2));
+      link->strength = strength;
+      
+      /*strength = link->strength;*/
+      if (count == 0) {
+          min = strength;
+          max = strength;
+      }
+      else {
+        if (strength < min) min = strength;
+        if (strength > max) max = strength;
+      }
+      count++;
+    }
+    else {
+      link->strength = 0;
+    }
+    links = links->next;
+  }
+  PRINT2("got %lu links with edge, %lu in total\n", count, forest->links.count);
+  PRINT2("min=%.3f max=%.3f\n", min, max);
+  
+  links = forest->links.first.next;
+  endlinks = &forest->links.last;
+  while (links != endlinks) {
+    link = (quad_tree_link*)links->data;
+    if (link->strength < 0.0000001) {
+      link->strength = 0;
+    }
+    else {
+      link->strength = 1 - ((link->strength - min) / (max - min)); /* 1 - */
+    }
+    links = links->next;
+  }
+  
   /*
         if (count == 0) {
           min = strength;

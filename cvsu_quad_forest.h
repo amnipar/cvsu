@@ -256,7 +256,6 @@ typedef struct quad_tree_link_head_t {
   /** Angle of the line going away from this head */
   integral_value angle;
   integral_value cost;
-  uint32 length;
   parse_context context;
 } quad_tree_link_head;
 
