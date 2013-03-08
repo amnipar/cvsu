@@ -4890,51 +4890,6 @@ result quad_forest_find_boundaries
   RETURN();
 }
 
-/* interesting code for finding boundaries with overlap
-  for (i = 0; i < size; i++) {
-    quad_tree_prime_with_mean(forest->roots[i]);
-  }
-
-  for (remaining = rounds; remaining--;) {
-    for (i = 0; i < size; i++) {
-      quad_tree_propagate(forest->roots[i]);
-    }
-    if (remaining > 0) {
-      for (i = 0; i < size; i++) {
-        quad_tree_prime_with_pool(forest->roots[i]);
-      }
-    }
-  }
-
-  for (i = 0; i < size; i++) {
-    tree = forest->roots[i];
-    mean = tree->pool;
-    dev = getmax(1, tree->segment.devmean);
-    a1 = mean - dev;
-    if (a1 < 0) a1 = 0;
-    a2 = mean + dev;
-    if (a2 > 255) a2 = 255;
-    mean = tree->stat.mean;
-    dev = getmax(1, tree->stat.deviation);
-    b1 = mean - dev;
-    if (b1 < 0) b1 = 0;
-    b2 = mean + dev;
-    if (b2 > 255) b2 = 255;
-
-    I = getmin(a2,b2) - getmax(a1,b1);
-    if (I < 0) I = 0;
-    U = getmax(a2,b2) - getmin(a1,b1);
-
-    value = I / U;
-
-    if (value < 0.5) {
-      tree->segment.has_boundary = TRUE;
-    }
-    else {
-      tree->segment.has_boundary = FALSE;
-    }
-  }
-*/
 /******************************************************************************/
 
 result quad_forest_find_boundaries_with_hysteresis
@@ -5561,6 +5516,12 @@ result quad_forest_segment_with_boundaries
 
 /******************************************************************************/
 
+typedef struct segment_parser_t {
+
+} segment_parser;
+
+/******************************************************************************/
+
 typedef struct edge_parser_t {
   integral_value pool_cost;
   integral_value acc_cost;
@@ -5633,7 +5594,7 @@ result init_edge_parsers(quad_forest *forest, quad_tree *tree, uint32 token)
   list_item *links, *endlinks;
   quad_tree_link_head *head;
   edge_parser *eparser;
-  
+
   /* set token and set round to 0 */
   tree->context.token = token;
   tree->context.round = 0;
@@ -5654,7 +5615,7 @@ result init_edge_parsers(quad_forest *forest, quad_tree *tree, uint32 token)
       eparser->pool_cost = 0;
       eparser->acc_length = 0;
       eparser->pool_length = 0;
-      
+
       /* calculate half-step cost */
       angle1 = head->angle;
       if (angle1 > M_PI) angle1 -= M_PI;
@@ -5663,8 +5624,8 @@ result init_edge_parsers(quad_forest *forest, quad_tree *tree, uint32 token)
       anglediff = fabs(angle1 - angle2);
       if (anglediff > (M_PI / 2)) anglediff = M_PI - anglediff;
       anglediff /= (M_PI / 2);
-      
-      if (tree->stat.deviation < tree->segment.devmean && 
+
+      if (tree->stat.deviation < tree->segment.devmean &&
           head->other->tree->stat.deviation < head->other->tree->segment.devmean) {
         cost = tree->segment.devmean - fabs(tree->stat.deviation - head->other->tree->stat.deviation);
         if (cost < 0) cost = 0;
@@ -5672,14 +5633,14 @@ result init_edge_parsers(quad_forest *forest, quad_tree *tree, uint32 token)
       else {
         cost = anglediff * fabs(tree->segment.devdev - head->other->tree->segment.devdev);
       }
-      
+
       if (cost < 0.0000001) cost = 0.001;
-    
+
       head->cost = cost;
     }
     links = links->next;
   }
-  
+
   FINALLY(init_edge_parsers);
   RETURN();
 }
@@ -5694,14 +5655,14 @@ result pool_edge_parsers(quad_tree *tree, uint32 round)
   list_item *links, *endlinks;
   quad_tree_link_head *head, *head1, *head2;
   edge_parser *eparser;
-  
+
   head1 = NULL;
   cost1 = 0;
   length1 = 0;
   head2 = NULL;
   cost2 = 0;
   length2 = 0;
-  
+
   links = tree->links.first.next;
   endlinks = &tree->links.last;
   while (links != endlinks) {
@@ -5729,7 +5690,7 @@ result pool_edge_parsers(quad_tree *tree, uint32 round)
     }
     links = links->next;
   }
-  
+
   links = tree->links.first.next;
   endlinks = &tree->links.last;
   while (links != endlinks) {
@@ -5746,13 +5707,13 @@ result pool_edge_parsers(quad_tree *tree, uint32 round)
         length = length2;
       }
     }
-    
+
     /* pool the cost of best path, length, plus cost of own half-step */
     CHECK(expect_edge_parser(&eparser, &head->context.data));
     eparser->pool_cost = cost + head->cost;
     eparser->pool_length = length;
     head->context.round = round;
-    
+
     links = links->next;
   }
   if (head1 != NULL) {
@@ -5761,9 +5722,9 @@ result pool_edge_parsers(quad_tree *tree, uint32 round)
   if (head2 != NULL) {
     head2->link->strength = 1;
   }
-  
+
   tree->context.round = round;
-  
+
   FINALLY(pool_edge_parsers);
   RETURN();
 }
@@ -5776,7 +5737,7 @@ result acc_edge_parsers(quad_tree *tree, uint32 token)
   list_item *links, *endlinks;
   quad_tree_link_head *head;
   edge_parser *eparser1, *eparser2;
-  
+
   /* add pooled cost of other end of each link to own half-step cost, increase length by 1 */
   links = tree->links.first.next;
   endlinks = &tree->links.last;
@@ -5790,7 +5751,7 @@ result acc_edge_parsers(quad_tree *tree, uint32 token)
     }
     links = links->next;
   }
-  
+
   FINALLY(acc_edge_parsers);
   RETURN();
 }
@@ -5808,7 +5769,7 @@ result quad_forest_parse
   TRY();
   uint32 remaining, i, size, count, token, round, length1, length2;
   integral_value mean, dev, value, dx, dy, strength, min, max, cost, cost1, cost2;
-  integral_value angle1, angle2, anglediff;
+  integral_value a1, a2, b1, b2, angle1, angle2, anglediff;
   quad_tree *tree1, *tree2;
   quad_tree_link_head *head, *head1, *head2;
   quad_tree_link *link;
@@ -5844,7 +5805,7 @@ result quad_forest_parse
 
   srand(384746272);
   token = rand();
-  
+
   PRINT0("calculate devmean and devdev\n");
   /* calculate devmean and devdev, and determine the boundary trees */
   for (i = 0; i < size; i++) {
@@ -5875,7 +5836,51 @@ result quad_forest_parse
       /*tree1->segment.has_boundary = FALSE;*/
     }
   }
-  
+
+  for (i = 0; i < size; i++) {
+    quad_tree_prime_with_mean(forest->roots[i]);
+  }
+
+  for (remaining = rounds; remaining--;) {
+    for (i = 0; i < size; i++) {
+      quad_tree_propagate(forest->roots[i]);
+    }
+    if (remaining > 0) {
+      for (i = 0; i < size; i++) {
+        quad_tree_prime_with_pool(forest->roots[i]);
+      }
+    }
+  }
+
+  for (i = 0; i < size; i++) {
+    tree = forest->roots[i];
+    mean = tree->pool;
+    dev = getmax(1, tree->segment.devmean);
+    a1 = mean - dev;
+    if (a1 < 0) a1 = 0;
+    a2 = mean + dev;
+    if (a2 > 255) a2 = 255;
+    mean = tree->stat.mean;
+    dev = getmax(1, tree->stat.deviation);
+    b1 = mean - dev;
+    if (b1 < 0) b1 = 0;
+    b2 = mean + dev;
+    if (b2 > 255) b2 = 255;
+
+    I = getmin(a2,b2) - getmax(a1,b1);
+    if (I < 0) I = 0;
+    U = getmax(a2,b2) - getmin(a1,b1);
+
+    value = I / U;
+
+    if (value < 0.5) {
+      tree->segment.has_boundary = TRUE;
+    }
+    else {
+      tree->segment.has_boundary = FALSE;
+    }
+  }
+
   /* parse propagation loop, start with round 1 */
   PRINT0("running propagate loop\n");
   for (round = 1; round <= rounds; round++) {
@@ -5918,7 +5923,7 @@ result quad_forest_parse
       }
     }
   }
-  
+
   PRINT0("normalize links\n");
   count = 0;
   links = forest->links.first.next;
@@ -5934,10 +5939,10 @@ result quad_forest_parse
       /*cost2 = link->b.cost;*/
       cost2 = eparser->acc_cost;
       length2 = eparser->acc_length;
-      
+
       strength = (cost1 + cost2) / ((integral_value)(length1 + length2));
       link->strength = strength;
-      
+
       /*strength = link->strength;*/
       if (count == 0) {
           min = strength;
@@ -5956,7 +5961,7 @@ result quad_forest_parse
   }
   PRINT2("got %lu links with edge, %lu in total\n", count, forest->links.count);
   PRINT2("min=%.3f max=%.3f\n", min, max);
-  
+
   links = forest->links.first.next;
   endlinks = &forest->links.last;
   while (links != endlinks) {
@@ -5969,32 +5974,6 @@ result quad_forest_parse
     }
     links = links->next;
   }
-  
-  /*
-        if (count == 0) {
-          min = strength;
-          max = strength;
-        }
-        else {
-          if (strength < min) min = strength;
-          if (strength > max) max = strength;
-        }
-        count++;
-  */
-  /*
-  links = forest->links.first.next;
-  endlinks = &forest->links.last;
-  while (links != endlinks) {
-    link = (quad_tree_link*)links->data;
-    if (link->strength < 0.0000001) {
-      link->strength = 0;
-    }
-    else {
-      link->strength = 1 - ((link->strength - min) / (max - min));
-    }
-    links = links->next;
-  }
-  */
 
   PRINT0("finished\n");
   FINALLY(quad_forest_parse);
