@@ -1952,7 +1952,8 @@ result quad_forest_update
   dstep = hstep + vstep;
 
   /* create a fresh copy of the source image in case it has changed */
-  CHECK(pixel_image_copy(target->source, target->original));
+  /* TODO: need to remove original and force giving the source images as param? */
+  /*CHECK(pixel_image_copy(target->source, target->original));*/
   CHECK(integral_image_update(&target->integral));
   /* if there are existing child nodes and blocks, remove them */
 
@@ -5769,7 +5770,7 @@ result quad_forest_parse
   TRY();
   uint32 remaining, i, size, count, token, round, length1, length2;
   integral_value mean, dev, value, dx, dy, strength, min, max, cost, cost1, cost2;
-  integral_value a1, a2, b1, b2, angle1, angle2, anglediff;
+  integral_value a1, a2, b1, b2, I, U, angle1, angle2, anglediff;
   quad_tree *tree1, *tree2;
   quad_tree_link_head *head, *head1, *head2;
   quad_tree_link *link;
@@ -5853,15 +5854,15 @@ result quad_forest_parse
   }
 
   for (i = 0; i < size; i++) {
-    tree = forest->roots[i];
-    mean = tree->pool;
-    dev = getmax(1, tree->segment.devmean);
+    tree1 = forest->roots[i];
+    mean = tree1->pool;
+    dev = getmax(1, tree1->segment.devmean);
     a1 = mean - dev;
     if (a1 < 0) a1 = 0;
     a2 = mean + dev;
     if (a2 > 255) a2 = 255;
-    mean = tree->stat.mean;
-    dev = getmax(1, tree->stat.deviation);
+    mean = tree1->stat.mean;
+    dev = getmax(1, tree1->stat.deviation);
     b1 = mean - dev;
     if (b1 < 0) b1 = 0;
     b2 = mean + dev;
@@ -5874,10 +5875,10 @@ result quad_forest_parse
     value = I / U;
 
     if (value < 0.5) {
-      tree->segment.has_boundary = TRUE;
+      tree1->segment.has_boundary = TRUE;
     }
     else {
-      tree->segment.has_boundary = FALSE;
+      tree1->segment.has_boundary = FALSE;
     }
   }
 
