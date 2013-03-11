@@ -70,6 +70,9 @@ string convert_rgb24_to_grey8_name = "convert_rgb24_to_grey8";
 string convert_rgb24_to_yuv24_name = "convert_rgb24_to_yuv24";
 string convert_yuv24_to_rgb24_name = "convert_yuv24_to_rgb24";
 string convert_yuv24_to_grey8_name = "convert_yuv24_to_grey8";
+string convert_uyvy16_to_grey8_name = "convert_uyvy16_to_grey8";
+string convert_uyvy16_to_yuv24_name = "convert_uyvy16_to_yuv24";
+string convert_yuyv16_to_grey8_name = "convert_yuyv16_to_grey8";
 string pick_1_channel_from_3_channels_name = "pick_1_channel_from_3_channels";
 
 /******************************************************************************/
@@ -1874,6 +1877,173 @@ result convert_yuv24_to_grey8
   }
 
   FINALLY(convert_yuv24_to_grey8);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result convert_uyvy16_to_grey8
+(
+  const pixel_image *source,
+  pixel_image *target
+)
+{
+  TRY();
+
+  CHECK_POINTER(source);
+  CHECK_POINTER(target);
+  CHECK_POINTER(source->data);
+  CHECK_POINTER(target->data);
+  CHECK_PARAM(source->type == p_U8);
+  CHECK_PARAM(target->type == p_U8);
+  CHECK_PARAM(source->step == 2);
+  CHECK_PARAM(target->step == 1);
+  CHECK_PARAM(source->format == UYVY);
+  CHECK_PARAM(target->format == GREY);
+  CHECK_PARAM(source->width == target->width);
+  CHECK_PARAM(source->height == target->height);
+
+  /* simply copy y values from uyvy image to greyscale image */
+  if (pixel_image_is_continuous(source) && pixel_image_is_continuous(target)) {
+    CONTINUOUS_IMAGE_VARIABLES(byte, byte);
+    /* y values are in second channel, so must apply offset 1 to source */
+    FOR_2_CONTINUOUS_IMAGES_WITH_OFFSET(1, 0)
+    {
+      PIXEL_VALUE(target) = PIXEL_VALUE(source);
+    }
+  }
+  else {
+    DISCONTINUOUS_IMAGE_VARIABLES(byte, byte);
+    uint32 offset, x, y;
+    /* for discontinuous images offset is applied to row table */
+    /* therefore must correct the offset in case it's other than 0 */
+    offset = 1 - source->offset;
+    FOR_2_DISCONTINUOUS_IMAGES_WITH_OFFSET(offset, 0)
+    {
+      PIXEL_VALUE(target) = PIXEL_VALUE(source);
+    }
+  }
+
+  FINALLY(convert_uyvy16_to_grey8);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result convert_uyvy16_to_yuv24
+(
+  const pixel_image *source,
+  pixel_image *target
+)
+{
+  byte y1,y2,u,v;
+  TRY();
+
+  CHECK_POINTER(source);
+  CHECK_POINTER(target);
+  CHECK_POINTER(source->data);
+  CHECK_POINTER(target->data);
+  CHECK_PARAM(source->type == p_U8);
+  CHECK_PARAM(target->type == p_U8);
+  CHECK_PARAM(source->step == 2);
+  CHECK_PARAM(target->step == 3);
+  CHECK_PARAM(source->format == UYVY);
+  CHECK_PARAM(target->format == YUV);
+  CHECK_PARAM(source->width == target->width);
+  CHECK_PARAM(source->height == target->height);
+
+  /* simply copy y value from second channel */
+  /* u and v values are stored only once for two columnes */
+  /* therefore, must read two columns at once */
+  if (pixel_image_is_continuous(source) && pixel_image_is_continuous(target)) {
+    CONTINUOUS_IMAGE_VARIABLES(byte, byte);
+    FOR_2_CONTINUOUS_IMAGES()
+    {
+      u  = PIXEL_VALUE(source);
+      y1 = PIXEL_VALUE_PLUS(source,1);
+      source_pos += source_step;
+      v  = PIXEL_VALUE(source);
+      y2 = PIXEL_VALUE_PLUS(source,1);
+
+      PIXEL_VALUE(target)        = y1;
+      PIXEL_VALUE_PLUS(target,1) = u;
+      PIXEL_VALUE_PLUS(target,2) = v;
+      target_pos += target_step;
+      PIXEL_VALUE(target)        = y2;
+      PIXEL_VALUE_PLUS(target,1) = u;
+      PIXEL_VALUE_PLUS(target,2) = v;
+    }
+  }
+  else {
+    DISCONTINUOUS_IMAGE_VARIABLES(byte, byte);
+    uint32 x, y;
+    FOR_2_DISCONTINUOUS_IMAGES()
+    {
+      u  = PIXEL_VALUE(source);
+      y1 = PIXEL_VALUE_PLUS(source,1);
+      source_pos += source_step;
+      v  = PIXEL_VALUE(source);
+      y2 = PIXEL_VALUE_PLUS(source,1);
+
+      PIXEL_VALUE(target)        = y1;
+      PIXEL_VALUE_PLUS(target,1) = u;
+      PIXEL_VALUE_PLUS(target,2) = v;
+      target_pos += target_step;
+      PIXEL_VALUE(target)        = y2;
+      PIXEL_VALUE_PLUS(target,1) = u;
+      PIXEL_VALUE_PLUS(target,2) = v;
+    }
+  }
+
+  FINALLY(convert_uyvy16_to_yuv24);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result convert_yuyv16_to_grey8
+(
+  const pixel_image *source,
+  pixel_image *target
+)
+{
+  TRY();
+
+  CHECK_POINTER(source);
+  CHECK_POINTER(target);
+  CHECK_POINTER(source->data);
+  CHECK_POINTER(target->data);
+  CHECK_PARAM(source->type == p_U8);
+  CHECK_PARAM(target->type == p_U8);
+  CHECK_PARAM(source->step == 2);
+  CHECK_PARAM(target->step == 1);
+  CHECK_PARAM(source->format == UYVY);
+  CHECK_PARAM(target->format == GREY);
+  CHECK_PARAM(source->width == target->width);
+  CHECK_PARAM(source->height == target->height);
+
+  /* simply copy y values from uyvy image to greyscale image */
+  if (pixel_image_is_continuous(source) && pixel_image_is_continuous(target)) {
+    CONTINUOUS_IMAGE_VARIABLES(byte, byte);
+    /* y values are in first channel, so must apply offset 0 to source */
+    FOR_2_CONTINUOUS_IMAGES_WITH_OFFSET(0, 0)
+    {
+      PIXEL_VALUE(target) = PIXEL_VALUE(source);
+    }
+  }
+  else {
+    DISCONTINUOUS_IMAGE_VARIABLES(byte, byte);
+    uint32 offset, x, y;
+    /* for discontinuous images offset is applied to row table */
+    /* therefore must correct the offset in case it's other than 0 */
+    offset = 0 - source->offset;
+    FOR_2_DISCONTINUOUS_IMAGES_WITH_OFFSET(offset, 0)
+    {
+      PIXEL_VALUE(target) = PIXEL_VALUE(source);
+    }
+  }
+
+  FINALLY(convert_yuyv16_to_grey8);
   RETURN();
 }
 
