@@ -40,6 +40,7 @@ extern "C" {
 #include "cvsu_pixel_image.h"
 #include "cvsu_quad_forest.h"
 #include "cvsu_background_forest.h"
+#include "cvsu_list.h"
 
 typedef struct temporal_forest_t {
   background_forest *background;
@@ -102,7 +103,30 @@ result temporal_forest_update
 
 result temporal_forest_visualize
 (
-temporal_forest *target
+  temporal_forest *target
+);
+
+quad_forest *temporal_forest_get_current
+(
+  temporal_forest *target
+);
+
+uint32 temporal_forest_segment_count
+(
+  temporal_forest *target
+);
+
+result temporal_forest_get_segments
+(
+  temporal_forest *forest,
+  quad_forest_segment **segments
+);
+
+result temporal_forest_get_segment_boundary
+(
+  temporal_forest *forest,
+  quad_forest_segment *segment,
+  list *boundary
 );
 
 #ifdef __cplusplus

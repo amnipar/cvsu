@@ -32,6 +32,27 @@
 #include "cvsu_temporal_forest.h"
 #include "cvsu_macros.h"
 #include "cvsu_memory.h"
+#include <math.h>
+
+/******************************************************************************/
+/* some gcc versions seem to require these definitions to work properly       */
+/* remove them if they cause problems with other compilers                    */
+
+#ifdef NEED_MINMAX
+#if INTEGRAL_IMAGE_DATA_TYPE == INTEGRAL_IMAGE_USING_FLOAT
+float fminf(float __x, float __y);
+float fmaxf(float __x, float __y);
+#define getmin fminf
+#define getmax fmaxf
+#elif INTEGRAL_IMAGE_DATA_TYPE == INTEGRAL_IMAGE_USING_DOUBLE
+double fmin(double __x, double __y);
+double fmax(double __x, double __y);
+#define getmin fmin
+#define getmax fmax
+#else
+#error "integral image data type not defined"
+#endif
+#endif
 
 /******************************************************************************/
 /* constants for reporting function names in error messages                   */
@@ -43,6 +64,8 @@ string temporal_forest_destroy_name = "temporal_forest_destroy";
 string temporal_forest_nullify_name = "temporal_forest_nullify";
 string temporal_forest_update_name = "temporal_forest_update";
 string temporal_forest_visualize_name = "temporal_forest_visualize";
+string temporal_forest_get_segments_name = "temporal_forest_get_segments";
+string temporal_forest_get_segment_boundary_name = "temporal_forest_get_segment_boundary";
 
 /******************************************************************************/
 
@@ -103,9 +126,9 @@ result temporal_forest_create
     CHECK(quad_forest_create(&target->forests[i], source, max_size, min_size));
   }
   target->count = frame_count;
-  target->current = -1;
+  target->current = 0;
   target->frames = 0;
-  CHECK(pixel_image_create(&target->visual, p_U8, RGB, source->width, source->height, source->step, source->stride));
+  CHECK(pixel_image_create(&target->visual, p_U8, RGB, source->width, source->height, 3, 3 * source->stride));
   target->tree_max_size = max_size;
   target->tree_min_size = min_size;
   target->rows = target->forests[0].rows;
@@ -128,8 +151,12 @@ result temporal_forest_destroy
 )
 {
   TRY();
+  uint32 i;
 
-  CHECK(memory_deallocate((data_pointer*)&target->frames));
+  for (i = 0; i < target->count; i++) {
+      CHECK(quad_forest_destroy(&target->forests[i]));
+  }
+  CHECK(memory_deallocate((data_pointer*)&target->forests));
   CHECK(pixel_image_destroy(&target->visual));
   CHECK(temporal_forest_nullify(target));
 
@@ -189,6 +216,11 @@ result temporal_forest_update
 )
 {
   TRY();
+  uint32 i, size;
+  integral_value mean1, mean2, dev1, dev2, dev;
+  quad_forest *forest1, *forest2;
+  quad_tree *tree1, *tree2;
+  quad_forest_segment *parent, *neighbor_parent;
 
   CHECK_POINTER(target);
   CHECK_POINTER(source);
@@ -197,9 +229,147 @@ result temporal_forest_update
   if (target->current >= target->count) {
     target->current = 0;
   }
-  CHECK(pixel_image_copy(target->forests[0].source, source));
-  CHECK(quad_forest_update(&target->forests[0]));
+  CHECK(pixel_image_copy(target->forests[target->current].source, source));
+  CHECK(quad_forest_update(&target->forests[target->current]));
   target->frames++;
+  if (target->frames > 1) {
+    if (target->current == 0) {
+      forest1 = &target->forests[target->count - 1];
+    }
+    else {
+      forest1 = &target->forests[target->current - 1];
+    }
+    forest2 = &target->forests[target->current];
+    size = target->rows * target->cols;
+    for (i = 0; i < size; i++) {
+      tree1 = forest1->roots[i];
+      tree2 = forest2->roots[i];
+      mean1 = tree1->stat.mean;
+      mean2 = tree2->stat.mean;
+      dev1 = getmax(1, tree1->stat.deviation);
+      dev2 = getmax(1, tree2->stat.deviation);
+      dev = dev1 + dev2; /*getmin(dev1, dev2);*/
+      if (fabs(mean1 - mean2) > dev) {
+        quad_tree_segment_create(tree2);
+      }
+      else {
+        tree2->segment.parent = NULL;
+      }
+    }
+    for (i = 0; i < size; i++) {
+      tree1 = forest2->roots[i];
+      parent = quad_tree_segment_find(tree1);
+      if (parent == &tree1->segment) {
+        tree2 = tree1->n;
+        if (tree2 != NULL) {
+          neighbor_parent = quad_tree_segment_find(tree2);
+          if (neighbor_parent == &tree2->segment) {
+            quad_tree_segment_union(tree1, tree2);
+          }
+          else {
+            mean1 = tree1->stat.mean;
+            mean2 = tree2->stat.mean;
+            dev1 = getmax(1, tree1->stat.deviation);
+            dev2 = getmax(1, tree2->stat.deviation);
+            dev = dev1 + dev2;
+            if (fabs(mean1 - mean2) < dev) {
+              quad_tree_segment_create(tree2);
+              quad_tree_segment_union(tree1, tree2);
+            }
+          }
+        }
+        tree2 = tree1->e;
+        if (tree2 != NULL) {
+          neighbor_parent = quad_tree_segment_find(tree2);
+          if (neighbor_parent == &tree2->segment) {
+            quad_tree_segment_union(tree1, tree2);
+          }
+          else {
+            mean1 = tree1->stat.mean;
+            mean2 = tree2->stat.mean;
+            dev1 = getmax(1, tree1->stat.deviation);
+            dev2 = getmax(1, tree2->stat.deviation);
+            dev = dev1 + dev2;
+            if (fabs(mean1 - mean2) < dev) {
+              quad_tree_segment_create(tree2);
+              quad_tree_segment_union(tree1, tree2);
+            }
+          }
+        }
+        tree2 = tree1->s;
+        if (tree2 != NULL) {
+          neighbor_parent = quad_tree_segment_find(tree2);
+          if (neighbor_parent == &tree2->segment) {
+            quad_tree_segment_union(tree1, tree2);
+          }
+          else {
+            mean1 = tree1->stat.mean;
+            mean2 = tree2->stat.mean;
+            dev1 = getmax(1, tree1->stat.deviation);
+            dev2 = getmax(1, tree2->stat.deviation);
+            dev = dev1 + dev2;
+            if (fabs(mean1 - mean2) < dev) {
+              quad_tree_segment_create(tree2);
+              quad_tree_segment_union(tree1, tree2);
+            }
+          }
+        }
+        tree2 = tree1->w;
+        if (tree2 != NULL) {
+          neighbor_parent = quad_tree_segment_find(tree2);
+          if (neighbor_parent == &tree2->segment) {
+            quad_tree_segment_union(tree1, tree2);
+          }
+          else {
+            mean1 = tree1->stat.mean;
+            mean2 = tree2->stat.mean;
+            dev1 = getmax(1, tree1->stat.deviation);
+            dev2 = getmax(1, tree2->stat.deviation);
+            dev = dev1 + dev2;
+            if (fabs(mean1 - mean2) < dev) {
+              quad_tree_segment_create(tree2);
+              quad_tree_segment_union(tree1, tree2);
+            }
+          }
+        }
+      }
+    }
+    for (i = 0; i < size; i++) {
+      tree1 = forest2->roots[i];
+      parent = quad_tree_segment_find(tree1);
+      if (parent != NULL) {
+        tree2 = tree1->n;
+        if (tree2 != NULL) {
+          neighbor_parent = quad_tree_segment_find(tree2);
+          if (neighbor_parent != NULL && parent != neighbor_parent) {
+            quad_tree_segment_union(tree1, tree2);
+          }
+        }
+        tree2 = tree1->e;
+        if (tree2 != NULL) {
+          neighbor_parent = quad_tree_segment_find(tree2);
+          if (neighbor_parent != NULL && parent != neighbor_parent) {
+            quad_tree_segment_union(tree1, tree2);
+          }
+        }
+        tree2 = tree1->s;
+        if (tree2 != NULL) {
+          neighbor_parent = quad_tree_segment_find(tree2);
+          if (neighbor_parent != NULL && parent != neighbor_parent) {
+            quad_tree_segment_union(tree1, tree2);
+          }
+        }
+        tree2 = tree1->w;
+        if (tree2 != NULL) {
+          neighbor_parent = quad_tree_segment_find(tree2);
+          if (neighbor_parent != NULL && parent != neighbor_parent) {
+            quad_tree_segment_union(tree1, tree2);
+          }
+        }
+      }
+    }
+    CHECK(quad_forest_refresh_segments(forest2));
+  }
 
   FINALLY(temporal_forest_update);
   RETURN();
@@ -216,11 +386,11 @@ result temporal_forest_visualize
   list_item *trees, *end;
   quad_forest *forest;
   quad_tree *tree;
+  quad_forest_segment *parent;
   uint32 x, y, width, height, stride, row_step;
   byte *target_data, *target_pos, color0, color1, color2;
 
   CHECK_POINTER(target);
-  CHECK(target->current >= 0);
 
   forest = &target->forests[target->current];
   width = target->visual.width;
@@ -231,12 +401,21 @@ result temporal_forest_visualize
   CHECK(pixel_image_clear(&target->visual));
 
   trees = forest->trees.first.next;
-  while (trees != &forest->trees.last) {
+  end = &forest->trees.last;
+  while (trees != end) {
     tree = (quad_tree *)trees->data;
     if (tree->nw == NULL) {
-      color0 = (byte)tree->stat.mean;
-      color1 = color0;
-      color2 = color0;
+      parent = quad_tree_segment_find(tree);
+      if (parent != NULL) {
+        color0 = parent->color[0];
+        color1 = parent->color[1];
+        color2 = parent->color[2];
+      }
+      else {
+        color0 = (byte)tree->stat.mean;
+        color1 = color0;
+        color2 = color0;
+      }
       width = tree->size;
       height = width;
       row_step = stride - 3 * width;
@@ -255,7 +434,70 @@ result temporal_forest_visualize
     trees = trees->next;
   }
 
-FINALLY(temporal_forest_visualize);
+  FINALLY(temporal_forest_visualize);
+  RETURN();
+}
+
+/******************************************************************************/
+
+quad_forest *temporal_forest_get_current
+(
+  temporal_forest *target
+)
+{
+  if (target != NULL) {
+    if (target->count > 0) {
+      return &target->forests[target->current];
+    }
+  }
+  return NULL;
+}
+
+/******************************************************************************/
+
+uint32 temporal_forest_segment_count
+(
+  temporal_forest *target
+)
+{
+  quad_forest *forest;
+  forest = temporal_forest_get_current(target);
+  if (forest != NULL) {
+    return forest->segments;
+  }
+  return 0;
+}
+
+/******************************************************************************/
+
+result temporal_forest_get_segments
+(
+  temporal_forest *forest,
+  quad_forest_segment **segments
+)
+{
+  TRY();
+
+  CHECK(quad_forest_get_segments(temporal_forest_get_current(forest), segments));
+
+  FINALLY(temporal_forest_get_segments);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result temporal_forest_get_segment_boundary
+(
+  temporal_forest *forest,
+  quad_forest_segment *segment,
+  list *boundary
+)
+{
+  TRY();
+
+  CHECK(quad_forest_get_segment_boundary(temporal_forest_get_current(forest), segment, boundary));
+
+  FINALLY(temporal_forest_get_segment_boundary);
   RETURN();
 }
 
