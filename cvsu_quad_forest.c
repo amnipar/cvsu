@@ -3009,6 +3009,7 @@ void get_next
       TRY_E()
       TRY_SE()
       TRY_S()
+      *next_dir = d_NULL;
       PRINT0("not found: nw");
       break;
     }
@@ -3022,6 +3023,7 @@ void get_next
       TRY_S()
       TRY_SW()
       TRY_W()
+      *next_dir = d_NULL;
       PRINT0("not found: w");
       break;
     }
@@ -3035,6 +3037,7 @@ void get_next
       TRY_S()
       TRY_SW()
       TRY_W()
+      *next_dir = d_NULL;
       PRINT0("not found: nw");
       break;
     }
@@ -3048,6 +3051,7 @@ void get_next
       TRY_W()
       TRY_NW()
       TRY_N()
+      *next_dir = d_NULL;
       PRINT0("not found: e");
       break;
     }
@@ -3061,6 +3065,7 @@ void get_next
       TRY_W()
       TRY_NW()
       TRY_N()
+      *next_dir = d_NULL;
       PRINT0("not found: se");
       break;
     }
@@ -3074,6 +3079,7 @@ void get_next
       TRY_N()
       TRY_NE()
       TRY_E()
+      *next_dir = d_NULL;
       PRINT0("not found: s");
       break;
     }
@@ -3087,6 +3093,7 @@ void get_next
       TRY_N()
       TRY_NE()
       TRY_E()
+      *next_dir = d_NULL;
       PRINT0("not found: sw");
       break;
     }
@@ -3100,10 +3107,12 @@ void get_next
       TRY_E()
       TRY_SE()
       TRY_S()
+      *next_dir = d_NULL;
       PRINT0("not found: w");
       break;
     }
     default:
+      *next_dir = d_NULL;
       PRINT0("wrong direction!");
   }
 }
@@ -3175,7 +3184,7 @@ result quad_forest_get_segment_boundary
         tree_segment = quad_tree_segment_find(tree);
       }
       else {
-        printf("%lu %lu %lu %lu %lu %lu\n", segment->x1, segment->y1, segment->x2, segment->y2, row, col);
+        /*printf("%lu %lu %lu %lu %lu %lu\n", segment->x1, segment->y1, segment->x2, segment->y2, row, col);*/
         TERMINATE(SUCCESS); /*NOT_FOUND*/
       }
     }
@@ -3206,7 +3215,7 @@ result quad_forest_get_segment_boundary
               POINT_LEFT(tree);
               break;
             default: ;
-              PRINT1("incorrect prev_dir with d_NW: %d", prev_dir);
+              /*PRINT1("incorrect prev_dir with d_NW: %d", prev_dir);*/
           }
         }
         break;
@@ -3224,7 +3233,7 @@ result quad_forest_get_segment_boundary
               POINT_LEFT(tree);
               break;
             default: ;
-              PRINT1("incorrect prev_dir with d_N: %d", prev_dir);
+              /*PRINT1("incorrect prev_dir with d_N: %d", prev_dir);*/
               /* TODO: maybe add d_E creating a sharp corner? */
           }
         }
@@ -3244,7 +3253,7 @@ result quad_forest_get_segment_boundary
               POINT_TOP(tree);
               break;
             default: ;
-              PRINT1("incorrect prev_dir with d_NE: %d", prev_dir);
+              /*PRINT1("incorrect prev_dir with d_NE: %d", prev_dir);*/
           }
         }
         break;
@@ -3262,7 +3271,7 @@ result quad_forest_get_segment_boundary
               POINT_TOP(tree);
               break;
             default: ;
-              PRINT1("incorrect prev_dir with d_E: %d", prev_dir);
+              /*PRINT1("incorrect prev_dir with d_E: %d", prev_dir);*/
               /* maybe add d_S creating a sharp corner? */
           }
         }
@@ -3282,7 +3291,7 @@ result quad_forest_get_segment_boundary
               POINT_RIGHT(tree);
               break;
             default: ;
-              PRINT1("incorrect prev_dir with d_SE: %d", prev_dir);
+              /*PRINT1("incorrect prev_dir with d_SE: %d", prev_dir);*/
           }
         }
         break;
@@ -3300,7 +3309,7 @@ result quad_forest_get_segment_boundary
               POINT_RIGHT(tree);
               break;
             default: ;
-              PRINT1("incorrect prev_dir with d_S: %d", prev_dir);
+              /*PRINT1("incorrect prev_dir with d_S: %d", prev_dir);*/
           }
         }
         break;
@@ -3319,7 +3328,7 @@ result quad_forest_get_segment_boundary
               POINT_BOTTOM(tree);
               break;
             default: ;
-              PRINT1("incorrect prev_dir with d_SW: %d", prev_dir);
+              /*PRINT1("incorrect prev_dir with d_SW: %d", prev_dir);*/
           }
         }
         break;
@@ -3337,14 +3346,14 @@ result quad_forest_get_segment_boundary
               POINT_BOTTOM(tree);
               break;
             default: ;
-              PRINT1("incorrect prev_dir with d_W: %d", prev_dir);
+              /*PRINT1("incorrect prev_dir with d_W: %d", prev_dir);*/
           }
         }
         break;
         default: ;
-          PRINT1("incorrect next_dir: %d", next_dir);
+          /*PRINT1("incorrect next_dir: %d", next_dir);*/
       }
-
+      if (next_dir == d_NULL) break;
       tree = next_tree;
       prev_dir = next_dir;
     } while (tree != end_tree);
