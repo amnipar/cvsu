@@ -1,7 +1,7 @@
 /**
- * @file cvsu_background_forest.c
+ * @file cvsu_segmentation.h
  * @author Matti J. Eskelinen <matti.j.eskelinen@gmail.com>
- * @brief Forest structure for modeling image background.
+ * @brief Functions for parsing images.
  *
  * Copyright (c) 2013, Matti Johannes Eskelinen
  * All Rights Reserved.
@@ -29,9 +29,17 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "cvsu_background_forest.h"
+#ifndef CVSU_SEGMENTATION_H
+#   define CVSU_SEGMENTATION_H
 
-/******************************************************************************/
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-/* end of file                                                                */
-/******************************************************************************/
+
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* CVSU_SEGMENTATION_H */

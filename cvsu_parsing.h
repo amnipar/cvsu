@@ -1,7 +1,7 @@
 /**
- * @file cvsu_background_forest.c
+ * @file cvsu_parsing.h
  * @author Matti J. Eskelinen <matti.j.eskelinen@gmail.com>
- * @brief Forest structure for modeling image background.
+ * @brief Functions for parsing images.
  *
  * Copyright (c) 2013, Matti Johannes Eskelinen
  * All Rights Reserved.
@@ -29,9 +29,31 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "cvsu_background_forest.h"
+#ifndef CVSU_PARSING_H
+#   define CVSU_PARSING_H
 
-/******************************************************************************/
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-/* end of file                                                                */
-/******************************************************************************/
+
+/**
+ * Uses deviation propagation to find potential segment boundaries.
+ */
+result quad_forest_parse
+(
+  quad_forest *forest,
+  /** How many propagation rounds to use for determining devmean and devdev */
+  uint32 rounds,
+  /** The bias value used for determining devdev threshold for boundary */
+  integral_value bias,
+  /** The minimum length of edge chains _before_ starting to fill gaps */
+  uint32 min_length
+);
+
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* CVSU_PARSING_H */
