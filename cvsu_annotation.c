@@ -175,5 +175,29 @@ truth_value quad_tree_is_segment_parent
   return FALSE;
 }
 
+/******************************************************************************/
+/* comparator function for quad_forest_segments                               */
+
+int compare_segments(const void *a, const void *b)
+{
+  const quad_forest_segment *sa, *sb;
+
+  sa = *((const quad_forest_segment* const *)a);
+  if (sa == NULL) {
+    printf("warning: tree is null in compare_segments\n");
+    return -1;
+  }
+  sb = *((const quad_forest_segment* const *)b);
+
+  if (sb == NULL) {
+    printf("warning: tree is null in compare_segments\n");
+    return -1;
+  }
+
+  if (sa > sb) return 1;
+  else if (sa < sb) return -1;
+  else return 0;
+}
+
 /* end of file                                                                */
 /******************************************************************************/

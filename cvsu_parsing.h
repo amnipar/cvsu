@@ -36,6 +36,26 @@
 extern "C" {
 #endif
 
+#include "cvsu_config.h"
+#include "cvsu_types.h"
+#include "cvsu_quad_tree.h"
+#include "cvsu_list.h"
+#include "cvsu_context.h"
+
+typedef void (*context_operation)(quad_tree *tree, list *collection);
+
+/**
+ * Runs a generic prime/propagate/accumulate operation on a list of trees.
+ */
+result run_context_operation
+(
+  list *input_trees,
+  list *output_trees,
+  context_operation prime_operation,
+  context_operation propagate_operation,
+  context_operation accumulate_operation,
+  truth_value needs_list
+);
 
 /**
  * Uses deviation propagation to find potential segment boundaries.

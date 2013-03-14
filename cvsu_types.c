@@ -199,37 +199,6 @@ integral_value cast_pixel_value
 
 /******************************************************************************/
 
-void typed_pointer_create
-(
-  typed_pointer *tptr,
-  type_label type,
-  uint32 count,
-  pointer value
-)
-{
-  if (tptr != NULL) {
-    tptr->type = type;
-    tptr->count = count;
-    tptr->value = value;
-  }
-}
-
-/******************************************************************************/
-
-void typed_pointer_destroy
-(
-  typed_pointer *tptr
-)
-{
-  if (tptr != NULL && tptr->value != NULL) {
-    memory_deallocate((data_pointer*)&tptr->value);
-    tptr->type = t_UNDEF;
-    tptr->count = 0;
-  }
-}
-
-/******************************************************************************/
-
 void statistics_init
 (
   statistics *stat

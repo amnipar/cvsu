@@ -147,6 +147,7 @@ typedef struct quad_forest_segment_t
   byte color[4];
 } quad_forest_segment;
 
+int compare_segments(const void *a, const void *b)
 
 #ifdef __cplusplus
 }

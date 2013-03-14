@@ -51,16 +51,40 @@ void make_stat_accumulator
   tptr->value = (pointer)source;
 }
 
+/******************************************************************************/
+
 truth_value is_stat_accumulator
 (
   typed_pointer *tptr
 )
 {
-  if (tptr->type == t_STAT_ACCUMULATOR) {
+  if (tptr != NULL && tptr->type == t_STAT_ACCUMULATOR) {
     return TRUE;
   }
   return FALSE;
 }
+
+/******************************************************************************/
+
+stat_accumulator *has_stat_accumulator
+(
+  typed_pointer *tptr
+)
+{
+  if (IS_TRUE(is_stat_accumulator(tptr))) {
+    return (stat_accumulator*)tptr->value;
+  }
+  if (IS_TRUE(is_tuple(tptr))) {
+    uint32 i;
+    stat_accumulator *acc;
+    for (i = 0; i < tptr->count; i++) {
+      acc = has_stat_accumulator((typed_pointer))
+    }
+  }
+
+}
+
+/******************************************************************************/
 
 result expect_stat_accumulator
 (
@@ -97,6 +121,8 @@ void make_path_sniffer
   tptr->value = (pointer)source;
 }
 
+/******************************************************************************/
+
 truth_value is_path_sniffer
 (
   typed_pointer *tptr
@@ -107,6 +133,8 @@ truth_value is_path_sniffer
   }
   return FALSE;
 }
+
+/******************************************************************************/
 
 result expect_path_sniffer
 (
@@ -198,8 +226,6 @@ result expect_edge_parser
 
 /******************************************************************************/
 
-/******************************************************************************/
-
 typedef struct segment_parser_t {
 
 } segment_parser;
@@ -265,8 +291,6 @@ result expect_edge_parser
 
 /******************************************************************************/
 
-/******************************************************************************/
-
 void make_edge_parser
 (
   typed_pointer *tptr,
@@ -314,8 +338,6 @@ result expect_edge_parser
   FINALLY(expect_edge_parser);
   RETURN();
 }
-
-/******************************************************************************/
 
 /* end of file                                                                */
 /******************************************************************************/

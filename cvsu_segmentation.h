@@ -1,7 +1,7 @@
 /**
  * @file cvsu_segmentation.h
  * @author Matti J. Eskelinen <matti.j.eskelinen@gmail.com>
- * @brief Functions for parsing images.
+ * @brief Functions for segmenting images.
  *
  * Copyright (c) 2013, Matti Johannes Eskelinen
  * All Rights Reserved.
@@ -36,6 +36,87 @@
 extern "C" {
 #endif
 
+/**
+ * Refreshes the segment count and colors. MUST be called after segmentation and
+ * BEFORE calling @see quad_forest_get_segments.
+ */
+result quad_forest_refresh_segments
+(
+  quad_forest *target
+);
+
+/**
+ * Segments the quad_forest structure using a deviation threshold as
+ * consistency and similarity criteria. Divides all trees that have deviation
+ * larger than the threshold, and then merges trees and regions that have the
+ * difference of means smaller than the threshold.
+ */
+result quad_forest_segment_with_deviation
+(
+  /** The quad_forest structure to be segmented. */
+  quad_forest *target,
+  /** Threshold value for deviation, trees with larger value are divided. */
+  integral_value threshold,
+  /** Deviation multiplier used for creating the estimated intensity range. */
+  integral_value alpha
+);
+
+/**
+ * Segments the quad_forest structure using an entropy measure as consistency
+ * and similarity criteria.
+ * TODO: maybe add some region size constraint as a parameter.
+ */
+result quad_forest_segment_with_overlap
+(
+  /** The quad_forest structure to be segmented. */
+  quad_forest *target,
+  /** Deviation multiplier used for creating the estimated intensity range. */
+  integral_value alpha,
+  /** Range overlap threshold used for determining the trees to merge. */
+  integral_value threshold_trees,
+  /** Range overlap threshold used for determining the segments to merge. */
+  integral_value threshold_segments
+);
+
+/**
+ * Segments the forest by finding first all horizontal edges with edge
+ * propagation, then merging segments that have edges in neighboring trees.
+ */
+result quad_forest_segment_edges
+(
+  /** Forest to be segmented */
+  quad_forest *target,
+  /** How many rounds to propagate while determining trees with edges */
+  uint32 detect_rounds,
+  /** Bias value used in edge detection */
+  integral_value detect_bias,
+  /** Direction of edges to search (H,V,N4) */
+  direction detect_dir,
+  /** How many rounds to propagate the found edges to close gaps */
+  uint32 propagate_rounds,
+  /** Acceptance threshold for propagated edges */
+  integral_value propagate_threshold,
+  /** The direction in which to propagate */
+  direction propagate_dir,
+  /** The direction in which to merge segments */
+  direction merge_dir
+);
+
+/**
+ * Segments the forest by using boundaries found using deviation propagation
+ * and hysteresis to limit the expansion of segments.
+ */
+result quad_forest_segment_with_boundaries
+(
+  quad_forest *forest,
+  uint32 rounds,
+  integral_value high_bias,
+  integral_value low_factor,
+  integral_value tree_alpha,
+  integral_value segment_alpha,
+  truth_value use_hysteresis,
+  truth_value use_pruning
+);
 
 
 #ifdef __cplusplus

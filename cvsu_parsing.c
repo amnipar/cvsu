@@ -42,6 +42,1500 @@ string acc_edge_parsers_name = "acc_edge_parsers";
 
 /******************************************************************************/
 
+result quad_forest_find_edges
+(
+  quad_forest *forest,
+  uint32 rounds,
+  integral_value bias,
+  direction dir
+)
+{
+  TRY();
+  uint32 remaining, i, size;
+  integral_value mean, dev, value;
+  quad_tree *tree;
+
+  CHECK_POINTER(forest);
+  CHECK_PARAM(rounds > 0);
+  CHECK_PARAM(dir == d_H || dir == d_V || dir == d_N4);
+
+  size = forest->rows * forest->cols;
+
+  /* first get the edge responses */
+  /* TODO: add forest state to determine if this has been done already */
+  for (i = 0; i < size; i++) {
+    CHECK(quad_tree_get_edge_response(forest, forest->roots[i], NULL, NULL));
+  }
+
+  /* before propagation, prime all trees */
+  /* for finding horizontal edges, prime with dy */
+  if (dir == d_H) {
+    for (i = 0; i < size; i++) {
+      quad_tree_prime_with_dy(forest->roots[i]);
+    }
+  }
+  else
+  /* for finding vertical edges, prime with dx */
+  if (dir == d_V) {
+    for (i = 0; i < size; i++) {
+      quad_tree_prime_with_dx(forest->roots[i]);
+    }
+  }
+  /* otherwise, prime with magnitude */
+  else {
+    for (i = 0; i < size; i++) {
+      quad_tree_prime_with_mag(forest->roots[i]);
+    }
+  }
+
+  /* then, propagate the requested number of rounds */
+  for (remaining = rounds; remaining--;) {
+    for (i = 0; i < size; i++) {
+      quad_tree_propagate(forest->roots[i]);
+    }
+    /* on other rounds except the last, prime for the new run */
+    if (remaining > 0) {
+      for (i = 0; i < size; i++) {
+        quad_tree_prime_with_pool(forest->roots[i]);
+      }
+    }
+  }
+
+  for (i = 0; i < size; i++) {
+    tree = forest->roots[i];
+    mean = tree->pool;
+    dev = tree->pool2;
+    dev -= mean*mean;
+    if (dev < 0) dev = 0; else dev = sqrt(dev);
+    tree->edge.mean = mean;
+    tree->edge.deviation = dev;
+    tree->edge.dir = dir;
+
+    if (dir == d_H) {
+      value = tree->edge.dy;
+    }
+    else
+    if (dir == d_V) {
+      value = tree->edge.dx;
+    }
+    else {
+      value = tree->edge.mag;
+    }
+
+    if (value > getmax(mean, mean + bias - dev)) {
+      /*printf("value %.3f mean %.3f dev %.3f\n", tree->mag, mean, dev);*/
+      tree->edge.has_edge = TRUE;
+    }
+    else {
+      tree->edge.has_edge = FALSE;
+    }
+  }
+
+  FINALLY(quad_forest_find_edges);
+  RETURN();
+}
+
+/******************************************************************************/
+
+#define GET_NEIGHBOR_N()\
+  neighbor = tree->n
+
+#define GET_NEIGHBOR_NE()\
+  neighbor = tree->n != NULL ? tree->n->e : NULL
+
+#define GET_NEIGHBOR_E()\
+  neighbor = tree->e
+
+#define GET_NEIGHBOR_SE()\
+  neighbor = tree->s != NULL ? tree->s->e : NULL
+
+#define GET_NEIGHBOR_S()\
+  neighbor = tree->s
+
+#define GET_NEIGHBOR_SW()\
+  neighbor = tree->s != NULL ? tree->s->w : NULL
+
+#define GET_NEIGHBOR_W()\
+  neighbor = tree->w
+
+#define GET_NEIGHBOR_NW()\
+  neighbor = tree->n != NULL ? tree->n->w : NULL
+
+#define CHECK_NEIGHBOR(tree, value, has_next, max)\
+  if (neighbor != NULL) {\
+    if (IS_TRUE(neighbor->segment.has_boundary)) {\
+      if ((signum(tree->edge.dx) == signum(neighbor->edge.dx)) && \
+          (signum(tree->edge.dy) == signum(neighbor->edge.dy))) {\
+        has_next = TRUE;\
+        if (max == NULL) {\
+          max = neighbor;\
+        }\
+        else if (neighbor->edge.strength > max->edge.strength) {\
+          max = neighbor;\
+        }\
+      }\
+    }\
+  }
+
+#define CHECK_NEIGHBOR_HYSTERESIS(tree, value, has_next, max)\
+  if (neighbor != NULL) {\
+    if (IS_TRUE(neighbor->segment.has_boundary)) {\
+      has_next = TRUE;\
+    }\
+    else\
+    if (neighbor->stat.deviation > value) {\
+      if (max == NULL) {\
+        max = neighbor;\
+      }\
+      else if (neighbor->stat.deviation > max->stat.deviation) {\
+        max = neighbor;\
+      }\
+    }\
+  }
+
+#define CHECK_SNIFFER_NEIGHBOR() \
+  if (neighbor != NULL) {\
+    if (neighbor->context.token == token) {\
+      CHECK(expect_path_sniffer(&neighbor_sniffer, &neighbor->context.data));\
+      if (sniffer->endpoint == neighbor_sniffer->endpoint) {\
+        PRINT0("update cost...");\
+        cost = sniffer->cost + fabs(sniffer->strength - neighbor_sniffer->strength);\
+        if (neighbor_sniffer->cost > cost) {\
+          neighbor_sniffer->cost = cost;\
+          neighbor_sniffer->prev = sniffer;\
+          neighbor_sniffer->length = sniffer->length + 1;\
+        }\
+        PRINT0("done\n");\
+      }\
+      else {\
+        PRINT0("new connection...");\
+        new_connection.endpoint1 = sniffer->endpoint;\
+        new_connection.endpoint2 = neighbor_sniffer->endpoint;\
+        new_connection.sniffer1 = sniffer;\
+        new_connection.sniffer2 = neighbor_sniffer;\
+        new_connection.cost = 1000000000;\
+        CHECK(list_append_unique_return_pointer(&connection_list,\
+                                                (pointer)&new_connection,\
+                                                (pointer*)&connection,\
+                                                connection_equals_by_endpoints));\
+        cost = sniffer->cost + neighbor_sniffer->cost + \
+            fabs(sniffer->strength - neighbor_sniffer->strength);\
+        if (connection->cost > cost) {\
+          PRINT0("...updating...");\
+          /*\
+          connection->endpoint1 = sniffer->endpoint;\
+          connection->endpoint2 = neighbor_sniffer->endpoint;\
+          */\
+          connection->sniffer1 = sniffer;\
+          connection->sniffer2 = neighbor_sniffer;\
+          connection->cost = cost;\
+        }\
+        PRINT0("done\n");\
+      }\
+    }\
+    else {\
+      if (neighbor->edge.chain != NULL) {\
+        PRINT0("intersection\n");\
+      }\
+      else {\
+        if (sniffer->length < 4) {\
+          /*PRINT0("add next...");*/\
+          neighbor->context.token = token;\
+          CREATE_POINTER(&neighbor->context.data, path_sniffer, 1);\
+          CHECK(expect_path_sniffer(&neighbor_sniffer, &neighbor->context.data));\
+          neighbor_sniffer->prev = sniffer;\
+          neighbor_sniffer->tree = neighbor;\
+          neighbor_sniffer->chain = sniffer->chain;\
+          neighbor_sniffer->endpoint = sniffer->endpoint;\
+          neighbor_sniffer->strength = neighbor->segment.devdev;\
+          neighbor_sniffer->cost = sniffer->cost + fabs(sniffer->strength - neighbor_sniffer->strength);\
+          neighbor_sniffer->length = sniffer->length + 1;\
+          neighbor_sniffer->dir_start = sniffer->dir_start;\
+          neighbor_sniffer->dir_end = sniffer->dir_end;\
+          CHECK(list_insert_sorted(&context_list, (pointer)&neighbor_sniffer,\
+              path_sniffer_compare_by_cost));\
+          /*PRINT0("done\n");*/\
+        }\
+      }\
+    }\
+  }
+
+void edge_chain_create
+(
+  quad_forest_edge *edge
+)
+{
+  if (edge != NULL && edge->parent == NULL) {
+    edge->parent = edge;
+    edge->prev = NULL;
+    edge->next = NULL;
+    edge->rank = 0;
+    edge->length = 1;
+  }
+}
+
+quad_forest_edge *edge_chain_find
+(
+  quad_forest_edge *edge
+)
+{
+  if (edge != NULL) {
+    if (edge->parent != NULL && edge->parent != edge) {
+      edge->parent = edge_chain_find(edge->parent);
+    }
+    return edge->parent;
+  }
+  return NULL;
+}
+
+void edge_chain_union
+(
+  quad_forest_edge *edge1,
+  quad_forest_edge *edge2
+)
+{
+  quad_forest_edge *parent1, *parent2;
+
+  parent1 = edge_chain_find(edge1);
+  parent2 = edge_chain_find(edge2);
+  if (parent1 != NULL && parent2 != NULL && parent1 != parent2) {
+    if (parent1->rank < parent2->rank) {
+      parent1->parent = parent2;
+      parent2->length += parent1->length;
+    }
+    else {
+      parent2->parent = parent1;
+      if (parent1->rank == parent2->rank) {
+        parent1->rank += 1;
+      }
+      parent1->length += parent2->length;
+    }
+  }
+}
+
+quad_forest_edge *edge_chain_follow_forward
+(
+  quad_forest_edge *parent,
+  quad_forest_edge *prev,
+  quad_forest_edge *next
+)
+{
+  if (next->next == prev) {
+    next->next = next->prev;
+    next->prev = prev;
+  }
+  if (next->next == parent) {
+    return next;
+  }
+  if (next->prev == prev) {
+    edge_chain_union(parent, next);
+    if (next->next != NULL) {
+      return edge_chain_follow_forward(parent, next, next->next);
+    }
+    else {
+      return next;
+    }
+  }
+  else {
+    return prev;
+  }
+}
+
+quad_forest_edge *edge_chain_follow_backward
+(
+  quad_forest_edge *parent,
+  quad_forest_edge *next,
+  quad_forest_edge *prev
+)
+{
+  if (prev->prev == next) {
+    prev->prev = prev->next;
+    prev->next = next;
+  }
+  if (prev->prev == parent) {
+    return prev;
+  }
+  if (prev->next == next) {
+    edge_chain_union(parent, prev);
+    if (prev->prev != NULL) {
+      return edge_chain_follow_backward(parent, prev, prev->prev);
+    }
+    else {
+      return prev;
+    }
+  }
+  else {
+    return next;
+  }
+}
+
+void edge_set_chain
+(
+  quad_forest_edge *node,
+  quad_forest_edge_chain *chain
+)
+{
+  if (node != NULL) {
+    node->chain = chain;
+    node->token = chain->token;
+    if (node->next != NULL) {
+      chain->cost += fabs(node->strength - node->next->strength);
+      if (node->next->token != chain->token) {
+        edge_set_chain(node->next, chain);
+      }
+      else {
+        chain->last = node;
+        node->next->prev = NULL;
+        node->next = NULL;
+      }
+    }
+    else {
+      chain->last = node;
+    }
+  }
+}
+
+void edge_chain_clear(quad_forest_edge *edge) {
+  quad_forest_edge *next;
+  if (edge != NULL) {
+    next = edge->next;
+    edge->prev = NULL;
+    edge->next = NULL;
+    edge->parent = NULL;
+    edge->length = 1;
+    edge_chain_clear(next);
+  }
+}
+
+/* keeping these functions cleaner by just creating the edge chain */
+/* need to determine elsewhere what has to be done with the endpoints */
+void path_follow_extend_edge(path_sniffer *sniffer)
+{
+  quad_forest_edge *prev, *next, *end, *parent;
+  if (sniffer->prev != NULL) {
+    path_follow_extend_edge(sniffer->prev);
+    end = sniffer->prev->endpoint;
+    if (end->next == NULL && end->prev != NULL) {
+      prev = end;
+      next = &sniffer->tree->edge;
+      next->parent = NULL;
+      edge_chain_create(next);
+      next->tree = sniffer->tree;
+      next->strength = next->tree->segment.devdev;
+      next->chain = prev->chain;
+      next->chain->last = next;
+      prev->next = next;
+      next->prev = prev;
+      next->next = NULL;
+      parent = edge_chain_find(prev);
+      edge_chain_union(parent, next);
+      end = next;
+    }
+    else
+    if (end->prev == NULL && end->next != NULL) {
+      next = end;
+      prev = &sniffer->tree->edge;
+      prev->parent = NULL;
+      edge_chain_create(prev);
+      prev->tree = sniffer->tree;
+      prev->chain = next->chain;
+      prev->chain->first = prev;
+      next->prev = prev;
+      prev->next = next;
+      prev->prev = NULL;
+      parent = edge_chain_find(next);
+      edge_chain_union(parent, prev);
+      end = prev;
+    }
+    else {
+      PRINT0("not an endpoint in path_follow_extend_edge\n");
+      return;
+    }
+    sniffer->endpoint = end;
+  }
+}
+
+quad_forest_edge *find_first
+(
+  quad_forest_edge *edge,
+  uint32 token
+)
+{
+  if (edge != NULL) {
+    edge->token = token;
+    if (edge->prev != NULL) {
+      if (edge->prev->token != token) {
+        return find_first(edge->prev, token);
+      }
+      else {
+        edge->prev->next = NULL;
+        edge->prev = NULL;
+        return edge;
+      }
+    }
+  }
+  return edge;
+}
+
+quad_forest_edge *find_last
+(
+  quad_forest_edge *edge,
+  uint32 token
+)
+{
+  if (edge != NULL) {
+    edge->token = token;
+    if (edge->next != NULL) {
+      if (edge->next->token != token) {
+        return find_last(edge->next, token);
+      }
+      else {
+        edge->next->prev = NULL;
+        edge->next = NULL;
+        return edge;
+      }
+    }
+  }
+  return edge;
+}
+
+void path_merge_edge_chains(path_sniffer *sniffer1, path_sniffer *sniffer2)
+{
+  quad_forest_edge *prev, *next, *end, *parent;
+  quad_forest_edge_chain *chain;
+  end = sniffer1->endpoint;
+  if (end->next == NULL && end->prev != NULL) {
+    prev = end;
+    next = sniffer2->endpoint;
+    chain = prev->chain;
+    if (chain->first == NULL && chain->last == NULL) {
+      PRINT0("recreating removed chain\n");
+      chain->token = rand();
+      chain->first = find_first(prev, chain->token);
+    }
+    parent = edge_chain_find(prev);
+    chain->parent = parent;
+    prev->next = next;
+    if (next->prev == NULL) {
+      next->prev = prev;
+    }
+    else
+    if (next->next == NULL) {
+      next->next = prev;
+    }
+    else {
+      PRINT0("not endpoint in path_merge_edge_chains\n");
+    }
+    PRINT0("follow a\n");
+    end = edge_chain_follow_forward(parent, prev, next);
+    chain->last = end;
+    chain->length = parent->length;
+    chain->cost = 0;
+    PRINT0("set a\n");
+    chain->token = rand();
+    edge_set_chain(chain->first, chain);
+  }
+  else
+  if (end->prev == NULL && end->next != NULL) {
+    next = end;
+    prev = sniffer2->endpoint;
+    chain = next->chain;
+    if (chain->first == NULL && chain->last == NULL) {
+      PRINT0("recreating removed chain\n");
+      chain->token = rand();
+      chain->last = find_last(next, chain->token);
+    }
+    parent = edge_chain_find(next);
+    chain->parent = parent;
+    next->prev = prev;
+    if (prev->next == NULL) {
+      prev->next = next;
+    }
+    else
+    if (prev->prev == NULL) {
+      prev->prev = next;
+    }
+    else {
+      PRINT0("not endpoint in path_merge_edge_chains\n");
+    }
+    PRINT0("follow b\n");
+    end = edge_chain_follow_backward(parent, next, prev);
+    chain->first = end;
+    chain->length = parent->length;
+    chain->cost = 0;
+    PRINT0("set b\n");
+    chain->token = rand();
+    edge_set_chain(chain->first, chain);
+  }
+  else {
+    PRINT0("not an endpoint in path_merge_edge_chains\n");
+  }
+}
+
+int compare_edges_descending(const void *a, const void *b)
+{
+  const quad_forest_edge *sa, *sb;
+  integral_value sta, stb;
+
+  sa = *((const quad_forest_edge* const *)a);
+  if (sa == NULL) {
+    /* should never get here TODO: add some assert or similar.. */
+    PRINT0("warning: null pointer in compare_edges_descending\n");
+    return 1;
+  }
+  sb = *((const quad_forest_edge* const *)b);
+  if (sb == NULL) {
+    /* should never get here TODO: add some assert or similar.. */
+    printf("warning: null pointer in compare_edges_descending\n");
+    return 1;
+  }
+
+  sta = sa->strength;
+  stb = sb->strength;
+  /* opposite values than normally, as we wish to sort in descending order */
+  if (sta > stb) return -1;
+  else if (sta < stb) return 1;
+  else return 0;
+}
+
+truth_value edge_chain_equals(const void *a, const void *b)
+{
+  const quad_forest_edge_chain *sa, *sb;
+
+  sa = ((const quad_forest_edge_chain *)a);
+  sb = ((const quad_forest_edge_chain *)b);
+  if (sa == NULL || sb == NULL) return FALSE;
+  if (sa == sb) return TRUE;
+}
+
+/*
+ * comparison function used for inserting sniffer contexts into a list
+ * sorted by cost, smallest first
+ */
+int path_sniffer_compare_by_cost(const void *a, const void *b)
+{
+  const path_sniffer *sa, *sb;
+  integral_value ca, cb;
+
+  sa = *((const path_sniffer * const *)a);
+  if (sa == NULL) return 1;
+  sb = *((const path_sniffer * const *)b);
+  if (sb == NULL) return -1;
+
+  ca = sa->cost;
+  cb = sb->cost;
+
+  if (ca < cb) return -1;
+  if (ca > cb) return 1;
+  return 0;
+}
+
+int path_sniffer_equals(const void *a, const void *b)
+{
+  const path_sniffer *sa, *sb;
+
+  sa = *((const path_sniffer * const *)a);
+  sb = *((const path_sniffer * const *)b);
+  if (sa == NULL || sb == NULL) return FALSE;
+  if (sa == sb) return TRUE;
+}
+
+void path_sniffer_determine_directions(path_sniffer *sniffer)
+{
+  quad_forest_edge *this, *other;
+
+  this = sniffer->endpoint;
+  if (this->next == NULL) {
+    other = this->prev;
+  }
+  else
+  if (this->prev == NULL) {
+    other = this->next;
+  }
+  else {
+    PRINT0("sniffer not an endpoint in determine directions\n");
+    sniffer->dir_start = d_NULL;
+    sniffer->dir_end = d_NULL;
+    return;
+  }
+  if (this != NULL && other != NULL) {
+    sint32 xdiff, ydiff;
+    xdiff = ((quad_tree*)this->tree)->x - ((quad_tree*)other->tree)->x;
+    ydiff = ((quad_tree*)this->tree)->y - ((quad_tree*)other->tree)->y;
+    if (xdiff > 0) {
+      if (ydiff > 0) {
+        sniffer->dir_start = d_E;
+        sniffer->dir_end = d_S;
+      }
+      else
+      if (ydiff == 0) {
+        sniffer->dir_start = d_NE;
+        sniffer->dir_end = d_SE;
+      }
+      else { /* ydiff < 0 */
+        sniffer->dir_start = d_N;
+        sniffer->dir_end = d_E;
+      }
+    }
+    else
+    if (xdiff == 0) {
+      if (ydiff > 0) {
+        sniffer->dir_start = d_SE;
+        sniffer->dir_end = d_SW;
+      }
+      else { /* ydiff < 0, not possible that also ydiff == 0 */
+        sniffer->dir_start = d_NW;
+        sniffer->dir_end = d_NE;
+      }
+    }
+    else { /* xdiff < 0 */
+      if (ydiff > 0) {
+        sniffer->dir_start = d_S;
+        sniffer->dir_end = d_W;
+      }
+      else
+      if (ydiff == 0) {
+        sniffer->dir_start = d_SW;
+        sniffer->dir_end = d_NW;
+      }
+      else { /* ydiff < 0 */
+        sniffer->dir_start = d_W;
+        sniffer->dir_end = d_N;
+      }
+    }
+  }
+  else {
+    sniffer->dir_start = d_NULL;
+    sniffer->dir_end = d_NULL;
+  }
+}
+
+/* A private structure for storing the discovered edge chain connections */
+typedef struct edge_connection_t {
+  quad_forest_edge *endpoint1;
+  quad_forest_edge *endpoint2;
+  path_sniffer *sniffer1;
+  path_sniffer *sniffer2;
+  integral_value cost;
+} edge_connection;
+
+/* A connection is the same, if it connects the same two endpoints; after */
+/* verifying the identity, need to check also the cost in the code using this */
+truth_value connection_equals_by_endpoints(const void *a, const void *b)
+{
+  const edge_connection *sa, *sb;
+
+  sa = ((const edge_connection*)a);
+  sb = ((const edge_connection*)b);
+  if (sa == NULL || sb == NULL) return FALSE;
+  if ((sa->endpoint1 == sb->endpoint1 && sa->endpoint2 == sb->endpoint2) ||
+      (sa->endpoint1 == sb->endpoint2 && sa->endpoint2 == sb->endpoint1)) {
+    return TRUE;
+  }
+  return FALSE;
+}
+
+/* After all these supporting definitions, finally the function that uses them */
+result quad_forest_find_boundaries
+(
+  quad_forest *forest,
+  uint32 rounds,
+  integral_value bias,
+  uint32 min_length
+)
+{
+  TRY();
+  uint32 remaining, i, size;
+  integral_value mean, dev, value, dx, dy;
+  truth_value has_a, has_b;
+  quad_tree *tree, *neighbor, *best_a, *best_b;
+  list edge_list, context_list, connection_list;
+  list_item *edges, *end;
+  quad_forest_edge *edge, *parent;
+  quad_forest_edge_chain new_chain, *chain;
+
+  CHECK_POINTER(forest);
+  CHECK_PARAM(rounds > 0);
+
+  CHECK(list_create(&edge_list, 1000, sizeof(quad_forest_edge*), 1));
+
+  size = forest->rows * forest->cols;
+
+  /* before propagation, prime all trees */
+  /* for finding boundaries, prime with deviation */
+  for (i = 0; i < size; i++) {
+    quad_tree_prime_with_dev(forest->roots[i]);
+  }
+
+  /* then, propagate the requested number of rounds */
+  for (remaining = rounds; remaining--;) {
+    for (i = 0; i < size; i++) {
+      quad_tree_propagate(forest->roots[i]);
+    }
+    /* on other rounds except the last, prime for the new run */
+    if (remaining > 0) {
+      for (i = 0; i < size; i++) {
+        quad_tree_prime_with_pool(forest->roots[i]);
+      }
+    }
+  }
+
+  PRINT0("calculate devmean and devdev\n");
+  /* calculate devmean and devdev, and determine the boundary trees */
+  for (i = 0; i < size; i++) {
+    tree = forest->roots[i];
+    mean = tree->pool;
+    dev = tree->pool2;
+    dev -= mean*mean;
+    if (dev < 0) dev = 0; else dev = sqrt(dev);
+    tree->segment.devmean = mean;
+    tree->segment.devdev = dev;
+
+    value = tree->stat.deviation;
+
+    if (value > getmax(mean, mean + bias - dev)) {
+      tree->segment.has_boundary = TRUE;
+      /* at this point, get the edge responses for strong boundaries */
+      CHECK(quad_tree_get_edge_response(forest, tree, NULL, NULL));
+      edge = &tree->edge;
+      edge_chain_create(edge);
+      edge->tree = tree;
+      /* using devdev as edge strength measure */
+      edge->strength = dev;
+      edge->is_intersection = FALSE;
+      edge->chain = NULL;
+      CHECK(list_insert_sorted(&edge_list, (pointer)&edge, &compare_edges_descending));
+    }
+    else {
+      tree->segment.has_boundary = FALSE;
+    }
+  }
+
+  PRINT0("check relevant neighbors\n");
+  /* check relevant neighbors of boundary trees and create edge nodes */
+  edges = edge_list.first.next;
+  end = &edge_list.last;
+  while (edges != end) {
+    edge = *(quad_forest_edge**)edges->data;
+    tree = (quad_tree*)edge->tree;
+    dx = edge->dx;
+    dy = edge->dy;
+    has_a = FALSE;
+    has_b = FALSE;
+    best_a = NULL;
+    best_b = NULL;
+    /* decide which neighbors to check based on edge direction */
+    if (fabs(dx) > fabs(dy)) {
+      if (dy == 0) {
+        GET_NEIGHBOR_N();
+        CHECK_NEIGHBOR(tree, value, has_a, best_a);
+        GET_NEIGHBOR_S();
+        CHECK_NEIGHBOR(tree, value, has_b, best_b);
+      }
+      else
+      if ((dx > 0 && dy > 0) || (dx < 0 && dy < 0)) {
+        if (fabs(dx) < 2 * fabs(dy)) {
+          GET_NEIGHBOR_N();
+          CHECK_NEIGHBOR(tree, value, has_a, best_a);
+          GET_NEIGHBOR_NE();
+          CHECK_NEIGHBOR(tree, value, has_a, best_a);
+          GET_NEIGHBOR_E();
+          CHECK_NEIGHBOR(tree, value, has_a, best_a);
+          GET_NEIGHBOR_S();
+          CHECK_NEIGHBOR(tree, value, has_b, best_b);
+          GET_NEIGHBOR_SW();
+          CHECK_NEIGHBOR(tree, value, has_b, best_b);
+          GET_NEIGHBOR_W();
+          CHECK_NEIGHBOR(tree, value, has_b, best_b);
+        }
+        else {
+          GET_NEIGHBOR_N();
+          CHECK_NEIGHBOR(tree, value, has_a, best_a);
+          GET_NEIGHBOR_NE();
+          CHECK_NEIGHBOR(tree, value, has_a, best_a);
+          GET_NEIGHBOR_S();
+          CHECK_NEIGHBOR(tree, value, has_b, best_b);
+          GET_NEIGHBOR_SW();
+          CHECK_NEIGHBOR(tree, value, has_b, best_b);
+        }
+      }
+      else {
+        if (fabs(dx) < 2 * fabs(dy)) {
+          GET_NEIGHBOR_W();
+          CHECK_NEIGHBOR(tree, value, has_a, best_a);
+          GET_NEIGHBOR_NW();
+          CHECK_NEIGHBOR(tree, value, has_a, best_a);
+          GET_NEIGHBOR_N();
+          CHECK_NEIGHBOR(tree, value, has_a, best_a);
+          GET_NEIGHBOR_E();
+          CHECK_NEIGHBOR(tree, value, has_b, best_b);
+          GET_NEIGHBOR_SE();
+          CHECK_NEIGHBOR(tree, value, has_b, best_b);
+          GET_NEIGHBOR_S();
+          CHECK_NEIGHBOR(tree, value, has_b, best_b);
+        }
+        else {
+          GET_NEIGHBOR_NW();
+          CHECK_NEIGHBOR(tree, value, has_a, best_a);
+          GET_NEIGHBOR_N();
+          CHECK_NEIGHBOR(tree, value, has_a, best_a);
+          GET_NEIGHBOR_SE();
+          CHECK_NEIGHBOR(tree, value, has_b, best_b);
+          GET_NEIGHBOR_S();
+          CHECK_NEIGHBOR(tree, value, has_b, best_b);
+        }
+      }
+    }
+    else {
+      if (dx == 0) {
+        GET_NEIGHBOR_W();
+        CHECK_NEIGHBOR(tree, value, has_a, best_a);
+        GET_NEIGHBOR_E();
+        CHECK_NEIGHBOR(tree, value, has_b, best_b);
+      }
+      else
+      if ((dx > 0 && dy > 0) || (dx < 0 && dy < 0)) {
+        if (fabs(dx) < 2 * fabs(dy)) {
+          GET_NEIGHBOR_N();
+          CHECK_NEIGHBOR(tree, value, has_a, best_a);
+          GET_NEIGHBOR_NE();
+          CHECK_NEIGHBOR(tree, value, has_a, best_a);
+          GET_NEIGHBOR_E();
+          CHECK_NEIGHBOR(tree, value, has_a, best_a);
+          GET_NEIGHBOR_S();
+          CHECK_NEIGHBOR(tree, value, has_b, best_b);
+          GET_NEIGHBOR_SW();
+          CHECK_NEIGHBOR(tree, value, has_b, best_b);
+          GET_NEIGHBOR_W();
+          CHECK_NEIGHBOR(tree, value, has_b, best_b);
+        }
+        else {
+          GET_NEIGHBOR_W();
+          CHECK_NEIGHBOR(tree, value, has_a, best_a);
+          GET_NEIGHBOR_SW();
+          CHECK_NEIGHBOR(tree, value, has_a, best_a);
+          GET_NEIGHBOR_E();
+          CHECK_NEIGHBOR(tree, value, has_b, best_b);
+          GET_NEIGHBOR_NE();
+          CHECK_NEIGHBOR(tree, value, has_b, best_b);
+        }
+      }
+      else {
+        if (fabs(dx) < 2 * fabs(dy)) {
+          GET_NEIGHBOR_W();
+          CHECK_NEIGHBOR(tree, value, has_a, best_a);
+          GET_NEIGHBOR_NW();
+          CHECK_NEIGHBOR(tree, value, has_a, best_a);
+          GET_NEIGHBOR_N();
+          CHECK_NEIGHBOR(tree, value, has_a, best_a);
+          GET_NEIGHBOR_E();
+          CHECK_NEIGHBOR(tree, value, has_b, best_b);
+          GET_NEIGHBOR_SE();
+          CHECK_NEIGHBOR(tree, value, has_b, best_b);
+          GET_NEIGHBOR_S();
+          CHECK_NEIGHBOR(tree, value, has_b, best_b);
+        }
+        else {
+          GET_NEIGHBOR_NW();
+          CHECK_NEIGHBOR(tree, value, has_a, best_a);
+          GET_NEIGHBOR_W();
+          CHECK_NEIGHBOR(tree, value, has_a, best_a);
+          GET_NEIGHBOR_SE();
+          CHECK_NEIGHBOR(tree, value, has_b, best_b);
+          GET_NEIGHBOR_E();
+          CHECK_NEIGHBOR(tree, value, has_b, best_b);
+        }
+      }
+    }
+    /* at this stage, each node sets its own predecessor and successor */
+    if (IS_TRUE(has_a)) {
+      edge->next = &best_a->edge;
+    }
+    else {
+      edge->next = NULL;
+    }
+    if (IS_TRUE(has_b)) {
+      edge->prev = &best_b->edge;
+    }
+    else {
+      edge->prev = NULL;
+    }
+    edges = edges->next;
+  }
+
+  PRINT0("merge edge chains\n");
+  srand(38374);
+  /* then go through the list again, and merge edge chains where the nodes agree */
+  edges = edge_list.first.next;
+  end = &edge_list.last;
+  while (edges != end) {
+    edge = *(quad_forest_edge**)edges->data;
+    parent = edge_chain_find(edge);
+    /* if parent is different than self, the edge already belongs to a chain */
+    if (parent == edge) {
+      new_chain.parent = parent;
+
+      if (edge->prev != NULL) {
+        new_chain.first = edge_chain_follow_backward(parent, edge, edge->prev);
+      }
+      else {
+        new_chain.first = edge;
+      }
+      new_chain.first->prev = NULL;
+      if (edge->next != NULL) {
+        new_chain.last = edge_chain_follow_forward(parent, edge, edge->next);
+      }
+      else {
+        new_chain.last = edge;
+      }
+      new_chain.last->next = NULL;
+      new_chain.length = parent->length;
+
+      /* add only long enough chains to the list */
+      if (new_chain.length >= min_length) {
+        CHECK(list_append_return_pointer(&forest->edges, (pointer)&new_chain, (pointer*)&chain));
+        /* cost must be initialized to null, it is updated during next operation */
+        chain->cost = 0;
+        chain->token = rand();
+        edge_set_chain(chain->first, chain);
+      }
+      else {
+        edge_chain_clear(new_chain.first);
+      }
+    }
+    edges = edges->next;
+  }
+  PRINT1("found %lu edge chains\n", forest->edges.count);
+
+  /*CHECK(quad_forest_refresh_edges(forest));*/
+
+
+  /* then try connecting individual pieces of edge chains */
+  {
+    uint32 token;
+    integral_value cost;
+    list_item *items, *end;
+    quad_forest_edge_chain *chain;
+    path_sniffer new_sniffer, *sniffer, *neighbor_sniffer;
+    edge_connection new_connection, *connection;
+
+    CHECK(list_create(&context_list, 10 * forest->edges.count, sizeof(path_sniffer*), 1));
+    CHECK(list_create(&connection_list, forest->edges.count, sizeof(edge_connection), 1));
+
+    /* TODO: later use randomly generated tokens to identify parsing phases */
+    token = 1948572362;
+
+    PRINT0("init context list\n");
+    items = forest->edges.first.next;
+    end = &forest->edges.last;
+    while (items != end) {
+      chain = (quad_forest_edge_chain*)items->data;
+
+      /* create context for the first endpoint */
+      tree = chain->first->tree;
+      tree->context.token = token;
+      tree->context.round = 0;
+
+      CREATE_POINTER(&tree->context.data, path_sniffer, 1);
+      CHECK(expect_path_sniffer(&sniffer, &tree->context.data));
+
+      sniffer->prev = NULL;
+      sniffer->tree = tree;
+      sniffer->chain = chain;
+      sniffer->endpoint = chain->first;
+      sniffer->strength = tree->segment.devdev;
+      sniffer->cost = 0;
+      sniffer->length = 0;
+      path_sniffer_determine_directions(sniffer);
+
+      CHECK(list_append(&context_list, (pointer)&sniffer));
+
+      /* create context for the second endpoint */
+      tree = chain->last->tree;
+      tree->context.token = token;
+      tree->context.round = 0;
+
+      CREATE_POINTER(&tree->context.data, path_sniffer, 1);
+      CHECK(expect_path_sniffer(&sniffer, &tree->context.data));
+
+      sniffer->prev = NULL;
+      sniffer->tree = tree;
+      sniffer->chain = chain;
+      sniffer->endpoint = chain->last;
+      sniffer->strength = tree->segment.devdev;
+      sniffer->cost = 0;
+      sniffer->length = 0;
+      path_sniffer_determine_directions(sniffer);
+
+      CHECK(list_append(&context_list, (pointer)&sniffer));
+
+      items = items->next;
+    }
+
+    PRINT0("start to process contexts\n");
+    items = context_list.first.next;
+    end = &context_list.last;
+    while (items != NULL && items != end) {
+      sniffer = *((path_sniffer**)items->data);
+      /*PRINT0("pop\n");*/
+      /* popping items from beginning and inserting new items in sorted order */
+      items = list_pop_item(&context_list, items);
+      if (sniffer == NULL) {
+        PRINT0("null sniffer\n");
+        break;
+      }
+      /*PRINT0("handle sniffer\n");*/
+      tree = sniffer->tree;
+      switch (sniffer->dir_start) {
+        case d_NW:
+        {
+          /*PRINT0("nw ");*/
+          GET_NEIGHBOR_NW();
+          CHECK_SNIFFER_NEIGHBOR();
+        }
+        case d_N:
+        {
+          /*PRINT0("n ");*/
+          GET_NEIGHBOR_N();
+          CHECK_SNIFFER_NEIGHBOR();
+        }
+        case d_NE:
+        {
+          /*PRINT0("ne ");*/
+          GET_NEIGHBOR_NE();
+          CHECK_SNIFFER_NEIGHBOR();
+          if (sniffer->dir_end == d_NE) {
+            break;
+          }
+        }
+        case d_E:
+        {
+          /*PRINT0("e ");*/
+          GET_NEIGHBOR_E();
+          CHECK_SNIFFER_NEIGHBOR();
+          if (sniffer->dir_end == d_E) {
+            break;
+          }
+        }
+        case d_SE:
+        {
+          /*PRINT0("se ");*/
+          GET_NEIGHBOR_SE();
+          CHECK_SNIFFER_NEIGHBOR();
+          if (sniffer->dir_end == d_SE) {
+            break;
+          }
+        }
+        case d_S:
+        {
+          /*PRINT0("s ");*/
+          GET_NEIGHBOR_S();
+          CHECK_SNIFFER_NEIGHBOR();
+          if (sniffer->dir_end == d_S) {
+            break;
+          }
+        }
+        case d_SW:
+        {
+          /*PRINT0("sw ");*/
+          GET_NEIGHBOR_SW();
+          CHECK_SNIFFER_NEIGHBOR();
+          if (sniffer->dir_end == d_SW) {
+            break;
+          }
+        }
+        case d_W:
+        {
+          /*PRINT0("w ");*/
+          GET_NEIGHBOR_W();
+          CHECK_SNIFFER_NEIGHBOR();
+          if (sniffer->dir_end == d_W) {
+            break;
+          }
+          /*PRINT0("nw ");*/
+          GET_NEIGHBOR_NW();
+          CHECK_SNIFFER_NEIGHBOR();
+          if (sniffer->dir_end == d_NW) {
+            break;
+          }
+          /*PRINT0("n ");*/
+          GET_NEIGHBOR_N();
+          CHECK_SNIFFER_NEIGHBOR();
+          if (sniffer->dir_end == d_N) {
+            break;
+          }
+        }
+      }
+      /* no need to get the next item, as using list_pop_item */
+    }
+
+    PRINT0("check connections\n");
+    srand(token);
+    items = connection_list.first.next;
+    end = &connection_list.last;
+    while (items != NULL && items != end) {
+      connection = (edge_connection*)items->data;
+
+      PRINT0("follow 1...");
+      path_follow_extend_edge(connection->sniffer1);
+      PRINT0("done, follow 2...");
+      path_follow_extend_edge(connection->sniffer2);
+      PRINT0("done\n");
+
+      if (connection->sniffer1->endpoint->chain != connection->sniffer2->endpoint->chain) {
+
+        chain = connection->sniffer2->endpoint->chain;
+        PRINT0("merge...\n");
+        path_merge_edge_chains(connection->sniffer1, connection->sniffer2);
+        PRINT0("done\n");
+        /*
+        chain->first = NULL;
+        chain->last = NULL;
+        */
+      }
+      else {
+        PRINT0("trying to merge chain with itself\n");
+      }
+
+      items = items->next;
+    }
+
+    PRINT0("removing extra edges...\n");
+    items = forest->edges.first.next;
+    end = &forest->edges.last;
+    while (items != end) {
+      chain = (quad_forest_edge_chain*)items->data;
+      items = items->next;
+      if (chain->first == NULL && chain->last == NULL) {
+        PRINT0("remove\n");
+        CHECK(list_remove_item(&forest->edges, items->prev));
+      }
+    }
+    PRINT0("remove finished\n");
+  }
+
+  FINALLY(quad_forest_find_boundaries);
+  list_destroy(&edge_list);
+  list_destroy(&context_list);
+  list_destroy(&connection_list);
+  PRINT0("finished\n");
+  RETURN();
+}
+
+/******************************************************************************/
+
+result quad_forest_find_boundaries_with_hysteresis
+(
+  quad_forest *forest,
+  uint32 rounds,
+  integral_value high_bias,
+  integral_value low_factor
+)
+{
+  TRY();
+  uint32 remaining, i, size;
+  integral_value mean, dev, value, dx, dy;
+  truth_value has_a, has_b;
+  quad_tree *tree, *neighbor, *best_a, *best_b;
+  list boundary_list;
+  list_item *boundaries, *end;
+
+  CHECK_POINTER(forest);
+  CHECK_PARAM(rounds > 0);
+  CHECK_PARAM(high_bias > 0);
+  CHECK_PARAM(0 < low_factor && low_factor < 1);
+
+  CHECK(list_create(&boundary_list, 1000, sizeof(quad_tree*), 1));
+
+  size = forest->rows * forest->cols;
+
+  /* before propagation, prime all trees */
+  /* for finding boundaries, prime with deviation */
+  for (i = 0; i < size; i++) {
+    quad_tree_prime_with_dev(forest->roots[i]);
+  }
+
+  /* then, propagate the requested number of rounds */
+  for (remaining = rounds; remaining--;) {
+    for (i = 0; i < size; i++) {
+      quad_tree_propagate(forest->roots[i]);
+    }
+    /* on other rounds except the last, prime for the new run */
+    if (remaining > 0) {
+      for (i = 0; i < size; i++) {
+        quad_tree_prime_with_pool(forest->roots[i]);
+      }
+    }
+  }
+
+  /* mark those trees that have a strong enough boundary */
+  for (i = 0; i < size; i++) {
+    tree = forest->roots[i];
+    mean = tree->pool;
+    dev = tree->pool2;
+    dev -= mean*mean;
+    if (dev < 0) dev = 0; else dev = sqrt(dev);
+    tree->segment.devmean = mean;
+    tree->segment.devdev = dev;
+
+    value = tree->stat.deviation;
+
+    if (value > getmax(mean, mean + high_bias - dev)) {
+      /*printf("value %.3f mean %.3f dev %.3f\n", value, mean, dev);*/
+      tree->segment.has_boundary = TRUE;
+      /* at this point, get the edge responses for strong boundaries */
+      CHECK(quad_tree_get_edge_response(forest, tree, NULL, NULL));
+      CHECK(list_append(&boundary_list, (pointer)&tree));
+    }
+    else {
+      tree->segment.has_boundary = FALSE;
+    }
+  }
+
+  boundaries = boundary_list.first.next;
+  end = &boundary_list.last;
+  /* check neighboring trees in the direction of edge and discard those that */
+  /* do not have at least one strong neighbor in correct direction */
+  while (boundaries != end) {
+    tree = *(quad_tree**)boundaries->data;
+    if (IS_TRUE(tree->segment.has_boundary)) {
+      dx = tree->edge.dx;
+      dy = tree->edge.dy;
+      has_a = FALSE;
+      has_b = FALSE;
+      best_a = NULL;
+      best_b = NULL;
+      value = low_factor * tree->stat.deviation;
+      /* decide which neighbors to check based on edge direction */
+      if (fabs(dx) > fabs(dy)) {
+        if (dy == 0) {
+          GET_NEIGHBOR_N();
+          CHECK_NEIGHBOR(tree, value, has_a, best_a);
+          GET_NEIGHBOR_S();
+          CHECK_NEIGHBOR(tree, value, has_b, best_b);
+        }
+        else
+        if ((dx > 0 && dy > 0) || (dx < 0 && dy < 0)) {
+          if (fabs(dx) < 2 * fabs(dy)) {
+            GET_NEIGHBOR_N();
+            CHECK_NEIGHBOR(tree, value, has_a, best_a);
+            GET_NEIGHBOR_NE();
+            CHECK_NEIGHBOR(tree, value, has_a, best_a);
+            GET_NEIGHBOR_E();
+            CHECK_NEIGHBOR(tree, value, has_a, best_a);
+            GET_NEIGHBOR_S();
+            CHECK_NEIGHBOR(tree, value, has_b, best_b);
+            GET_NEIGHBOR_SW();
+            CHECK_NEIGHBOR(tree, value, has_b, best_b);
+            GET_NEIGHBOR_W();
+            CHECK_NEIGHBOR(tree, value, has_b, best_b);
+          }
+          else {
+            GET_NEIGHBOR_N();
+            CHECK_NEIGHBOR(tree, value, has_a, best_a);
+            GET_NEIGHBOR_NE();
+            CHECK_NEIGHBOR(tree, value, has_a, best_a);
+            GET_NEIGHBOR_S();
+            CHECK_NEIGHBOR(tree, value, has_b, best_b);
+            GET_NEIGHBOR_SW();
+            CHECK_NEIGHBOR(tree, value, has_b, best_b);
+          }
+        }
+        else {
+          if (fabs(dx) < 2 * fabs(dy)) {
+            GET_NEIGHBOR_W();
+            CHECK_NEIGHBOR(tree, value, has_a, best_a);
+            GET_NEIGHBOR_NW();
+            CHECK_NEIGHBOR(tree, value, has_a, best_a);
+            GET_NEIGHBOR_N();
+            CHECK_NEIGHBOR(tree, value, has_a, best_a);
+            GET_NEIGHBOR_E();
+            CHECK_NEIGHBOR(tree, value, has_b, best_b);
+            GET_NEIGHBOR_SE();
+            CHECK_NEIGHBOR(tree, value, has_b, best_b);
+            GET_NEIGHBOR_S();
+            CHECK_NEIGHBOR(tree, value, has_b, best_b);
+          }
+          else {
+            GET_NEIGHBOR_NW();
+            CHECK_NEIGHBOR(tree, value, has_a, best_a);
+            GET_NEIGHBOR_N();
+            CHECK_NEIGHBOR(tree, value, has_a, best_a);
+            GET_NEIGHBOR_SE();
+            CHECK_NEIGHBOR(tree, value, has_b, best_b);
+            GET_NEIGHBOR_S();
+            CHECK_NEIGHBOR(tree, value, has_b, best_b);
+          }
+        }
+      }
+      else {
+        if (dx == 0) {
+          GET_NEIGHBOR_W();
+          CHECK_NEIGHBOR(tree, value, has_a, best_a);
+          GET_NEIGHBOR_E();
+          CHECK_NEIGHBOR(tree, value, has_b, best_b);
+        }
+        else
+        if ((dx > 0 && dy > 0) || (dx < 0 && dy < 0)) {
+          if (fabs(dx) < 2 * fabs(dy)) {
+            GET_NEIGHBOR_N();
+            CHECK_NEIGHBOR(tree, value, has_a, best_a);
+            GET_NEIGHBOR_NE();
+            CHECK_NEIGHBOR(tree, value, has_a, best_a);
+            GET_NEIGHBOR_E();
+            CHECK_NEIGHBOR(tree, value, has_a, best_a);
+            GET_NEIGHBOR_S();
+            CHECK_NEIGHBOR(tree, value, has_b, best_b);
+            GET_NEIGHBOR_SW();
+            CHECK_NEIGHBOR(tree, value, has_b, best_b);
+            GET_NEIGHBOR_W();
+            CHECK_NEIGHBOR(tree, value, has_b, best_b);
+          }
+          else {
+            GET_NEIGHBOR_W();
+            CHECK_NEIGHBOR(tree, value, has_a, best_a);
+            GET_NEIGHBOR_SW();
+            CHECK_NEIGHBOR(tree, value, has_a, best_a);
+            GET_NEIGHBOR_E();
+            CHECK_NEIGHBOR(tree, value, has_b, best_b);
+            GET_NEIGHBOR_NE();
+            CHECK_NEIGHBOR(tree, value, has_b, best_b);
+          }
+        }
+        else {
+          if (fabs(dx) < 2 * fabs(dy)) {
+            GET_NEIGHBOR_W();
+            CHECK_NEIGHBOR(tree, value, has_a, best_a);
+            GET_NEIGHBOR_NW();
+            CHECK_NEIGHBOR(tree, value, has_a, best_a);
+            GET_NEIGHBOR_N();
+            CHECK_NEIGHBOR(tree, value, has_a, best_a);
+            GET_NEIGHBOR_E();
+            CHECK_NEIGHBOR(tree, value, has_b, best_b);
+            GET_NEIGHBOR_SE();
+            CHECK_NEIGHBOR(tree, value, has_b, best_b);
+            GET_NEIGHBOR_S();
+            CHECK_NEIGHBOR(tree, value, has_b, best_b);
+          }
+          else {
+            GET_NEIGHBOR_NW();
+            CHECK_NEIGHBOR(tree, value, has_a, best_a);
+            GET_NEIGHBOR_W();
+            CHECK_NEIGHBOR(tree, value, has_a, best_a);
+            GET_NEIGHBOR_SE();
+            CHECK_NEIGHBOR(tree, value, has_b, best_b);
+            GET_NEIGHBOR_E();
+            CHECK_NEIGHBOR(tree, value, has_b, best_b);
+          }
+        }
+      }
+      if (IS_FALSE(has_a) && IS_FALSE(has_b)) {
+        tree->segment.has_boundary = FALSE;
+        /*PRINT0("discard\n");*/
+      }
+      else {
+        if (IS_FALSE(has_a) && best_a != NULL) {
+          /*PRINT0("found new tree a\n");*/
+          best_a->segment.has_boundary = TRUE;
+          CHECK(quad_tree_get_edge_response(forest, best_a, NULL, NULL));
+          CHECK(list_append(&boundary_list, (pointer)&best_a));
+        }
+        if (IS_FALSE(has_b) && best_b != NULL) {
+          /*PRINT0("found new tree b\n");*/
+          best_b->segment.has_boundary = TRUE;
+          CHECK(quad_tree_get_edge_response(forest, best_b, NULL, NULL));
+          CHECK(list_append(&boundary_list, (pointer)&best_b));
+        }
+      }
+    }
+    boundaries = boundaries->next;
+  }
+
+  FINALLY(quad_forest_find_boundaries_with_hysteresis);
+  list_destroy(&boundary_list);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result quad_forest_prune_boundaries
+(
+  quad_forest *forest
+)
+{
+  TRY();
+  uint32 i, size;
+  truth_value has_diff_segment;
+  quad_tree *tree, *neighbor, *prev_neighbor;
+  quad_forest_segment *prev_segment, *neighbor_segment;
+
+  CHECK_POINTER(forest);
+
+  size = forest->rows * forest->cols;
+
+  for (i = 0; i < size; i++) {
+    tree = forest->roots[i];
+    if (IS_TRUE(tree->segment.has_boundary)) {
+      prev_segment = NULL;
+      prev_neighbor = NULL;
+      has_diff_segment = FALSE;
+      neighbor = tree->n;
+      if (neighbor != NULL && IS_FALSE(neighbor->segment.has_boundary)) {
+        neighbor_segment = quad_tree_segment_find(neighbor);
+        if (neighbor_segment != NULL) {
+          prev_segment = neighbor_segment;
+          prev_neighbor = neighbor;
+        }
+      }
+      neighbor = tree->e;
+      if (neighbor != NULL && IS_FALSE(neighbor->segment.has_boundary)) {
+        neighbor_segment = quad_tree_segment_find(neighbor);
+        if (neighbor_segment != NULL) {
+          if (prev_segment != NULL && prev_segment != neighbor_segment) {
+            has_diff_segment = TRUE;
+          }
+          prev_segment = neighbor_segment;
+          prev_neighbor = neighbor;
+        }
+      }
+      neighbor = tree->s;
+      if (neighbor != NULL && IS_FALSE(neighbor->segment.has_boundary)) {
+        neighbor_segment = quad_tree_segment_find(neighbor);
+        if (neighbor_segment != NULL) {
+          if (prev_segment != NULL && prev_segment != neighbor_segment) {
+            has_diff_segment = TRUE;
+          }
+          prev_segment = neighbor_segment;
+          prev_neighbor = neighbor;
+        }
+      }
+      neighbor = tree->w;
+      if (neighbor != NULL && IS_FALSE(neighbor->segment.has_boundary)) {
+        neighbor_segment = quad_tree_segment_find(neighbor);
+        if (neighbor_segment != NULL) {
+          if (prev_segment != NULL && prev_segment != neighbor_segment) {
+            has_diff_segment = TRUE;
+          }
+          prev_segment = neighbor_segment;
+          prev_neighbor = neighbor;
+        }
+      }
+      if (IS_FALSE(has_diff_segment)) {
+        tree->segment.has_boundary = FALSE;
+        if (prev_neighbor != NULL) {
+          quad_tree_segment_create(tree);
+          quad_tree_segment_union(tree, prev_neighbor);
+        }
+      }
+    }
+  }
+
+  FINALLY(quad_forest_prune_boundaries);
+  RETURN();
+}
+
+/******************************************************************************/
+
 result init_edge_parsers(quad_forest *forest, quad_tree *tree, uint32 token)
 {
   TRY();

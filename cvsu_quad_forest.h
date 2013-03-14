@@ -139,15 +139,6 @@ result quad_forest_destroy
 );
 
 /**
- * Refreshes the segment count and colors. MUST be called after segmentation and
- * BEFORE calling @see quad_forest_get_segments.
- */
-result quad_forest_refresh_segments
-(
-  quad_forest *target
-);
-
-/**
  * Initializes the contents of a quad_forest to null. Does not deallocate data.
  */
 result quad_forest_nullify
@@ -174,39 +165,6 @@ result quad_forest_update
 (
   /** The quad_forest structure to be updated. */
   quad_forest *target
-);
-
-/**
- * Segments the quad_forest structure using a deviation threshold as
- * consistency and similarity criteria. Divides all trees that have deviation
- * larger than the threshold, and then merges trees and regions that have the
- * difference of means smaller than the threshold.
- */
-result quad_forest_segment_with_deviation
-(
-  /** The quad_forest structure to be segmented. */
-  quad_forest *target,
-  /** Threshold value for deviation, trees with larger value are divided. */
-  integral_value threshold,
-  /** Deviation multiplier used for creating the estimated intensity range. */
-  integral_value alpha
-);
-
-/**
- * Segments the quad_forest structure using an entropy measure as consistency
- * and similarity criteria.
- * TODO: maybe add some region size constraint as a parameter.
- */
-result quad_forest_segment_with_overlap
-(
-  /** The quad_forest structure to be segmented. */
-  quad_forest *target,
-  /** Deviation multiplier used for creating the estimated intensity range. */
-  integral_value alpha,
-  /** Range overlap threshold used for determining the trees to merge. */
-  integral_value threshold_trees,
-  /** Range overlap threshold used for determining the segments to merge. */
-  integral_value threshold_segments
 );
 
 /**
@@ -243,20 +201,6 @@ result quad_forest_get_segment_neighbors
   quad_forest *forest,
   quad_forest_segment **segments,
   uint32 segment_count
-);
-
-/**
- * Draw tree values over an rgb image. For segmented images, use_segments
- * can be set to true and segment colors will be used for trees, otherwise
- * mean value with deviation encoded into the red component is used. In this
- * case, also draws the boundary trees with yellow color, if boundaries have
- * been detected.
- */
-result quad_forest_draw_trees
-(
-  quad_forest *forest,
-  pixel_image *target,
-  truth_value use_segments
 );
 
 /**
@@ -312,7 +256,7 @@ result quad_forest_get_links
 
 /**
 * Collects all trees contained in a list of segments and draws them on a
-* pixel_image with a red color (TODO: add parameter for selecting color)
+* pixel_image with a red color
 */
 result quad_forest_highlight_segments
 (
@@ -339,6 +283,20 @@ result quad_forest_draw_image
   truth_value use_segments,
   /** For segments, should we use mean or colors? No effect for trees. */
   truth_value use_colors
+);
+
+/**
+ * Draw tree values over an rgb image. For segmented images, use_segments
+ * can be set to true and segment colors will be used for trees, otherwise
+ * mean value with deviation encoded into the red component is used. In this
+ * case, also draws the boundary trees with yellow color, if boundaries have
+ * been detected.
+ */
+result quad_forest_draw_trees
+(
+  quad_forest *forest,
+  pixel_image *target,
+  truth_value use_segments
 );
 
 /**
@@ -388,46 +346,6 @@ result quad_forest_find_boundaries_with_hysteresis
 result quad_forest_prune_boundaries
 (
   quad_forest *forest
-);
-
-/**
- * Segments the forest by finding first all horizontal edges with edge
- * propagation, then merging segments that have edges in neighboring trees.
- */
-result quad_forest_segment_edges
-(
-  /** Forest to be segmented */
-  quad_forest *target,
-  /** How many rounds to propagate while determining trees with edges */
-  uint32 detect_rounds,
-  /** Bias value used in edge detection */
-  integral_value detect_bias,
-  /** Direction of edges to search (H,V,N4) */
-  direction detect_dir,
-  /** How many rounds to propagate the found edges to close gaps */
-  uint32 propagate_rounds,
-  /** Acceptance threshold for propagated edges */
-  integral_value propagate_threshold,
-  /** The direction in which to propagate */
-  direction propagate_dir,
-  /** The direction in which to merge segments */
-  direction merge_dir
-);
-
-/**
- * Segments the forest by using boundaries found using deviation propagation
- * and hysteresis to limit the expansion of segments.
- */
-result quad_forest_segment_with_boundaries
-(
-  quad_forest *forest,
-  uint32 rounds,
-  integral_value high_bias,
-  integral_value low_factor,
-  integral_value tree_alpha,
-  integral_value segment_alpha,
-  truth_value use_hysteresis,
-  truth_value use_pruning
 );
 
 #ifdef __cplusplus

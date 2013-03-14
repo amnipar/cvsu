@@ -54,8 +54,14 @@ typedef struct parse_context_t {
  * Context value for accumulating neighborhood statistics.
  */
 typedef struct stat_accumulator_t {
-  integral_value pool;
-  integral_value acc;
+  integral_value mean_pool1;
+  integral_value mean_acc1;
+  integral_value mean_pool2;
+  integral_value mean_acc2;
+  integral_value dev_pool1;
+  integral_value dev_acc1;
+  integral_value dev_pool2;
+  integral_value dev_acc2;
 } stat_accumulator;
 
 void make_stat_accumulator
@@ -65,6 +71,11 @@ void make_stat_accumulator
 );
 
 truth_value is_stat_accumulator
+(
+  typed_pointer *tptr
+);
+
+stat_accumulator *has_stat_accumulator
 (
   typed_pointer *tptr
 );
