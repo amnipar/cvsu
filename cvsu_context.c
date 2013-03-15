@@ -41,18 +41,6 @@ string expect_edge_parser_name = "expect_edge_parser";
 /******************************************************************************/
 /* TODO: these should be moved to some other file, along with the structs...  */
 
-void make_stat_accumulator
-(
-  typed_pointer *tptr,
-  stat_accumulator *source
-)
-{
-  tptr->type = t_STAT_ACCUMULATOR;
-  tptr->value = (pointer)source;
-}
-
-/******************************************************************************/
-
 truth_value is_stat_accumulator
 (
   typed_pointer *tptr
@@ -66,6 +54,36 @@ truth_value is_stat_accumulator
 
 /******************************************************************************/
 
+result add_stat_accumulator
+(
+  parse_context *context,
+  stat_accumulator **acc
+)
+{
+  TRY();
+  CHECK_POINTER(acc);
+  *acc = NULL;
+  CHECK_POINTER(context);
+
+  if (context.data.type == t_UNDEF) {
+    CHECK(typed_pointer_create(&context.data, t_STAT_ACCUMULATOR, 1));
+    *acc = (stat_accumulator*)context.data.value;
+  }
+  else {
+    typed_pointer tptr;
+    CHECK(typed_pointer_create(&tptr, t_STAT_ACCUMULATOR, 1));
+    if (context.data.type != t_TUPLE) {
+      CHECK(tuple_promote(&context.data));
+    }
+    CHECK(tuple_extend(&context.data, &tptr, acc));
+  }
+
+  FINALLY();
+  RETURN();
+}
+
+/******************************************************************************/
+
 stat_accumulator *has_stat_accumulator
 (
   typed_pointer *tptr
@@ -75,13 +93,14 @@ stat_accumulator *has_stat_accumulator
     return (stat_accumulator*)tptr->value;
   }
   if (IS_TRUE(is_tuple(tptr))) {
-    uint32 i;
-    stat_accumulator *acc;
-    for (i = 0; i < tptr->count; i++) {
-      acc = has_stat_accumulator((typed_pointer))
+    typed_pointer *element;
+    /* must have exactly one stat accumulator */
+    element = tuple_has_type(tptr, t_STAT_ACCUMULATOR, 1, 1);
+    if (element != NULL) {
+      return (stat_accumulator*)element->value;
     }
   }
-
+  return NULL;
 }
 
 /******************************************************************************/

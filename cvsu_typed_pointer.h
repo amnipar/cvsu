@@ -89,7 +89,7 @@ typedef struct typed_pointer_t {
 /**
  * Creates a typed pointer containing the given amount of values of given type.
  */
-void typed_pointer_create
+result typed_pointer_create
 (
   typed_pointer *tptr,
   type_label type,
@@ -173,7 +173,7 @@ result tuple_extend
  * Checks whether the tuple contains the given type, and returns the (first)
  * matching item. If a number larger than 0 is given, checks also that there are
  * exactly that many items with that type, and returns the item with the given
- * (0-based) index. If count is 0, just returns the first matching item.
+ * (1-based) index. If count is 0, just returns the first matching item.
  */
 typed_pointer *tuple_has_type
 (

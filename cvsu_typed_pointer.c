@@ -75,18 +75,17 @@ result typed_pointer_create
 (
   typed_pointer *tptr,
   type_label type,
-  uint32 count,
-  pointer value
+  uint32 count
 )
 {
   TRY();
-  
+
   CHECK_POINTER(tptr);
   typed_pointer_destroy(tptr);
   CHECK(memory_allocate((data_pointer*)&tptr->value, count, typesize[((uint32)type)]));
   tptr->type = type;
   tptr->count = count;
-  
+
   FINALLY(typed_pointer_create);
   RETURN();
 }
@@ -173,6 +172,7 @@ result tuple_create
   tptr->type = t_TUPLE;
   CHECK(memory_allocate((data_pointer*)&values, count, sizeof(typed_pointer)));
   tptr->value = (pointer)values;
+  tptr->count = count;
 
   FINALLY(tuple_create);
   RETURN();
@@ -193,8 +193,7 @@ void tuple_destroy
       typed_pointer_destroy(values[i]);
     }
     memory_deallocate((data_pointer*)&tuple->value);
-    tptr->type = t_UNDEF;
-    tptr->count = 0;
+    typed_pointer_nullify(tuple);
   }
 }
 
@@ -207,9 +206,9 @@ result tuple_promote
 {
   TRY();
   typed_pointer *values, element;
-  
+
   CHECK_POINTER(tptr);
-  
+
   /* make a copy of the previous content */
   element = *tptr;
   /* then nullify and create a tuple instead */
@@ -218,8 +217,8 @@ result tuple_promote
   /* copy the previous content as the first value of the tuple */
   values = (typed_pointer*)tptr->value;
   values[0] = element;
-  
-  FINALLY();
+
+  FINALLY(tuple_promote);
   RETURN();
 }
 
@@ -228,7 +227,8 @@ result tuple_promote
 result tuple_extend
 (
   typed_pointer *tuple,
-  typed_pointer *tptr
+  typed_pointer *tptr,
+  typed_pointer **res
 )
 {
   TRY();
@@ -237,7 +237,7 @@ result tuple_extend
 
   CHECK_POINTER(tuple);
   CHECK_PARAM(tuple->type == t_TUPLE);
-  
+
   count = tuple->count + 1;
 
   old_values = (typed_pointer*)tuple->value;
@@ -249,8 +249,11 @@ result tuple_extend
   memory_deallocate((data_pointer*)&tuple->value);
   tuple->value = (pointer)new_values;
   tuple->count = count;
+  if (res != NULL) {
+    *res = &new_values[count-1];
+  }
 
-  FINALLY();
+  FINALLY(tuple_extend);
   RETURN();
 }
 
@@ -265,10 +268,34 @@ typed_pointer *tuple_has_type
 )
 {
   if (tuple != NULL and tuple->type == t_TUPLE) {
+    uint32 i, num;
+    typed_pointer *elements;
+
+    elements = (typed_pointer*)tuple->value;
+    /* if count is specified, first checks that the tuple has the correct */
+    /* number of items of specified type, then returns the item with given index */
     if (count > 0) {
-      uint32 i, sum;
-      typed_pointer *item;
-      
+      num = 0;
+      for (i = 0; i < tuple->count; i++) {
+        if (elements[i].type == type) {
+          num++;
+        }
+      }
+      if (num == count && index <= count) {
+        return &elements[index-1];
+      }
+      else {
+        return NULL;
+      }
+    }
+    /* otherwise just returns the first occurrence of the specified type */
+    else {
+      for (i = 0; i < tuple->count; i++) {
+        if (elements[i].type == type) {
+          return &elements[i];
+        }
+      }
+      return NULL;
     }
   }
   return NULL;
