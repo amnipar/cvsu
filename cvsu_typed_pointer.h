@@ -3,7 +3,7 @@
  * @author Matti J. Eskelinen <matti.j.eskelinen@gmail.com>
  * @brief Generic pointers with type annotations.
  *
- * Copyright (c) 2011-2013, Matti Johannes Eskelinen
+ * Copyright (c) 2013, Matti Johannes Eskelinen
  * All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,8 +29,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef CVSUTYPES_H
-#   define CVSUTYPES_H
+#ifndef CVSU_TYPED_POINTER_H
+#   define CVSU_TYPED_POINTER_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -53,8 +53,10 @@ typedef enum type_label_t {
   t_U16,
   t_S32,
   t_U32,
+/*
   t_S64,
   t_U64,
+*/
   t_F32,
   t_F64,
   t_TUPLE,
@@ -85,7 +87,7 @@ typedef struct typed_pointer_t {
 } typed_pointer;
 
 /**
- * A convenience function for initializing the fields of a typed_pointer.
+ * Creates a typed pointer containing the given amount of values of given type.
  */
 void typed_pointer_create
 (
@@ -96,7 +98,7 @@ void typed_pointer_create
 );
 
 /**
- * Deallocates the memory and sets the pointer to NULL.
+ * Deallocates the memory and sets the structure to NULL value.
  */
 void typed_pointer_destroy
 (
@@ -104,50 +106,90 @@ void typed_pointer_destroy
 );
 
 /**
- * Tuple is basically an array of typed pointers.
+ * Sets the structure to NULL value
+ * -type is undefined
+ * -count is 0
+ * -pointer is NULL
  */
-typedef typed_pointer tuple;
-
-/**
- * Creates a tuple, which is basically a typed pointer with multiple typed
- * pointer values inside. Each value may have different type. For tuples with
- * specific types inside, need to create special is-, has- and expect-functions.
- */
-make_tuple
-(
-  typed_pointer *tptr,
-  typed_pointer *tuple
-);
-
-truth_value is_tuple
+void typed_pointer_nullify
 (
   typed_pointer *tptr
 );
 
 /**
- * A convenience macro for creating pointers, ensures that the possible previous
- * value is deallocated first. Requires that a make_x function exists for the
- * given type x, taking typed_pointer and x* as parameters.
- * Note: it is important that typed_pointers are always allocated to NULL.
+ * Checks whether the structure contains null value
  */
-#define CREATE_POINTER(ptr,t,c) {\
-  t *temp_ptr;\
-  typed_pointer_destroy(ptr);\
-  CHECK(memory_allocate((data_pointer*)&temp_ptr, (c), sizeof(t)));\
-  make_##t((ptr), temp_ptr);\
-  (ptr)->count = (c);\
-}
+truth_value typed_pointer_is_null
+(
+  typed_pointer *tptr
+);
 
-#define CREATE_TUPLE(ptr,c) {\
-  typed_pointer *temp_ptr;\
-  if ((ptr)->value != NULL) {\
-    CHECK(memory_deallocate((data_pointer*)&((ptr)->value)));\
-  }\
-  CHECK(memory_allocate((data_pointer*)&temp_ptr, (c), sizeof(typed_pointer)));\
-  (ptr)->type = t_TUPLE;\
-  (ptr)->count = (c);\
-  (ptr)->value = (pointer)temp_ptr;\
-}
+/**
+ * Checks whether the type of the value is typed_pointer.
+ */
+truth_value is_typed_pointer
+(
+  typed_pointer *tptr
+);
+
+/**
+ * Creates a tuple, which is basically a typed pointer with multiple typed
+ * pointer values inside. Each value may have a different type. For tuples with
+ * specific types inside, need to create special is-, has- and expect-functions.
+ */
+result tuple_create
+(
+  typed_pointer *tptr,
+  uint32 count
+);
+
+/**
+ * Destroys a tuple, by destroying all contained typed pointers
+ */
+void tuple_destroy
+(
+  typed_pointer *tuple
+);
+
+/**
+ * Promotes a typed pointer value into a tuple with one element, containing the
+ * previous value contained by the pointer
+ */
+result tuple_promote
+(
+  typed_pointer *tptr
+)
+
+/**
+ * Extends a tuple by one element, adding the new pointer as the last element
+ */
+result tuple_extend
+(
+  typed_pointer *tuple,
+  typed_pointer *tptr
+);
+
+/**
+ * Checks whether the tuple contains the given type, and returns the (first)
+ * matching item. If a number larger than 0 is given, checks also that there are
+ * exactly that many items with that type, and returns the item with the given
+ * (0-based) index. If count is 0, just returns the first matching item.
+ */
+typed_pointer *tuple_has_type
+(
+  typed_pointer *tuple,
+  type_label type,
+  uint32 count,
+  uint32 index
+);
+
+/**
+ * Checks whether the type of the value is tuple.
+ */
+truth_value is_tuple
+(
+  typed_pointer *tptr
+);
 
 #ifdef __cplusplus
 }

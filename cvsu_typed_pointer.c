@@ -31,10 +31,47 @@
 
 #include "cvsu_typed_pointer.h"
 #include "cvsu_memory.h"
+#include "cvsu_list.h"
+#include "cvsu_context.h"
+#include "cvsu_annotation.h"
 
 /******************************************************************************/
 
-void typed_pointer_create
+uint32 typesize[] = {
+  0,
+  sizeof(type_label),
+  sizeof(truth_value),
+  sizeof(pointer),
+  sizeof(typed_pointer),
+  sizeof(string),
+  sizeof(sint8),
+  sizeof(uint8),
+  sizeof(sint16),
+  sizeof(uint16),
+  sizeof(sint32),
+  sizeof(uint32),
+/*
+  sizeof(sint64),
+  sizeof(uint64),
+*/
+  sizeof(real32),
+  sizeof(real64),
+  sizeof(typed_pointer),
+  sizeof(list),
+  sizeof(statistics),
+  sizeof(accumulated_stat),
+  sizeof(quad_forest_segment), /* TODO: change to segment */
+  sizeof(quad_forest_edge), /* TODO: change to boundary? */
+  sizeof(quad_forest_intersection), /* TODO: change to intersection? */
+  sizeof(stat_accumulator),
+  sizeof(path_sniffer),
+  sizeof(edge_parser),
+  sizeof(segment_parser)
+};
+
+/******************************************************************************/
+
+result typed_pointer_create
 (
   typed_pointer *tptr,
   type_label type,
@@ -42,11 +79,16 @@ void typed_pointer_create
   pointer value
 )
 {
-  if (tptr != NULL) {
-    tptr->type = type;
-    tptr->count = count;
-    tptr->value = value;
-  }
+  TRY();
+  
+  CHECK_POINTER(tptr);
+  typed_pointer_destroy(tptr);
+  CHECK(memory_allocate((data_pointer*)&tptr->value, count, typesize[((uint32)type)]));
+  tptr->type = type;
+  tptr->count = count;
+  
+  FINALLY(typed_pointer_create);
+  RETURN();
 }
 
 /******************************************************************************/
@@ -56,16 +98,60 @@ void typed_pointer_destroy
   typed_pointer *tptr
 )
 {
-  if (tptr != NULL && tptr->value != NULL) {
+  if (IS_FALSE(typed_pointer_is_null(tptr))) {
     if (tptr->type == t_TUPLE) {
       tuple_destroy(tptr);
     }
     else {
       memory_deallocate((data_pointer*)&tptr->value);
-      tptr->type = t_UNDEF;
-      tptr->count = 0;
+      typed_pointer_nullify(tptr);
     }
   }
+}
+
+/******************************************************************************/
+
+void typed_pointer_nullify
+(
+  typed_pointer *tptr
+)
+{
+  /* TODO: create some code generation cues, like ensure_not_null */
+  /* if the same thing has been already done in chain, can be pruned */
+  if (tptr != NULL) {
+    tptr->type = t_UNDEF;
+    tptr->count = 0;
+    tptr->value = NULL;
+  }
+}
+
+/******************************************************************************/
+
+truth_value typed_pointer_is_null
+(
+  typed_pointer *tptr
+)
+{
+  if (tptr != NULL && tptr->value != NULL) {
+    return FALSE;
+  }
+  return TRUE;
+  /* TODO: here would benefit from three-state truth value - undef, true, false */
+  /* struct pointer that is null is actually undefined, not null */
+  /* structure with (type-specific) null contents would be null */
+}
+
+/******************************************************************************/
+
+truth_value is_typed_pointer
+(
+  typed_pointer *tptr
+)
+{
+  if (tptr != NULL && tptr->type == t_TPOINTER) {
+    return TRUE;
+  }
+  return FALSE;
 }
 
 /******************************************************************************/
@@ -114,31 +200,78 @@ void tuple_destroy
 
 /******************************************************************************/
 
+result tuple_promote
+(
+  typed_pointer *tptr
+)
+{
+  TRY();
+  typed_pointer *values, element;
+  
+  CHECK_POINTER(tptr);
+  
+  /* make a copy of the previous content */
+  element = *tptr;
+  /* then nullify and create a tuple instead */
+  typed_pointer_nullify(tptr);
+  CHECK(tuple_create(tptr, 1));
+  /* copy the previous content as the first value of the tuple */
+  values = (typed_pointer*)tptr->value;
+  values[0] = element;
+  
+  FINALLY();
+  RETURN();
+}
+
+/******************************************************************************/
+
 result tuple_extend
 (
   typed_pointer *tuple,
-  uint32 count
+  typed_pointer *tptr
 )
 {
   TRY();
   typed_pointer *new_values, *old_values;
-  uint32 i;
+  uint32 i, count;
 
   CHECK_POINTER(tuple);
   CHECK_PARAM(tuple->type == t_TUPLE);
-  CHECK_PARAM(count > tuple->count);
+  
+  count = tuple->count + 1;
 
   old_values = (typed_pointer*)tuple->value;
   CHECK(memory_allocate((data_pointer*)&new_values, count, sizeof(typed_pointer)));
   for (i = tuple->count; i--; ) {
     new_values[i] = old_values[i];
   }
+  new_values[count-1] = *tptr;
   memory_deallocate((data_pointer*)&tuple->value);
   tuple->value = (pointer)new_values;
   tuple->count = count;
 
   FINALLY();
   RETURN();
+}
+
+/******************************************************************************/
+
+typed_pointer *tuple_has_type
+(
+  typed_pointer *tuple,
+  type_label type,
+  uint32 count,
+  uint32 index
+)
+{
+  if (tuple != NULL and tuple->type == t_TUPLE) {
+    if (count > 0) {
+      uint32 i, sum;
+      typed_pointer *item;
+      
+    }
+  }
+  return NULL;
 }
 
 /******************************************************************************/

@@ -45,6 +45,10 @@ typedef struct tree_annotation_t {
   typed_pointer data;
 } tree_annotation;
 
+typedef struct accumulated_stat_t {
+  
+} accumulated_stat;
+
 typedef struct quad_forest_intersection_t {
   struct quad_tree_t *tree;
   list edges;
