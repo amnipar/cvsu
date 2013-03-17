@@ -30,6 +30,94 @@
  */
 
 #include "cvsu_annotation.h"
+#include "cvsu_typed_pointer.h"
+
+/******************************************************************************/
+/* constants for reporting function names in error messages                   */
+
+string accumulated_stat_create_name = "accumulated_stat_create";
+string annotation_ensure_accumulated_stat_name = "annotation_ensure_accumulated_stat";
+
+/******************************************************************************/
+
+result accumulated_stat_create
+(
+  quad_tree *tree,
+  stat_accumulator *acc
+)
+{
+  TRY();
+  accumulated_stat *astat;
+  
+  CHECK_POINTER(tree);
+  CHECK_POINTER(acc);
+  
+  CHECK(annotation_ensure_accumulated_stat(&tree->annotation, &astat));
+  
+  astat->meanmean = 0;
+  astat->meandev = 0;
+  astat->devmean = 0;
+  astat->devdev = 0;
+  
+  FINALLY(accumulated_stat_create);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result annotation_ensure_accumulated_stat
+(
+  tree_annotation *annotation,
+  accumulated_stat **stat;
+)
+{
+  TRY();
+  typed_pointer *tptr;
+  
+  CHECK_POINTER(stat);
+  *stat = NULL;
+  CHECK_POINTER(annotation);
+  
+  CHECK(tuple_ensure_has_unique(&annotation.data, t_ASTAT, &tptr));
+  
+  *stat = (accumulated_stat*)tptr->value;
+  
+  FINALLY(annotation_ensure_accumulated_stat);
+  RETURN();
+}
+
+/******************************************************************************/
+
+truth_value is_accumulated_stat
+(
+  typed_pointer *tptr
+)
+{
+  if (tptr != NULL && tptr->type == t_ASTAT) {
+    return TRUE;
+  }
+  return FALSE;
+}
+
+/******************************************************************************/
+
+accumulated_stat *has_accumulated_stat
+(
+  typed_pointer *tptr
+)
+{
+  if (IS_TRUE(is_accumulated_stat(tptr))) {
+    return (accumulated_stat*)tptr->value;
+  }
+  if (IS_TRUE(is_tuple(tptr))) {
+    typed_pointer *element;
+    element = tuple_has_type(tptr, t_ASTAT, 1, 1);
+    if (element != NULL) {
+      return (accumulated_stat*)element->value;
+    }
+  }
+  return NULL;
+}
 
 /******************************************************************************/
 

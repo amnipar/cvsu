@@ -93,12 +93,12 @@ result typed_pointer_create
 (
   typed_pointer *tptr,
   type_label type,
-  uint32 count,
-  pointer value
+  uint32 count
 );
 
 /**
  * Deallocates the memory and sets the structure to NULL value.
+ * TODO: should remove 'result' return type from all destroy functions
  */
 void typed_pointer_destroy
 (
@@ -110,6 +110,7 @@ void typed_pointer_destroy
  * -type is undefined
  * -count is 0
  * -pointer is NULL
+ * TODO: should make all nullify functions have void return type
  */
 void typed_pointer_nullify
 (
@@ -161,12 +162,28 @@ result tuple_promote
 )
 
 /**
- * Extends a tuple by one element, adding the new pointer as the last element
+ * Extends a tuple by one element, adding the new pointer as the last element;
+ * returns a pointer to the new element through the res pointer
  */
 result tuple_extend
 (
   typed_pointer *tuple,
-  typed_pointer *tptr
+  typed_pointer *tptr,
+  typed_pointer **res
+);
+
+/**
+ * Ensures that a typed pointer has one element with a given type. If the
+ * element is found, returns a pointer to that; if it is not found, a new
+ * undefined element is added, and a pointer is returned to that. In order to
+ * avoid having multiple elements of the given type, all additions should be
+ * done with this function.
+ */
+result tuple_ensure_has_unique
+(
+  typed_pointer *tuple,
+  type_label type,
+  typed_pointer **res
 );
 
 /**

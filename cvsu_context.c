@@ -34,12 +34,35 @@
 /******************************************************************************/
 /* constants for reporting function names in error messages                   */
 
+string context_ensure_stat_accumulator_name = "context_ensure_stat_accumulator";
 string expect_stat_accumulator_name = "expect_stat_accumulator";
 string expect_path_sniffer_name = "expect_path_sniffer";
 string expect_edge_parser_name = "expect_edge_parser";
 
 /******************************************************************************/
-/* TODO: these should be moved to some other file, along with the structs...  */
+
+result context_ensure_stat_accumulator
+(
+  parse_context *context,
+  stat_accumulator **acc
+)
+{
+  TRY();
+  typed_pointer *tptr;
+  
+  CHECK_POINTER(acc);
+  *acc = NULL;
+  CHECK_POINTER(context);
+
+  CHECK(tuple_ensure_has_unique(&context.data, t_STAT_ACCUMULATOR, &tptr));
+  
+  *acc = (stat_accumulator*)tptr->value;
+
+  FINALLY(context_ensure_stat_accumulator);
+  RETURN();
+}
+
+/******************************************************************************/
 
 truth_value is_stat_accumulator
 (
@@ -50,36 +73,6 @@ truth_value is_stat_accumulator
     return TRUE;
   }
   return FALSE;
-}
-
-/******************************************************************************/
-
-result add_stat_accumulator
-(
-  parse_context *context,
-  stat_accumulator **acc
-)
-{
-  TRY();
-  CHECK_POINTER(acc);
-  *acc = NULL;
-  CHECK_POINTER(context);
-
-  if (context.data.type == t_UNDEF) {
-    CHECK(typed_pointer_create(&context.data, t_STAT_ACCUMULATOR, 1));
-    *acc = (stat_accumulator*)context.data.value;
-  }
-  else {
-    typed_pointer tptr;
-    CHECK(typed_pointer_create(&tptr, t_STAT_ACCUMULATOR, 1));
-    if (context.data.type != t_TUPLE) {
-      CHECK(tuple_promote(&context.data));
-    }
-    CHECK(tuple_extend(&context.data, &tptr, acc));
-  }
-
-  FINALLY();
-  RETURN();
 }
 
 /******************************************************************************/

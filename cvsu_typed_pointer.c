@@ -36,6 +36,15 @@
 #include "cvsu_annotation.h"
 
 /******************************************************************************/
+/* constants for reporting function names in error messages                   */
+
+string typed_pointer_create_name = "typed_pointer_create"
+string tuple_create_name ="tuple_create";
+string tuple_promote_name = "tuple_promote";
+string tuple_extend_name = "tuple_extend";
+string tuple_ensure_has_unique_name = "tuple_ensure_has_unique";
+
+/******************************************************************************/
 
 uint32 typesize[] = {
   0,
@@ -254,6 +263,56 @@ result tuple_extend
   }
 
   FINALLY(tuple_extend);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result tuple_ensure_has_unique
+(
+  typed_pointer *tuple,
+  type_label type,
+  typed_pointer **res
+)
+{
+  TRY();
+  
+  CHECK_POINTER(res);
+  *res = NULL;
+  CHECK_POINTER(tuple);
+  
+  if (tuple->type == type) {
+    *res = tuple;
+  }
+  else
+  if (tuple->type == t_UNDEF) {
+    CHECK(typed_pointer_create(tuple, type, 1));
+    *res = tuple;
+  }
+  else {
+    uint32 i;
+    typed_pointer *elements;
+    if (tuple->type != t_TUPLE) {
+      CHECK(tuple_promote(tuple));
+    }
+    else {
+      elements = (typed_pointer*)tuple->value;
+      for (i = 0; i < tuple->count; i++) {
+        if (elements[i].type == type) {
+          *res = &elements[i];
+          break;
+        }
+      }
+    }
+    if (*res == NULL) {
+      typed_pointer new_ptr;
+      typed_pointer_nullify(&new_ptr);
+      CHECK(typed_pointer_create(&new_ptr, type, 1));
+      CHECK(tuple_extend(tuple, &new_ptr, res));
+    }
+  }
+  
+  FINALLY(tuple_ensure_has_unique);
   RETURN();
 }
 

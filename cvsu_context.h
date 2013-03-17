@@ -36,24 +36,11 @@
 extern "C" {
 #endif
 
-
-/**
- * Parsing context for image parsing operations.
- */
-typedef struct parse_context_t {
-  /** Token identifying this specific parsing operation */
-  uint32 token;
-  /** Number of the current parsing round */
-  uint32 round;
-  /** Actual context data that depends on operation */
-  typed_pointer data;
-} parse_context;
-
-
 /**
  * Context value for accumulating neighborhood statistics.
  */
 typedef struct stat_accumulator_t {
+  uint32 round;
   integral_value mean_pool1;
   integral_value mean_acc1;
   integral_value mean_pool2;
@@ -152,6 +139,27 @@ typedef struct edge_parser_t {
   uint32 pool_length;
   uint32 acc_length;
 } edge_parser;
+
+/**
+ * Parsing context for image parsing operations.
+ */
+typedef struct parse_context_t {
+  /** Token identifying this specific parsing operation */
+  uint32 token;
+  /** Number of the current parsing round */
+  uint32 round;
+  /** Actual context data that depends on operation */
+  typed_pointer data;
+} parse_context;
+
+/**
+ * Ensures that the context has a stat accumulator value.
+ */
+result context_ensure_stat_accumulator
+(
+  parse_context *context,
+  stat_accumulator **acc
+)
 
 #ifdef __cplusplus
 }

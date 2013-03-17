@@ -36,6 +36,7 @@
 extern "C" {
 #endif
 
+#include "cvsu_context.h"
 
 /**
  * Generic tree annotation. Can be edge, segment, intersection.
@@ -46,8 +47,33 @@ typedef struct tree_annotation_t {
 } tree_annotation;
 
 typedef struct accumulated_stat_t {
-  
+  integral_value meanmean;
+  integral_value meandev;
+  integral_value devmean;
+  integral_value devdev;
 } accumulated_stat;
+
+result accumulated_stat_create
+(
+  quad_tree *tree,
+  stat_accumulator *acc
+);
+
+result annotation_ensure_accumulated_stat
+(
+  tree_annotation *annotation,
+  accumulated_stat **stat;
+);
+
+truth_value is_accumulated_stat
+(
+  typed_pointer *tptr
+);
+
+accumulated_stat *has_accumulated_stat
+(
+  typed_pointer *tptr
+);
 
 typedef struct quad_forest_intersection_t {
   struct quad_tree_t *tree;
