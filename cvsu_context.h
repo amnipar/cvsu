@@ -36,6 +36,10 @@
 extern "C" {
 #endif
 
+#include "cvsu_config.h"
+#include "cvsu_types.h"
+#include "cvsu_typed_pointer.h"
+
 /**
  * Context value for accumulating neighborhood statistics.
  */
@@ -73,6 +77,8 @@ result expect_stat_accumulator
   typed_pointer *tptr
 );
 
+struct quad_forest_edge_t;
+struct quad_forest_edge_chain_t;
 
 /**
  * Context value for sniffing shortest paths between line endpoints.
@@ -83,9 +89,9 @@ typedef struct path_sniffer_t {
   /** Quad tree associated with this node */
   struct quad_tree_t *tree;
   /** Edge chain that we attempt to extend */
-  quad_forest_edge_chain *chain;
+  struct quad_forest_edge_chain_t *chain;
   /** Edge chain endpoint where starting to extend */
-  quad_forest_edge *endpoint;
+  struct quad_forest_edge_t *endpoint;
   /** Strength of edge at this point */
   integral_value strength;
   /** Cost of this path so far */
@@ -128,7 +134,7 @@ result expect_path_sniffer
 /******************************************************************************/
 
 typedef struct segment_parser_t {
-
+  uint32 round;
 } segment_parser;
 
 /******************************************************************************/
@@ -139,6 +145,23 @@ typedef struct edge_parser_t {
   uint32 pool_length;
   uint32 acc_length;
 } edge_parser;
+
+void make_edge_parser
+(
+  typed_pointer *tptr,
+  edge_parser *parser
+);
+
+truth_value is_edge_parser
+(
+  typed_pointer *tptr
+);
+
+result expect_edge_parser
+(
+  edge_parser **target,
+  const typed_pointer *tptr
+);
 
 /**
  * Parsing context for image parsing operations.
@@ -159,7 +182,7 @@ result context_ensure_stat_accumulator
 (
   parse_context *context,
   stat_accumulator **acc
-)
+);
 
 #ifdef __cplusplus
 }

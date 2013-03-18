@@ -159,7 +159,7 @@ void tuple_destroy
 result tuple_promote
 (
   typed_pointer *tptr
-)
+);
 
 /**
  * Extends a tuple by one element, adding the new pointer as the last element;

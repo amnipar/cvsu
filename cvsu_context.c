@@ -29,6 +29,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "cvsu_macros.h"
 #include "cvsu_context.h"
 
 /******************************************************************************/
@@ -49,13 +50,13 @@ result context_ensure_stat_accumulator
 {
   TRY();
   typed_pointer *tptr;
-  
+
   CHECK_POINTER(acc);
   *acc = NULL;
   CHECK_POINTER(context);
 
-  CHECK(tuple_ensure_has_unique(&context.data, t_STAT_ACCUMULATOR, &tptr));
-  
+  CHECK(tuple_ensure_has_unique(&context->data, t_STAT_ACCUMULATOR, &tptr));
+
   *acc = (stat_accumulator*)tptr->value;
 
   FINALLY(context_ensure_stat_accumulator);
@@ -168,136 +169,6 @@ result expect_path_sniffer
   }
 
   FINALLY(expect_path_sniffer);
-  RETURN();
-}
-
-/******************************************************************************/
-
-typedef struct segment_parser_t {
-
-} segment_parser;
-
-/******************************************************************************/
-
-typedef struct edge_parser_t {
-  integral_value pool_cost;
-  integral_value acc_cost;
-  uint32 pool_length;
-  uint32 acc_length;
-} edge_parser;
-
-/******************************************************************************/
-
-void make_edge_parser
-(
-  typed_pointer *tptr,
-  edge_parser *parser
-)
-{
-  tptr->type = t_EDGE_PARSER;
-  tptr->value = (pointer)parser;
-}
-
-/******************************************************************************/
-
-truth_value is_edge_parser
-(
-  typed_pointer *tptr
-)
-{
-  if (tptr->type == t_EDGE_PARSER) {
-    return TRUE;
-  }
-  return FALSE;
-}
-
-/******************************************************************************/
-
-result expect_edge_parser
-(
-  edge_parser **target,
-  const typed_pointer *tptr
-)
-{
-  TRY();
-
-  CHECK_POINTER(target);
-  CHECK_POINTER(tptr);
-  CHECK_POINTER(tptr->value);
-
-  if (tptr->type == t_EDGE_PARSER) {
-    *target = (edge_parser*)tptr->value;
-  }
-  else {
-    ERROR(BAD_TYPE);
-  }
-
-  FINALLY(expect_edge_parser);
-  RETURN();
-}
-
-/******************************************************************************/
-
-typedef struct segment_parser_t {
-
-} segment_parser;
-
-/******************************************************************************/
-
-typedef struct edge_parser_t {
-  integral_value pool_cost;
-  integral_value acc_cost;
-  uint32 pool_length;
-  uint32 acc_length;
-} edge_parser;
-
-/******************************************************************************/
-
-void make_edge_parser
-(
-  typed_pointer *tptr,
-  edge_parser *parser
-)
-{
-  tptr->type = t_EDGE_PARSER;
-  tptr->value = (pointer)parser;
-}
-
-/******************************************************************************/
-
-truth_value is_edge_parser
-(
-  typed_pointer *tptr
-)
-{
-  if (tptr->type == t_EDGE_PARSER) {
-    return TRUE;
-  }
-  return FALSE;
-}
-
-/******************************************************************************/
-
-result expect_edge_parser
-(
-  edge_parser **target,
-  const typed_pointer *tptr
-)
-{
-  TRY();
-
-  CHECK_POINTER(target);
-  CHECK_POINTER(tptr);
-  CHECK_POINTER(tptr->value);
-
-  if (tptr->type == t_EDGE_PARSER) {
-    *target = (edge_parser*)tptr->value;
-  }
-  else {
-    ERROR(BAD_TYPE);
-  }
-
-  FINALLY(expect_edge_parser);
   RETURN();
 }
 

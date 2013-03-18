@@ -29,7 +29,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "cvsu_macros.h"
 #include "cvsu_quad_tree.h"
+#include "cvsu_quad_forest.h"
+#include "cvsu_memory.h"
+#include <math.h>
 
 /******************************************************************************/
 /* constants for reporting function names in error messages                   */
@@ -46,29 +50,24 @@ string quad_tree_get_neighbors_name = "quad_tree_get_neighbors";
 
 /******************************************************************************/
 
-result quad_tree_destroy
+void quad_tree_destroy
 (
   quad_tree *tree
 )
 {
-  TRY();
+  if (tree != NULL) {
+    /* must deallocate the memory pointed to by typed pointers, if set */
+    typed_pointer_destroy(&tree->annotation.data);
+    typed_pointer_destroy(&tree->context.data);
 
-  CHECK_POINTER(tree);
+    /* later will need a special function for destroying annotation and context */
+    list_destroy(&tree->intersection.edges);
+    list_destroy(&tree->intersection.chains);
 
-  /* must deallocate the memory pointed to by typed pointers, if set */
-  typed_pointer_destroy(&tree->annotation.data);
-  typed_pointer_destroy(&tree->context.data);
+    list_destroy(&tree->links);
 
-  /* later will need a special function for destroying annotation and context */
-  CHECK(list_destroy(&tree->intersection.edges));
-  CHECK(list_destroy(&tree->intersection.chains));
-
-  CHECK(list_destroy(&tree->links));
-
-  CHECK(quad_tree_nullify(tree));
-
-  FINALLY(quad_tree_destroy);
-  RETURN();
+    quad_tree_nullify(tree);
+  }
 }
 
 /******************************************************************************/

@@ -36,7 +36,11 @@
 extern "C" {
 #endif
 
+#include "cvsu_config.h"
+#include "cvsu_types.h"
+#include "cvsu_typed_pointer.h"
 #include "cvsu_context.h"
+#include "cvsu_list.h"
 
 /**
  * Generic tree annotation. Can be edge, segment, intersection.
@@ -53,16 +57,18 @@ typedef struct accumulated_stat_t {
   integral_value devdev;
 } accumulated_stat;
 
+struct quad_tree_t;
+
 result accumulated_stat_create
 (
-  quad_tree *tree,
+  struct quad_tree_t *tree,
   stat_accumulator *acc
 );
 
 result annotation_ensure_accumulated_stat
 (
   tree_annotation *annotation,
-  accumulated_stat **stat;
+  accumulated_stat **astat
 );
 
 truth_value is_accumulated_stat
@@ -177,7 +183,61 @@ typedef struct quad_forest_segment_t
   byte color[4];
 } quad_forest_segment;
 
-int compare_segments(const void *a, const void *b)
+int compare_segments(const void *a, const void *b);
+
+/**
+ * Creates a new segment from this quad_tree.
+ * Part of the Union-Find implementation for quad_trees.
+ */
+void quad_tree_segment_create
+(
+  struct quad_tree_t *tree
+);
+
+/**
+ * Creates a union of two segments.
+ */
+void quad_forest_segment_union
+(
+  quad_forest_segment *segment1,
+  quad_forest_segment *segment2
+);
+
+/**
+ * Creates a union of the two segments these two quad_trees belong to.
+ * Part of the Union-Find implementation for quad_trees.
+ */
+void quad_tree_segment_union
+(
+  struct quad_tree_t *tree1,
+  struct quad_tree_t *tree2
+);
+
+/**
+ * Finds the parent element in the segment this tree belongs to.
+ * Part of the Union-Find implementation for quad_trees.
+ */
+quad_forest_segment *quad_tree_segment_find
+(
+  struct quad_tree_t *tree
+);
+
+/**
+ * Gets the segment id for this quad_tree. Effectively the pointer cast into an
+ * int. Helper function on top of the Union-Find implementation for quad_trees.
+ */
+uint32 quad_tree_segment_get
+(
+  struct quad_tree_t *tree
+);
+
+/**
+ * Checks if this quad_tree is a segment parent (id == segment_info)
+ */
+truth_value quad_tree_is_segment_parent
+(
+  struct quad_tree_t *tree
+);
 
 #ifdef __cplusplus
 }

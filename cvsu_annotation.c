@@ -29,8 +29,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "cvsu_macros.h"
+#include "cvsu_output.h"
+#include "cvsu_memory.h"
 #include "cvsu_annotation.h"
 #include "cvsu_typed_pointer.h"
+#include "cvsu_quad_tree.h"
 
 /******************************************************************************/
 /* constants for reporting function names in error messages                   */
@@ -48,17 +52,17 @@ result accumulated_stat_create
 {
   TRY();
   accumulated_stat *astat;
-  
+
   CHECK_POINTER(tree);
   CHECK_POINTER(acc);
-  
+
   CHECK(annotation_ensure_accumulated_stat(&tree->annotation, &astat));
-  
+
   astat->meanmean = 0;
   astat->meandev = 0;
   astat->devmean = 0;
   astat->devdev = 0;
-  
+
   FINALLY(accumulated_stat_create);
   RETURN();
 }
@@ -68,20 +72,20 @@ result accumulated_stat_create
 result annotation_ensure_accumulated_stat
 (
   tree_annotation *annotation,
-  accumulated_stat **stat;
+  accumulated_stat **astat
 )
 {
   TRY();
   typed_pointer *tptr;
-  
-  CHECK_POINTER(stat);
-  *stat = NULL;
+
+  CHECK_POINTER(astat);
+  *astat = NULL;
   CHECK_POINTER(annotation);
-  
-  CHECK(tuple_ensure_has_unique(&annotation.data, t_ASTAT, &tptr));
-  
-  *stat = (accumulated_stat*)tptr->value;
-  
+
+  CHECK(tuple_ensure_has_unique(&annotation->data, t_ASTAT, &tptr));
+
+  *astat = (accumulated_stat*)tptr->value;
+
   FINALLY(annotation_ensure_accumulated_stat);
   RETURN();
 }
@@ -272,13 +276,13 @@ int compare_segments(const void *a, const void *b)
 
   sa = *((const quad_forest_segment* const *)a);
   if (sa == NULL) {
-    printf("warning: tree is null in compare_segments\n");
+    PRINT0("warning: tree is null in compare_segments\n");
     return -1;
   }
   sb = *((const quad_forest_segment* const *)b);
 
   if (sb == NULL) {
-    printf("warning: tree is null in compare_segments\n");
+    PRINT0("warning: tree is null in compare_segments\n");
     return -1;
   }
 

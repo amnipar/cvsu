@@ -29,38 +29,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "cvsu_quad_forest.h"
 #include "cvsu_macros.h"
+#include "cvsu_quad_tree.h"
+#include "cvsu_quad_forest.h"
 #include "cvsu_memory.h"
 
 #include <stdlib.h>
 /*#include <stdio.h>*/
 #include <sys/time.h>
-#include <math.h>
-
-/******************************************************************************/
-/* some gcc versions seem to require these definitions to work properly       */
-/* remove them if they cause problems with other compilers                    */
-
-#ifdef NEED_MINMAX
-#if INTEGRAL_IMAGE_DATA_TYPE == INTEGRAL_IMAGE_USING_FLOAT
-float fminf(float __x, float __y);
-float fmaxf(float __x, float __y);
-#define getmin fminf
-#define getmax fmaxf
-#elif INTEGRAL_IMAGE_DATA_TYPE == INTEGRAL_IMAGE_USING_DOUBLE
-double fmin(double __x, double __y);
-double fmax(double __x, double __y);
-#define getmin fmin
-#define getmax fmax
-#else
-#error "integral image data type not defined"
-#endif
-#endif
-
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
 
 /******************************************************************************/
 /* constants for reporting function names in error messages                   */
@@ -86,10 +62,6 @@ string quad_forest_get_path_sniffers_name = "quad_forest_get_path_sniffers";
 string quad_forest_draw_trees_name =  "quad_forest_draw_trees";
 string quad_forest_highlight_segments_name = "quad_forest_highlight_segments";
 string quad_forest_draw_image_name = "quad_forest_draw_image";
-string quad_forest_find_edges_name = "quad_forest_find_edges";
-string quad_forest_find_boundaries_name = "quad_forest_find_boundaries";
-string quad_forest_find_boundaries_with_hysteresis_name = "quad_forest_find_boundaries_with_hysteresis";
-string quad_forest_prune_boundaries_name = "quad_forest_prune_boundaries";
 string quad_forest_segment_edges_name = "quad_forest_segment_edges";
 string quad_forest_segment_with_boundaries_name = "quad_forest_segment_with_boundaries";
 
@@ -146,6 +118,7 @@ truth_value quad_tree_link_equals(const void *a, const void *b)
 result quad_forest_init
 (
   quad_forest *target,
+  pixel_image *source,
   uint32 tree_max_size,
   uint32 tree_min_size
 )
@@ -158,8 +131,8 @@ result quad_forest_init
   quad_tree_link_head *head;
 
   /* not necessary to check target pointer, calling function should handle that */
-  width = target->original->width;
-  height = target->original->height;
+  width = source->width;
+  height = source->height;
 
   CHECK_PARAM(tree_max_size <= width && tree_max_size <= height);
   CHECK_PARAM(tree_min_size <= tree_max_size);
@@ -206,7 +179,8 @@ result quad_forest_init
   if (target->source == NULL) {
     target->source = pixel_image_alloc();
     CHECK_POINTER(target->source);
-    CHECK(pixel_image_create(target->source, p_U8, GREY, width, height, 1, width));
+    CHECK(pixel_image_clone(target->source, source));
+    /*p_U8, GREY, width, height, 1, width));*/
   }
 
   /*printf("create integral image\n");*/
@@ -368,7 +342,8 @@ result quad_forest_create
 
   target->original = source;
 
-  CHECK(quad_forest_init(target, tree_max_size, tree_min_size));
+  CHECK(quad_forest_init(target, source, tree_max_size, tree_min_size));
+  CHECK(pixel_image_copy(target->source, source));
 
   FINALLY(quad_forest_create);
   RETURN();
@@ -389,7 +364,8 @@ result quad_forest_reload
   CHECK_POINTER(target->original);
 
   if (target->tree_max_size != tree_max_size || target->tree_min_size != tree_min_size) {
-    quad_forest_init(target, tree_max_size, tree_min_size);
+    quad_forest_init(target, target->original, tree_max_size, tree_min_size);
+    CHECK(pixel_image_copy(target->source, target->original));
   }
 
   FINALLY(quad_forest_reload);
@@ -413,7 +389,7 @@ result quad_forest_destroy
   items = target->trees.first.next;
   end = &target->trees.last;
   while (items != end) {
-    CHECK(quad_tree_destroy((quad_tree *)items->data));
+    quad_tree_destroy((quad_tree *)items->data);
     items = items->next;
   }
   CHECK(list_destroy(&target->trees));
@@ -1546,14 +1522,14 @@ result quad_forest_get_edge_chain
   token = current->token + 1;
   if (current != NULL) {
     tree = (quad_tree*)current->tree;
-    point_a.x = tree->x + (uint32)(tree->size / 2);
-    point_a.y = tree->y + (uint32)(tree->size / 2);
+    point_a.x = (signed)(tree->x + (uint32)(tree->size / 2));
+    point_a.y = (signed)(tree->y + (uint32)(tree->size / 2));
     current->token = token;
     current = current->next;
     while (current != NULL) {
       tree = (quad_tree*)current->tree;
-      point_b.x = tree->x + (uint32)(tree->size / 2);
-      point_b.y = tree->y + (uint32)(tree->size / 2);
+      point_b.x = (signed)(tree->x + (uint32)(tree->size / 2));
+      point_b.y = (signed)(tree->y + (uint32)(tree->size / 2));
       new_line.start = point_a;
       new_line.end = point_b;
       CHECK(list_append(chain, (pointer)&new_line));
@@ -1584,7 +1560,6 @@ result quad_forest_get_path_sniffers
   uint32 i, size;
   quad_tree *tree, *prev;
   path_sniffer *current;
-  point point_a, point_b;
   line new_line;
 
   CHECK_POINTER(forest);
@@ -1599,10 +1574,10 @@ result quad_forest_get_path_sniffers
       CHECK(expect_path_sniffer(&current, &tree->context.data));
       if (current->prev != NULL) {
         prev = current->prev->tree;
-        new_line.start.x = tree->x + (uint32)(tree->size / 2);
-        new_line.start.y = tree->y + (uint32)(tree->size / 2);
-        new_line.end.x = prev->x + (uint32)(prev->size / 2);
-        new_line.end.y = prev->y + (uint32)(prev->size / 2);
+        new_line.start.x = (signed)(tree->x + (uint32)(tree->size / 2));
+        new_line.start.y = (signed)(tree->y + (uint32)(tree->size / 2));
+        new_line.end.x = (signed)(prev->x + (uint32)(prev->size / 2));
+        new_line.end.y = (signed)(prev->y + (uint32)(prev->size / 2));
         CHECK(list_append(sniffers, (pointer)&new_line));
       }
     }
@@ -1624,7 +1599,7 @@ result quad_forest_get_links
   list_item *items, *end;
   quad_tree *tree;
   quad_tree_link *link;
-  integral_value d;
+  /*integral_value d;*/
   weighted_line new_line;
 
   CHECK_POINTER(forest);
@@ -1636,11 +1611,11 @@ result quad_forest_get_links
   while (items != end) {
     link = (quad_tree_link*)items->data;
     tree = link->a.tree;
-    new_line.start.x = tree->x + (uint32)(tree->size / 2);
-    new_line.start.y = tree->y + (uint32)(tree->size / 2);
+    new_line.start.x = (signed)(tree->x + (uint32)(tree->size / 2));
+    new_line.start.y = (signed)(tree->y + (uint32)(tree->size / 2));
     tree = link->b.tree;
-    new_line.end.x = tree->x + (uint32)(tree->size / 2);
-    new_line.end.y = tree->y + (uint32)(tree->size / 2);
+    new_line.end.x = (signed)(tree->x + (uint32)(tree->size / 2));
+    new_line.end.y = (signed)(tree->y + (uint32)(tree->size / 2));
     new_line.weight = link->strength;
     CHECK(list_append(links, (pointer)&new_line));
 

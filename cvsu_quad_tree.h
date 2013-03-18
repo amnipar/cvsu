@@ -36,6 +36,11 @@
 extern "C" {
 #endif
 
+#include "cvsu_config.h"
+#include "cvsu_types.h"
+#include "cvsu_list.h"
+#include "cvsu_context.h"
+#include "cvsu_annotation.h"
 
 /* forward declaration */
 struct quad_tree_link_t;
@@ -129,6 +134,12 @@ typedef struct quad_tree_t {
   parse_context context;
 } quad_tree;
 
+struct quad_forest_t;
+
+void quad_tree_destroy
+(
+  quad_tree *target
+);
 
 /**
  * Initializes the contents of a quad_tree with null values.
@@ -154,7 +165,7 @@ truth_value quad_tree_is_null
 result quad_tree_divide
 (
   /** The quad_forest where the tree resides. */
-  quad_forest *forest,
+  struct quad_forest_t *forest,
   /** The quad_tree to be divided. */
   quad_tree *target
 );
@@ -175,7 +186,7 @@ truth_value quad_tree_has_children
 result quad_tree_get_child_statistics
 (
   /** The quad_forest where the tree resides. */
-  quad_forest *forest,
+  struct quad_forest_t *forest,
   /** The quad_tree that will will be examined. */
   quad_tree *source,
   /** The array of child quad_trees to fill, must contain at least 4. */
@@ -191,7 +202,7 @@ result quad_tree_get_child_statistics
 result quad_tree_get_neighborhood_statistics
 (
   /** The quad_forest where the tree resides. */
-  quad_forest *forest,
+  struct quad_forest_t *forest,
   /** The quad_tree around which the neighborhood is generated. */
   quad_tree *tree,
   /** The statistics structure where the result will be stored. */
@@ -208,7 +219,7 @@ result quad_tree_get_neighborhood_statistics
 result quad_tree_divide_with_overlap
 (
   /** The quad_forest where the tree resides. */
-  quad_forest *forest,
+  struct quad_forest_t *forest,
   /** The quad_tree to be divided if its internal overlap is high. */
   quad_tree *target,
   /** Deviation multiplier used for creating the estimated intensity range. */
@@ -224,7 +235,7 @@ result quad_tree_divide_with_overlap
 result quad_tree_get_edge_response
 (
   /** The quad_forest where the tree resides. */
-  quad_forest *forest,
+  struct quad_forest_t *forest,
   /** The quad_tree where the edge response is calculated. */
   quad_tree *target,
   /** Pointer where the horizontal scanning result is stored. */
@@ -240,7 +251,7 @@ result quad_tree_get_edge_response
 result quad_tree_get_child_edge_response
 (
   /** The quad_forest where the tree resides. */
-  quad_forest *forest,
+  struct quad_forest_t *forest,
   /** The quad_tree that will will be examined. */
   quad_tree *source,
   /** Array where the horizontal scanning results are stored: must fit 4. */
@@ -263,61 +274,6 @@ result quad_tree_get_neighbors
   list *target,
   quad_tree *tree
 );
-
-/**
- * Creates a new segment from this quad_tree.
- * Part of the Union-Find implementation for quad_trees.
- */
-void quad_tree_segment_create
-(
-  quad_tree *tree
-);
-
-/**
- * Creates a union of two segments.
- */
-void quad_forest_segment_union
-(
-  quad_forest_segment *segment1,
-  quad_forest_segment *segment2
-);
-
-/**
- * Creates a union of the two segments these two quad_trees belong to.
- * Part of the Union-Find implementation for quad_trees.
- */
-void quad_tree_segment_union
-(
-  quad_tree *tree1,
-  quad_tree *tree2
-);
-
-/**
- * Finds the parent element in the segment this tree belongs to.
- * Part of the Union-Find implementation for quad_trees.
- */
-quad_forest_segment *quad_tree_segment_find
-(
-  quad_tree *tree
-);
-
-/**
- * Gets the segment id for this quad_tree. Effectively the pointer cast into an
- * int. Helper function on top of the Union-Find implementation for quad_trees.
- */
-uint32 quad_tree_segment_get
-(
-  quad_tree *tree
-);
-
-/**
- * Checks if this quad_tree is a segment parent (id == segment_info)
- */
-truth_value quad_tree_is_segment_parent
-(
-  quad_tree *tree
-);
-
 
 #ifdef __cplusplus
 }

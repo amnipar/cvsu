@@ -39,10 +39,11 @@ extern "C" {
 #include "cvsu_config.h"
 #include "cvsu_types.h"
 #include "cvsu_quad_tree.h"
+#include "cvsu_quad_forest.h"
 #include "cvsu_list.h"
 #include "cvsu_context.h"
 
-typedef void (*context_operation)(quad_tree *tree, list *collection);
+typedef result (*context_operation)(quad_tree *tree, list *collection);
 
 /**
  * Runs a generic prime/propagate/accumulate operation on a list of trees.
@@ -54,7 +55,20 @@ result run_context_operation
   context_operation prime_operation,
   context_operation propagate_operation,
   context_operation accumulate_operation,
+  uint32 rounds,
   truth_value needs_list
+);
+
+result quad_forest_calculate_accumulated_stats
+(
+  quad_forest *forest,
+  uint32 rounds
+);
+
+result quad_forest_visualize_accumulated_stats
+(
+  quad_forest *forest,
+  pixel_image *target
 );
 
 /**
@@ -70,7 +84,6 @@ result quad_forest_parse
   /** The minimum length of edge chains _before_ starting to fill gaps */
   uint32 min_length
 );
-
 
 #ifdef __cplusplus
 }

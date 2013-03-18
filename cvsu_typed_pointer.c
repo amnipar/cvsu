@@ -29,6 +29,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "cvsu_macros.h"
 #include "cvsu_typed_pointer.h"
 #include "cvsu_memory.h"
 #include "cvsu_list.h"
@@ -38,7 +39,7 @@
 /******************************************************************************/
 /* constants for reporting function names in error messages                   */
 
-string typed_pointer_create_name = "typed_pointer_create"
+string typed_pointer_create_name = "typed_pointer_create";
 string tuple_create_name ="tuple_create";
 string tuple_promote_name = "tuple_promote";
 string tuple_extend_name = "tuple_extend";
@@ -178,10 +179,10 @@ result tuple_create
   /* ensure the possible previous data is destroyed */
   typed_pointer_destroy(tuple);
 
-  tptr->type = t_TUPLE;
+  tuple->type = t_TUPLE;
   CHECK(memory_allocate((data_pointer*)&values, count, sizeof(typed_pointer)));
-  tptr->value = (pointer)values;
-  tptr->count = count;
+  tuple->value = (pointer)values;
+  tuple->count = count;
 
   FINALLY(tuple_create);
   RETURN();
@@ -199,7 +200,7 @@ void tuple_destroy
     typed_pointer *values;
     values = (typed_pointer*)tuple->value;
     for (i = tuple->count; i--; ) {
-      typed_pointer_destroy(values[i]);
+      typed_pointer_destroy(&values[i]);
     }
     memory_deallocate((data_pointer*)&tuple->value);
     typed_pointer_nullify(tuple);
@@ -276,11 +277,11 @@ result tuple_ensure_has_unique
 )
 {
   TRY();
-  
+
   CHECK_POINTER(res);
   *res = NULL;
   CHECK_POINTER(tuple);
-  
+
   if (tuple->type == type) {
     *res = tuple;
   }
@@ -311,7 +312,7 @@ result tuple_ensure_has_unique
       CHECK(tuple_extend(tuple, &new_ptr, res));
     }
   }
-  
+
   FINALLY(tuple_ensure_has_unique);
   RETURN();
 }
@@ -326,7 +327,7 @@ typed_pointer *tuple_has_type
   uint32 index
 )
 {
-  if (tuple != NULL and tuple->type == t_TUPLE) {
+  if (tuple != NULL && tuple->type == t_TUPLE) {
     uint32 i, num;
     typed_pointer *elements;
 

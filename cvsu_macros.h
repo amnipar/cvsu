@@ -36,6 +36,34 @@
 #include "cvsu_types.h"
 #include "cvsu_output.h"
 
+/******************************************************************************/
+/* some gcc versions seem to require these definitions to work properly       */
+/* remove them if they cause problems with other compilers                    */
+
+#include <math.h>
+
+#ifdef NEED_MINMAX
+#if INTEGRAL_IMAGE_DATA_TYPE == INTEGRAL_IMAGE_USING_FLOAT
+float fminf(float __x, float __y);
+float fmaxf(float __x, float __y);
+#define getmin fminf
+#define getmax fmaxf
+#elif INTEGRAL_IMAGE_DATA_TYPE == INTEGRAL_IMAGE_USING_DOUBLE
+double fmin(double __x, double __y);
+double fmax(double __x, double __y);
+#define getmin fmin
+#define getmax fmax
+#else
+#error "integral image data type not defined"
+#endif
+#endif
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
+/******************************************************************************/
+
 #define TRY(func) result r
 
 #define ERROR(e) do {\

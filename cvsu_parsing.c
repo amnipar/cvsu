@@ -29,16 +29,326 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "cvsu_macros.h"
 #include "cvsu_parsing.h"
+#include "cvsu_annotation.h"
+
+#include <stdlib.h> /* for rand */
 
 /******************************************************************************/
 /* constants for reporting function names in error messages                   */
 
+string prime_stat_accumulator_name = "prime_stat_accumulator";
+string prop_stat_accumulator_name = "prop_stat_accumulator";
+string acc_stat_accumulator_name = "acc_stat_accumulator";
+
+string run_context_operation_name = "run_context_operation";
+string quad_forest_calculate_accumulated_stats_name = "quad_forest_calculate_accumulated_stats";
+string quad_forest_visualize_accumulated_stats_name = "quad_forest_visualize_accumulated_stats";
 string quad_forest_parse_name = "quad_forest_parse";
 
 string init_edge_parsers_name = "init_edge_parsers";
 string pool_edge_parsers_name = "pool_edge_parsers";
 string acc_edge_parsers_name = "acc_edge_parsers";
+
+string quad_forest_find_edges_name = "quad_forest_find_edges";
+string quad_forest_find_boundaries_name = "quad_forest_find_boundaries";
+string quad_forest_find_boundaries_with_hysteresis_name = "quad_forest_find_boundaries_with_hysteresis";
+string quad_forest_prune_boundaries_name = "quad_forest_prune_boundaries";
+
+/******************************************************************************/
+
+result prime_stat_accumulator
+(
+  quad_tree *tree,
+  list *collection
+)
+{
+  TRY();
+  stat_accumulator *acc;
+
+  CHECK_POINTER(tree);
+
+  CHECK(context_ensure_stat_accumulator(&tree->context, &acc));
+  if (acc->round == 0) {
+    integral_value mean, dev;
+
+    mean = tree->stat.mean;
+    dev = tree->stat.deviation;
+
+    acc->mean_acc1 = mean / 2;
+    acc->mean_pool1 = acc->mean_acc1;
+    acc->mean_acc2 = mean * acc->mean_acc1;
+    acc->mean_pool2 = acc->mean_acc2;
+
+    acc->dev_acc1 = dev / 2;
+    acc->dev_pool1 = acc->dev_acc1;
+    acc->dev_acc2 = dev * acc->dev_acc1;
+    acc->dev_pool2 = acc->dev_acc2;
+
+    acc->round = 1;
+  }
+  else {
+    acc->mean_acc1 = acc->mean_pool1 / 2;
+    acc->mean_pool1 = acc->mean_acc1;
+    acc->mean_acc2 = acc->mean_pool2 / 2;
+    acc->mean_pool2 = acc->mean_acc2;
+
+    acc->dev_acc1 = acc->dev_pool1 / 2;
+    acc->dev_pool1 = acc->dev_acc1;
+    acc->dev_acc2 = acc->dev_pool2 / 2;
+    acc->dev_pool2 = acc->dev_acc2;
+
+    acc->round++;
+  }
+
+  FINALLY(prime_stat_accumulator);
+  (void)collection;
+  RETURN();
+}
+
+/******************************************************************************/
+
+#define NEIGHBOR_PROP_STAT(neighbor)\
+if ((neighbor) != NULL) {\
+    neighbor_acc = has_stat_accumulator(&(neighbor)->context.data);\
+    CHECK_POINTER(neighbor_acc);\
+    neighbor_acc->mean_pool1 += mean_pool1;\
+    neighbor_acc->mean_pool2 += mean_pool2;\
+    neighbor_acc->dev_pool1 += dev_pool1;\
+    neighbor_acc->dev_pool2 += dev_pool2;\
+  }\
+  else {\
+    tree_acc->mean_pool1 += mean_pool1;\
+    tree_acc->mean_pool2 += mean_pool2;\
+    tree_acc->dev_pool1 += dev_pool1;\
+    tree_acc->dev_pool2 += dev_pool2;\
+  }
+
+result prop_stat_accumulator
+(
+  quad_tree *tree,
+  list *collection
+)
+{
+  TRY();
+  stat_accumulator *tree_acc, *neighbor_acc;
+  integral_value mean_pool1, mean_pool2, dev_pool1, dev_pool2;
+
+  CHECK_POINTER(tree);
+  tree_acc = has_stat_accumulator(&tree->context.data);
+  CHECK_POINTER(tree_acc);
+
+  mean_pool1 = tree_acc->mean_acc1 / 4;
+  mean_pool2 = tree_acc->mean_acc2 / 4;
+  dev_pool1 = tree_acc->dev_acc1 / 4;
+  dev_pool2 = tree_acc->dev_acc2 / 4;
+
+  /* TODO: use neighbor links and link categorization instead */
+  /* neighbor n */
+  NEIGHBOR_PROP_STAT(tree->n);
+  NEIGHBOR_PROP_STAT(tree->e);
+  NEIGHBOR_PROP_STAT(tree->s);
+  NEIGHBOR_PROP_STAT(tree->w);
+
+  FINALLY(prop_stat_accumulator);
+  (void)collection;
+  RETURN();
+}
+
+/******************************************************************************/
+
+result acc_stat_accumulator
+(
+  quad_tree *tree,
+  list *collection
+)
+{
+  TRY();
+  stat_accumulator *acc;
+  accumulated_stat *astat;
+  integral_value mean, dev;
+
+  CHECK_POINTER(tree);
+  acc = has_stat_accumulator(&tree->context.data);
+  CHECK_POINTER(acc);
+  CHECK(annotation_ensure_accumulated_stat(&tree->annotation, &astat));
+
+  mean = acc->mean_pool1;
+  dev = acc->mean_pool2;
+  dev -= mean*mean;
+  if (dev < 0) dev = 0; else dev = sqrt(dev);
+  astat->meanmean = mean;
+  astat->meandev = dev;
+
+  mean = acc->dev_pool1;
+  dev = acc->dev_pool2;
+  dev -= mean*mean;
+  if (dev < 0) dev = 0; else dev = sqrt(dev);
+  astat->devmean = mean;
+  astat->devdev = dev;
+
+  FINALLY(acc_stat_accumulator);
+  (void)collection;
+  RETURN();
+}
+
+/******************************************************************************/
+
+result run_context_operation
+(
+  list *input_trees,
+  list *output_trees,
+  context_operation prime_operation,
+  context_operation propagate_operation,
+  context_operation accumulate_operation,
+  uint32 rounds,
+  truth_value needs_list
+)
+{
+  TRY();
+  uint32 remaining;
+  list_item *trees, *end;
+
+  /* if a new list needs to be generated, how to do it? */
+  /* new list for each round, use output list for accumulate round? */
+  if (IS_TRUE(needs_list)) {
+
+  }
+  else {
+    for (remaining = rounds; remaining--;) {
+      trees = input_trees->first.next;
+      end = &input_trees->last;
+      while (trees != end) {
+        CHECK(prime_operation((quad_tree *)trees->data, NULL));
+        trees = trees->next;
+      }
+      trees = input_trees->first.next;
+      end = &input_trees->last;
+      while (trees != end) {
+        CHECK(propagate_operation((quad_tree *)trees->data, NULL));
+        trees = trees->next;
+      }
+    }
+    trees = input_trees->first.next;
+    end = &input_trees->last;
+    while (trees != end) {
+      CHECK(accumulate_operation((quad_tree *)trees->data, NULL));
+      trees = trees->next;
+    }
+  }
+
+  FINALLY(run_context_operation);
+  (void)output_trees;
+  RETURN();
+}
+
+/******************************************************************************/
+
+result quad_forest_calculate_accumulated_stats
+(
+  quad_forest *forest,
+  uint32 rounds
+)
+{
+  TRY();
+
+  CHECK_POINTER(forest);
+
+  CHECK(run_context_operation(&forest->trees, NULL, prime_stat_accumulator,
+                              prop_stat_accumulator, acc_stat_accumulator,
+                              rounds, FALSE));
+
+  FINALLY(quad_forest_calculate_accumulated_stats);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result quad_forest_visualize_accumulated_stats
+(
+  quad_forest *forest,
+  pixel_image *target
+)
+{
+  TRY();
+  list_item *trees, *end;
+  quad_tree *tree;
+  accumulated_stat *astat;
+  integral_value maxmeandev, maxdevdev, meandev, devdev;
+  uint32 x, y, width, height, stride, row_step, count;
+  byte *target_data, *target_pos, color, color0, color1, color2;
+
+  CHECK_POINTER(forest);
+  CHECK_POINTER(target);
+
+  width = target->width;
+  height = target->height;
+  stride = target->stride;
+  target_data = (byte*)target->data;
+
+  CHECK(pixel_image_clear(target));
+
+  maxmeandev = 0;
+  maxdevdev = 0;
+  count = 0;
+  trees = forest->trees.first.next;
+  end = &forest->trees.last;
+  while (trees != end) {
+    tree = (quad_tree *)trees->data;
+    if (tree->nw == NULL) {
+      astat = has_accumulated_stat(&tree->annotation.data);
+      if (astat != NULL) {
+        if (astat->meandev > maxmeandev) {
+          maxmeandev = astat->meandev;
+        }
+        if (astat->devdev > maxdevdev) {
+          maxdevdev = astat->devdev;
+        }
+        count++;
+      }
+    }
+    trees = trees->next;
+  }
+  PRINT1("trees that had astat: %lu\n", count);
+
+  trees = forest->trees.first.next;
+  end = &forest->trees.last;
+  while (trees != end) {
+    tree = (quad_tree *)trees->data;
+    if (tree->nw == NULL) {
+      astat = has_accumulated_stat(&tree->annotation.data);
+      if (astat != NULL) {
+        meandev = astat->meandev / maxmeandev;
+        devdev = astat->devdev / maxdevdev;
+        color = (byte)(255 * ((0.5 * meandev) + (0.5 * devdev)));
+        color0 = color;
+        color1 = color;
+        color2 = color;
+      }
+      width = tree->size;
+      height = width;
+      row_step = stride - width;
+      target_pos = target_data + tree->y * stride + tree->x;
+      for (y = 0; y < height; y++, target_pos += row_step) {
+        for (x = 0; x < width; x++) {
+          *target_pos = color;
+          target_pos++;
+          /*
+          *target_pos = color1;
+          target_pos++;
+          *target_pos = color2;
+          target_pos++;
+          */
+        }
+      }
+    }
+    trees = trees->next;
+  }
+
+  FINALLY(quad_forest_visualize_accumulated_stats);
+  RETURN();
+}
 
 /******************************************************************************/
 
@@ -241,7 +551,7 @@ result quad_forest_find_edges
         if (sniffer->length < 4) {\
           /*PRINT0("add next...");*/\
           neighbor->context.token = token;\
-          CREATE_POINTER(&neighbor->context.data, path_sniffer, 1);\
+          CHECK(typed_pointer_create(&neighbor->context.data, t_PATH_SNIFFER, 1));\
           CHECK(expect_path_sniffer(&neighbor_sniffer, &neighbor->context.data));\
           neighbor_sniffer->prev = sniffer;\
           neighbor_sniffer->tree = neighbor;\
@@ -510,7 +820,7 @@ void path_merge_edge_chains(path_sniffer *sniffer1, path_sniffer *sniffer2)
     chain = prev->chain;
     if (chain->first == NULL && chain->last == NULL) {
       PRINT0("recreating removed chain\n");
-      chain->token = rand();
+      chain->token = (unsigned)rand();
       chain->first = find_first(prev, chain->token);
     }
     parent = edge_chain_find(prev);
@@ -532,7 +842,7 @@ void path_merge_edge_chains(path_sniffer *sniffer1, path_sniffer *sniffer2)
     chain->length = parent->length;
     chain->cost = 0;
     PRINT0("set a\n");
-    chain->token = rand();
+    chain->token = (unsigned)rand();
     edge_set_chain(chain->first, chain);
   }
   else
@@ -542,7 +852,7 @@ void path_merge_edge_chains(path_sniffer *sniffer1, path_sniffer *sniffer2)
     chain = next->chain;
     if (chain->first == NULL && chain->last == NULL) {
       PRINT0("recreating removed chain\n");
-      chain->token = rand();
+      chain->token = (unsigned)rand();
       chain->last = find_last(next, chain->token);
     }
     parent = edge_chain_find(next);
@@ -564,7 +874,7 @@ void path_merge_edge_chains(path_sniffer *sniffer1, path_sniffer *sniffer2)
     chain->length = parent->length;
     chain->cost = 0;
     PRINT0("set b\n");
-    chain->token = rand();
+    chain->token = (unsigned)rand();
     edge_set_chain(chain->first, chain);
   }
   else {
@@ -606,6 +916,7 @@ truth_value edge_chain_equals(const void *a, const void *b)
   sb = ((const quad_forest_edge_chain *)b);
   if (sa == NULL || sb == NULL) return FALSE;
   if (sa == sb) return TRUE;
+  return FALSE;
 }
 
 /*
@@ -638,6 +949,7 @@ int path_sniffer_equals(const void *a, const void *b)
   sb = *((const path_sniffer * const *)b);
   if (sa == NULL || sb == NULL) return FALSE;
   if (sa == sb) return TRUE;
+  return FALSE;
 }
 
 void path_sniffer_determine_directions(path_sniffer *sniffer)
@@ -660,8 +972,8 @@ void path_sniffer_determine_directions(path_sniffer *sniffer)
   }
   if (this != NULL && other != NULL) {
     sint32 xdiff, ydiff;
-    xdiff = ((quad_tree*)this->tree)->x - ((quad_tree*)other->tree)->x;
-    ydiff = ((quad_tree*)this->tree)->y - ((quad_tree*)other->tree)->y;
+    xdiff = (signed)(((quad_tree*)this->tree)->x - ((quad_tree*)other->tree)->x);
+    ydiff = (signed)(((quad_tree*)this->tree)->y - ((quad_tree*)other->tree)->y);
     if (xdiff > 0) {
       if (ydiff > 0) {
         sniffer->dir_start = d_E;
@@ -996,7 +1308,7 @@ result quad_forest_find_boundaries
         CHECK(list_append_return_pointer(&forest->edges, (pointer)&new_chain, (pointer*)&chain));
         /* cost must be initialized to null, it is updated during next operation */
         chain->cost = 0;
-        chain->token = rand();
+        chain->token = (unsigned)rand();
         edge_set_chain(chain->first, chain);
       }
       else {
@@ -1036,7 +1348,7 @@ result quad_forest_find_boundaries
       tree->context.token = token;
       tree->context.round = 0;
 
-      CREATE_POINTER(&tree->context.data, path_sniffer, 1);
+      CHECK(typed_pointer_create(&tree->context.data, t_PATH_SNIFFER, 1));
       CHECK(expect_path_sniffer(&sniffer, &tree->context.data));
 
       sniffer->prev = NULL;
@@ -1055,7 +1367,7 @@ result quad_forest_find_boundaries
       tree->context.token = token;
       tree->context.round = 0;
 
-      CREATE_POINTER(&tree->context.data, path_sniffer, 1);
+      CHECK(typed_pointer_create(&tree->context.data, t_PATH_SNIFFER, 1));
       CHECK(expect_path_sniffer(&sniffer, &tree->context.data));
 
       sniffer->prev = NULL;
@@ -1165,12 +1477,14 @@ result quad_forest_find_boundaries
             break;
           }
         }
+        default:
+          break;
       }
       /* no need to get the next item, as using list_pop_item */
     }
 
     PRINT0("check connections\n");
-    srand(token);
+    srand((signed)token);
     items = connection_list.first.next;
     end = &connection_list.last;
     while (items != NULL && items != end) {
@@ -1558,7 +1872,7 @@ result init_edge_parsers(quad_forest *forest, quad_tree *tree, uint32 token)
       /* create context, add token, set round to 0 */
       head->context.token = token;
       head->context.round = 0;
-      CREATE_POINTER(&head->context.data, edge_parser, 1);
+      CHECK(typed_pointer_create(&head->context.data, t_EDGE_PARSER, 1));
       CHECK(expect_edge_parser(&eparser, &head->context.data));
       eparser->acc_cost = 0;
       eparser->pool_cost = 0;
@@ -1753,7 +2067,7 @@ result quad_forest_parse
   }
 
   srand(384746272);
-  token = rand();
+  token = (unsigned)rand();
 
   PRINT0("calculate devmean and devdev\n");
   /* calculate devmean and devdev, and determine the boundary trees */
@@ -1929,8 +2243,6 @@ result quad_forest_parse
   list_destroy(&treelist);
   RETURN();
 }
-
-/******************************************************************************/
 
 /* end of file                                                                */
 /******************************************************************************/

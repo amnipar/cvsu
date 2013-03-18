@@ -36,10 +36,13 @@
 extern "C" {
 #endif
 
+#include "cvsu_config.h"
+#include "cvsu_types.h"
 #include "cvsu_pixel_image.h"
 #include "cvsu_integral.h"
 #include "cvsu_edges.h"
 #include "cvsu_list.h"
+#include "cvsu_quad_tree.h"
 
 /** Stores the forest status as a collection of bitwise flags. */
 typedef uint32 quad_forest_status;
