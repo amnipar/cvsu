@@ -37,6 +37,9 @@
 
 string context_ensure_stat_accumulator_name = "context_ensure_stat_accumulator";
 string expect_stat_accumulator_name = "expect_stat_accumulator";
+string context_ensure_reg_accumulator_name = "context_ensure_reg_accumulator";
+string context_ensure_range_overlap_name = "context_ensure_range_overlap";
+string context_ensure_ridge_finder_name = "context_ensure_ridge_finder";
 string expect_path_sniffer_name = "expect_path_sniffer";
 string expect_edge_parser_name = "expect_edge_parser";
 
@@ -111,10 +114,8 @@ result expect_stat_accumulator
   CHECK_POINTER(tptr);
   CHECK_POINTER(tptr->value);
 
-  if (tptr->type == t_STAT_ACCUMULATOR) {
-    *target = (stat_accumulator*)tptr->value;
-  }
-  else {
+  *target = has_stat_accumulator(tptr);
+  if (*target == NULL) {
     ERROR(BAD_TYPE);
   }
 
@@ -124,14 +125,173 @@ result expect_stat_accumulator
 
 /******************************************************************************/
 
-void make_path_sniffer
+result context_ensure_reg_accumulator
 (
-  typed_pointer *tptr,
-  path_sniffer *source
+  parse_context *context,
+  reg_accumulator **reg
 )
 {
-  tptr->type = t_PATH_SNIFFER;
-  tptr->value = (pointer)source;
+  TRY();
+  typed_pointer *tptr;
+
+  CHECK_POINTER(reg);
+  *reg = NULL;
+  CHECK_POINTER(context);
+
+  CHECK(tuple_ensure_has_unique(&context->data, t_REG_ACCUMULATOR, &tptr));
+
+  *reg = (reg_accumulator*)tptr->value;
+
+  FINALLY(context_ensure_reg_accumulator);
+  RETURN();
+}
+
+/******************************************************************************/
+
+truth_value is_reg_accumulator
+(
+  typed_pointer *tptr
+)
+{
+  if (tptr != NULL && tptr->type == t_REG_ACCUMULATOR) {
+    return TRUE;
+  }
+  return FALSE;
+}
+
+/******************************************************************************/
+
+reg_accumulator *has_reg_accumulator
+(
+  typed_pointer *tptr
+)
+{
+  if (IS_TRUE(is_reg_accumulator(tptr))) {
+    return (reg_accumulator*)tptr->value;
+  }
+  if (IS_TRUE(is_tuple(tptr))) {
+    typed_pointer *element;
+    /* must have exactly one stat accumulator */
+    element = tuple_has_type(tptr, t_REG_ACCUMULATOR, 1, 1);
+    if (element != NULL) {
+      return (reg_accumulator*)element->value;
+    }
+  }
+  return NULL;
+}
+
+/******************************************************************************/
+
+result context_ensure_range_overlap
+(
+  parse_context *context,
+  range_overlap **overlap
+)
+{
+  TRY();
+  typed_pointer *tptr;
+
+  CHECK_POINTER(overlap);
+  *overlap = NULL;
+  CHECK_POINTER(context);
+
+  CHECK(tuple_ensure_has_unique(&context->data, t_RANGE_OVERLAP, &tptr));
+
+  *overlap = (range_overlap*)tptr->value;
+
+  FINALLY(context_ensure_range_overlap);
+  RETURN();
+}
+
+/******************************************************************************/
+
+truth_value is_range_overlap
+(
+  typed_pointer *tptr
+)
+{
+  if (tptr != NULL && tptr->type == t_RANGE_OVERLAP) {
+    return TRUE;
+  }
+  return FALSE;
+}
+
+/******************************************************************************/
+
+range_overlap *has_range_overlap
+(
+  typed_pointer *tptr
+)
+{
+  if (IS_TRUE(is_range_overlap(tptr))) {
+    return (range_overlap*)tptr->value;
+  }
+  if (IS_TRUE(is_tuple(tptr))) {
+    typed_pointer *element;
+    /* must have exactly one stat accumulator */
+    element = tuple_has_type(tptr, t_RANGE_OVERLAP, 1, 1);
+    if (element != NULL) {
+      return (range_overlap*)element->value;
+    }
+  }
+  return NULL;
+}
+
+/******************************************************************************/
+
+result context_ensure_ridge_finder
+(
+  parse_context *context,
+  ridge_finder **rfind
+)
+{
+  TRY();
+  typed_pointer *tptr;
+
+  CHECK_POINTER(rfind);
+  *rfind = NULL;
+  CHECK_POINTER(context);
+
+  CHECK(tuple_ensure_has_unique(&context->data, t_RIDGE_FINDER, &tptr));
+
+  *rfind = (ridge_finder*)tptr->value;
+
+  FINALLY(context_ensure_ridge_finder);
+  RETURN();
+}
+
+/******************************************************************************/
+
+truth_value is_ridge_finder
+(
+  typed_pointer *tptr
+)
+{
+  if (tptr != NULL && tptr->type == t_RIDGE_FINDER) {
+    return TRUE;
+  }
+  return FALSE;
+}
+
+/******************************************************************************/
+
+ridge_finder *has_ridge_finder
+(
+  typed_pointer *tptr
+)
+{
+  if (IS_TRUE(is_ridge_finder(tptr))) {
+    return (ridge_finder*)tptr->value;
+  }
+  if (IS_TRUE(is_tuple(tptr))) {
+    typed_pointer *element;
+    /* must have exactly one stat accumulator */
+    element = tuple_has_type(tptr, t_RIDGE_FINDER, 1, 1);
+    if (element != NULL) {
+      return (ridge_finder*)element->value;
+    }
+  }
+  return NULL;
 }
 
 /******************************************************************************/

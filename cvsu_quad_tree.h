@@ -74,9 +74,16 @@ typedef struct quad_tree_link_t {
   integral_value distance;
   /** Strength of the link */
   integral_value strength;
+  /** Link category */
+  direction category;
   /** Context used in parsing operations */
   parse_context context;
 } quad_tree_link;
+
+void quad_tree_link_destroy
+(
+  quad_tree_link *target
+);
 
 /**
  * Stores a quad tree holding image data.
@@ -261,6 +268,16 @@ result quad_tree_get_child_edge_response
 );
 
 /**
+ * Generates a line corresponding to edge response direction (if edge response
+ * is found) and appends it to the list.
+ */
+result quad_tree_edge_response_to_line
+(
+  quad_tree *tree,
+  list *lines
+);
+
+/**
  * Adds all immediate neighbors of a quad_tree to a list.
  * The neighbor links point to the direct neighbors, or to those trees that are
  * directly adjacent at the same or lower level, thus of the same or larger
@@ -273,6 +290,15 @@ result quad_tree_get_neighbors
 (
   list *target,
   quad_tree *tree
+);
+
+/**
+ * Comparison function for links.
+ */
+truth_value quad_tree_link_equals
+(
+  const void *a,
+  const void *b
 );
 
 #ifdef __cplusplus

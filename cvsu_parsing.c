@@ -42,10 +42,21 @@ string prime_stat_accumulator_name = "prime_stat_accumulator";
 string prop_stat_accumulator_name = "prop_stat_accumulator";
 string acc_stat_accumulator_name = "acc_stat_accumulator";
 
+string prime_reg_accumulator_name = "prime_reg_accumulator";
+string prop_reg_accumulator_name = "prop_reg_accumulator";
+string acc_reg_accumulator_name = "acc_reg_accumulator";
+
+string prime_ridge_finder_name = "prime_ridge_finder";
+
 string run_context_operation_name = "run_context_operation";
 string quad_forest_calculate_accumulated_stats_name = "quad_forest_calculate_accumulated_stats";
 string quad_forest_visualize_accumulated_stats_name = "quad_forest_visualize_accumulated_stats";
+string quad_forest_calculate_accumulated_regs_name = "quad_forest_calculate_accumulated_regs";
+string quad_forest_visualize_accumulated_regs_name = "quad_forest_visualize_accumulated_regs";
+string quad_forest_calculate_accumulated_bounds_name = "quad_forest_calculate_accumulated_bounds";
+string quad_forest_visualize_accumulated_bounds_name = "quad_forest_visualize_accumulated_bounds";
 string quad_forest_parse_name = "quad_forest_parse";
+string quad_forest_visualize_parse_result_name = "quad_forest_visualize_parse_result";
 
 string init_edge_parsers_name = "init_edge_parsers";
 string pool_edge_parsers_name = "pool_edge_parsers";
@@ -187,8 +198,216 @@ result acc_stat_accumulator
   if (dev < 0) dev = 0; else dev = sqrt(dev);
   astat->devmean = mean;
   astat->devdev = dev;
+  
+  astat->strength = 0;
 
   FINALLY(acc_stat_accumulator);
+  (void)collection;
+  RETURN();
+}
+
+/******************************************************************************/
+
+result prime_reg_accumulator
+(
+  quad_tree *tree,
+  list *collection
+)
+{
+  TRY();
+  list_item *links, *endlinks;
+  reg_accumulator *reg;
+  accumulated_stat *astat;
+  quad_tree_link_head *head;
+  quad_tree *neighbor;
+
+  CHECK_POINTER(tree);
+
+  CHECK(context_ensure_reg_accumulator(&tree->context, &reg));
+  if (reg->round == 0) {
+    CHECK(expect_accumulated_stat(&astat, &tree->annotation.data));
+    {
+      integral_value mean, meana, meanb, deva, devb, a1, a2, b1, b2, I, U;
+
+      /* form the extremal ranges from the ranges of mean and dev */
+      mean = astat->meanmean;
+      meana = getmax(0, mean - astat->meandev);
+      meanb = getmin(mean + astat->meandev, 255);
+      deva = getmax(1, astat->devmean - astat->devdev);
+      devb = getmax(1, astat->devmean + astat->devdev);
+      
+      a1 = getmax(0, meana - devb);
+      a2 = getmin(meanb + devb, 255);
+      b1 = getmax(0, mean - deva);
+      b2 = getmin(mean + deva, 255);
+      
+      I = b2 - b1;
+      if (I < 1) I = 1;
+      U = a2 - a1;
+      if (U < 1) U = 1;
+      reg->locality_overlap = I / U;
+    }
+    {
+      integral_value tm, ts, nm, ns, x1, x2, x1min, x1max, x2min, x2max, I, U, sum, count;
+      range_overlap *link_range;
+      
+      tm = tree->stat.mean;
+      ts = getmax(1, tree->stat.deviation);
+      
+      count = 0;
+      sum = 0;
+      links = tree->links.first.next;
+      endlinks = &tree->links.last;
+      while (links != endlinks) {
+        head = *((quad_tree_link_head**)links->data);
+        if (head->link->category == d_N4) {
+          CHECK(context_ensure_range_overlap(&head->link->context, &link_range));
+          if (link_range->round == 0) {
+            neighbor = head->other->tree;
+            nm = neighbor->stat.mean;
+            ns = getmax(1, neighbor->stat.deviation);
+            x1min = getmax(0, tm - ts);
+            x1max = x1min;
+            x2min = getmin(tm + ts, 255);
+            x2max = x2min;
+            x1 = getmax(0, nm - ns);
+            x2 = getmin(nm + ns, 255);
+            if (x1 < x1min) x1min = x1; else x1max = x1;
+            if (x2 < x2min) x2min = x2; else x2max = x2;
+            if (x1max > x2min) {
+              I = 0;
+            }
+            else {
+              I = (x2min - x1max);
+              if (I < 1) I = 1;
+            }
+            U = (x2max - x1min);
+            if (U < 1) U = 1;
+            
+            link_range->overlap = I / U;
+            link_range->round = 1;
+          }
+          sum += link_range->overlap;
+          count++;
+        }
+        links = links->next;
+      }
+      reg->neighborhood_overlap = sum / count;
+    }
+    reg->locality_acc = reg->locality_overlap / 2;
+    reg->locality_pool = reg->locality_acc;
+    reg->neighborhood_acc = reg->neighborhood_overlap / 2;
+    reg->neighborhood_pool = reg->neighborhood_acc;
+    reg->round = 1;
+  }
+  else {
+    reg->locality_acc = reg->locality_pool / 2;
+    reg->locality_pool = reg->locality_acc;
+    reg->neighborhood_acc = reg->neighborhood_pool / 2;
+    reg->neighborhood_pool = reg->neighborhood_acc;
+    reg->round++;
+  }
+
+  FINALLY(prime_stat_accumulator);
+  (void)collection;
+  RETURN();
+}
+
+/******************************************************************************/
+
+#define NEIGHBOR_PROP_REG(neighbor)\
+  if ((neighbor) != NULL) {\
+    neighbor_acc = has_reg_accumulator(&(neighbor)->context.data);\
+    CHECK_POINTER(neighbor_acc);\
+    neighbor_acc->locality_pool += locality_pool;\
+    neighbor_acc->neighborhood_pool += neighborhood_pool;\
+  }\
+  else {\
+    tree_acc->locality_pool += locality_pool;\
+    tree_acc->neighborhood_pool += neighborhood_pool;\
+  }
+
+result prop_reg_accumulator
+(
+  quad_tree *tree,
+  list *collection
+)
+{
+  TRY();
+  reg_accumulator *tree_acc, *neighbor_acc;
+  integral_value locality_pool, neighborhood_pool;
+
+  CHECK_POINTER(tree);
+  tree_acc = has_reg_accumulator(&tree->context.data);
+  CHECK_POINTER(tree_acc);
+
+  locality_pool = tree_acc->locality_acc / 4;
+  neighborhood_pool = tree_acc->neighborhood_acc / 4;
+
+  /* TODO: use neighbor links and link categorization instead */
+  /* neighbor n */
+  NEIGHBOR_PROP_REG(tree->n);
+  NEIGHBOR_PROP_REG(tree->e);
+  NEIGHBOR_PROP_REG(tree->s);
+  NEIGHBOR_PROP_REG(tree->w);
+
+  FINALLY(prop_reg_accumulator);
+  (void)collection;
+  RETURN();
+}
+
+/******************************************************************************/
+
+result acc_reg_accumulator
+(
+  quad_tree *tree,
+  list *collection
+)
+{
+  TRY();
+  reg_accumulator *acc;
+  accumulated_reg *areg;
+
+  CHECK_POINTER(tree);
+  acc = has_reg_accumulator(&tree->context.data);
+  CHECK_POINTER(acc);
+  CHECK(annotation_ensure_accumulated_reg(&tree->annotation, &areg));
+
+  areg->locality_overlap = acc->locality_overlap;
+  areg->locality_mean = acc->locality_pool;
+  areg->neighborhood_overlap = acc->neighborhood_overlap;
+  areg->neighborhood_mean = acc->neighborhood_pool;
+  
+  areg->locality_strength = 0;
+  areg->neighborhood_strength = 0;
+
+  FINALLY(acc_reg_accumulator);
+  (void)collection;
+  RETURN();
+}
+
+/******************************************************************************/
+
+result prime_ridge_finder
+(
+  quad_tree *tree,
+  list *collection
+)
+{
+  TRY();
+  ridge_finder *rfind;
+
+  CHECK_POINTER(tree);
+
+  CHECK(context_ensure_ridge_finder(&tree->context, &rfind));
+  if (rfind->round == 0) {
+    
+  }
+  else {
+    
+  }
+
+  FINALLY(prime_ridge_finder);
   (void)collection;
   RETURN();
 }
@@ -252,13 +471,52 @@ result quad_forest_calculate_accumulated_stats
 )
 {
   TRY();
+  list_item *trees, *end;
+  quad_tree *tree;
+  accumulated_stat *astat;
+  integral_value maxmeandev, maxdevdev, meandev, devdev;
 
   CHECK_POINTER(forest);
 
   CHECK(run_context_operation(&forest->trees, NULL, prime_stat_accumulator,
                               prop_stat_accumulator, acc_stat_accumulator,
                               rounds, FALSE));
-
+  
+  maxmeandev = 0;
+  maxdevdev = 0;
+  trees = forest->trees.first.next;
+  end = &forest->trees.last;
+  while (trees != end) {
+    tree = (quad_tree*)trees->data;
+    if (tree->nw == NULL) {
+      astat = has_accumulated_stat(&tree->annotation.data);
+      if (astat != NULL) {
+        if (astat->meandev > maxmeandev) {
+          maxmeandev = astat->meandev;
+        }
+        if (astat->devdev > maxdevdev) {
+          maxdevdev = astat->devdev;
+        }
+      }
+    }
+    trees = trees->next;
+  }
+  
+  trees = forest->trees.first.next;
+  end = &forest->trees.last;
+  while (trees != end) {
+    tree = (quad_tree*)trees->data;
+    if (tree->nw == NULL) {
+      astat = has_accumulated_stat(&tree->annotation.data);
+      if (astat != NULL) {
+        meandev = astat->meandev / maxmeandev;
+        devdev = astat->devdev / maxdevdev;
+        astat->strength = (0.5 * meandev) + (0.5 * devdev);
+      }
+    }
+    trees = trees->next;
+  }
+  
   FINALLY(quad_forest_calculate_accumulated_stats);
   RETURN();
 }
@@ -275,7 +533,6 @@ result quad_forest_visualize_accumulated_stats
   list_item *trees, *end;
   quad_tree *tree;
   accumulated_stat *astat;
-  integral_value maxmeandev, maxdevdev, meandev, devdev;
   uint32 x, y, width, height, stride, row_step, count;
   byte *target_data, *target_pos, color, color0, color1, color2;
 
@@ -289,57 +546,30 @@ result quad_forest_visualize_accumulated_stats
 
   CHECK(pixel_image_clear(target));
 
-  maxmeandev = 0;
-  maxdevdev = 0;
-  count = 0;
   trees = forest->trees.first.next;
   end = &forest->trees.last;
   while (trees != end) {
-    tree = (quad_tree *)trees->data;
+    tree = (quad_tree*)trees->data;
     if (tree->nw == NULL) {
       astat = has_accumulated_stat(&tree->annotation.data);
       if (astat != NULL) {
-        if (astat->meandev > maxmeandev) {
-          maxmeandev = astat->meandev;
-        }
-        if (astat->devdev > maxdevdev) {
-          maxdevdev = astat->devdev;
-        }
-        count++;
-      }
-    }
-    trees = trees->next;
-  }
-  PRINT1("trees that had astat: %lu\n", count);
-
-  trees = forest->trees.first.next;
-  end = &forest->trees.last;
-  while (trees != end) {
-    tree = (quad_tree *)trees->data;
-    if (tree->nw == NULL) {
-      astat = has_accumulated_stat(&tree->annotation.data);
-      if (astat != NULL) {
-        meandev = astat->meandev / maxmeandev;
-        devdev = astat->devdev / maxdevdev;
-        color = (byte)(255 * ((0.5 * meandev) + (0.5 * devdev)));
-        color0 = color;
-        color1 = color;
+        color = (byte)(255 * astat->strength);
+        color0 = (byte)astat->meanmean;
+        color1 = 0;
         color2 = color;
       }
       width = tree->size;
       height = width;
-      row_step = stride - width;
-      target_pos = target_data + tree->y * stride + tree->x;
+      row_step = stride - 3 * width;
+      target_pos = target_data + tree->y * stride + 3 * tree->x;
       for (y = 0; y < height; y++, target_pos += row_step) {
         for (x = 0; x < width; x++) {
-          *target_pos = color;
+          *target_pos = color0;
           target_pos++;
-          /*
           *target_pos = color1;
           target_pos++;
           *target_pos = color2;
           target_pos++;
-          */
         }
       }
     }
@@ -347,6 +577,226 @@ result quad_forest_visualize_accumulated_stats
   }
 
   FINALLY(quad_forest_visualize_accumulated_stats);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result quad_forest_calculate_accumulated_regs
+(
+  quad_forest *forest,
+  uint32 rounds
+)
+{
+  TRY();
+  list_item *trees, *end;
+  quad_tree *tree;
+  accumulated_reg *areg;
+  integral_value min_loverlap, max_noverlap;
+  
+  CHECK_POINTER(forest);
+  
+  CHECK(quad_forest_calculate_accumulated_stats(forest, rounds));
+
+  CHECK(run_context_operation(&forest->trees, NULL, prime_reg_accumulator,
+                              prop_reg_accumulator, acc_reg_accumulator,
+                              rounds, FALSE));
+  
+  min_loverlap = 1;
+  max_noverlap = 0;
+  trees = forest->trees.first.next;
+  end = &forest->trees.last;
+  while (trees != end) {
+    tree = (quad_tree*)trees->data;
+    if (tree->nw == NULL) {
+      areg = has_accumulated_reg(&tree->annotation.data);
+      if (areg != NULL) {
+        if (areg->locality_overlap < min_loverlap) {
+          min_loverlap = areg->locality_overlap;
+        }
+        if (areg->neighborhood_mean > max_noverlap) {
+          max_noverlap = areg->neighborhood_mean;
+        }
+      }
+    }
+    trees = trees->next;
+  }
+  
+  min_loverlap = 1 - min_loverlap;
+  max_noverlap = max_noverlap;
+  trees = forest->trees.first.next;
+  end = &forest->trees.last;
+  while (trees != end) {
+    tree = (quad_tree*)trees->data;
+    if (tree->nw == NULL) {
+      areg = has_accumulated_reg(&tree->annotation.data);
+      if (areg != NULL) {
+        areg->locality_strength = (1 - areg->locality_overlap) / min_loverlap;
+        areg->neighborhood_strength = areg->neighborhood_mean / max_noverlap;
+      }
+    }
+    trees = trees->next;
+  }
+  
+  FINALLY(quad_forest_calculate_accumulated_regs);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result quad_forest_visualize_accumulated_regs
+(
+  quad_forest *forest,
+  pixel_image *target
+)
+{
+  TRY();
+  list_item *trees, *end;
+  quad_tree *tree;
+  accumulated_reg *areg;
+  uint32 x, y, width, height, stride, row_step;
+  byte *target_data, *target_pos, color0, color1, color2;
+
+  CHECK_POINTER(forest);
+  CHECK_POINTER(target);
+
+  width = target->width;
+  height = target->height;
+  stride = target->stride;
+  target_data = (byte*)target->data;
+
+  CHECK(pixel_image_clear(target));
+
+  trees = forest->trees.first.next;
+  end = &forest->trees.last;
+  while (trees != end) {
+    tree = (quad_tree*)trees->data;
+    if (tree->nw == NULL) {
+      areg = has_accumulated_reg(&tree->annotation.data);
+      if (areg != NULL) {
+        color0 = (byte)(255 * areg->locality_strength);
+        color1 = 0;
+        color2 = (byte)(255 * areg->neighborhood_strength);
+      }
+      width = tree->size;
+      height = width;
+      row_step = stride - 3 * width;
+      target_pos = target_data + tree->y * stride + 3 * tree->x;
+      for (y = 0; y < height; y++, target_pos += row_step) {
+        for (x = 0; x < width; x++) {
+          *target_pos = color0;
+          target_pos++;
+          *target_pos = color1;
+          target_pos++;
+          *target_pos = color2;
+          target_pos++;
+        }
+      }
+    }
+    trees = trees->next;
+  }
+  
+  FINALLY(quad_forest_visualize_accumulated_regs);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result quad_forest_calculate_accumulated_bounds
+(
+  quad_forest *forest,
+  uint32 rounds
+)
+{
+  TRY();
+  list_item *trees, *endtrees;
+  quad_tree *tree;
+  accumulated_stat *astat;
+  ridge_finder *rfind;
+  integral_value t;
+  
+  CHECK_POINTER(forest);
+  
+  CHECK(quad_forest_calculate_accumulated_regs(forest, rounds));
+  
+  trees = forest->trees.first.next;
+  endtrees = &forest->trees.last;
+  while (trees != endtrees) {
+    tree = (quad_tree*)trees->data;
+    if (tree->nw == NULL) {
+      astat = has_accumulated_stat(&tree->annotation.data);
+      if (astat != NULL) {
+        t = astat->meandev - astat->devdev;
+        t = getmax(3, t);
+        if (tree->stat.deviation > t) {
+          CHECK(context_ensure_ridge_finder(&tree->context, &rfind));
+          if (rfind->round == 0) {
+            list_item *links, *endlinks;
+            accumulated_stat *astat2;
+            integral_value angle1, angle2, anglediff;
+            uint32 total, smaller;
+            quad_tree_link_head *head;
+            
+            CHECK(quad_tree_get_edge_response(forest, tree, NULL, NULL));
+            
+            angle1 = tree->edge.ang;
+            if (angle1 > M_PI) angle1 -= M_PI;
+            total = 0;
+            smaller = 0;
+            links = tree->links.first.next;
+            endlinks = &tree->links.last;
+            while (links != endlinks) {
+              head = *((quad_tree_link_head**)links->data);
+              astat2 = has_accumulated_stat(&head->other->tree->annotation.data);
+              if (astat2 != NULL) {
+                angle2 = head->angle;
+                if (angle2 > M_PI) angle2 -= M_PI;
+                anglediff = fabs(angle1 - angle2);
+                if (anglediff > (M_PI / 2)) anglediff = M_PI - anglediff;
+                anglediff /= (M_PI / 2);
+                if (anglediff > 0.5) {
+                  total++;
+                  if (astat->strength > astat2->strength) {
+                    smaller++;
+                  }
+                }
+              }
+              links = links->next;
+            }
+            rfind->round = 1;
+            PRINT2("(%lu,%lu)",total,smaller);
+            if (total-smaller > 1) {
+              rfind->has_ridge = FALSE;
+            }
+            else {
+              rfind->has_ridge = TRUE;
+              /*CHECK(quad_tree_edge_response_to_line(tree, lines));*/
+            }
+          }
+        }
+      }
+    }
+    trees = trees->next;
+  }
+  
+  FINALLY(quad_forest_calculate_accumulated_bounds);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result quad_forest_visualize_accumulated_bounds
+(
+  quad_forest *forest,
+  pixel_image *target
+)
+{
+  TRY();
+  
+  CHECK_POINTER(forest);
+  CHECK_POINTER(target);
+  
+  FINALLY(quad_forest_visualize_accumulated_bounds);
   RETURN();
 }
 
@@ -2241,6 +2691,23 @@ result quad_forest_parse
   PRINT0("finished\n");
   FINALLY(quad_forest_parse);
   list_destroy(&treelist);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result quad_forest_visualize_parse_result
+(
+  quad_forest *forest,
+  pixel_image *target
+)
+{
+  TRY();
+  
+  CHECK_POINTER(forest);
+  CHECK_POINTER(target);
+  
+  FINALLY(quad_forest_visualize_parse_result);
   RETURN();
 }
 

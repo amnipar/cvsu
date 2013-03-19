@@ -70,10 +70,14 @@ uint32 typesize[] = {
   sizeof(list),
   sizeof(statistics),
   sizeof(accumulated_stat),
+  sizeof(accumulated_reg),
   sizeof(quad_forest_segment), /* TODO: change to segment */
   sizeof(quad_forest_edge), /* TODO: change to boundary? */
   sizeof(quad_forest_intersection), /* TODO: change to intersection? */
   sizeof(stat_accumulator),
+  sizeof(reg_accumulator),
+  sizeof(range_overlap),
+  sizeof(ridge_finder),
   sizeof(path_sniffer),
   sizeof(edge_parser),
   sizeof(segment_parser)
@@ -172,7 +176,6 @@ result tuple_create
 )
 {
   TRY();
-  typed_pointer *values;
 
   CHECK_POINTER(tuple);
 
@@ -180,8 +183,7 @@ result tuple_create
   typed_pointer_destroy(tuple);
 
   tuple->type = t_TUPLE;
-  CHECK(memory_allocate((data_pointer*)&values, count, sizeof(typed_pointer)));
-  tuple->value = (pointer)values;
+  CHECK(memory_allocate((data_pointer*)&tuple->value, count, sizeof(typed_pointer)));
   tuple->count = count;
 
   FINALLY(tuple_create);
@@ -199,7 +201,7 @@ void tuple_destroy
     uint32 i;
     typed_pointer *values;
     values = (typed_pointer*)tuple->value;
-    for (i = tuple->count; i--; ) {
+    for (i = 0; i < tuple->count; i++) {
       typed_pointer_destroy(&values[i]);
     }
     memory_deallocate((data_pointer*)&tuple->value);
@@ -221,12 +223,21 @@ result tuple_promote
 
   /* make a copy of the previous content */
   element = *tptr;
+  tptr->type = t_TUPLE;
+  tptr->count = 0;
+  CHECK(memory_allocate((data_pointer*)&values, 1, sizeof(typed_pointer)));
+  values[0] = element;
+  tptr->value = (pointer)values;
+  tptr->count = 1;
   /* then nullify and create a tuple instead */
+  /*
   typed_pointer_nullify(tptr);
   CHECK(tuple_create(tptr, 1));
+  */
   /* copy the previous content as the first value of the tuple */
+  /*
   values = (typed_pointer*)tptr->value;
-  values[0] = element;
+  */
 
   FINALLY(tuple_promote);
   RETURN();
@@ -252,15 +263,15 @@ result tuple_extend
 
   old_values = (typed_pointer*)tuple->value;
   CHECK(memory_allocate((data_pointer*)&new_values, count, sizeof(typed_pointer)));
-  for (i = tuple->count; i--; ) {
+  for (i = 0; i < tuple->count; i++) {
     new_values[i] = old_values[i];
   }
-  new_values[count-1] = *tptr;
+  new_values[i] = *tptr;
   memory_deallocate((data_pointer*)&tuple->value);
   tuple->value = (pointer)new_values;
   tuple->count = count;
   if (res != NULL) {
-    *res = &new_values[count-1];
+    *res = &new_values[i];
   }
 
   FINALLY(tuple_extend);
@@ -328,12 +339,19 @@ typed_pointer *tuple_has_type
 )
 {
   if (tuple != NULL && tuple->type == t_TUPLE) {
-    uint32 i, num;
+    uint32 i;
     typed_pointer *elements;
 
     elements = (typed_pointer*)tuple->value;
+    for (i = 0; i < tuple->count; i++) {
+      if (elements[i].type == type) {
+        return &elements[i];
+      }
+    }
+    return NULL;
     /* if count is specified, first checks that the tuple has the correct */
     /* number of items of specified type, then returns the item with given index */
+    /*
     if (count > 0) {
       num = 0;
       for (i = 0; i < tuple->count; i++) {
@@ -348,7 +366,9 @@ typed_pointer *tuple_has_type
         return NULL;
       }
     }
+    */
     /* otherwise just returns the first occurrence of the specified type */
+    /*
     else {
       for (i = 0; i < tuple->count; i++) {
         if (elements[i].type == type) {
@@ -357,6 +377,7 @@ typed_pointer *tuple_has_type
       }
       return NULL;
     }
+    */
   }
   return NULL;
 }

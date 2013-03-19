@@ -41,6 +41,8 @@
 
 string accumulated_stat_create_name = "accumulated_stat_create";
 string annotation_ensure_accumulated_stat_name = "annotation_ensure_accumulated_stat";
+string expect_accumulated_stat_name = "expect_accumulated_stat";
+string annotation_ensure_accumulated_reg_name = "annotation_ensure_accumulated_reg";
 
 /******************************************************************************/
 
@@ -83,6 +85,7 @@ result annotation_ensure_accumulated_stat
   CHECK_POINTER(annotation);
 
   CHECK(tuple_ensure_has_unique(&annotation->data, t_ASTAT, &tptr));
+  CHECK_TRUE(is_accumulated_stat(tptr));
 
   *astat = (accumulated_stat*)tptr->value;
 
@@ -117,7 +120,93 @@ accumulated_stat *has_accumulated_stat
     typed_pointer *element;
     element = tuple_has_type(tptr, t_ASTAT, 1, 1);
     if (element != NULL) {
+      if (IS_FALSE(is_accumulated_stat(element))) {
+        return NULL;
+      }
       return (accumulated_stat*)element->value;
+    }
+  }
+  return NULL;
+}
+
+/******************************************************************************/
+
+result expect_accumulated_stat
+(
+  accumulated_stat **astat,
+  typed_pointer *tptr
+)
+{
+  TRY();
+  
+  CHECK_POINTER(astat);
+  CHECK_POINTER(tptr);
+  CHECK_POINTER(tptr->value);
+  
+  *astat = has_accumulated_stat(tptr);
+  if (*astat == NULL) {
+    ERROR(BAD_TYPE);
+  }
+  
+  FINALLY(expect_accumulated_stat);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result annotation_ensure_accumulated_reg
+(
+  tree_annotation *annotation,
+  accumulated_reg **areg
+)
+{
+  TRY();
+  typed_pointer *tptr;
+
+  CHECK_POINTER(areg);
+  *areg = NULL;
+  CHECK_POINTER(annotation);
+
+  CHECK(tuple_ensure_has_unique(&annotation->data, t_AREG, &tptr));
+  CHECK_TRUE(is_accumulated_reg(tptr));
+
+  *areg = (accumulated_reg*)tptr->value;
+
+  FINALLY(annotation_ensure_accumulated_reg);
+  RETURN();
+}
+
+/******************************************************************************/
+
+truth_value is_accumulated_reg
+(
+  typed_pointer *tptr
+)
+{
+  if (tptr != NULL && tptr->type == t_AREG) {
+    return TRUE;
+  }
+  return FALSE;
+}
+
+/******************************************************************************/
+
+accumulated_reg *has_accumulated_reg
+(
+  typed_pointer *tptr
+)
+{
+  if (IS_TRUE(is_accumulated_reg(tptr))) {
+    return (accumulated_reg*)tptr->value;
+  }
+  if (IS_TRUE(is_tuple(tptr))) {
+    typed_pointer *element;
+    element = tuple_has_type(tptr, t_AREG, 1, 1);
+    if (element != NULL) {
+      if (IS_FALSE(is_accumulated_reg(element))) {
+        return NULL;
+      }
+      return (accumulated_reg*)element->value;
     }
   }
   return NULL;

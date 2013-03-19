@@ -1127,8 +1127,10 @@ result list_append_unique_return_pointer
   TRY();
   list_item *i, *end;
 
-  i = target->first.next;
-  end = &target->last;
+  /* starting from end, with assumption that possible previous value has been */
+  /* added recently */
+  i = target->last.prev;
+  end = &target->first;
   while (i != end) {
     if (i == NULL) {
       /* iteration finished without encountering the end item */
@@ -1139,7 +1141,7 @@ result list_append_unique_return_pointer
       *list_data = i->data;
       TERMINATE(SUCCESS);
     }
-    i = i->next;
+    i = i->prev;
   }
   CHECK(list_append_return_pointer(target, data, list_data));
 

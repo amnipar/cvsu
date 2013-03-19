@@ -85,7 +85,8 @@ const quad_forest_status FOREST_EDGES_DETECTED;
 /* a private function for initializing quad_forest structure                  */
 /* used in create and in reload                                               */
 
-#define ADD_LINK(neighbor) \
+#define ADD_LINK(neighbor,cat)\
+  new_link.category = cat;\
   new_link.b.tree = (neighbor);\
   CHECK(list_append_unique_return_pointer(&target->links, (pointer)&new_link,\
                                           (pointer*)&link, quad_tree_link_equals));\
@@ -101,19 +102,6 @@ const quad_forest_status FOREST_EDGES_DETECTED;
   }\
   head->angle = angle;\
   CHECK(list_append(&tree->links, (pointer)&head));\
-
-truth_value quad_tree_link_equals(const void *a, const void *b)
-{
-  const quad_tree_link *sa, *sb;
-  if (a == NULL || b == NULL) return FALSE;
-  sa = (const quad_tree_link *)a;
-  sb = (const quad_tree_link *)b;
-  if ((sa->a.tree == sb->a.tree && sa->b.tree == sb->b.tree) ||
-      (sa->a.tree == sb->b.tree && sa->b.tree == sb->a.tree)) {
-    return TRUE;
-  }
-  return FALSE;
-}
 
 result quad_forest_init
 (
@@ -239,45 +227,45 @@ result quad_forest_init
       if (col > 0) {
         tree->w = target->roots[pos - 1];
         angle = M_PI;
-        ADD_LINK(tree->w);
+        ADD_LINK(tree->w, d_N4);
         /* nw neighbor */
         if (row > 0) {
           angle = 3 * M_PI / 4;
-          ADD_LINK(target->roots[pos - cols - 1]);
+          ADD_LINK(target->roots[pos - cols - 1], d_N8);
         }
         /* sw neighbor */
         if (row < (unsigned)(rows - 1)) {
           angle = 5 * M_PI / 4;
-          ADD_LINK(target->roots[pos + cols - 1]);
+          ADD_LINK(target->roots[pos + cols - 1], d_N8);
         }
       }
       /* add neighbor to north */
       if (row > 0) {
         tree->n = target->roots[pos - cols];
         angle = M_PI / 2;
-        ADD_LINK(tree->n);
+        ADD_LINK(tree->n, d_N4);
       }
       /* add neighbor to east */
       if (col < (unsigned)(cols - 1)) {
         tree->e = target->roots[pos + 1];
         angle = 0;
-        ADD_LINK(tree->e);
+        ADD_LINK(tree->e, d_N4);
         /* ne neighbor */
         if (row > 0) {
           angle = M_PI / 4;
-          ADD_LINK(target->roots[pos - cols + 1]);
+          ADD_LINK(target->roots[pos - cols + 1], d_N8);
         }
         /* se neighbor */
         if (row < (unsigned)(rows - 1)) {
           angle = 7 * M_PI / 4;
-          ADD_LINK(target->roots[pos + cols + 1]);
+          ADD_LINK(target->roots[pos + cols + 1], d_N8);
         }
       }
       /* add neighbor to south */
       if (row < (unsigned)(rows - 1)) {
         tree->s = target->roots[pos + cols];
         angle = 3 * M_PI / 2;
-        ADD_LINK(tree->s);
+        ADD_LINK(tree->s, d_N4);
       }
     }
   }
@@ -381,28 +369,28 @@ result quad_forest_destroy
 {
   TRY();
   list_item *items, *end;
-  quad_tree_link *link;
 
   CHECK_POINTER(target);
 
   /* it is necessary to destroy the trees, as they may contain typed pointers */
+  PRINT0("destroy trees\n");
   items = target->trees.first.next;
   end = &target->trees.last;
   while (items != end) {
     quad_tree_destroy((quad_tree *)items->data);
     items = items->next;
   }
+  PRINT0("destroyed\n");
   CHECK(list_destroy(&target->trees));
 
+  PRINT0("destroy links\n");
   items = target->links.first.next;
   end = &target->links.last;
   while (items != end) {
-    link = (quad_tree_link*)items->data;
-    typed_pointer_destroy(&link->a.context.data);
-    typed_pointer_destroy(&link->b.context.data);
-    typed_pointer_destroy(&link->context.data);
+    quad_tree_link_destroy((quad_tree_link*)items->data);
     items = items->next;
   }
+  PRINT0("destroyed\n");
   CHECK(list_destroy(&target->links));
   CHECK(list_destroy(&target->edges));
   CHECK(memory_deallocate((data_pointer*)&target->roots));

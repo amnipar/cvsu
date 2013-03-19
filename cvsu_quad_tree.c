@@ -46,7 +46,22 @@ string quad_tree_get_neighborhood_statistics_name = "quad_tree_get_neighborhood_
 string quad_tree_divide_with_overlap_name = "quad_tree_divide_with_overlap";
 string quad_tree_get_edge_response_name = "quad_tree_get_edge_response";
 string quad_tree_get_child_edge_response_name = "quad_tree_get_child_edge_response";
+string quad_tree_edge_response_to_line_name = "quad_tree_edge_response_to_line";
 string quad_tree_get_neighbors_name = "quad_tree_get_neighbors";
+
+/******************************************************************************/
+
+void quad_tree_link_destroy
+(
+  quad_tree_link *target
+)
+{
+  if (target != NULL) {
+    typed_pointer_destroy(&target->a.context.data);
+    typed_pointer_destroy(&target->b.context.data);
+    typed_pointer_destroy(&target->context.data);
+  }
+}
 
 /******************************************************************************/
 
@@ -59,7 +74,7 @@ void quad_tree_destroy
     /* must deallocate the memory pointed to by typed pointers, if set */
     typed_pointer_destroy(&tree->annotation.data);
     typed_pointer_destroy(&tree->context.data);
-
+    
     /* later will need a special function for destroying annotation and context */
     list_destroy(&tree->intersection.edges);
     list_destroy(&tree->intersection.chains);
@@ -305,12 +320,10 @@ result quad_tree_get_child_statistics
     /* size 0 should not happen unless someone tries to divide tree with size 1 */
     if (size < 2) {
       pixel_image *original;
-      void *data;
       pixel_type type;
       integral_value mean;
 
       original = forest->source;
-      data = original->data;
       type = original->type;
       step = original->step;
       stride = original->stride;
@@ -817,6 +830,43 @@ result quad_tree_get_child_edge_response
 }
 
 /******************************************************************************/
+
+result quad_tree_edge_response_to_line
+(
+  quad_tree *tree,
+  list *lines
+)
+{
+  TRY();
+  uint32 x, y, d, dx, dy;
+  integral_value m, radius;
+  line new_line;
+  
+  CHECK_POINTER(tree);
+  CHECK_POINTER(lines);
+  
+  if (tree->edge.mag > 0) {
+    x = tree->x;
+    y = tree->y;
+    radius = ((integral_value)tree->size) / 2.0;
+    m = getmax(fabs(tree->edge.dx), fabs(tree->edge.dy));
+    d = (unsigned)getlround(r);
+    dx = (unsigned)getlround(tree->edge.dy / m * radius);
+    dy = (unsigned)getlround(tree->edge.dx / m * radius);
+    
+    new_line.start.x = (signed)(x + d + dx);
+    new_line.start.y = (signed)(y + d - dy);
+    new_line.end.x = (signed)(x + d - dx);
+    new_line.end.y = (signed)(y + d + dy);
+    
+    CHECK(list_append(lines, (pointer)&new_line));
+  }
+  
+  FINALLY(quad_tree_edge_response_to_line);
+  RETURN();
+}
+
+/******************************************************************************/
 /* private functions for managing graph propagation algorithms                */
 
 /*******************************************************************************
@@ -1193,6 +1243,25 @@ result quad_tree_get_neighbors
 
   FINALLY(quad_tree_get_neighbors);
   RETURN();
+}
+
+/******************************************************************************/
+
+truth_value quad_tree_link_equals
+(
+  const void *a,
+  const void *b
+)
+{
+  const quad_tree_link *sa, *sb;
+  if (a == NULL || b == NULL) return FALSE;
+  sa = (const quad_tree_link *)a;
+  sb = (const quad_tree_link *)b;
+  if ((sa->a.tree == sb->a.tree && sa->b.tree == sb->b.tree) ||
+      (sa->a.tree == sb->b.tree && sa->b.tree == sb->a.tree)) {
+    return TRUE;
+  }
+  return FALSE;
 }
 
 /* end of file                                                                */

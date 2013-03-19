@@ -41,6 +41,18 @@ extern "C" {
 #include "cvsu_typed_pointer.h"
 
 /**
+ * Parsing context for image parsing operations.
+ */
+typedef struct parse_context_t {
+  /** Token identifying this specific parsing operation */
+  uint32 token;
+  /** Number of the current parsing round */
+  uint32 round;
+  /** Actual context data that depends on operation */
+  typed_pointer data;
+} parse_context;
+
+/**
  * Context value for accumulating neighborhood statistics.
  */
 typedef struct stat_accumulator_t {
@@ -54,12 +66,6 @@ typedef struct stat_accumulator_t {
   integral_value dev_pool2;
   integral_value dev_acc2;
 } stat_accumulator;
-
-void make_stat_accumulator
-(
-  typed_pointer *tptr,
-  stat_accumulator *source
-);
 
 truth_value is_stat_accumulator
 (
@@ -76,6 +82,108 @@ result expect_stat_accumulator
   stat_accumulator **target,
   typed_pointer *tptr
 );
+
+/**
+ * Ensures that the context has a stat accumulator value.
+ */
+result context_ensure_stat_accumulator
+(
+  parse_context *context,
+  stat_accumulator **acc
+);
+
+/******************************************************************************/
+
+/**
+ * Context value for accumulating region characteristics.
+ */
+typedef struct reg_accumulator_t {
+  uint32 round;
+  integral_value locality_overlap;
+  integral_value neighborhood_overlap;
+  integral_value locality_pool;
+  integral_value locality_acc;
+  integral_value neighborhood_pool;
+  integral_value neighborhood_acc;
+} reg_accumulator;
+
+truth_value is_reg_accumulator
+(
+  typed_pointer *tptr
+);
+
+reg_accumulator *has_reg_accumulator
+(
+  typed_pointer *tptr
+);
+
+/**
+ * Ensures that the context has a reg accumulator value.
+ */
+result context_ensure_reg_accumulator
+(
+  parse_context *context,
+  reg_accumulator **reg
+);
+
+/******************************************************************************/
+
+typedef struct range_overlap_t {
+  uint32 round;
+  integral_value overlap;
+} range_overlap;
+
+truth_value is_range_overlap
+(
+  typed_pointer *tptr
+);
+
+range_overlap *has_range_overlap
+(
+  typed_pointer *tptr
+);
+
+/**
+ * Ensures that the context has a range overlap value.
+ */
+result context_ensure_range_overlap
+(
+  parse_context *context,
+  range_overlap **overlap
+);
+
+/******************************************************************************/
+
+typedef struct ridge_finder_t {
+  uint32 round;
+  truth_value has_ridge;
+} ridge_finder;
+
+truth_value is_ridge_finder
+(
+  typed_pointer *tptr
+);
+
+ridge_finder *has_ridge_finder
+(
+  typed_pointer *tptr
+);
+
+/**
+ * Ensures that the context has a ridge finder value.
+ */
+result context_ensure_ridge_finder
+(
+  parse_context *context,
+  ridge_finder **acc
+);
+
+/******************************************************************************/
+
+typedef struct boundary_finder_t {
+  uint32 round;
+  
+} boundary_finder;
 
 struct quad_forest_edge_t;
 struct quad_forest_edge_chain_t;
@@ -161,27 +269,6 @@ result expect_edge_parser
 (
   edge_parser **target,
   const typed_pointer *tptr
-);
-
-/**
- * Parsing context for image parsing operations.
- */
-typedef struct parse_context_t {
-  /** Token identifying this specific parsing operation */
-  uint32 token;
-  /** Number of the current parsing round */
-  uint32 round;
-  /** Actual context data that depends on operation */
-  typed_pointer data;
-} parse_context;
-
-/**
- * Ensures that the context has a stat accumulator value.
- */
-result context_ensure_stat_accumulator
-(
-  parse_context *context,
-  stat_accumulator **acc
 );
 
 #ifdef __cplusplus

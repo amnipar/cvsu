@@ -50,14 +50,17 @@ typedef struct tree_annotation_t {
   typed_pointer data;
 } tree_annotation;
 
+struct quad_tree_t;
+
+/******************************************************************************/
+
 typedef struct accumulated_stat_t {
   integral_value meanmean;
   integral_value meandev;
   integral_value devmean;
   integral_value devdev;
+  integral_value strength;
 } accumulated_stat;
-
-struct quad_tree_t;
 
 result accumulated_stat_create
 (
@@ -80,6 +83,41 @@ accumulated_stat *has_accumulated_stat
 (
   typed_pointer *tptr
 );
+
+result expect_accumulated_stat
+(
+  accumulated_stat **astat,
+  typed_pointer *tptr
+);
+
+/******************************************************************************/
+
+typedef struct accumulated_reg_t {
+  integral_value locality_overlap;
+  integral_value locality_mean;
+  integral_value neighborhood_overlap;
+  integral_value neighborhood_mean;
+  integral_value locality_strength;
+  integral_value neighborhood_strength;
+} accumulated_reg;
+
+result annotation_ensure_accumulated_reg
+(
+  tree_annotation *annotation,
+  accumulated_reg **areg
+);
+
+truth_value is_accumulated_reg
+(
+  typed_pointer *tptr
+);
+
+accumulated_reg *has_accumulated_reg
+(
+  typed_pointer *tptr
+);
+
+/******************************************************************************/
 
 typedef struct quad_forest_intersection_t {
   struct quad_tree_t *tree;

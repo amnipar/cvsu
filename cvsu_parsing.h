@@ -71,6 +71,30 @@ result quad_forest_visualize_accumulated_stats
   pixel_image *target
 );
 
+result quad_forest_calculate_accumulated_regs
+(
+  quad_forest *forest,
+  uint32 rounds
+);
+
+result quad_forest_visualize_accumulated_regs
+(
+  quad_forest *forest,
+  pixel_image *target
+);
+
+result quad_forest_calculate_accumulated_bounds
+(
+  quad_forest *forest,
+  uint32 rounds
+);
+
+result quad_forest_visualize_accumulated_bounds
+(
+  quad_forest *forest,
+  pixel_image *target
+);
+
 /**
  * Uses deviation propagation to find potential segment boundaries.
  */
@@ -83,6 +107,12 @@ result quad_forest_parse
   integral_value bias,
   /** The minimum length of edge chains _before_ starting to fill gaps */
   uint32 min_length
+);
+
+result quad_forest_visualize_parse_result
+(
+  quad_forest *forest,
+  pixel_image *target
 );
 
 #ifdef __cplusplus

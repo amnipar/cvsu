@@ -54,6 +54,14 @@ void print_usage()
   PRINT0("  target: target image file to generate\n\n");
 }
 
+enum mode_t {
+  m_UNDEF = 0,
+  m_STAT,
+  m_REG,
+  m_BOUND,
+  m_FULL
+};
+
 int main(int argc, char *argv[])
 {
   TRY();
@@ -61,7 +69,9 @@ int main(int argc, char *argv[])
   pixel_image dst_image;
   quad_forest forest;
   uint32 max_size, min_size, rounds;
-  string mode, source_file, target_file;
+  string smode, source_file, target_file;
+  enum mode_t mode;
+  /*list lines;*/
 
   if (argc < 7) {
     PRINT0("\nError: wrong number of parameters\n\n");
@@ -71,9 +81,25 @@ int main(int argc, char *argv[])
   else {
     int scan_result;
 
-    mode = argv[1];
-    if (strcmp(mode, "stat") != 0) {
-      PRINT1("\nError: unsupported mode (%s)\n\n", mode);
+    mode = m_UNDEF;
+    smode = argv[1];
+    if (strcmp(smode, "stat") == 0) {
+      mode = m_STAT;
+    }
+    else
+    if (strcmp(smode, "reg") == 0) {
+      mode = m_REG;
+    }
+    else
+    if (strcmp(smode, "bound") == 0) {
+      mode = m_BOUND;
+    }
+    else
+    if (strcmp(smode, "full") == 0) {
+      mode = m_FULL;
+    }
+    else {
+      PRINT1("\nError: unsupported mode (%s)\n\n", smode);
       print_usage();
       return 1;
     }
@@ -123,24 +149,58 @@ int main(int argc, char *argv[])
 
   PRINT0("load image...\n");
   CHECK(pixel_image_create_from_file(&src_image, source_file, p_U8, GREY));
-  CHECK(pixel_image_clone(&dst_image, &src_image));
+  CHECK(pixel_image_create(&dst_image, p_U8, RGB, src_image.width, src_image.height,
+                           3, 3 * src_image.width));
   PRINT0("create forest...\n");
   CHECK(quad_forest_create(&forest, &src_image, max_size, min_size));
   PRINT0("updating forest...\n");
   CHECK(quad_forest_update(&forest));
-  PRINT0("parsing...\n");
-  CHECK(quad_forest_calculate_accumulated_stats(&forest, rounds));
-  PRINT0("drawing image...\n");
-  CHECK(quad_forest_visualize_accumulated_stats(&forest, &dst_image));
+  switch (mode) {
+    case m_STAT:
+      PRINT0("parsing stat...\n");
+      CHECK(quad_forest_calculate_accumulated_stats(&forest, rounds));
+      PRINT0("drawing image...\n");
+      CHECK(quad_forest_visualize_accumulated_stats(&forest, &dst_image));
+      break;
+    case m_REG:
+      PRINT0("parsing regs...\n");
+      CHECK(quad_forest_calculate_accumulated_regs(&forest, rounds));
+      PRINT0("drawing image...\n");
+      CHECK(quad_forest_visualize_accumulated_regs(&forest, &dst_image));
+      break;
+    case m_BOUND:
+      PRINT0("parsing stat...\n");
+      CHECK(quad_forest_calculate_accumulated_bounds(&forest, rounds));
+      PRINT0("drawing image...\n");
+      CHECK(quad_forest_visualize_accumulated_bounds(&forest, &dst_image));
+      break;
+    case m_FULL:
+      PRINT0("parsing...\n");
+      CHECK(quad_forest_parse(&forest, rounds, 5, 3));
+      PRINT0("drawing image...\n");
+      CHECK(quad_forest_visualize_parse_result(&forest, &dst_image));
+      break;
+    default:
+      PRINT0("unknown mode\n");
+      ERROR(BAD_PARAM);
+  }
+  /*
+  PRINT0("drawing boundaries...\n");
+  CHECK(list_create(&lines, 100, sizeof(line), 1));
+  CHECK(quad_forest_find_accumulated_boundaries(&forest, rounds, &lines));
+  CHECK(pixel_image_draw_lines(&dst_image, &lines));
+  */
   /*CHECK(quad_forest_draw_image(&forest, &dst_image, FALSE, FALSE));*/
   PRINT0("writing result to file...\n");
   CHECK(pixel_image_write_to_file(&dst_image, target_file));
   PRINT0("done!\n");
 
   FINALLY(main);
+  PRINT0("destroy forest\n");
   quad_forest_destroy(&forest);
+  PRINT0("destroyed\n");
   pixel_image_destroy(&dst_image);
   pixel_image_destroy(&src_image);
-
+  /*list_destroy(&lines);*/
   return 0;
 }

@@ -42,6 +42,7 @@ string pixel_image_create_from_ipl_image_name = "pixel_image_create_from_ipl_ima
 string ipl_image_create_from_pixel_image_name = "ipl_image_create_from_pixel_image";
 string pixel_image_create_from_file_name = "pixel_image_create_from_file";
 string pixel_image_write_to_file_name = "pixel_image_write_to_file";
+string pixel_image_draw_lines_name = "pixel_image_draw_lines";
 
 /******************************************************************************/
 
@@ -250,6 +251,47 @@ result pixel_image_write_to_file
   cvSaveImage(filename, dst, 0);
 
   FINALLY(pixel_image_write_to_file);
+  cvReleaseImageHeader(&dst);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result pixel_image_draw_lines
+(
+  pixel_image *source,
+  list *lines
+)
+{
+  TRY();
+  IplImage *dst;
+  CvSize size;
+  list_item *items, *end;
+  line *this_line;
+  
+  CHECK_POINTER(source);
+  CHECK_POINTER(lines);
+  CHECK_PARAM(source->type == p_U8);
+  CHECK_PARAM(source->format == RGB);
+  
+  size.width = (signed)source->width;
+  size.height = (signed)source->height;
+  dst = cvCreateImageHeader(size, IPL_DEPTH_8U, 3);
+  cvSetData(dst, source->data, (signed)source->stride);
+  
+  items = lines->first.next;
+  end = &lines->last;
+  while (items != end) {
+    this_line = (line*)items->data;
+    cvLine(dst,
+           cvPoint(this_line->start.x, this_line->start.y),
+           cvPoint(this_line->end.x, this_line->end.y),
+           cvScalar(0,255,255,0), 2, 8, 0);
+    items = items->next;
+  }
+  
+  FINALLY(pixel_image_draw_lines);
+  cvReleaseImageHeader(&dst);
   RETURN();
 }
 

@@ -46,13 +46,21 @@
 #if INTEGRAL_IMAGE_DATA_TYPE == INTEGRAL_IMAGE_USING_FLOAT
 float fminf(float __x, float __y);
 float fmaxf(float __x, float __y);
+float roundf(float __x);
+long lroundf(float __x);
 #define getmin fminf
 #define getmax fmaxf
+#define getround roundf
+#define getlround lroundf
 #elif INTEGRAL_IMAGE_DATA_TYPE == INTEGRAL_IMAGE_USING_DOUBLE
 double fmin(double __x, double __y);
 double fmax(double __x, double __y);
+double round(double __x);
+long lround(double __x);
 #define getmin fmin
 #define getmax fmax
+#define getround round
+#define getlround lround
 #else
 #error "integral image data type not defined"
 #endif

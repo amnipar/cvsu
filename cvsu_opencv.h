@@ -38,6 +38,7 @@ extern "C" {
 
 #include <opencv2/core/core_c.h>
 #include "cvsu_pixel_image.h"
+#include "cvsu_list.h"
 
 /**
  * Convert from pixel_image to IplImage.
@@ -77,6 +78,15 @@ result pixel_image_write_to_file
 (
   pixel_image *source,
   const char *filename
+);
+
+/**
+ * Draw a list of lines over an image using OpenCV cvLine function.
+ */
+result pixel_image_draw_lines
+(
+  pixel_image *source,
+  list *lines
 );
 
 #ifdef __cplusplus

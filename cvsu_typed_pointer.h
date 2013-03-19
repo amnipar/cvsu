@@ -64,11 +64,15 @@ typedef enum type_label_t {
   /* tree annotation types */
   t_STAT,
   t_ASTAT,
+  t_AREG,
   t_SEGMENT,
   t_BOUNDARY,
   t_INTERSECTION,
   /* parsing context types */
   t_STAT_ACCUMULATOR,
+  t_REG_ACCUMULATOR,
+  t_RANGE_OVERLAP,
+  t_RIDGE_FINDER,
   t_PATH_SNIFFER,
   t_EDGE_PARSER,
   t_SEGMENT_PARSER
