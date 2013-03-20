@@ -226,18 +226,21 @@ result prime_reg_accumulator
   CHECK(context_ensure_reg_accumulator(&tree->context, &reg));
   if (reg->round == 0) {
     integral_value tm, ts, nm, ns, ms, ss, mdist, mdistmax, sdist, sdistmax;
+    integral_value mdistsum, sdistsum, count;
 
     CHECK(expect_accumulated_stat(&astat, &tree->annotation.data));
 
-    /* form the extremal ranges from the ranges of mean and dev */
     ms = getmax(1, astat->meandev);
     ss = getmax(1, astat->devdev);
 
     tm = tree->stat.mean;
-    ts = tree->stat.deviation;
+    ts = getmax(1, tree->stat.deviation);
 
     mdistmax = 0;
+    mdistsum = 0;
     sdistmax = 0;
+    sdistsum = 0;
+    count = 0;
     links = tree->links.first.next;
     endlinks = &tree->links.last;
     while (links != endlinks) {
@@ -245,17 +248,20 @@ result prime_reg_accumulator
       if (head->link->category == d_N4) {
         neighbor = head->other->tree;
         nm = neighbor->stat.mean;
-        ns = neighbor->stat.deviation;
+        ns = getmax(1, neighbor->stat.deviation);
 
         mdist = fabs(nm - tm) / ms;
         if (mdist > mdistmax) mdistmax = mdist;
+        mdistsum += mdist;
         sdist = fabs(ns - ts) / ss;
         if (sdist > sdistmax) sdistmax = sdist;
+        sdistsum += sdist;
+        count += 1;
       }
       links = links->next;
     }
-    reg->locality_overlap = mdistmax;
-    reg->neighborhood_overlap = sdistmax;
+    reg->locality_overlap = mdistsum / count;
+    reg->neighborhood_overlap = sdistsum / count;
 
     reg->locality_acc = reg->locality_overlap / 2;
     reg->locality_pool = reg->locality_acc;
@@ -612,8 +618,10 @@ result quad_forest_calculate_accumulated_regs
     if (tree->nw == NULL) {
       areg = has_accumulated_reg(&tree->annotation.data);
       if (areg != NULL) {
-        overlap = areg->locality_mean;
-        overlap = (overlap - min_loverlap) / (max_loverlap - min_loverlap);
+        overlap = areg->locality_overlap;
+        if (overlap < 1) overlap = 0;
+        if (overlap > 2) overlap = 1;
+        /*overlap = (overlap - min_loverlap) / (max_loverlap - min_loverlap);*/
         /*
         overlap = (areg->locality_overlap - areg->locality_mean);
         if (overlap < 0) {
@@ -626,8 +634,10 @@ result quad_forest_calculate_accumulated_regs
         */
         areg->locality_strength = 1 - overlap;
 
-        overlap = areg->neighborhood_mean;
-        overlap = (overlap - min_noverlap) / (max_noverlap - min_noverlap);
+        overlap = areg->neighborhood_overlap;
+        if (overlap < 1) overlap = 0;
+        if (overlap > 2) overlap = 1;
+        /*overlap = (overlap - min_noverlap) / (max_noverlap - min_noverlap);*/
         /*
         overlap = (areg->neighborhood_overlap - areg->neighborhood_mean);
         if (overlap > 0) {
@@ -639,7 +649,10 @@ result quad_forest_calculate_accumulated_regs
         }
         */
         areg->neighborhood_strength = 1 - overlap;
-        if (areg->locality_strength < areg->neighborhood_strength) {
+        /*
+        if (areg->locality_strength > areg->neighborhood_strength) {
+          areg->locality_strength = areg->neighborhood_strength;
+          
           if (areg->locality_strength < 0.5) {
             areg->neighborhood_strength = 0;
             areg->locality_strength = 0;
@@ -648,8 +661,11 @@ result quad_forest_calculate_accumulated_regs
             areg->neighborhood_strength = 1;
             areg->locality_strength = 1;
           }
+          
         }
         else {
+          areg->neighborhood_strength = areg->locality_strength;
+          
           if (areg->neighborhood_strength < 0.5) {
             areg->neighborhood_strength = 0;
             areg->locality_strength = 0;
@@ -658,7 +674,9 @@ result quad_forest_calculate_accumulated_regs
             areg->neighborhood_strength = 1;
             areg->locality_strength = 1;
           }
+          
         }
+        */
       }
     }
     trees = trees->next;
