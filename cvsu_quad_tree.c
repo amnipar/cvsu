@@ -48,6 +48,7 @@ string quad_tree_get_edge_response_name = "quad_tree_get_edge_response";
 string quad_tree_get_child_edge_response_name = "quad_tree_get_child_edge_response";
 string quad_tree_edge_response_to_line_name = "quad_tree_edge_response_to_line";
 string quad_tree_get_neighbors_name = "quad_tree_get_neighbors";
+string quad_tree_find_link_name = "quad_tree_find_link";
 
 /******************************************************************************/
 
@@ -74,7 +75,7 @@ void quad_tree_destroy
     /* must deallocate the memory pointed to by typed pointers, if set */
     typed_pointer_destroy(&tree->annotation.data);
     typed_pointer_destroy(&tree->context.data);
-    
+
     /* later will need a special function for destroying annotation and context */
     list_destroy(&tree->intersection.edges);
     list_destroy(&tree->intersection.chains);
@@ -841,10 +842,10 @@ result quad_tree_edge_response_to_line
   uint32 x, y, d, dx, dy;
   integral_value m, radius;
   line new_line;
-  
+
   CHECK_POINTER(tree);
   CHECK_POINTER(lines);
-  
+
   if (tree->edge.mag > 0) {
     x = tree->x;
     y = tree->y;
@@ -853,15 +854,15 @@ result quad_tree_edge_response_to_line
     d = (unsigned)getlround(r);
     dx = (unsigned)getlround(tree->edge.dy / m * radius);
     dy = (unsigned)getlround(tree->edge.dx / m * radius);
-    
+
     new_line.start.x = (signed)(x + d + dx);
     new_line.start.y = (signed)(y + d - dy);
     new_line.end.x = (signed)(x + d - dx);
     new_line.end.y = (signed)(y + d + dy);
-    
+
     CHECK(list_append(lines, (pointer)&new_line));
   }
-  
+
   FINALLY(quad_tree_edge_response_to_line);
   RETURN();
 }
@@ -1262,6 +1263,39 @@ truth_value quad_tree_link_equals
     return TRUE;
   }
   return FALSE;
+}
+
+/******************************************************************************/
+
+result quad_tree_find_link
+(
+  quad_tree *tree1,
+  quad_tree *tree2,
+  quad_tree_link_head **link
+)
+{
+  TRY();
+  list_item *links, *endlinks;
+  quad_tree_link_head *head;
+
+  CHECK_POINTER(link);
+  *link = NULL;
+  CHECK_POINTER(tree1);
+  CHECK_POINTER(tree2);
+
+  links = tree1->links.first.next;
+  endlinks = &tree1->links.last;
+  while (links != endlinks) {
+    head = *((quad_tree_link_head**)links->data);
+    if (head->other->tree == tree2) {
+      *link = head->other;
+      break;
+    }
+    links = links->next;
+  }
+
+  FINALLY(quad_tree_find_link);
+  RETURN();
 }
 
 /* end of file                                                                */

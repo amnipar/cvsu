@@ -301,6 +301,13 @@ truth_value quad_tree_link_equals
   const void *b
 );
 
+result quad_tree_find_link
+(
+  quad_tree *tree1,
+  quad_tree *tree2,
+  quad_tree_link_head **link
+);
+
 #ifdef __cplusplus
 }
 #endif

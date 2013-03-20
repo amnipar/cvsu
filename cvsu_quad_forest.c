@@ -88,17 +88,20 @@ const quad_forest_status FOREST_EDGES_DETECTED;
 #define ADD_LINK(neighbor,cat)\
   new_link.category = cat;\
   new_link.b.tree = (neighbor);\
-  CHECK(list_append_unique_return_pointer(&target->links, (pointer)&new_link,\
-                                          (pointer*)&link, quad_tree_link_equals));\
+  CHECK(list_append_return_pointer(&target->links, (pointer)&new_link,\
+        (pointer*)&link));\
   link->a.link = link;\
   link->a.other = &link->b;\
   link->b.link = link;\
   link->b.other = &link->a;\
-  if (link->a.tree == tree) {\
-    head = &link->a;\
-  }\
-  else {\
-    head = &link->b;\
+  head = &link->a;\
+  head->angle = angle;\
+  CHECK(list_append(&tree->links, (pointer)&head));\
+
+#define GET_LINK(neighbor,cat)\
+  CHECK(quad_tree_find_link(neighbor, tree, &head));\
+  if (head == NULL) {\
+    ERROR(NOT_FOUND);\
   }\
   head->angle = angle;\
   CHECK(list_append(&tree->links, (pointer)&head));\
@@ -227,11 +230,11 @@ result quad_forest_init
       if (col > 0) {
         tree->w = target->roots[pos - 1];
         angle = M_PI;
-        ADD_LINK(tree->w, d_N4);
+        GET_LINK(tree->w, d_N4);
         /* nw neighbor */
         if (row > 0) {
           angle = 3 * M_PI / 4;
-          ADD_LINK(target->roots[pos - cols - 1], d_N8);
+          GET_LINK(target->roots[pos - cols - 1], d_N8);
         }
         /* sw neighbor */
         if (row < (unsigned)(rows - 1)) {
@@ -243,7 +246,7 @@ result quad_forest_init
       if (row > 0) {
         tree->n = target->roots[pos - cols];
         angle = M_PI / 2;
-        ADD_LINK(tree->n, d_N4);
+        GET_LINK(tree->n, d_N4);
       }
       /* add neighbor to east */
       if (col < (unsigned)(cols - 1)) {
@@ -253,7 +256,7 @@ result quad_forest_init
         /* ne neighbor */
         if (row > 0) {
           angle = M_PI / 4;
-          ADD_LINK(target->roots[pos - cols + 1], d_N8);
+          GET_LINK(target->roots[pos - cols + 1], d_N8);
         }
         /* se neighbor */
         if (row < (unsigned)(rows - 1)) {
