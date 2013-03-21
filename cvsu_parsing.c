@@ -649,10 +649,10 @@ result quad_forest_calculate_accumulated_regs
         }
         */
         areg->neighborhood_strength = 1 - overlap;
-        /*
+
         if (areg->locality_strength > areg->neighborhood_strength) {
-          areg->locality_strength = areg->neighborhood_strength;
-          
+          areg->locality_strength = 1 - areg->neighborhood_strength;
+          /*
           if (areg->locality_strength < 0.5) {
             areg->neighborhood_strength = 0;
             areg->locality_strength = 0;
@@ -661,11 +661,11 @@ result quad_forest_calculate_accumulated_regs
             areg->neighborhood_strength = 1;
             areg->locality_strength = 1;
           }
-          
+          */
         }
         else {
-          areg->neighborhood_strength = areg->locality_strength;
-          
+          areg->neighborhood_strength = 1 - areg->locality_strength;
+          /*
           if (areg->neighborhood_strength < 0.5) {
             areg->neighborhood_strength = 0;
             areg->locality_strength = 0;
@@ -674,9 +674,8 @@ result quad_forest_calculate_accumulated_regs
             areg->neighborhood_strength = 1;
             areg->locality_strength = 1;
           }
-          
+          */
         }
-        */
       }
     }
     trees = trees->next;
