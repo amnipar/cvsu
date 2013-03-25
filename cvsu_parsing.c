@@ -234,7 +234,7 @@ result prime_reg_accumulator
     ss = getmax(1, astat->devdev);
 
     tm = tree->stat.mean;
-    ts = getmax(1, tree->stat.deviation);
+    ts = tree->stat.deviation;
 
     mdistmax = 0;
     mdistsum = 0;
@@ -248,7 +248,7 @@ result prime_reg_accumulator
       if (head->link->category == d_N4) {
         neighbor = head->other->tree;
         nm = neighbor->stat.mean;
-        ns = getmax(1, neighbor->stat.deviation);
+        ns = neighbor->stat.deviation;
 
         mdist = fabs(nm - tm) / ms;
         if (mdist > mdistmax) mdistmax = mdist;
@@ -266,7 +266,7 @@ result prime_reg_accumulator
     reg->sdist_max = sdistmax;
     reg->sdist_mean = sdistsum / count;
 
-    if (mdistmax > 1 || sdistmax > 1) {
+    if (mdistmax > 2 || sdistmax > 2) {
       reg->boundary_acc = 1;
     }
     else {
@@ -325,7 +325,9 @@ result prop_reg_accumulator
 )
 {
   TRY();
-  list_item *links, *endlinks;
+  uint32 bcount;
+  integral_value acc;
+  list_item *links, *endlinks, *links2, *endlinks2;
   reg_accumulator *reg, *link_reg;
   quad_tree_link_head *head;
 
@@ -333,6 +335,7 @@ result prop_reg_accumulator
   reg = has_reg_accumulator(&tree->context.data);
   CHECK_POINTER(reg);
 
+  bcount = 0;
   links = tree->links.first.next;
   endlinks = &tree->links.last;
   while (links != endlinks) {
@@ -345,12 +348,24 @@ result prop_reg_accumulator
         link_reg->round = 1;
       }
       else {
-        link_reg->boundary_acc = reg->boundary_acc - link_reg->boundary_acc;
+        if (link_reg->boundary_acc > 0) {
+          bcount++;
+        }
+        acc = reg->boundary_acc - link_reg->boundary_acc;
+        if (acc > 0) {
+          link_reg->boundary_acc = acc;
+        }
         link_reg->segment_acc = reg->segment_acc - link_reg->segment_acc;
         link_reg->round++;
       }
     }
     links = links->next;
+  }
+  if (reg->boundary_acc > 0 && bcount > 0) {
+    reg->boundary_acc += bcount;
+  }
+  else {
+    reg->boundary_acc = 0;
   }
 
   FINALLY(prop_reg_accumulator);
