@@ -99,12 +99,14 @@ result context_ensure_stat_accumulator
  */
 typedef struct reg_accumulator_t {
   uint32 round;
-  integral_value locality_overlap;
-  integral_value neighborhood_overlap;
-  integral_value locality_pool;
-  integral_value locality_acc;
-  integral_value neighborhood_pool;
-  integral_value neighborhood_acc;
+  integral_value mdist_max;
+  integral_value mdist_mean;
+  integral_value sdist_max;
+  integral_value sdist_mean;
+  integral_value boundary_pool;
+  integral_value boundary_acc;
+  integral_value segment_pool;
+  integral_value segment_acc;
 } reg_accumulator;
 
 truth_value is_reg_accumulator
@@ -182,7 +184,7 @@ result context_ensure_ridge_finder
 
 typedef struct boundary_finder_t {
   uint32 round;
-  
+
 } boundary_finder;
 
 struct quad_forest_edge_t;

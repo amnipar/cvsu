@@ -93,12 +93,12 @@ result expect_accumulated_stat
 /******************************************************************************/
 
 typedef struct accumulated_reg_t {
-  integral_value locality_overlap;
-  integral_value locality_mean;
-  integral_value neighborhood_overlap;
-  integral_value neighborhood_mean;
-  integral_value locality_strength;
-  integral_value neighborhood_strength;
+  integral_value mdist_mean;
+  integral_value mdist_max;
+  integral_value sdist_mean;
+  integral_value sdist_max;
+  integral_value boundary_strength;
+  integral_value segment_strength;
 } accumulated_reg;
 
 result annotation_ensure_accumulated_reg
