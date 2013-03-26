@@ -99,6 +99,7 @@ typedef struct accumulated_reg_t {
   integral_value sdist_max;
   integral_value boundary_strength;
   integral_value segment_strength;
+  integral_value spread_strength;
 } accumulated_reg;
 
 result annotation_ensure_accumulated_reg

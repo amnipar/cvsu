@@ -99,10 +99,10 @@ result context_ensure_stat_accumulator
  */
 typedef struct reg_accumulator_t {
   uint32 round;
-  integral_value mdist_max;
-  integral_value mdist_mean;
-  integral_value sdist_max;
-  integral_value sdist_mean;
+  integral_value cost_total;
+  integral_value cost_spread;
+  integral_value cost_max;
+  integral_value cost_min;
   integral_value boundary_pool;
   integral_value boundary_acc;
   integral_value segment_pool;

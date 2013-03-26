@@ -108,7 +108,9 @@ typedef enum direction_t {
   /** Combined 4-neighborhood directions (N+E+S+W) */
   d_N4,
   /** Combined 8-neighborhood directions */
-  d_N8
+  d_N8,
+  /** Mid-range 6-neighborhood directions */
+  d_N6
 } direction;
 
 typedef sint32 coord;

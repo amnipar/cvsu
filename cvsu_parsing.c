@@ -217,7 +217,7 @@ result prime_reg_accumulator
   TRY();
   list_item *links, *endlinks;
   reg_accumulator *reg, *link_reg;
-  accumulated_stat *astat;
+  accumulated_stat *astat_tree, *astat_neighbor;
   quad_tree_link_head *head;
   quad_tree *neighbor;
 
@@ -225,58 +225,70 @@ result prime_reg_accumulator
 
   CHECK(context_ensure_reg_accumulator(&tree->context, &reg));
   if (reg->round == 0) {
-    integral_value tm, ts, nm, ns, ms, ss, mdist, mdistmax, sdist, sdistmax;
-    integral_value mdistsum, sdistsum, count;
+    integral_value tree_height, neighbor_height, cost;
+    integral_value cost_total, cost_sum, cost_mean, cost_min, cost_max, count;
 
-    CHECK(expect_accumulated_stat(&astat, &tree->annotation.data));
+    CHECK(expect_accumulated_stat(&astat_tree, &tree->annotation.data));
 
-    ms = getmax(1, astat->meandev);
-    ss = getmax(1, astat->devdev);
+    tree_height = astat_tree->strength;
 
-    tm = tree->stat.mean;
-    ts = tree->stat.deviation;
-
-    mdistmax = 0;
-    mdistsum = 0;
-    sdistmax = 0;
-    sdistsum = 0;
+    cost_min = 100;
+    cost_max = 0;
+    cost_total = 0;
+    cost_sum = 0;
     count = 0;
     links = tree->links.first.next;
     endlinks = &tree->links.last;
     while (links != endlinks) {
       head = *((quad_tree_link_head**)links->data);
-      if (head->link->category == d_N4) {
+      if (head->link->category != d_N6) {
         neighbor = head->other->tree;
-        nm = neighbor->stat.mean;
-        ns = neighbor->stat.deviation;
-
-        mdist = fabs(nm - tm) / ms;
-        if (mdist > mdistmax) mdistmax = mdist;
-        mdistsum += mdist;
-        sdist = fabs(ns - ts) / ss;
-        if (sdist > sdistmax) sdistmax = sdist;
-        sdistsum += sdist;
+        CHECK(expect_accumulated_stat(&astat_neighbor, &neighbor->annotation.data));
+        neighbor_height = astat_neighbor->strength;
+        cost = neighbor_height - tree_height;
+        head->cost = cost;
+        /* signed value in total cost */
+        cost_total += cost;
+        /* absolute value in sum */
+        cost = fabs(cost);
+        cost_sum += cost;
+        if (cost < cost_min) cost_min = cost;
+        if (cost > cost_max) cost_max = cost;
         count += 1;
       }
       links = links->next;
     }
 
-    reg->mdist_max = mdistmax;
-    reg->mdist_mean = mdistsum / count;
-    reg->sdist_max = sdistmax;
-    reg->sdist_mean = sdistsum / count;
+    cost_mean = cost_sum / count;
+    reg->cost_total = cost_total / count;
+    reg->cost_max = cost_max;
+    reg->cost_min = cost_min;
 
-    if (mdistmax > 2 || sdistmax > 2) {
-      reg->boundary_acc = 1;
+    cost_sum = 0;
+    links = tree->links.first.next;
+    endlinks = &tree->links.last;
+    while (links != endlinks) {
+      head = *((quad_tree_link_head**)links->data);
+      if (head->link->category != d_N6) {
+        cost = head->cost;
+        head->cost = signum(cost);
+        cost_sum += fabs(cost - cost_mean) / cost_mean;
+        head->cost *= (1 - fabs(cost / cost_max));
+      }
+      links = links->next;
+    }
+
+    cost_mean = cost_sum / count;
+    if (cost_mean > 1) cost_mean = 1;
+    reg->cost_spread = cost_mean;
+
+    if (reg->cost_total < 0) {
+      reg->boundary_acc = cost_mean;
+      reg->segment_acc = 1 - cost_mean;
     }
     else {
       reg->boundary_acc = 0;
-    }
-    if (reg->mdist_mean < 1 && reg->sdist_mean < 1) {
-      reg->segment_acc = 1;
-    }
-    else {
-      reg->segment_acc = 0;
+      reg->segment_acc = 1 - cost_mean;
     }
 
     reg->round = 1;
@@ -286,12 +298,11 @@ result prime_reg_accumulator
     endlinks = &tree->links.last;
     while (links != endlinks) {
       head = *((quad_tree_link_head**)links->data);
-      if (head->link->category == d_N4) {
-        CHECK(context_ensure_reg_accumulator(&head->context, &link_reg));
+      if (head->link->category != d_N6) {
+        CHECK(context_ensure_reg_accumulator(&head->other->context, &link_reg));
         if (link_reg->round > 0) {
           reg->boundary_acc += link_reg->boundary_acc;
           reg->segment_acc += link_reg->segment_acc;
-          link_reg->round++;
         }
       }
       links = links->next;
@@ -325,8 +336,6 @@ result prop_reg_accumulator
 )
 {
   TRY();
-  uint32 bcount;
-  integral_value acc;
   list_item *links, *endlinks, *links2, *endlinks2;
   reg_accumulator *reg, *link_reg;
   quad_tree_link_head *head;
@@ -335,37 +344,21 @@ result prop_reg_accumulator
   reg = has_reg_accumulator(&tree->context.data);
   CHECK_POINTER(reg);
 
-  bcount = 0;
   links = tree->links.first.next;
   endlinks = &tree->links.last;
   while (links != endlinks) {
     head = *((quad_tree_link_head**)links->data);
-    if (head->link->category == d_N4) {
-      CHECK(context_ensure_reg_accumulator(&head->other->context, &link_reg));
-      if (link_reg->round == 0) {
-        link_reg->boundary_acc = reg->boundary_acc;
-        link_reg->segment_acc = reg->segment_acc;
-        link_reg->round = 1;
+    if (head->link->category != d_N6) {
+      CHECK(context_ensure_reg_accumulator(&head->context, &link_reg));
+      if (reg->boundary_acc > 0) {
+        link_reg->boundary_acc = fabs(head->cost) * reg->boundary_acc;
       }
-      else {
-        if (link_reg->boundary_acc > 0) {
-          bcount++;
-        }
-        acc = reg->boundary_acc - link_reg->boundary_acc;
-        if (acc > 0) {
-          link_reg->boundary_acc = acc;
-        }
-        link_reg->segment_acc = reg->segment_acc - link_reg->segment_acc;
-        link_reg->round++;
+      if (reg->segment_acc > 0 && head->cost < 0) {
+        link_reg->segment_acc = fabs(head->cost) * reg->segment_acc;
       }
+      link_reg->round++;
     }
     links = links->next;
-  }
-  if (reg->boundary_acc > 0 && bcount > 0) {
-    reg->boundary_acc += bcount;
-  }
-  else {
-    reg->boundary_acc = 0;
   }
 
   FINALLY(prop_reg_accumulator);
@@ -396,8 +389,8 @@ result acc_reg_accumulator
   endlinks = &tree->links.last;
   while (links != endlinks) {
     head = *((quad_tree_link_head**)links->data);
-    if (head->link->category == d_N4) {
-      CHECK(context_ensure_reg_accumulator(&head->context, &link_reg));
+    if (head->link->category != d_N6) {
+      CHECK(context_ensure_reg_accumulator(&head->other->context, &link_reg));
       if (link_reg->round > 0) {
         reg->boundary_acc += link_reg->boundary_acc;
         reg->segment_acc += link_reg->segment_acc;
@@ -406,12 +399,9 @@ result acc_reg_accumulator
     links = links->next;
   }
 
-  areg->mdist_mean = reg->mdist_mean;
-  areg->mdist_max = reg->mdist_max;
-  areg->sdist_mean = reg->sdist_mean;
-  areg->sdist_max = reg->sdist_max;
   areg->boundary_strength = reg->boundary_acc;
   areg->segment_strength = reg->segment_acc;
+  areg->spread_strength = reg->cost_spread;
 
   FINALLY(acc_reg_accumulator);
   (void)collection;
@@ -542,7 +532,9 @@ result quad_forest_calculate_accumulated_stats
       astat = has_accumulated_stat(&tree->annotation.data);
       if (astat != NULL) {
         meandev = astat->meandev / maxmeandev;
+        astat->meandev = meandev;
         devdev = astat->devdev / maxdevdev;
+        astat->devdev = devdev;
         astat->strength = (0.5 * meandev) + (0.5 * devdev);
       }
     }
@@ -586,9 +578,9 @@ result quad_forest_visualize_accumulated_stats
       astat = has_accumulated_stat(&tree->annotation.data);
       if (astat != NULL) {
         color = (byte)(255 * astat->strength);
-        color0 = (byte)astat->meanmean;
+        color0 = (byte)(255 * astat->strength * astat->meandev);
         color1 = 0;
-        color2 = color;
+        color2 = (byte)(255 * astat->strength * astat->devdev);
       }
       width = tree->size;
       height = width;
@@ -625,6 +617,7 @@ result quad_forest_calculate_accumulated_regs
   quad_tree *tree;
   accumulated_reg *areg;
   integral_value strength, min_bstrength, max_bstrength, min_sstrength, max_sstrength;
+  integral_value spread, min_spread, max_spread;
 
   CHECK_POINTER(forest);
 
@@ -638,6 +631,8 @@ result quad_forest_calculate_accumulated_regs
   max_bstrength = 0;
   min_sstrength = 1000;
   max_sstrength = 0;
+  min_spread = 1000;
+  max_spread = 0;
   trees = forest->trees.first.next;
   end = &forest->trees.last;
   while (trees != end) {
@@ -647,16 +642,20 @@ result quad_forest_calculate_accumulated_regs
       if (areg != NULL) {
         strength = areg->boundary_strength;
         if (strength < min_bstrength) min_bstrength = strength;
-        else if (strength > max_bstrength) max_bstrength = strength;
+        if (strength > max_bstrength) max_bstrength = strength;
         strength = areg->segment_strength;
         if (strength < min_sstrength) min_sstrength = strength;
-        else if (strength > max_sstrength) max_sstrength = strength;
+        if (strength > max_sstrength) max_sstrength = strength;
+        spread = areg->spread_strength;
+        if (spread < min_spread) min_spread = spread;
+        if (spread > max_spread) max_spread = spread;
       }
     }
     trees = trees->next;
   }
   PRINT2("minb %.3f maxb %.3f\n", min_bstrength, max_bstrength);
   PRINT2("mins %.3f maxs %.3f\n", min_sstrength, max_sstrength);
+  PRINT2("mins %.3f maxs %.3f\n", min_spread, max_spread);
 
   trees = forest->trees.first.next;
   end = &forest->trees.last;
@@ -672,6 +671,11 @@ result quad_forest_calculate_accumulated_regs
         strength = areg->segment_strength;
         strength = (strength - min_sstrength) / (max_sstrength - min_sstrength);
         areg->segment_strength = strength;
+
+        strength = areg->spread_strength;
+        strength = (strength - min_spread) / (max_spread - min_spread);
+        areg->spread_strength = 1 - strength;
+
         /*
         if (areg->locality_strength > areg->neighborhood_strength) {
           areg->locality_strength = 1 - areg->neighborhood_strength;
@@ -742,7 +746,7 @@ result quad_forest_visualize_accumulated_regs
       areg = has_accumulated_reg(&tree->annotation.data);
       if (areg != NULL) {
         color0 = (byte)(255 * areg->boundary_strength);
-        color1 = 0;
+        color1 = (byte)(255 * areg->spread_strength);
         color2 = (byte)(255 * areg->segment_strength);
       }
       width = tree->size;
