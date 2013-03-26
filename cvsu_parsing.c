@@ -279,16 +279,20 @@ result prime_reg_accumulator
     }
 
     cost_mean = cost_sum / count;
-    if (cost_mean > 1) cost_mean = 1;
-    reg->cost_spread = cost_mean;
+    if (cost_mean > 1) {
+      reg->cost_spread = 1;
+    }
+    else {
+      reg->cost_spread = cost_mean;
+    }
 
-    if (reg->cost_total < 0) {
+    if (reg->cost_total < 0 && cost_mean > 1) {
       reg->boundary_acc = cost_mean;
-      reg->segment_acc = 1 - cost_mean;
+      reg->segment_acc = 0;
     }
     else {
       reg->boundary_acc = 0;
-      reg->segment_acc = 1 - cost_mean;
+      reg->segment_acc = 1;
     }
 
     reg->round = 1;
@@ -353,7 +357,7 @@ result prop_reg_accumulator
       if (reg->boundary_acc > 0) {
         link_reg->boundary_acc = fabs(head->cost) * reg->boundary_acc;
       }
-      if (reg->segment_acc > 0 && head->cost < 0) {
+      if (reg->segment_acc > 0) {
         link_reg->segment_acc = fabs(head->cost) * reg->segment_acc;
       }
       link_reg->round++;
