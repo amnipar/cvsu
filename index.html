@@ -41,12 +41,34 @@
 <li>Scene and camera tracking with moving camera</li>
 </ul><p>Some features for segmentation and motion tracking are working already, and in near future a new release will introduce first features for geometric analysis. The library is written in C, with Haskell bindings, and it can work on many platforms, including Android phones.</p>
       </section>
+
+<section>
+<h3>Samples</h3>
+
+<p>
+These images show some results for extremely fast and robust edge detection. It has been used succesfully also for extracting edge chains and straight lines. The method can be given a width that determines how long the edge segments must be at least to be detected.
+</p>
+<img src="images/edges_wide.png" alt="wide edge detection example" title="Wide edges" /><br />
+<img src="images/edges_thin.png" alt="thin edge detection example" title="Thin edges" />
+<p>
+This image shows some results for extremely fast and robust segmentation. It oversegments, but is quite simple. More advanced methods are under development, that will combine boundary and segment information and not oversegment so easily.
+</p>
+<img src="images/segment_quad.png" alt="quad forest segmentation example" title="Quad forest segmentation" /><br />
+<p>
+This image shows some first results for segmentation based on both boundaries and regions. It runs in real-time on Android phones.
+</p>
+<img src="images/segment_bounds.png" alt="boundary segmentation example" title="Boundary segmentation" /><br />
+<p>
+This video demonstrates basic motion tracking. Motion detection is very fast and robust, and it can be made more sensitive. In near future it can be used for segmenting the outline of the moving objects, and for tracking paths of moving objects.
+</p>
+<iframe width="640" height="480" src="http://www.youtube.com/embed/T9MoXoYdhy8" frameborder="0" allowfullscreen></iframe>
+</section>
       <footer>
         <p>This project is maintained by <a href="https://github.com/amnipar">amnipar</a></p>
         <p><small>Hosted on GitHub Pages &mdash; Theme by <a href="https://github.com/orderedlist">orderedlist</a></small></p>
       </footer>
     </div>
     <script src="javascripts/scale.fix.js"></script>
-    
+
   </body>
 </html>
