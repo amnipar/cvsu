@@ -51,6 +51,7 @@ struct quad_tree_link_t;
  */
 typedef struct quad_tree_link_head_t {
   struct quad_tree_link_t *link;
+  struct quad_tree_link_head_t *opposite;
   const struct quad_tree_link_head_t *other;
   struct quad_tree_t *tree;
   /** Angle of the line going away from this head */
