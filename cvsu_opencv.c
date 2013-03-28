@@ -34,6 +34,7 @@
 #include "cvsu_opencv.h"
 #include <opencv2/highgui/highgui_c.h>
 #include <stdio.h>
+#include <sys/time.h>
 
 /******************************************************************************/
 /* constants for reporting function names in error messages                   */
@@ -43,6 +44,7 @@ string ipl_image_create_from_pixel_image_name = "ipl_image_create_from_pixel_ima
 string pixel_image_create_from_file_name = "pixel_image_create_from_file";
 string pixel_image_write_to_file_name = "pixel_image_write_to_file";
 string pixel_image_draw_lines_name = "pixel_image_draw_lines";
+string pixel_image_draw_rects_name = "pixel_image_draw_rects";
 
 /******************************************************************************/
 
@@ -268,17 +270,17 @@ result pixel_image_draw_lines
   CvSize size;
   list_item *items, *end;
   line *this_line;
-  
+
   CHECK_POINTER(source);
   CHECK_POINTER(lines);
   CHECK_PARAM(source->type == p_U8);
   CHECK_PARAM(source->format == RGB);
-  
+
   size.width = (signed)source->width;
   size.height = (signed)source->height;
   dst = cvCreateImageHeader(size, IPL_DEPTH_8U, 3);
   cvSetData(dst, source->data, (signed)source->stride);
-  
+
   items = lines->first.next;
   end = &lines->last;
   while (items != end) {
@@ -286,11 +288,69 @@ result pixel_image_draw_lines
     cvLine(dst,
            cvPoint(this_line->start.x, this_line->start.y),
            cvPoint(this_line->end.x, this_line->end.y),
-           cvScalar(0,255,255,0), 2, 8, 0);
+           cvScalar(0,0,0,0), 1, 8, 0);
     items = items->next;
   }
-  
+
   FINALLY(pixel_image_draw_lines);
+  cvReleaseImageHeader(&dst);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result pixel_image_draw_rects
+(
+  pixel_image *source,
+  quad_forest_segment **segments,
+  uint32 count
+)
+{
+  TRY();
+  IplImage *dst;
+  CvSize size;
+  list_item *items, *end;
+  quad_forest_segment *segment;
+  rect *this_rect;
+  uint32 i;
+  struct timeval finish;
+  double timestamp;
+  char filename[50];
+
+  CHECK_POINTER(source);
+  CHECK_POINTER(segments);
+  CHECK_PARAM(source->type == p_U8);
+  CHECK_PARAM(source->format == RGB);
+
+  size.width = (signed)source->width;
+  size.height = (signed)source->height;
+  dst = cvCreateImageHeader(size, IPL_DEPTH_8U, 3);
+  cvSetData(dst, source->data, (signed)source->stride);
+  /*
+  items = lines->first.next;
+  end = &lines->last;
+  while (items != end) {
+  */
+  for (i = 0; i < count; i++) {
+    /*this_line = (line*)items->data;*/
+    segment = segments[i];
+    if (segment->x2 - segment->x1 > 30 && segment->y2 - segment->y1 > 20) {
+      cvRectangle(dst,
+             cvPoint(segment->x1, segment->y1),
+             cvPoint(segment->x2, segment->y2),
+             cvScalar(0,255,255,0), 2, 8, 0);
+    }
+  }
+  /*
+    items = items->next;
+  }
+  */
+  gettimeofday(&finish, NULL);
+  timestamp = (((double)finish.tv_sec) + (((double)finish.tv_usec) / 1000000.0));
+  sprintf(filename, "capture/%.6f.png", timestamp);
+  cvSaveImage(filename, dst, 0);
+
+  FINALLY(pixel_image_draw_rects);
   cvReleaseImageHeader(&dst);
   RETURN();
 }

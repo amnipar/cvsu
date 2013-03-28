@@ -39,6 +39,7 @@ extern "C" {
 #include <opencv2/core/core_c.h>
 #include "cvsu_pixel_image.h"
 #include "cvsu_list.h"
+#include "cvsu_annotation.h"
 
 /**
  * Convert from pixel_image to IplImage.
@@ -87,6 +88,16 @@ result pixel_image_draw_lines
 (
   pixel_image *source,
   list *lines
+);
+
+/**
+ * Draw a list of rects over an image using OpenCV cvRectangle function.
+ */
+result pixel_image_draw_rects
+(
+  pixel_image *source,
+  quad_forest_segment **segments,
+  uint32 count
 );
 
 #ifdef __cplusplus
