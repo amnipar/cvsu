@@ -52,6 +52,8 @@ string edgel_response_x_name = "edgel_response_x";
 string edges_x_box_deviation_name = "edges_x_box_deviation";
 string edge_image_update_name = "edge_image_update";
 string edge_image_convert_to_grey8_name = "edge_image_convert_to_grey8";
+string edge_image_overlay_to_grey8_name = "edge_image_convert_to_grey8";
+string edge_image_overlay_to_rgb_name = "edge_image_convert_to_rgb";
 
 /******************************************************************************/
 
@@ -488,6 +490,7 @@ result edge_image_overlay_to_grey8
   CHECK_POINTER(source->vedges.data);
   CHECK_POINTER(target->data);
   CHECK_PARAM(target->type == p_U8);
+  CHECK_PARAM(target->format == GREY);
   CHECK_PARAM(target->width == source->I.width);
   CHECK_PARAM(target->height == source->I.height);
 
@@ -544,7 +547,85 @@ result edge_image_overlay_to_grey8
     }
   }
 
-  FINALLY(edge_image_convert_to_grey8);
+  FINALLY(edge_image_overlay_to_grey8);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result edge_image_overlay_to_rgb
+(
+  edge_image *source,
+  pixel_image *target
+)
+{
+  TRY();
+  pixel_image *edges;
+  uint32 i, x, y;
+  sint32 grey_value;
+  char edge_value;
+  SINGLE_DISCONTINUOUS_IMAGE_VARIABLES(target, byte);
+
+  CHECK_POINTER(source);
+  CHECK_POINTER(target);
+  CHECK_POINTER(source->hedges.data);
+  CHECK_POINTER(source->vedges.data);
+  CHECK_POINTER(target->data);
+  CHECK_PARAM(target->type == p_U8);
+  CHECK_PARAM(target->format == RGB);
+  CHECK_PARAM(target->width == source->I.width);
+  CHECK_PARAM(target->height == source->I.height);
+
+  /* process vertical edge image */
+  edges = &source->vedges;
+  {
+    SINGLE_DISCONTINUOUS_IMAGE_VARIABLES(edges, char);
+    for (y = 0; y < edges->height; y++) {
+      edges_pos = edges_rows[y];
+      target_pos = target_rows[y * source->vstep + source->vmargin + source->dy];
+      for (x = 0; x < edges->width; x++,
+           edges_pos += edges_step, target_pos += target_step) {
+        edge_value = PIXEL_VALUE(edges);
+        if (edge_value != 0) {
+          for (i = 0; i < source->box_width; i++) {
+            PIXEL_VALUE_PLUS(target, i * target->stride)     = 255;
+            PIXEL_VALUE_PLUS(target, i * target->stride + 1) = 0;
+            PIXEL_VALUE_PLUS(target, i * target->stride + 2) = 0;
+            PIXEL_VALUE_PLUS(target, i * target->stride + 3) = 255;
+            PIXEL_VALUE_PLUS(target, i * target->stride + 4) = 0;
+            PIXEL_VALUE_PLUS(target, i * target->stride + 5) = 0;
+          }
+        }
+      }
+    }
+  }
+  edges = &source->hedges;
+  /* process horizontal edge image */
+  {
+    uint32 edges_stride;
+    SINGLE_DISCONTINUOUS_IMAGE_VARIABLES(edges, char);
+    edges_stride = edges->stride;
+    for (x = 0; x < edges->width; x++) {
+      edges_pos = edges_rows[0] + x * edges_step;
+      target_pos = target_rows[0] + (x * source->hstep + source->hmargin + source->dx) * target_step;
+      for (y = 0; y < edges->height; y++,
+           edges_pos += edges_stride, target_pos += target->stride) {
+        edge_value = PIXEL_VALUE(edges);
+        if (edge_value != 0) {
+          for (i = 0; i < source->box_width; i++) {
+            PIXEL_VALUE_PLUS(target, i * target_step)     = 255;
+            PIXEL_VALUE_PLUS(target, i * target_step + 1) = 0;
+            PIXEL_VALUE_PLUS(target, i * target_step + 2) = 0;
+            PIXEL_VALUE_PLUS(target, i * target_step + target->stride) = 255;
+            PIXEL_VALUE_PLUS(target, i * target_step + target->stride + 1) = 0;
+            PIXEL_VALUE_PLUS(target, i * target_step + target->stride + 2) = 0;
+          }
+        }
+      }
+    }
+  }
+
+  FINALLY(edge_image_overlay_to_rgb);
   RETURN();
 }
 

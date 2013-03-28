@@ -190,6 +190,15 @@ result edge_image_overlay_to_grey8
 );
 
 /**
+ * Overlays the edge values over an 8-bit rgb image using yellow color.
+ */
+result edge_image_overlay_to_rgb
+(
+  edge_image *source,
+  pixel_image *target
+);
+
+/**
  * Edgel strength measure using normal Fisher criterion.
  * In this criterion, the difference of means is squared, and divided by the
  * sum of variances. This is the 'normal' Fisher criterion for distance
