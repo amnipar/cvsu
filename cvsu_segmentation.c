@@ -29,7 +29,17 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "cvsu_macros.h"
 #include "cvsu_segmentation.h"
+
+/******************************************************************************/
+/* constants for reporting function names in error messages                   */
+
+string quad_forest_refresh_segments_name = "quad_forest_refresh_segments";
+string quad_forest_segment_with_deviation_name = "quad_forest_segment_with_deviation";
+string quad_forest_segment_with_overlap_name = "quad_forest_segment_with_overlap";
+string quad_forest_segment_edges_name = "quad_forest_segment_edges";
+string quad_forest_segment_with_boundaries_name = "quad_forest_segment_with_boundaries";
 
 /******************************************************************************/
 
@@ -611,12 +621,16 @@ result quad_forest_segment_with_boundaries
   CHECK_POINTER(forest);
 
   /* first find boundaries (and establish devmean and devdev) */
+  /*
   if (IS_TRUE(use_hysteresis)) {
     CHECK(quad_forest_find_boundaries_with_hysteresis(forest, rounds, high_bias, low_factor));
   }
   else {
+  */
     CHECK(quad_forest_find_boundaries(forest, rounds, high_bias, 3));
+  /*
   }
+  */
 
   /* then merge consistent non-boundary neighbors */
   trees = forest->trees.first.next;

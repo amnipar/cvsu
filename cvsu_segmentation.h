@@ -36,6 +36,11 @@
 extern "C" {
 #endif
 
+#include "cvsu_config.h"
+#include "cvsu_types.h"
+#include "cvsu_quad_tree.h"
+#include "cvsu_quad_forest.h"
+
 /**
  * Refreshes the segment count and colors. MUST be called after segmentation and
  * BEFORE calling @see quad_forest_get_segments.
