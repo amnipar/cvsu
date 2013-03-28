@@ -851,7 +851,7 @@ result quad_tree_edge_response_to_line
     y = tree->y;
     radius = ((integral_value)tree->size) / 2.0;
     m = getmax(fabs(tree->edge.dx), fabs(tree->edge.dy));
-    d = (unsigned)getlround(r);
+    d = (unsigned)getlround(radius);
     dx = (unsigned)getlround(tree->edge.dy / m * radius);
     dy = (unsigned)getlround(tree->edge.dx / m * radius);
 
