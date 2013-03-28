@@ -46,12 +46,9 @@ string quad_forest_alloc_name = "quad_forest_alloc";
 string quad_forest_free_name = "quad_forest_free";
 string quad_forest_create_name = "quad_forest_create";
 string quad_forest_reload_name = "quad_forest_reload";
-string quad_forest_refresh_segments_name = "quad_forest_refresh_segments";
 string quad_forest_destroy_name = "quad_forest_destroy";
 string quad_forest_nullify_name = "quad_forest_nullify";
 string quad_forest_update_name = "quad_forest_update";
-string quad_forest_segment_with_deviation_name = "quad_forest_segment_with_deviation";
-string quad_forest_segment_with_overlap_name = "quad_forest_segment_with_overlap";
 string quad_forest_get_segments_name = "quad_forest_get_regions";
 string quad_forest_get_segment_trees_name = "quad_forest_get_segment_trees";
 string quad_forest_get_segment_neighbors_name = "quad_forest_get_segment_neighbors";
@@ -62,8 +59,6 @@ string quad_forest_get_path_sniffers_name = "quad_forest_get_path_sniffers";
 string quad_forest_draw_trees_name =  "quad_forest_draw_trees";
 string quad_forest_highlight_segments_name = "quad_forest_highlight_segments";
 string quad_forest_draw_image_name = "quad_forest_draw_image";
-string quad_forest_segment_edges_name = "quad_forest_segment_edges";
-string quad_forest_segment_with_boundaries_name = "quad_forest_segment_with_boundaries";
 
 /******************************************************************************/
 /* quad_forest_status possible values                                         */
@@ -95,7 +90,6 @@ const quad_forest_status FOREST_EDGES_DETECTED;
   link->b.link = link;\
   link->b.other = &link->a;\
   head = &link->a;\
-  head->angle = angle;\
   CHECK(list_append(&tree->links, (pointer)&head));\
 
 #define GET_LINK(neighbor,cat)\
@@ -103,7 +97,6 @@ const quad_forest_status FOREST_EDGES_DETECTED;
   if (head == NULL) {\
     ERROR(NOT_FOUND);\
   }\
-  head->angle = angle;\
   CHECK(list_append(&tree->links, (pointer)&head));\
 
 result quad_forest_init
@@ -119,7 +112,7 @@ result quad_forest_init
   integral_value angle;
   quad_tree new_tree, *tree;
   quad_tree_link new_link, *link;
-  quad_tree_link_head *head;
+  quad_tree_link_head *head, *n, *ne, *e, *se, *s, *sw, *w, *nw;
 
   /* not necessary to check target pointer, calling function should handle that */
   width = source->width;
@@ -196,6 +189,15 @@ result quad_forest_init
   }
   target->last_root_tree = target->trees.last.prev;
 
+  n = NULL;
+  ne = NULL;
+  e = NULL;
+  se = NULL;
+  s = NULL;
+  sw = NULL;
+  w = NULL;
+  nw = NULL;
+  new_link.a.opposite = NULL;
   new_link.a.angle = 0;
   new_link.a.cost = 0;
   new_link.a.context.token = 0;
@@ -203,6 +205,7 @@ result quad_forest_init
   new_link.a.context.data.type = t_UNDEF;
   new_link.a.context.data.count = 0;
   new_link.a.context.data.value = NULL;
+  new_link.b.opposite = NULL;
   new_link.b.angle = 0;
   new_link.b.cost = 0;
   new_link.b.context.token = 0;
@@ -226,49 +229,107 @@ result quad_forest_init
     for (col = 0; col < cols; col++, pos++) {
       tree = target->roots[pos];
       new_link.a.tree = tree;
+      head = NULL;
       /* add neighbor to west */
       if (col > 0) {
         tree->w = target->roots[pos - 1];
-        angle = M_PI;
         GET_LINK(tree->w, d_N4);
+        head->angle = M_PI;
+        w = head;
         /* nw neighbor */
         if (row > 0) {
-          angle = 3 * M_PI / 4;
           GET_LINK(target->roots[pos - cols - 1], d_N8);
+          head->angle = 3 * M_PI / 4;
+          nw = head;
+        }
+        else {
+          nw = NULL;
         }
         /* sw neighbor */
         if (row < (unsigned)(rows - 1)) {
-          angle = 5 * M_PI / 4;
+          new_link.distance = sqrt(2);
           ADD_LINK(target->roots[pos + cols - 1], d_N8);
+          head->angle = 5 * M_PI / 4;
+          sw = head;
         }
+        else {
+          sw = NULL;
+        }
+      }
+      else {
+        w = NULL;
+        nw = NULL;
+        sw = NULL;
       }
       /* add neighbor to north */
       if (row > 0) {
         tree->n = target->roots[pos - cols];
-        angle = M_PI / 2;
         GET_LINK(tree->n, d_N4);
+        head->angle = M_PI / 2;
+        n = head;
+      }
+      else {
+        n = NULL;
       }
       /* add neighbor to east */
       if (col < (unsigned)(cols - 1)) {
         tree->e = target->roots[pos + 1];
-        angle = 0;
+        new_link.distance = 1;
         ADD_LINK(tree->e, d_N4);
+        head->angle = 0;
+        e = head;
         /* ne neighbor */
         if (row > 0) {
-          angle = M_PI / 4;
           GET_LINK(target->roots[pos - cols + 1], d_N8);
+          head->angle = M_PI / 4;
+          ne = head;
+        }
+        else {
+          ne = NULL;
         }
         /* se neighbor */
         if (row < (unsigned)(rows - 1)) {
-          angle = 7 * M_PI / 4;
+          new_link.distance = sqrt(2);
           ADD_LINK(target->roots[pos + cols + 1], d_N8);
+          head->angle = 7 * M_PI / 4;
+          se = head;
         }
+        else {
+          se = NULL;
+        }
+      }
+      else {
+        e = NULL;
+        ne = NULL;
+        se = NULL;
       }
       /* add neighbor to south */
       if (row < (unsigned)(rows - 1)) {
         tree->s = target->roots[pos + cols];
-        angle = 3 * M_PI / 2;
+        new_link.distance = 1;
         ADD_LINK(tree->s, d_N4);
+        head->angle = 3 * M_PI / 2;
+        s = head;
+      }
+      else {
+        s = NULL;
+      }
+
+      if (n != NULL && s != NULL) {
+        n->opposite = s;
+        s->opposite = n;
+      }
+      if (ne != NULL && sw != NULL) {
+        ne->opposite = sw;
+        sw->opposite = ne;
+      }
+      if (e != NULL && w != NULL) {
+        e->opposite = w;
+        w->opposite = e;
+      }
+      if (se != NULL && nw != NULL) {
+        se->opposite = nw;
+        nw->opposite = se;
       }
     }
   }
