@@ -397,7 +397,10 @@ result temporal_forest_visualize
   height = target->visual.height;
   stride = target->visual.stride;
   target_data = (byte*)target->visual.data;
-
+  /*
+  CHECK(pixel_image_clear(&target->visual));
+  CHECK(convert_grey8_to_grey24(forest->source, &target->visual));
+  */
   CHECK(pixel_image_clear(&target->visual));
 
   trees = forest->trees.first.next;
