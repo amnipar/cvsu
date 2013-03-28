@@ -59,6 +59,7 @@ int main (int argc, char *argv[])
 {
   TRY();
   pixel_image src_image;
+  pixel_image rgb_image;
   pixel_image tmp_image;
   edge_image edges;
   uint32 width, length;
@@ -112,6 +113,9 @@ int main (int argc, char *argv[])
   CHECK(pixel_image_create_from_file(&src_image, source_file, p_U8, GREY));
   printf("...done\n");
 
+  CHECK(pixel_image_create(&rgb_image, p_U8, RGB, src_image.width, src_image.height, 3, 3 * src_image.width));
+  CHECK(convert_grey8_to_grey24(&src_image, &rgb_image));
+
   printf("smooth image..\n");
   CHECK(pixel_image_clone(&tmp_image, &src_image));
   CHECK(smooth_binomial(&src_image, &tmp_image, 2));
@@ -122,14 +126,15 @@ int main (int argc, char *argv[])
   printf("...done\n");
 
   CHECK(edge_image_update(&edges));
-  CHECK(edge_image_overlay_to_grey8(&edges, &tmp_image));
+  CHECK(edge_image_overlay_to_rgb(&edges, &rgb_image));
   printf("write image...\n");
-  CHECK(pixel_image_write_to_file(&tmp_image, target_file));
+  CHECK(pixel_image_write_to_file(&rgb_image, target_file));
   printf("...done\n");
 
   FINALLY(main);
   pixel_image_destroy(&src_image);
   pixel_image_destroy(&tmp_image);
+  pixel_image_destroy(&rgb_image);
   edge_image_destroy(&edges);
 
   return 0;
