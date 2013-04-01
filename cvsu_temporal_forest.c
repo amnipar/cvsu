@@ -32,6 +32,7 @@
 #include "cvsu_temporal_forest.h"
 #include "cvsu_macros.h"
 #include "cvsu_memory.h"
+#include "cvsu_parsing.h"
 #include <math.h>
 
 /******************************************************************************/
@@ -240,6 +241,9 @@ result temporal_forest_update
       forest1 = &target->forests[target->current - 1];
     }
     forest2 = &target->forests[target->current];
+    
+    CHECK(quad_forest_calculate_neighborhood_stats(forest2, TRUE, 2, TRUE, FALSE, TRUE));
+    /*
     size = target->rows * target->cols;
     for (i = 0; i < size; i++) {
       tree1 = forest1->roots[i];
@@ -248,7 +252,7 @@ result temporal_forest_update
       mean2 = tree2->stat.mean;
       dev1 = getmax(1, tree1->stat.deviation);
       dev2 = getmax(1, tree2->stat.deviation);
-      dev = dev1 + dev2; /*getmin(dev1, dev2);*/
+      dev = dev1 + dev2;
       if (fabs(mean1 - mean2) > dev) {
         quad_tree_segment_create(tree2);
       }
@@ -369,6 +373,8 @@ result temporal_forest_update
       }
     }
     CHECK(quad_forest_refresh_segments(forest2));
+    */
+    
   }
 
   FINALLY(temporal_forest_update);
@@ -389,6 +395,7 @@ result temporal_forest_visualize
   quad_forest_segment *parent;
   uint32 x, y, width, height, stride, row_step;
   byte *target_data, *target_pos, color0, color1, color2;
+  list lines;
 
   CHECK_POINTER(target);
 
@@ -401,6 +408,21 @@ result temporal_forest_visualize
   CHECK(pixel_image_clear(&target->visual));
   CHECK(convert_grey8_to_grey24(forest->source, &target->visual));
   */
+  
+  CHECK(quad_forest_visualize_neighborhood_stats(forest, &target->visual, v_OVERLAP));
+  
+  CHECK(list_create(&lines, 1000, sizeof(line), 1));
+  trees = forest->trees.first.next;
+  end = &forest->trees.last;
+  while (trees != end) {
+    tree = (quad_tree *)trees->data;
+    if (tree->nw == NULL) {
+      CHECK(quad_tree_edge_response_to_line(tree, &lines));
+    }
+    trees = trees->next;
+  }
+  CHECK(pixel_image_draw_lines(&target->visual, &lines));
+  /*
   CHECK(pixel_image_clear(&target->visual));
 
   trees = forest->trees.first.next;
@@ -436,8 +458,9 @@ result temporal_forest_visualize
     }
     trees = trees->next;
   }
-
+  */
   FINALLY(temporal_forest_visualize);
+  list_destroy(&lines);
   RETURN();
 }
 

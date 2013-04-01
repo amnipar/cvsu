@@ -288,7 +288,7 @@ result pixel_image_draw_lines
     cvLine(dst,
            cvPoint(this_line->start.x, this_line->start.y),
            cvPoint(this_line->end.x, this_line->end.y),
-           cvScalar(0,0,0,0), 1, 8, 0);
+           cvScalar(255,255,0,0), 2, 8, 0);
     items = items->next;
   }
 
@@ -298,7 +298,7 @@ result pixel_image_draw_lines
 }
 
 /******************************************************************************/
-
+/* TODO: change parameters to list of rects */
 result pixel_image_draw_rects
 (
   pixel_image *source,

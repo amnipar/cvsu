@@ -437,24 +437,21 @@ result quad_forest_destroy
   CHECK_POINTER(target);
 
   /* it is necessary to destroy the trees, as they may contain typed pointers */
-  PRINT0("destroy trees\n");
   items = target->trees.first.next;
   end = &target->trees.last;
   while (items != end) {
     quad_tree_destroy((quad_tree *)items->data);
     items = items->next;
   }
-  PRINT0("destroyed\n");
   CHECK(list_destroy(&target->trees));
 
-  PRINT0("destroy links\n");
   items = target->links.first.next;
   end = &target->links.last;
   while (items != end) {
     quad_tree_link_destroy((quad_tree_link*)items->data);
     items = items->next;
   }
-  PRINT0("destroyed\n");
+  
   CHECK(list_destroy(&target->links));
   CHECK(list_destroy(&target->edges));
   CHECK(memory_deallocate((data_pointer*)&target->roots));
