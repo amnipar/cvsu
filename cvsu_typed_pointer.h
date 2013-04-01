@@ -64,7 +64,9 @@ typedef enum type_label_t {
   /* tree annotation types */
   t_STAT,
   t_ASTAT,
+  t_NSTAT,
   t_AREG,
+  t_EDGE_RESPONSE,
   t_SEGMENT,
   t_BOUNDARY,
   t_INTERSECTION,

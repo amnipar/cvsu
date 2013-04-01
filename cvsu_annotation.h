@@ -92,6 +92,41 @@ result expect_accumulated_stat
 
 /******************************************************************************/
 
+typedef struct neighborhood_stat_t {
+  integral_value mean_mean;
+  integral_value mean_dev;
+  integral_value mean_dist;
+  integral_value dev_mean;
+  integral_value dev_dev;
+  integral_value dev_dist;
+  integral_value strength;
+  integral_value overlap;
+} neighborhood_stat;
+
+result annotation_ensure_neighborhood_stat
+(
+  tree_annotation *annotation,
+  neighborhood_stat **nstat
+);
+
+truth_value is_neighborhood_stat
+(
+  typed_pointer *tptr
+);
+
+neighborhood_stat *has_neighborhood_stat
+(
+  typed_pointer *tptr
+);
+
+result expect_neighborhood_stat
+(
+  neighborhood_stat **nstat,
+  typed_pointer *tptr
+);
+
+/******************************************************************************/
+
 typedef struct accumulated_reg_t {
   integral_value mdist_mean;
   integral_value mdist_max;
@@ -120,12 +155,39 @@ accumulated_reg *has_accumulated_reg
 
 /******************************************************************************/
 
+typedef struct edge_response_t
+{
+  integral_value dx;
+  integral_value dy;
+  integral_value mag;
+  integral_value ang;
+} edge_response;
+
+result annotation_ensure_edge_response
+(
+  tree_annotation *annotation,
+  edge_response **eresp
+);
+
+truth_value is_edge_response
+(
+  typed_pointer *tptr
+);
+
+edge_response *has_edge_response
+(
+  typed_pointer *tptr
+);
+
+/******************************************************************************/
+
 typedef struct quad_forest_intersection_t {
   struct quad_tree_t *tree;
   list edges;
   list chains;
 } quad_forest_intersection;
 
+/******************************************************************************/
 
 /* forward declarations */
 

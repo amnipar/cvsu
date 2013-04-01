@@ -71,6 +71,31 @@ result quad_forest_visualize_accumulated_stats
   pixel_image *target
 );
 
+result quad_forest_calculate_neighborhood_stats
+(
+  quad_forest *forest,
+  truth_value calculate_weighted,
+  integral_value surround_weight,
+  truth_value calculate_overlap,
+  truth_value calculate_distance,
+  truth_value calculate_strength
+);
+
+typedef enum stat_visualization_mode_t {
+  v_STAT = 0,
+  v_NSTAT,
+  v_DIST,
+  v_OVERLAP,
+  v_STRENGTH
+} stat_visualization_mode;
+
+result quad_forest_visualize_neighborhood_stats
+(
+  quad_forest *forest,
+  pixel_image *target,
+  stat_visualization_mode mode
+);
+
 result quad_forest_calculate_accumulated_regs
 (
   quad_forest *forest,

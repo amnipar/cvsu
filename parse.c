@@ -46,10 +46,11 @@ void print_usage()
   PRINT0("Parses images using quad forests and propagation.\n\n");
   PRINT0("Usage:\n\n");
   PRINT0("parse mode max min rounds source target\n");
-  PRINT0("  mode: parsing mode [stat | ?]\n");
+  PRINT0("  mode: parsing mode [ stat | nstat | wstat | dist | overlap | strength | reg | ? ]\n");
   PRINT0("  max: maximum size for trees; suggested value 16 (larger than min)\n");
   PRINT0("  min: minimum size for tree;  suggested value 4 (smaller than max)\n");
   PRINT0("  rounds: number of propagation rounds (0..5]\n");
+  PRINT0("  weight: use this weight for calculation of neighborhood stats, 0 for no weighting\n");
   PRINT0("  source: source image file to process\n");
   PRINT0("  target: target image file to generate\n\n");
 }
@@ -57,6 +58,10 @@ void print_usage()
 enum mode_t {
   m_UNDEF = 0,
   m_STAT,
+  m_NSTAT,
+  m_DIST,
+  m_OVERLAP,
+  m_STRENGTH,
   m_REG,
   m_BOUND,
   m_FULL
@@ -69,11 +74,13 @@ int main(int argc, char *argv[])
   pixel_image dst_image;
   quad_forest forest;
   uint32 max_size, min_size, rounds;
+  integral_value weight;
+  truth_value use_weighted;
   string smode, source_file, target_file;
   enum mode_t mode;
   /*list lines;*/
 
-  if (argc < 7) {
+  if (argc < 8) {
     PRINT0("\nError: wrong number of parameters\n\n");
     print_usage();
     return 1;
@@ -85,6 +92,22 @@ int main(int argc, char *argv[])
     smode = argv[1];
     if (strcmp(smode, "stat") == 0) {
       mode = m_STAT;
+    }
+    else
+    if (strcmp(smode, "nstat") == 0) {
+      mode = m_NSTAT;
+    }
+    else
+    if (strcmp(smode, "dist") == 0) {
+      mode = m_DIST;
+    }
+    else
+    if (strcmp(smode, "overlap") == 0) {
+      mode = m_OVERLAP;
+    }
+    else
+    if (strcmp(smode, "strength") == 0) {
+      mode = m_STRENGTH;
     }
     else
     if (strcmp(smode, "reg") == 0) {
@@ -122,8 +145,20 @@ int main(int argc, char *argv[])
       print_usage();
       return 1;
     }
-    source_file = argv[5];
-    target_file = argv[6];
+    scan_result = sscanf(argv[4], "%lu", &rounds);
+    if (scan_result != 1) {
+      PRINT0("\nError: failed to parse parameter rounds\n\n");
+      print_usage();
+      return 1;
+    }
+    scan_result = sscanf(argv[5], "%lf", &weight);
+    if (scan_result != 1) {
+      PRINT0("\nError: failed to parse parameter weight\n\n");
+      print_usage();
+      return 1;
+    }
+    source_file = argv[6];
+    target_file = argv[7];
     if (max_size < min_size) {
       PRINT0("\nError: max may not be smaller than min\n\n");
       print_usage();
@@ -133,6 +168,13 @@ int main(int argc, char *argv[])
       PRINT0("\nError: rounds must be in range (0..5]\n\n");
       print_usage();
       return 1;
+    }
+    if (weight < 0 || weight > 10) {
+      PRINT0("\nError: weight must be in range [0..10]\n\n");
+    }
+    use_weighted = FALSE;
+    if (weight > 0.0000001) {
+      use_weighted = TRUE;
     }
 
     {
@@ -158,9 +200,33 @@ int main(int argc, char *argv[])
   switch (mode) {
     case m_STAT:
       PRINT0("parsing stat...\n");
-      CHECK(quad_forest_calculate_accumulated_stats(&forest, rounds));
+      /*CHECK(quad_forest_calculate_accumulated_stats(&forest, rounds));*/
       PRINT0("drawing image...\n");
-      CHECK(quad_forest_visualize_accumulated_stats(&forest, &dst_image));
+      CHECK(quad_forest_visualize_neighborhood_stats(&forest, &dst_image, v_STAT));
+      break;
+    case m_NSTAT:
+      PRINT0("parsing nstat...\n");
+      CHECK(quad_forest_calculate_neighborhood_stats(&forest, use_weighted, weight, FALSE, FALSE, FALSE));
+      PRINT0("drawing image...\n");
+      CHECK(quad_forest_visualize_neighborhood_stats(&forest, &dst_image, v_NSTAT));
+      break;
+    case m_DIST:
+      PRINT0("parsing dist...\n");
+      CHECK(quad_forest_calculate_neighborhood_stats(&forest, use_weighted, weight, FALSE, TRUE, FALSE));
+      PRINT0("drawing image...\n");
+      CHECK(quad_forest_visualize_neighborhood_stats(&forest, &dst_image, v_DIST));
+      break;
+    case m_OVERLAP:
+      PRINT0("parsing overlap...\n");
+      CHECK(quad_forest_calculate_neighborhood_stats(&forest, use_weighted, weight, TRUE, FALSE, FALSE));
+      PRINT0("drawing image...\n");
+      CHECK(quad_forest_visualize_neighborhood_stats(&forest, &dst_image, v_OVERLAP));
+      break;
+    case m_STRENGTH:
+      PRINT0("parsing strength...\n");
+      CHECK(quad_forest_calculate_neighborhood_stats(&forest, use_weighted, weight, FALSE, FALSE, TRUE));
+      PRINT0("drawing image...\n");
+      CHECK(quad_forest_visualize_neighborhood_stats(&forest, &dst_image, v_STRENGTH));
       break;
     case m_REG:
       PRINT0("parsing regs...\n");

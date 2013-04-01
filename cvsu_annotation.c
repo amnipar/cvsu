@@ -42,7 +42,10 @@
 string accumulated_stat_create_name = "accumulated_stat_create";
 string annotation_ensure_accumulated_stat_name = "annotation_ensure_accumulated_stat";
 string expect_accumulated_stat_name = "expect_accumulated_stat";
+string annotation_ensure_neighborhood_stat_name = "annotation_ensure_neighborhood_stat";
+string expect_neighborhood_stat_name = "expect_neighborhood_stat";
 string annotation_ensure_accumulated_reg_name = "annotation_ensure_accumulated_reg";
+string annotation_ensure_edge_response_name = "annotation_ensure_edge_response";
 
 /******************************************************************************/
 
@@ -154,6 +157,89 @@ result expect_accumulated_stat
 
 /******************************************************************************/
 
+result annotation_ensure_neighborhood_stat
+(
+  tree_annotation *annotation,
+  neighborhood_stat **nstat
+)
+{
+  TRY();
+  typed_pointer *tptr;
+
+  CHECK_POINTER(nstat);
+  *nstat = NULL;
+  CHECK_POINTER(annotation);
+
+  CHECK(tuple_ensure_has_unique(&annotation->data, t_NSTAT, &tptr));
+  CHECK_TRUE(is_neighborhood_stat(tptr));
+
+  *nstat = (neighborhood_stat*)tptr->value;
+
+  FINALLY(annotation_ensure_neighborhood_stat);
+  RETURN();
+}
+
+/******************************************************************************/
+
+truth_value is_neighborhood_stat
+(
+  typed_pointer *tptr
+)
+{
+  if (tptr != NULL && tptr->type == t_NSTAT) {
+    return TRUE;
+  }
+  return FALSE;
+}
+
+/******************************************************************************/
+
+neighborhood_stat *has_neighborhood_stat
+(
+  typed_pointer *tptr
+)
+{
+  if (IS_TRUE(is_neighborhood_stat(tptr))) {
+    return (neighborhood_stat*)tptr->value;
+  }
+  if (IS_TRUE(is_tuple(tptr))) {
+    typed_pointer *element;
+    element = tuple_has_type(tptr, t_NSTAT, 1, 1);
+    if (element != NULL) {
+      if (IS_FALSE(is_neighborhood_stat(element))) {
+        return NULL;
+      }
+      return (neighborhood_stat*)element->value;
+    }
+  }
+  return NULL;
+}
+
+/******************************************************************************/
+
+result expect_neighborhood_stat
+(
+  neighborhood_stat **nstat,
+  typed_pointer *tptr
+)
+{
+  TRY();
+  
+  CHECK_POINTER(nstat);
+  CHECK_POINTER(tptr);
+  CHECK_POINTER(tptr->value);
+  
+  *nstat = has_neighborhood_stat(tptr);
+  if (*nstat == NULL) {
+    ERROR(BAD_TYPE);
+  }
+  
+  FINALLY(expect_neighborhood_stat);
+  RETURN();
+}
+
+/******************************************************************************/
+
 result annotation_ensure_accumulated_reg
 (
   tree_annotation *annotation,
@@ -207,6 +293,66 @@ accumulated_reg *has_accumulated_reg
         return NULL;
       }
       return (accumulated_reg*)element->value;
+    }
+  }
+  return NULL;
+}
+
+/******************************************************************************/
+
+result annotation_ensure_edge_response
+(
+  tree_annotation *annotation,
+  edge_response **eresp
+)
+{
+  TRY();
+  typed_pointer *tptr;
+
+  CHECK_POINTER(eresp);
+  *eresp = NULL;
+  CHECK_POINTER(annotation);
+
+  CHECK(tuple_ensure_has_unique(&annotation->data, t_EDGE_RESPONSE, &tptr));
+  CHECK_TRUE(is_edge_response(tptr));
+
+  *eresp = (edge_response*)tptr->value;
+
+  FINALLY(annotation_ensure_edge_response);
+  RETURN();
+}
+
+/******************************************************************************/
+
+truth_value is_edge_response
+(
+  typed_pointer *tptr
+)
+{
+  if (tptr != NULL && tptr->type == t_EDGE_RESPONSE) {
+    return TRUE;
+  }
+  return FALSE;
+}
+
+/******************************************************************************/
+
+edge_response *has_edge_response
+(
+  typed_pointer *tptr
+)
+{
+  if (IS_TRUE(is_edge_response(tptr))) {
+    return (edge_response*)tptr->value;
+  }
+  if (IS_TRUE(is_tuple(tptr))) {
+    typed_pointer *element;
+    element = tuple_has_type(tptr, t_EDGE_RESPONSE, 1, 1);
+    if (element != NULL) {
+      if (IS_FALSE(is_edge_response(element))) {
+        return NULL;
+      }
+      return (edge_response*)element->value;
     }
   }
   return NULL;

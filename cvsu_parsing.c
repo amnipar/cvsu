@@ -51,6 +51,8 @@ string prime_ridge_finder_name = "prime_ridge_finder";
 string run_context_operation_name = "run_context_operation";
 string quad_forest_calculate_accumulated_stats_name = "quad_forest_calculate_accumulated_stats";
 string quad_forest_visualize_accumulated_stats_name = "quad_forest_visualize_accumulated_stats";
+string quad_forest_calculate_neighborhood_stats_name = "quad_forest_calculate_neighborhood_stats";
+string quad_forest_visualize_neighborhood_stats_name = "quad_forest_visualize_neighborhood_stats";
 string quad_forest_calculate_accumulated_regs_name = "quad_forest_calculate_accumulated_regs";
 string quad_forest_visualize_accumulated_regs_name = "quad_forest_visualize_accumulated_regs";
 string quad_forest_calculate_accumulated_bounds_name = "quad_forest_calculate_accumulated_bounds";
@@ -653,7 +655,7 @@ result quad_forest_visualize_accumulated_stats
   list_item *trees, *end;
   quad_tree *tree;
   accumulated_stat *astat;
-  uint32 x, y, width, height, stride, row_step, count;
+  uint32 x, y, width, height, stride, row_step;
   byte *target_data, *target_pos, color, color0, color1, color2;
 
   CHECK_POINTER(forest);
@@ -675,7 +677,7 @@ result quad_forest_visualize_accumulated_stats
       if (astat != NULL) {
         color = (byte)(255 * astat->strength);
         color0 = (byte)(255 * astat->strength * astat->meandev);
-        color1 = 0;
+        color1 = color;
         color2 = (byte)(255 * astat->strength * astat->devdev);
       }
       width = tree->size;
@@ -697,6 +699,513 @@ result quad_forest_visualize_accumulated_stats
   }
 
   FINALLY(quad_forest_visualize_accumulated_stats);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result quad_forest_calculate_neighborhood_stats
+(
+  quad_forest *forest,
+  truth_value calculate_weighted,
+  integral_value surround_weight,
+  truth_value calculate_overlap,
+  truth_value calculate_distance,
+  truth_value calculate_strength
+)
+{
+  TRY();
+  list_item *trees, *endtrees, *links, *endlinks;
+  neighborhood_stat *nstat;
+  quad_tree_link_head *head;
+  quad_tree *tree, *neighbor;
+  integral_value weight, count;
+  integral_value mean, mean_sum1, mean_sum2, mean_mean, mean_dev;
+  integral_value dev, dev_sum1, dev_sum2, dev_mean, dev_dev;
+
+  CHECK_POINTER(forest);
+  
+  trees = forest->trees.first.next;
+  endtrees = &forest->trees.last;
+  while (trees != endtrees) {
+    tree = (quad_tree*)trees->data;
+    CHECK(annotation_ensure_neighborhood_stat(&tree->annotation, &nstat));
+
+    if (IS_TRUE(calculate_weighted)) {
+      mean = tree->stat.mean;
+      weight = -4;
+      /* TODO: use a temp value to store the weighted mean to save time? */
+      mean_sum1 = weight * mean;
+      mean_sum2 = weight * mean * mean;
+      dev = tree->stat.deviation;
+      dev_sum1 = weight * dev;
+      dev_sum2 = weight * dev * dev;
+      count = weight;
+      
+      links = tree->links.first.next;
+      endlinks = &tree->links.last;
+      while (links != endlinks) {
+        head = *((quad_tree_link_head**)links->data);
+        if (head->link->category != d_N6) {
+          neighbor = head->other->tree;
+          weight = surround_weight / head->link->distance;
+          mean = neighbor->stat.mean;
+          mean_sum1 += weight * mean;
+          mean_sum2 += weight * mean * mean;
+          dev = neighbor->stat.deviation;
+          dev_sum1 += weight * dev;
+          dev_sum2 += weight * dev * dev;
+          count += weight;
+        }
+        links = links->next;
+      }
+      mean_mean = mean_sum1 / count;
+      mean_dev = mean_sum2 / count - mean_mean * mean_mean;
+      mean_dev = mean_dev < 1 ? 1 : sqrt(mean_dev);
+      dev_mean = dev_sum1 / count;
+      dev_dev = dev_sum2 / count - dev_mean * dev_mean;
+      dev_dev = dev_dev < 1 ? 1 : sqrt(dev_dev);
+      
+      nstat->mean_mean = mean_mean;
+      nstat->mean_dev = mean_dev;
+      nstat->dev_mean = dev_mean;
+      nstat->dev_dev = dev_dev;
+    }
+    else {
+      mean = tree->stat.mean;
+      mean_sum1 = mean;
+      mean_sum2 = mean * mean;
+      dev = tree->stat.deviation;
+      dev_sum1 = dev;
+      dev_sum2 = dev * dev;
+      count = 1;
+      
+      links = tree->links.first.next;
+      endlinks = &tree->links.last;
+      while (links != endlinks) {
+        head = *((quad_tree_link_head**)links->data);
+        if (head->link->category != d_N6) {
+          neighbor = head->other->tree;
+          weight = 1 / head->link->distance;
+          mean = neighbor->stat.mean;
+          mean_sum1 += weight * mean;
+          mean_sum2 += weight * mean * mean;
+          dev = neighbor->stat.deviation;
+          dev_sum1 += weight * dev;
+          dev_sum2 += weight * dev * dev;
+          count += weight;
+        }
+        links = links->next;
+      }
+      mean_mean = mean_sum1 / count;
+      mean_dev = mean_sum2 / count - mean_mean * mean_mean;
+      mean_dev = mean_dev < 1 ? 1 : sqrt(mean_dev);
+      dev_mean = dev_sum1 / count;
+      dev_dev = dev_sum2 / count - dev_mean * dev_mean;
+      dev_dev = dev_dev < 1 ? 1 : sqrt(dev_dev);
+      
+      nstat->mean_mean = mean_mean;
+      nstat->mean_dev = mean_dev;
+      nstat->dev_mean = dev_mean;
+      nstat->dev_dev = dev_dev;
+    }
+    
+    if (IS_TRUE(calculate_distance)) {
+      mean = tree->stat.mean;
+      mean_sum1 = (fabs(mean - mean_mean) / mean_dev * 8);
+      dev = tree->stat.deviation;
+      dev_sum1 = (fabs(dev - dev_mean) / dev_dev * 8);
+      count = 8;
+      links = tree->links.first.next;
+      endlinks = &tree->links.last;
+      while (links != endlinks) {
+        head = *((quad_tree_link_head**)links->data);
+        if (head->link->category != d_N6) {
+          neighbor = head->other->tree;
+          weight = 1 / head->link->distance;
+          mean = neighbor->stat.mean;
+          mean_sum1 += (fabs(mean - mean_mean) / mean_dev * weight);
+          dev = neighbor->stat.deviation;
+          dev_sum1 += (fabs(dev - dev_mean) / dev_dev * weight);
+          count += weight;
+        }
+        links = links->next;
+      }
+      nstat->mean_dist = mean_sum1 / count;
+      nstat->dev_dist = dev_sum1 / count;
+    }
+    else {
+      nstat->mean_dist = 0;
+      nstat->dev_dist = 0;
+    }
+
+    if (IS_TRUE(calculate_overlap)) {
+      integral_value x1, x2, x1min, x1max, x2min, x2max, I, U;
+      
+      x1min = getmax(0, mean_mean - dev_mean);
+      x1max = x1min;
+      x2min = getmin(mean_mean + dev_mean, 255);
+      x2max = x2min;
+
+      mean = tree->stat.mean;
+      dev = tree->stat.deviation;
+      x1 = getmax(0, mean - dev);
+      if (x1 < x1min) x1min = x1; else x1max = x1;
+      x2 = getmin(mean + dev, 255);
+      if (x2 < x2min) x2min = x2; else x2max = x2;
+      if (x1max - x2min > 0.001) {
+        I = 0;
+      }
+      else {
+        I = (x2min - x1max);
+        if (I < 1) I = 1;
+      }
+      U = (x2max - x1min);
+      if (U < 1) U = 1;
+      
+      nstat->overlap = I / U;
+      if (nstat->overlap < 0.25) {
+        CHECK(quad_tree_get_edge_response(forest, tree, NULL, NULL));
+      }
+      else {
+        tree->edge.mag = 0;
+      }
+    }
+    else {
+      nstat->overlap = 0;
+    }
+    
+    nstat->strength = 0;
+    
+    trees = trees->next;
+  }
+  
+  if (IS_TRUE(calculate_strength)) {
+    integral_value max_mean_dev, max_dev_dev;
+
+    max_mean_dev = 0;
+    max_dev_dev = 0;
+    trees = forest->trees.first.next;
+    endtrees = &forest->trees.last;
+    while (trees != endtrees) {
+      tree = (quad_tree*)trees->data;
+      nstat = has_neighborhood_stat(&tree->annotation.data);
+      if (nstat != NULL) {
+        mean_dev = nstat->mean_dev;
+        if (mean_dev > max_mean_dev) {
+          max_mean_dev = mean_dev;
+        }
+        dev_dev = nstat->dev_dev;
+        if (dev_dev > max_dev_dev) {
+          max_dev_dev = dev_dev;
+        }
+      }
+      trees = trees->next;
+    }
+
+    weight = 0.5;
+    trees = forest->trees.first.next;
+    endtrees = &forest->trees.last;
+    while (trees != endtrees) {
+      tree = (quad_tree*)trees->data;
+      nstat = has_neighborhood_stat(&tree->annotation.data);
+      if (nstat != NULL) {
+        mean_dev = nstat->mean_dev / max_mean_dev;
+        dev_dev = nstat->dev_dev / max_dev_dev;
+        nstat->strength = (weight * mean_dev) + (weight * dev_dev);
+      }
+      trees = trees->next;
+    }
+  }
+
+  FINALLY(quad_forest_calculate_neighborhood_stats);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result quad_forest_visualize_neighborhood_stats
+(
+  quad_forest *forest,
+  pixel_image *target,
+  stat_visualization_mode mode
+)
+{
+  TRY();
+  list_item *trees, *end;
+  quad_tree *tree;
+  neighborhood_stat *nstat;
+  uint32 x, y, width, height, stride, row_step, count;
+  byte *target_data, *target_pos, color, color0, color1, color2;
+
+  CHECK_POINTER(forest);
+  CHECK_POINTER(target);
+  CHECK_PARAM(target->type == p_U8);
+  CHECK_PARAM(target->format == RGB);
+
+  width = target->width;
+  height = target->height;
+  stride = target->stride;
+  target_data = (byte*)target->data;
+
+  CHECK(pixel_image_clear(target));
+
+  switch (mode) {
+    case v_STAT:
+      {
+        integral_value mean, min_mean, max_mean, dev, min_dev, max_dev, mean_scale, dev_scale;
+        
+        min_mean = 255;
+        max_mean = 0;
+        min_dev = 128;
+        max_dev = 0;
+        trees = forest->trees.first.next;
+        end = &forest->trees.last;
+        while (trees != end) {
+          tree = (quad_tree*)trees->data;
+          if (tree->nw == NULL) {
+            mean = tree->stat.mean;
+            if (mean < min_mean) min_mean = mean;
+            if (mean > max_mean) max_mean = mean;
+            dev = tree->stat.deviation;
+            if (dev < min_dev) min_dev = dev;
+            if (dev > max_dev) max_dev = dev;
+          }
+          trees = trees->next;
+        }
+        
+        mean_scale = max_mean - min_mean;
+        dev_scale = max_dev - min_dev;
+        trees = forest->trees.first.next;
+        end = &forest->trees.last;
+        while (trees != end) {
+          tree = (quad_tree*)trees->data;
+          if (tree->nw == NULL) {
+            mean = (tree->stat.mean - min_mean) / mean_scale;
+            dev = (tree->stat.deviation - min_dev) / dev_scale;
+            
+            color0 = (byte)(255 * mean);
+            color1 = 0;
+            color2 = (byte)(255 * dev);
+            
+            width = tree->size;
+            height = width;
+            row_step = stride - 3 * width;
+            target_pos = target_data + tree->y * stride + 3 * tree->x;
+            for (y = 0; y < height; y++, target_pos += row_step) {
+              for (x = 0; x < width; x++) {
+                *target_pos = color0;
+                target_pos++;
+                *target_pos = color1;
+                target_pos++;
+                *target_pos = color2;
+                target_pos++;
+              }
+            }
+          }
+          trees = trees->next;
+        }
+      }
+      break;
+    case v_NSTAT:
+      {
+        integral_value mean, min_mean, max_mean, dev, min_dev, max_dev, mean_scale, dev_scale;
+        
+        min_mean = 128;
+        max_mean = 0;
+        min_dev = 128;
+        max_dev = 0;
+        trees = forest->trees.first.next;
+        end = &forest->trees.last;
+        while (trees != end) {
+          tree = (quad_tree*)trees->data;
+          if (tree->nw == NULL) {
+            nstat = has_neighborhood_stat(&tree->annotation.data);
+            if (nstat != NULL) {
+              mean = nstat->mean_dev;
+              if (mean < min_mean) min_mean = mean;
+              if (mean > max_mean) max_mean = mean;
+              dev = nstat->dev_dev;
+              if (dev < min_dev) min_dev = dev;
+              if (dev > max_dev) max_dev = dev;
+            }
+          }
+          trees = trees->next;
+        }
+        
+        mean_scale = max_mean - min_mean;
+        dev_scale = max_dev - min_dev;
+        trees = forest->trees.first.next;
+        end = &forest->trees.last;
+        while (trees != end) {
+          tree = (quad_tree*)trees->data;
+          if (tree->nw == NULL) {
+            nstat = has_neighborhood_stat(&tree->annotation.data);
+            if (nstat != NULL) {
+              mean = (nstat->mean_dev - min_mean) / mean_scale;
+              dev = (nstat->dev_dev - min_dev) / dev_scale;
+            
+              color0 = (byte)(255 * mean);
+              color1 = 0;
+              color2 = (byte)(255 * dev);
+            
+              width = tree->size;
+              height = width;
+              row_step = stride - 3 * width;
+              target_pos = target_data + tree->y * stride + 3 * tree->x;
+              for (y = 0; y < height; y++, target_pos += row_step) {
+                for (x = 0; x < width; x++) {
+                  *target_pos = color0;
+                  target_pos++;
+                  *target_pos = color1;
+                  target_pos++;
+                  *target_pos = color2;
+                  target_pos++;
+                }
+              }
+            }
+          }
+          trees = trees->next;
+        }
+      }
+      break;
+    case v_DIST:
+      {
+        integral_value mean, min_mean, max_mean, dev, min_dev, max_dev, mean_scale, dev_scale;
+        
+        min_mean = 128;
+        max_mean = 0;
+        min_dev = 128;
+        max_dev = 0;
+        trees = forest->trees.first.next;
+        end = &forest->trees.last;
+        while (trees != end) {
+          tree = (quad_tree*)trees->data;
+          if (tree->nw == NULL) {
+            nstat = has_neighborhood_stat(&tree->annotation.data);
+            if (nstat != NULL) {
+              mean = nstat->mean_dist;
+              if (mean < min_mean) min_mean = mean;
+              if (mean > max_mean) max_mean = mean;
+              dev = nstat->dev_dist;
+              if (dev < min_dev) min_dev = dev;
+              if (dev > max_dev) max_dev = dev;
+            }
+          }
+          trees = trees->next;
+        }
+        
+        mean_scale = max_mean - min_mean;
+        dev_scale = max_dev - min_dev;
+        trees = forest->trees.first.next;
+        end = &forest->trees.last;
+        while (trees != end) {
+          tree = (quad_tree*)trees->data;
+          if (tree->nw == NULL) {
+            nstat = has_neighborhood_stat(&tree->annotation.data);
+            if (nstat != NULL) {
+              mean = (nstat->mean_dist - min_mean) / mean_scale;
+              dev = (nstat->dev_dist - min_dev) / dev_scale;
+            
+              color0 = (byte)(255 * mean);
+              color1 = (byte)(255 * (0.5 * mean + 0.5 * dev));
+              color2 = (byte)(255 * dev);
+            
+              width = tree->size;
+              height = width;
+              row_step = stride - 3 * width;
+              target_pos = target_data + tree->y * stride + 3 * tree->x;
+              for (y = 0; y < height; y++, target_pos += row_step) {
+                for (x = 0; x < width; x++) {
+                  *target_pos = color0;
+                  target_pos++;
+                  *target_pos = color1;
+                  target_pos++;
+                  *target_pos = color2;
+                  target_pos++;
+                }
+              }
+            }
+          }
+          trees = trees->next;
+        }
+      }
+      break;
+    case v_OVERLAP:
+      {
+        integral_value overlap;
+        
+        trees = forest->trees.first.next;
+        end = &forest->trees.last;
+        while (trees != end) {
+          tree = (quad_tree*)trees->data;
+          if (tree->nw == NULL) {
+            nstat = has_neighborhood_stat(&tree->annotation.data);
+            if (nstat != NULL) {
+              overlap = nstat->overlap;
+              color0 = (byte)(255 * overlap);
+              color1 = 0;
+              color2 = (byte)(255 * (1 - overlap));
+            }
+            width = tree->size;
+            height = width;
+            row_step = stride - 3 * width;
+            target_pos = target_data + tree->y * stride + 3 * tree->x;
+            for (y = 0; y < height; y++, target_pos += row_step) {
+              for (x = 0; x < width; x++) {
+                *target_pos = color0;
+                target_pos++;
+                *target_pos = color1;
+                target_pos++;
+                *target_pos = color2;
+                target_pos++;
+              }
+            }
+          }
+          trees = trees->next;
+        }
+      }
+      break;
+    case v_STRENGTH:
+      {
+        integral_value strength;
+        
+        trees = forest->trees.first.next;
+        end = &forest->trees.last;
+        while (trees != end) {
+          tree = (quad_tree*)trees->data;
+          if (tree->nw == NULL) {
+            nstat = has_neighborhood_stat(&tree->annotation.data);
+            if (nstat != NULL) {
+              strength = nstat->strength;
+              color0 = (byte)(255 * strength);
+              color1 = 0;
+              color2 = (byte)(255 * (1 - strength));
+            }
+            width = tree->size;
+            height = width;
+            row_step = stride - 3 * width;
+            target_pos = target_data + tree->y * stride + 3 * tree->x;
+            for (y = 0; y < height; y++, target_pos += row_step) {
+              for (x = 0; x < width; x++) {
+                *target_pos = color0;
+                target_pos++;
+                *target_pos = color1;
+                target_pos++;
+                *target_pos = color2;
+                target_pos++;
+              }
+            }
+          }
+          trees = trees->next;
+        }
+      }
+      break;
+    default:
+      ERROR(BAD_PARAM);
+  }
+  
+  FINALLY(quad_forest_visualize_neighborhood_stats);
   RETURN();
 }
 
