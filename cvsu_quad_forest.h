@@ -73,6 +73,8 @@ typedef struct quad_forest_t {
   uint32 dx;
   /** Vertical offset of the grid from the origin of the source image */
   uint32 dy;
+  /** Token for identifying processing stage */
+  uint32 token;
   /** List of all trees in the forest, including the root trees */
   list trees;
   /** List of edge chains found from the forest */

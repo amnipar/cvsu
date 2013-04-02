@@ -131,6 +131,7 @@ result quad_forest_init
     target->tree_min_size = tree_min_size;
     target->dx = (uint32)((width - (cols * tree_max_size)) / 2);
     target->dy = (uint32)((height - (rows * tree_max_size)) / 2);
+    target->token = 0;
 
     size = rows * cols;
     if (target->roots != NULL) {
@@ -451,7 +452,7 @@ result quad_forest_destroy
     quad_tree_link_destroy((quad_tree_link*)items->data);
     items = items->next;
   }
-  
+
   CHECK(list_destroy(&target->links));
   CHECK(list_destroy(&target->edges));
   CHECK(memory_deallocate((data_pointer*)&target->roots));
