@@ -345,10 +345,12 @@ result pixel_image_draw_rects
     items = items->next;
   }
   */
+  /*
   gettimeofday(&finish, NULL);
   timestamp = (((double)finish.tv_sec) + (((double)finish.tv_usec) / 1000000.0));
   sprintf(filename, "capture/%.6f.png", timestamp);
   cvSaveImage(filename, dst, 0);
+  */
 
   FINALLY(pixel_image_draw_rects);
   cvReleaseImageHeader(&dst);
