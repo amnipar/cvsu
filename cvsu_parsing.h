@@ -43,13 +43,14 @@ extern "C" {
 #include "cvsu_list.h"
 #include "cvsu_context.h"
 
-typedef result (*context_operation)(quad_tree *tree, list *collection);
+typedef result (*context_operation)(quad_forest *forest, quad_tree *tree, list *collection);
 
 /**
  * Runs a generic prime/propagate/accumulate operation on a list of trees.
  */
 result run_context_operation
 (
+  quad_forest *forest,
   list *input_trees,
   list *output_trees,
   context_operation prime_operation,

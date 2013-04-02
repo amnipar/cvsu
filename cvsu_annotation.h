@@ -46,6 +46,7 @@ extern "C" {
  * Generic tree annotation. Can be edge, segment, intersection.
  */
 typedef struct tree_annotation_t {
+  uint32 token;
   /** Actual annotation data */
   typed_pointer data;
 } tree_annotation;
