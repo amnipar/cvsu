@@ -1208,16 +1208,15 @@ result quad_forest_calculate_accumulated_regs
   integral_value spread, min_spread, max_spread;
 
   CHECK_POINTER(forest);
-  PRINT0("nstats\n");
+  
   CHECK(quad_forest_calculate_neighborhood_stats(forest, TRUE, 2, TRUE, FALSE, TRUE));
-  PRINT0("aregs\n");
+  
   CHECK(run_context_operation(forest, &forest->trees, NULL,
                               prime_reg_accumulator,
                               prop_reg_accumulator,
                               acc_reg_accumulator,
                               rounds, FALSE));
 
-  PRINT0("norm\n");
   min_bstrength = 1000000000;
   max_bstrength = 0;
   min_sstrength = 1000000000;
@@ -1244,10 +1243,11 @@ result quad_forest_calculate_accumulated_regs
     }
     trees = trees->next;
   }
+  /*
   PRINT2("minb %.3f maxb %.3f\n", min_bstrength, max_bstrength);
   PRINT2("mins %.3f maxs %.3f\n", min_sstrength, max_sstrength);
   PRINT2("mins %.3f maxs %.3f\n", min_spread, max_spread);
-
+  */
   trees = forest->trees.first.next;
   end = &forest->trees.last;
   while (trees != end) {
@@ -1300,7 +1300,7 @@ result quad_forest_visualize_accumulated_regs
   target_data = (byte*)target->data;
 
   CHECK(pixel_image_clear(target));
-  CHECK(list_create(&lines, 1000, sizeof(line), 1));
+  /*CHECK(list_create(&lines, 1000, sizeof(line), 1));*/
 
   trees = forest->trees.first.next;
   end = &forest->trees.last;
@@ -1312,7 +1312,7 @@ result quad_forest_visualize_accumulated_regs
         color0 = (byte)(255 * areg->boundary_strength);
         color1 = (byte)(255 * areg->spread_strength);
         color2 = (byte)(255 * areg->segment_strength);
-        CHECK(quad_tree_edge_response_to_line(tree, &lines));
+        /*CHECK(quad_tree_edge_response_to_line(tree, &lines));*/
         /*
         if (areg->boundary_strength > 0.05) {
           CHECK(quad_tree_edge_response_to_line(tree, &lines));
@@ -1344,10 +1344,10 @@ result quad_forest_visualize_accumulated_regs
     }
     trees = trees->next;
   }
-  CHECK(pixel_image_draw_lines(target, &lines));
+  /*CHECK(pixel_image_draw_lines(target, &lines));*/
 
   FINALLY(quad_forest_visualize_accumulated_regs);
-  list_destroy(&lines);
+  /*list_destroy(&lines);*/
   RETURN();
 }
 
