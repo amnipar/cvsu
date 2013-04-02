@@ -45,6 +45,7 @@ string quad_tree_get_child_statistics_name = "quad_tree_get_child_statistics";
 string quad_tree_get_neighborhood_statistics_name = "quad_tree_get_neighborhood_statistics";
 string quad_tree_divide_with_overlap_name = "quad_tree_divide_with_overlap";
 string quad_tree_get_edge_response_name = "quad_tree_get_edge_response";
+string quad_tree_ensure_edge_response_name = "quad_tree_ensure_edge_response";
 string quad_tree_get_child_edge_response_name = "quad_tree_get_child_edge_response";
 string quad_tree_edge_response_to_line_name = "quad_tree_edge_response_to_line";
 string quad_tree_get_neighbors_name = "quad_tree_get_neighbors";
@@ -729,11 +730,102 @@ result quad_tree_get_edge_response
   }
 
   tree->edge.mag = sqrt(hsum*hsum + vsum*vsum);
+  /*if (tree->edge.mag > )*/
   ang = atan2(hsum, vsum);
   if (ang < 0) ang = ang + 2 * M_PI;
   tree->edge.ang = ang;
 
   FINALLY(quad_tree_get_edge_response);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result quad_tree_ensure_edge_response
+(
+  quad_forest *forest,
+  quad_tree *tree,
+  edge_response **eresp
+)
+{
+  TRY();
+  uint32 box_width, box_length, row, col, endrow, endcol;
+  sint32 srow, scol;
+  integral_value hsum, vsum, ang;
+  edge_response *resp;
+  INTEGRAL_IMAGE_2BOX_VARIABLES();
+
+  CHECK_POINTER(forest);
+  CHECK_POINTER(tree);
+  CHECK_POINTER(eresp);
+
+  *eresp = NULL;
+  CHECK(annotation_ensure_edge_response(&tree->annotation, &resp));
+  *eresp = resp;
+
+  box_width = tree->size;
+  /* box length should be at least 4 to get proper result */
+  box_length = (uint32)(getmax(((integral_value)box_width) / 2.0, 4.0));
+
+  /* calculate horizontal cumulative gradient */
+  {
+    INTEGRAL_IMAGE_INIT_HBOX(&forest->integral, box_length, box_width);
+    scol = ((signed)tree->x) - ((signed)box_length);
+    endcol = ((unsigned)(scol + ((signed)box_width)));
+    hsum = 0;
+    /*printf("col %lu endcol %lu ", col, endcol);*/
+    if (scol >= 0 && endcol + box_width + 1 <= forest->integral.width) {
+      col = ((unsigned)scol);
+      iA1 = I_1_data + tree->y * stride + col;
+      i2A1 = I_2_data + tree->y * stride + col;
+      while (col < endcol) {
+        sum1 = INTEGRAL_IMAGE_SUM_1();
+        sum2 = INTEGRAL_IMAGE_SUM_2();
+        sumsqr1 = INTEGRAL_IMAGE_SUMSQR_1();
+        sumsqr2 = INTEGRAL_IMAGE_SUMSQR_2();
+        g = edgel_fisher_signed(N, sum1, sum2, sumsqr1, sumsqr2);
+        hsum += g;
+        col++;
+        iA1++;
+        i2A1++;
+      }
+    }
+    hsum /= ((integral_value)box_width);
+    resp->dx = hsum;
+  }
+  /* calculate vertical cumulative gradient */
+  {
+    INTEGRAL_IMAGE_INIT_VBOX(&forest->integral, box_length, box_width);
+    srow = ((signed)tree->y) - ((signed)box_length);
+    endrow = ((unsigned)(srow + ((signed)box_width)));
+    vsum = 0;
+    /*printf("row %lu endrow %lu ", row, endrow);*/
+    if (srow >= 0 && endrow + box_width + 1 <= forest->integral.height) {
+      row = ((unsigned)srow);
+      iA1 = I_1_data + row * stride + tree->x;
+      i2A1 = I_2_data + row * stride + tree->x;
+      while (row < endrow) {
+        sum1 = INTEGRAL_IMAGE_SUM_1();
+        sum2 = INTEGRAL_IMAGE_SUM_2();
+        sumsqr1 = INTEGRAL_IMAGE_SUMSQR_1();
+        sumsqr2 = INTEGRAL_IMAGE_SUMSQR_2();
+        g = edgel_fisher_signed(N, sum1, sum2, sumsqr1, sumsqr2);
+        vsum += g;
+        row++;
+        iA1 += stride;
+        i2A1 += stride;
+      }
+    }
+    vsum /= ((integral_value)box_width);
+    resp->dy = vsum;
+  }
+
+  resp->mag = sqrt(hsum*hsum + vsum*vsum);
+  ang = atan2(hsum, vsum);
+  if (ang < 0) ang = ang + 2 * M_PI;
+  resp->ang = ang;
+
+  FINALLY(quad_tree_ensure_edge_response);
   RETURN();
 }
 

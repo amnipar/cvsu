@@ -253,6 +253,16 @@ result quad_tree_get_edge_response
 );
 
 /**
+ * Ensures that a tree has an edge response annotation, when that is needed.
+ */
+result quad_tree_ensure_edge_response
+(
+  struct quad_forest_t *forest,
+  quad_tree *tree,
+  edge_response **eresp
+);
+
+/**
  * Generates the edge responses of the four child trees without dividing the
  * tree. Useful for determining consistency before deciding to divide.
  */
