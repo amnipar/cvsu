@@ -99,6 +99,7 @@ result typed_pointer_create
   CHECK_POINTER(tptr);
   typed_pointer_destroy(tptr);
   CHECK(memory_allocate((data_pointer*)&tptr->value, count, typesize[((uint32)type)]));
+  CHECK(memory_clear((data_pointer)tptr->value, count, typesize[((uint32)type)]));
   tptr->type = type;
   tptr->count = count;
 
