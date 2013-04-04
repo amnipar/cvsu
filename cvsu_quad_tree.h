@@ -56,8 +56,8 @@ typedef struct quad_tree_link_head_t {
   struct quad_tree_t *tree;
   /** Angle of the line going away from this head */
   integral_value angle;
-  integral_value cost;
-  parse_context context;
+  /** Annotation storing various calculated values for this link head */
+  typed_pointer annotation;
 } quad_tree_link_head;
 
 /**
@@ -71,20 +71,23 @@ typedef struct quad_tree_link_t {
   quad_tree_link_head a;
   /** Head B of the link */
   quad_tree_link_head b;
-  /** Distance between the heads */
-  integral_value distance;
-  /** Strength of the link */
-  integral_value strength;
   /** Link category */
   direction category;
-  /** Context used in parsing operations */
-  parse_context context;
+  /** Distance between the heads */
+  integral_value distance;
+  /** Annotation storing various calculated values for this link */
+  typed_pointer annotation;
 } quad_tree_link;
 
 void quad_tree_link_destroy
 (
   quad_tree_link *target
 );
+
+void quad_tree_link_ensure_edge_strength();
+void quad_tree_ensure_neighborhood_stat();
+void quad_tree_ensure_boundary_strength();
+void quad_tree_ensure_segment_strength();
 
 /**
  * Stores a quad tree holding image data.
@@ -100,14 +103,6 @@ typedef struct quad_tree_t {
   uint32 level;
   /** Statistics of the image region covered by this tree */
   statistics stat;
-  /* TODO: move all three of these into annotation structure */
-  /** Region info used in segmentation */
-  quad_forest_segment segment;
-  /** Edge info used in edge detection */
-  quad_forest_edge edge;
-  /** Intersection info used in edge chain detection */
-  quad_forest_intersection intersection;
-  tree_annotation annotation;
   /** Parent tree, NULL if this is a root tree */
   struct quad_tree_t *parent;
   /* child trees, all NULL if the tree has not beed divided */
@@ -128,18 +123,14 @@ typedef struct quad_tree_t {
   struct quad_tree_t *s;
   /** Direct neighbor on the left side */
   struct quad_tree_t *w;
-  /** Temporary pool value used in propagation algorithms */
-  integral_value pool;
-  /** Temporary squared pool value used in propagation algorithms */
-  integral_value pool2;
-  /** Temporary accumulator value used in propagation algorithms */
-  integral_value acc;
-  /** Temporary squared accumulator value used in propagation algorithms */
-  integral_value acc2;
   /** List of links to neighboring and nearby nodes */
   list links;
   /** Context data used in image parsing operations */
-  parse_context context;
+  typed_pointer context;
+  typed_pointer annotation;
+
+  /* TODO: to be removed */
+  quad_forest_segment segment;
 } quad_tree;
 
 struct quad_forest_t;

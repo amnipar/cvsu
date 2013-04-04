@@ -40,12 +40,12 @@
 /* constants for reporting function names in error messages                   */
 
 string accumulated_stat_create_name = "accumulated_stat_create";
-string annotation_ensure_accumulated_stat_name = "annotation_ensure_accumulated_stat";
+string ensure_accumulated_stat_name = "annotation_ensure_accumulated_stat";
 string expect_accumulated_stat_name = "expect_accumulated_stat";
-string annotation_ensure_neighborhood_stat_name = "annotation_ensure_neighborhood_stat";
+string ensure_neighborhood_stat_name = "annotation_ensure_neighborhood_stat";
 string expect_neighborhood_stat_name = "expect_neighborhood_stat";
-string annotation_ensure_accumulated_reg_name = "annotation_ensure_accumulated_reg";
-string annotation_ensure_edge_response_name = "annotation_ensure_edge_response";
+string ensure_accumulated_reg_name = "annotation_ensure_accumulated_reg";
+string ensure_edge_response_name = "annotation_ensure_edge_response";
 
 /******************************************************************************/
 
@@ -61,7 +61,7 @@ result accumulated_stat_create
   CHECK_POINTER(tree);
   CHECK_POINTER(acc);
 
-  CHECK(annotation_ensure_accumulated_stat(&tree->annotation, &astat));
+  CHECK(ensure_accumulated_stat(&tree->annotation, &astat));
 
   astat->meanmean = 0;
   astat->meandev = 0;
@@ -74,9 +74,9 @@ result accumulated_stat_create
 
 /******************************************************************************/
 
-result annotation_ensure_accumulated_stat
+result ensure_accumulated_stat
 (
-  tree_annotation *annotation,
+  typed_pointer *annotation,
   accumulated_stat **astat
 )
 {
@@ -85,14 +85,12 @@ result annotation_ensure_accumulated_stat
 
   CHECK_POINTER(astat);
   *astat = NULL;
-  CHECK_POINTER(annotation);
 
-  CHECK(tuple_ensure_has_unique(&annotation->data, t_ASTAT, &tptr));
-  CHECK_TRUE(is_accumulated_stat(tptr));
+  CHECK(ensure_has(annotation, t_ASTAT, &tptr));
 
   *astat = (accumulated_stat*)tptr->value;
 
-  FINALLY(annotation_ensure_accumulated_stat);
+  FINALLY(ensure_accumulated_stat);
   RETURN();
 }
 
@@ -141,25 +139,25 @@ result expect_accumulated_stat
 )
 {
   TRY();
-  
+
   CHECK_POINTER(astat);
   CHECK_POINTER(tptr);
   CHECK_POINTER(tptr->value);
-  
+
   *astat = has_accumulated_stat(tptr);
   if (*astat == NULL) {
     ERROR(BAD_TYPE);
   }
-  
+
   FINALLY(expect_accumulated_stat);
   RETURN();
 }
 
 /******************************************************************************/
 
-result annotation_ensure_neighborhood_stat
+result ensure_neighborhood_stat
 (
-  tree_annotation *annotation,
+  typed_pointer *annotation,
   neighborhood_stat **nstat
 )
 {
@@ -168,14 +166,12 @@ result annotation_ensure_neighborhood_stat
 
   CHECK_POINTER(nstat);
   *nstat = NULL;
-  CHECK_POINTER(annotation);
 
-  CHECK(tuple_ensure_has_unique(&annotation->data, t_NSTAT, &tptr));
-  CHECK_TRUE(is_neighborhood_stat(tptr));
+  CHECK(ensure_has(annotation, t_NSTAT, &tptr));
 
   *nstat = (neighborhood_stat*)tptr->value;
 
-  FINALLY(annotation_ensure_neighborhood_stat);
+  FINALLY(ensure_neighborhood_stat);
   RETURN();
 }
 
@@ -224,25 +220,25 @@ result expect_neighborhood_stat
 )
 {
   TRY();
-  
+
   CHECK_POINTER(nstat);
   CHECK_POINTER(tptr);
   CHECK_POINTER(tptr->value);
-  
+
   *nstat = has_neighborhood_stat(tptr);
   if (*nstat == NULL) {
     ERROR(BAD_TYPE);
   }
-  
+
   FINALLY(expect_neighborhood_stat);
   RETURN();
 }
 
 /******************************************************************************/
 
-result annotation_ensure_accumulated_reg
+result ensure_accumulated_reg
 (
-  tree_annotation *annotation,
+  typed_pointer *annotation,
   accumulated_reg **areg
 )
 {
@@ -251,14 +247,12 @@ result annotation_ensure_accumulated_reg
 
   CHECK_POINTER(areg);
   *areg = NULL;
-  CHECK_POINTER(annotation);
 
-  CHECK(tuple_ensure_has_unique(&annotation->data, t_AREG, &tptr));
-  CHECK_TRUE(is_accumulated_reg(tptr));
+  CHECK(ensure_has(annotation, t_AREG, &tptr));
 
   *areg = (accumulated_reg*)tptr->value;
 
-  FINALLY(annotation_ensure_accumulated_reg);
+  FINALLY(ensure_accumulated_reg);
   RETURN();
 }
 
@@ -300,9 +294,9 @@ accumulated_reg *has_accumulated_reg
 
 /******************************************************************************/
 
-result annotation_ensure_edge_response
+result ensure_edge_response
 (
-  tree_annotation *annotation,
+  typed_pointer *annotation,
   edge_response **eresp
 )
 {
@@ -311,14 +305,12 @@ result annotation_ensure_edge_response
 
   CHECK_POINTER(eresp);
   *eresp = NULL;
-  CHECK_POINTER(annotation);
 
-  CHECK(tuple_ensure_has_unique(&annotation->data, t_EDGE_RESPONSE, &tptr));
-  CHECK_TRUE(is_edge_response(tptr));
+  CHECK(ensure_has(annotation, t_EDGE_RESPONSE, &tptr));
 
   *eresp = (edge_response*)tptr->value;
 
-  FINALLY(annotation_ensure_edge_response);
+  FINALLY(ensure_edge_response);
   RETURN();
 }
 

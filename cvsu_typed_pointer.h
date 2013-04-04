@@ -73,7 +73,6 @@ typedef enum type_label_t {
   /* parsing context types */
   t_STAT_ACCUMULATOR,
   t_REG_ACCUMULATOR,
-  t_RANGE_OVERLAP,
   t_RIDGE_FINDER,
   t_PATH_SNIFFER,
   t_EDGE_PARSER,
@@ -89,6 +88,7 @@ typedef enum type_label_t {
 typedef struct typed_pointer_t {
   type_label type;
   uint32 count;
+  uint32 token;
   pointer value;
 } typed_pointer;
 
@@ -212,6 +212,28 @@ typed_pointer *tuple_has_type
 truth_value is_tuple
 (
   typed_pointer *tptr
+);
+
+/**
+ * Ensures that a typed pointer contains one element with a given type. If the
+ * element is not found, it is added.
+ */
+result ensure_has
+(
+  typed_pointer *tptr,
+  type_label type,
+  typed_pointer **res
+);
+
+/**
+ * Ensures that a typed pointer is of given type. If it is not, the old value is
+ * destroyed and replaced with the new one.
+ */
+result ensure_is
+(
+  typed_pointer *tptr,
+  type_label type,
+  typed_pointer **res
 );
 
 #ifdef __cplusplus

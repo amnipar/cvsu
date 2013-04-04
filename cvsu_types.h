@@ -116,13 +116,13 @@ typedef enum direction_t {
 typedef sint32 coord;
 
 typedef struct point_t {
-    coord x;
-    coord y;
+  coord x;
+  coord y;
 } point;
 
 typedef struct line_t {
-    point start;
-    point end;
+  point start;
+  point end;
 } line;
 
 typedef struct weighted_line_t {
@@ -131,29 +131,35 @@ typedef struct weighted_line_t {
   double weight;
 } weighted_line;
 
+typedef struct colored_line_t {
+  point start;
+  point end;
+  byte color[4];
+} colored_line;
+
 typedef struct rect_t {
-    coord left;
-    coord right;
-    coord top;
-    coord bottom;
+  coord left;
+  coord right;
+  coord top;
+  coord bottom;
 } rect;
 
 typedef enum result_t {
-    SUCCESS = 0,
-    FATAL,
-    CAUGHT_ERROR,
-    BAD_POINTER,
-    BAD_TYPE,
-    BAD_SIZE,
-    BAD_PARAM,
-    NOT_FOUND,
-    INPUT_ERROR,
-    NOT_IMPLEMENTED
+  SUCCESS = 0,
+  FATAL,
+  CAUGHT_ERROR,
+  BAD_POINTER,
+  BAD_TYPE,
+  BAD_SIZE,
+  BAD_PARAM,
+  NOT_FOUND,
+  INPUT_ERROR,
+  NOT_IMPLEMENTED
 } result;
 
 typedef struct fresult_t {
-    result code;
-    string function;
+  result code;
+  string function;
 } fresult;
 
 /**

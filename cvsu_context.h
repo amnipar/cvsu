@@ -41,18 +41,6 @@ extern "C" {
 #include "cvsu_typed_pointer.h"
 
 /**
- * Parsing context for image parsing operations.
- */
-typedef struct parse_context_t {
-  /** Token identifying this specific parsing operation */
-  uint32 token;
-  /** Number of the current parsing round */
-  uint32 round;
-  /** Actual context data that depends on operation */
-  typed_pointer data;
-} parse_context;
-
-/**
  * Context value for accumulating neighborhood statistics.
  */
 typedef struct stat_accumulator_t {
@@ -83,12 +71,9 @@ result expect_stat_accumulator
   typed_pointer *tptr
 );
 
-/**
- * Ensures that the context has a stat accumulator value.
- */
-result context_ensure_stat_accumulator
+result ensure_stat_accumulator
 (
-  parse_context *context,
+  typed_pointer *context,
   stat_accumulator **acc
 );
 
@@ -119,39 +104,10 @@ reg_accumulator *has_reg_accumulator
   typed_pointer *tptr
 );
 
-/**
- * Ensures that the context has a reg accumulator value.
- */
-result context_ensure_reg_accumulator
+result ensure_reg_accumulator
 (
-  parse_context *context,
-  reg_accumulator **reg
-);
-
-/******************************************************************************/
-
-typedef struct range_overlap_t {
-  uint32 round;
-  integral_value overlap;
-} range_overlap;
-
-truth_value is_range_overlap
-(
-  typed_pointer *tptr
-);
-
-range_overlap *has_range_overlap
-(
-  typed_pointer *tptr
-);
-
-/**
- * Ensures that the context has a range overlap value.
- */
-result context_ensure_range_overlap
-(
-  parse_context *context,
-  range_overlap **overlap
+  typed_pointer *context,
+  reg_accumulator **areg
 );
 
 /******************************************************************************/
@@ -171,13 +127,10 @@ ridge_finder *has_ridge_finder
   typed_pointer *tptr
 );
 
-/**
- * Ensures that the context has a ridge finder value.
- */
-result context_ensure_ridge_finder
+result ensure_ridge_finder
 (
-  parse_context *context,
-  ridge_finder **acc
+  typed_pointer *context,
+  ridge_finder **rfind
 );
 
 /******************************************************************************/

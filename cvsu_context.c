@@ -35,36 +35,13 @@
 /******************************************************************************/
 /* constants for reporting function names in error messages                   */
 
-string context_ensure_stat_accumulator_name = "context_ensure_stat_accumulator";
 string expect_stat_accumulator_name = "expect_stat_accumulator";
-string context_ensure_reg_accumulator_name = "context_ensure_reg_accumulator";
-string context_ensure_range_overlap_name = "context_ensure_range_overlap";
-string context_ensure_ridge_finder_name = "context_ensure_ridge_finder";
+string ensure_stat_accumulator_name = "ensure_stat_accumulator";
+string ensure_reg_accumulator_name = "context_ensure_reg_accumulator";
+string ensure_range_overlap_name = "context_ensure_range_overlap";
+string ensure_ridge_finder_name = "context_ensure_ridge_finder";
 string expect_path_sniffer_name = "expect_path_sniffer";
 string expect_edge_parser_name = "expect_edge_parser";
-
-/******************************************************************************/
-
-result context_ensure_stat_accumulator
-(
-  parse_context *context,
-  stat_accumulator **acc
-)
-{
-  TRY();
-  typed_pointer *tptr;
-
-  CHECK_POINTER(acc);
-  *acc = NULL;
-  CHECK_POINTER(context);
-
-  CHECK(tuple_ensure_has_unique(&context->data, t_STAT_ACCUMULATOR, &tptr));
-
-  *acc = (stat_accumulator*)tptr->value;
-
-  FINALLY(context_ensure_stat_accumulator);
-  RETURN();
-}
 
 /******************************************************************************/
 
@@ -110,10 +87,6 @@ result expect_stat_accumulator
 {
   TRY();
 
-  CHECK_POINTER(target);
-  CHECK_POINTER(tptr);
-  CHECK_POINTER(tptr->value);
-
   *target = has_stat_accumulator(tptr);
   if (*target == NULL) {
     ERROR(BAD_TYPE);
@@ -125,24 +98,23 @@ result expect_stat_accumulator
 
 /******************************************************************************/
 
-result context_ensure_reg_accumulator
+result ensure_stat_accumulator
 (
-  parse_context *context,
-  reg_accumulator **reg
+  typed_pointer *context,
+  stat_accumulator **acc
 )
 {
   TRY();
   typed_pointer *tptr;
 
-  CHECK_POINTER(reg);
-  *reg = NULL;
-  CHECK_POINTER(context);
+  CHECK_POINTER(acc);
+  *acc = NULL;
 
-  CHECK(tuple_ensure_has_unique(&context->data, t_REG_ACCUMULATOR, &tptr));
+  CHECK(ensure_is(context, t_STAT_ACCUMULATOR, &tptr));
 
-  *reg = (reg_accumulator*)tptr->value;
+  *acc = (stat_accumulator*)tptr->value;
 
-  FINALLY(context_ensure_reg_accumulator);
+  FINALLY(ensure_stat_accumulator);
   RETURN();
 }
 
@@ -182,81 +154,23 @@ reg_accumulator *has_reg_accumulator
 
 /******************************************************************************/
 
-result context_ensure_range_overlap
+result ensure_reg_accumulator
 (
-  parse_context *context,
-  range_overlap **overlap
+  typed_pointer *context,
+  reg_accumulator **reg
 )
 {
   TRY();
   typed_pointer *tptr;
 
-  CHECK_POINTER(overlap);
-  *overlap = NULL;
-  CHECK_POINTER(context);
+  CHECK_POINTER(reg);
+  *reg = NULL;
 
-  CHECK(tuple_ensure_has_unique(&context->data, t_RANGE_OVERLAP, &tptr));
+  CHECK(ensure_is(context, t_REG_ACCUMULATOR, &tptr));
 
-  *overlap = (range_overlap*)tptr->value;
+  *reg = (reg_accumulator*)tptr->value;
 
-  FINALLY(context_ensure_range_overlap);
-  RETURN();
-}
-
-/******************************************************************************/
-
-truth_value is_range_overlap
-(
-  typed_pointer *tptr
-)
-{
-  if (tptr != NULL && tptr->type == t_RANGE_OVERLAP) {
-    return TRUE;
-  }
-  return FALSE;
-}
-
-/******************************************************************************/
-
-range_overlap *has_range_overlap
-(
-  typed_pointer *tptr
-)
-{
-  if (IS_TRUE(is_range_overlap(tptr))) {
-    return (range_overlap*)tptr->value;
-  }
-  if (IS_TRUE(is_tuple(tptr))) {
-    typed_pointer *element;
-    /* must have exactly one stat accumulator */
-    element = tuple_has_type(tptr, t_RANGE_OVERLAP, 1, 1);
-    if (element != NULL) {
-      return (range_overlap*)element->value;
-    }
-  }
-  return NULL;
-}
-
-/******************************************************************************/
-
-result context_ensure_ridge_finder
-(
-  parse_context *context,
-  ridge_finder **rfind
-)
-{
-  TRY();
-  typed_pointer *tptr;
-
-  CHECK_POINTER(rfind);
-  *rfind = NULL;
-  CHECK_POINTER(context);
-
-  CHECK(tuple_ensure_has_unique(&context->data, t_RIDGE_FINDER, &tptr));
-
-  *rfind = (ridge_finder*)tptr->value;
-
-  FINALLY(context_ensure_ridge_finder);
+  FINALLY(ensure_reg_accumulator);
   RETURN();
 }
 
@@ -292,6 +206,28 @@ ridge_finder *has_ridge_finder
     }
   }
   return NULL;
+}
+
+/******************************************************************************/
+
+result ensure_ridge_finder
+(
+  typed_pointer *context,
+  ridge_finder **rfind
+)
+{
+  TRY();
+  typed_pointer *tptr;
+
+  CHECK_POINTER(rfind);
+  *rfind = NULL;
+
+  CHECK(ensure_is(context, t_RIDGE_FINDER, &tptr));
+
+  *rfind = (ridge_finder*)tptr->value;
+
+  FINALLY(ensure_ridge_finder);
+  RETURN();
 }
 
 /******************************************************************************/

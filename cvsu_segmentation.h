@@ -83,47 +83,6 @@ result quad_forest_segment_with_overlap
   integral_value threshold_segments
 );
 
-/**
- * Segments the forest by finding first all horizontal edges with edge
- * propagation, then merging segments that have edges in neighboring trees.
- */
-result quad_forest_segment_edges
-(
-  /** Forest to be segmented */
-  quad_forest *target,
-  /** How many rounds to propagate while determining trees with edges */
-  uint32 detect_rounds,
-  /** Bias value used in edge detection */
-  integral_value detect_bias,
-  /** Direction of edges to search (H,V,N4) */
-  direction detect_dir,
-  /** How many rounds to propagate the found edges to close gaps */
-  uint32 propagate_rounds,
-  /** Acceptance threshold for propagated edges */
-  integral_value propagate_threshold,
-  /** The direction in which to propagate */
-  direction propagate_dir,
-  /** The direction in which to merge segments */
-  direction merge_dir
-);
-
-/**
- * Segments the forest by using boundaries found using deviation propagation
- * and hysteresis to limit the expansion of segments.
- */
-result quad_forest_segment_with_boundaries
-(
-  quad_forest *forest,
-  uint32 rounds,
-  integral_value high_bias,
-  integral_value low_factor,
-  integral_value tree_alpha,
-  integral_value segment_alpha,
-  truth_value use_hysteresis,
-  truth_value use_pruning
-);
-
-
 #ifdef __cplusplus
 }
 #endif

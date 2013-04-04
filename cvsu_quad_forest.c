@@ -200,27 +200,21 @@ result quad_forest_init
   nw = NULL;
   new_link.a.opposite = NULL;
   new_link.a.angle = 0;
-  new_link.a.cost = 0;
-  new_link.a.context.token = 0;
-  new_link.a.context.round = 0;
-  new_link.a.context.data.type = t_UNDEF;
-  new_link.a.context.data.count = 0;
-  new_link.a.context.data.value = NULL;
+  new_link.a.annotation.type = t_UNDEF;
+  new_link.a.annotation.count = 0;
+  new_link.a.annotation.token = 0;
+  new_link.a.annotation.value = NULL;
   new_link.b.opposite = NULL;
   new_link.b.angle = 0;
-  new_link.b.cost = 0;
-  new_link.b.context.token = 0;
-  new_link.b.context.round = 0;
-  new_link.b.context.data.type = t_UNDEF;
-  new_link.b.context.data.count = 0;
-  new_link.b.context.data.value = NULL;
+  new_link.b.annotation.type = t_UNDEF;
+  new_link.b.annotation.count = 0;
+  new_link.b.annotation.token = 0;
+  new_link.b.annotation.value = NULL;
   new_link.distance = 0;
-  new_link.strength = 0;
-  new_link.context.token = 0;
-  new_link.context.round = 0;
-  new_link.context.data.type = t_UNDEF;
-  new_link.context.data.count = 0;
-  new_link.context.data.value = NULL;
+  new_link.annotation.type = t_UNDEF;
+  new_link.annotation.count = 0;
+  new_link.annotation.token = 0;
+  new_link.annotation.value = NULL;
   /* add neighbors to roots */
   /* TODO: create the neighbor links (first-rate 8-neighborhood) */
   /* then implement a simple edge propagation algorithm */
@@ -1620,8 +1614,8 @@ result quad_forest_get_path_sniffers
 
   for (i = 0; i < size; i++) {
     tree = forest->roots[i];
-    if (IS_TRUE(is_path_sniffer(&tree->context.data))) {
-      CHECK(expect_path_sniffer(&current, &tree->context.data));
+    if (IS_TRUE(is_path_sniffer(&tree->context))) {
+      CHECK(expect_path_sniffer(&current, &tree->context));
       if (current->prev != NULL) {
         prev = current->prev->tree;
         new_line.start.x = (signed)(tree->x + (uint32)(tree->size / 2));
@@ -1666,7 +1660,7 @@ result quad_forest_get_links
     tree = link->b.tree;
     new_line.end.x = (signed)(tree->x + (uint32)(tree->size / 2));
     new_line.end.y = (signed)(tree->y + (uint32)(tree->size / 2));
-    new_line.weight = link->strength;
+    new_line.weight = 1 / link->distance;
     CHECK(list_append(links, (pointer)&new_line));
 
     /*

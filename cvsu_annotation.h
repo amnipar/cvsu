@@ -42,15 +42,6 @@ extern "C" {
 #include "cvsu_context.h"
 #include "cvsu_list.h"
 
-/**
- * Generic tree annotation. Can be edge, segment, intersection.
- */
-typedef struct tree_annotation_t {
-  uint32 token;
-  /** Actual annotation data */
-  typed_pointer data;
-} tree_annotation;
-
 struct quad_tree_t;
 
 /******************************************************************************/
@@ -69,9 +60,9 @@ result accumulated_stat_create
   stat_accumulator *acc
 );
 
-result annotation_ensure_accumulated_stat
+result ensure_accumulated_stat
 (
-  tree_annotation *annotation,
+  typed_pointer *annotation,
   accumulated_stat **astat
 );
 
@@ -104,9 +95,9 @@ typedef struct neighborhood_stat_t {
   integral_value overlap;
 } neighborhood_stat;
 
-result annotation_ensure_neighborhood_stat
+result ensure_neighborhood_stat
 (
-  tree_annotation *annotation,
+  typed_pointer *annotation,
   neighborhood_stat **nstat
 );
 
@@ -138,9 +129,9 @@ typedef struct accumulated_reg_t {
   integral_value spread_strength;
 } accumulated_reg;
 
-result annotation_ensure_accumulated_reg
+result ensure_accumulated_reg
 (
-  tree_annotation *annotation,
+  typed_pointer *annotation,
   accumulated_reg **areg
 );
 
@@ -164,9 +155,9 @@ typedef struct edge_response_t
   integral_value ang;
 } edge_response;
 
-result annotation_ensure_edge_response
+result ensure_edge_response
 (
-  tree_annotation *annotation,
+  typed_pointer *annotation,
   edge_response **eresp
 );
 

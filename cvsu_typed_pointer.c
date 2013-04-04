@@ -45,6 +45,9 @@ string tuple_promote_name = "tuple_promote";
 string tuple_extend_name = "tuple_extend";
 string tuple_ensure_has_unique_name = "tuple_ensure_has_unique";
 
+string ensure_is_name = "ensure_is";
+string ensure_has_name = "ensure_has";
+
 /******************************************************************************/
 
 uint32 typesize[] = {
@@ -78,7 +81,6 @@ uint32 typesize[] = {
   sizeof(quad_forest_intersection), /* TODO: change to intersection? */
   sizeof(stat_accumulator),
   sizeof(reg_accumulator),
-  sizeof(range_overlap),
   sizeof(ridge_finder),
   sizeof(path_sniffer),
   sizeof(edge_parser),
@@ -137,6 +139,7 @@ void typed_pointer_nullify
   if (tptr != NULL) {
     tptr->type = t_UNDEF;
     tptr->count = 0;
+    tptr->token = 0;
     tptr->value = NULL;
   }
 }
@@ -396,6 +399,80 @@ truth_value is_tuple
     return TRUE;
   }
   return FALSE;
+}
+
+/******************************************************************************/
+
+result ensure_has
+(
+  typed_pointer *tptr,
+  type_label type,
+  typed_pointer **res
+)
+{
+  TRY();
+
+  CHECK_POINTER(res);
+  *res = NULL;
+  CHECK_POINTER(tptr);
+
+  if (tptr->type == type) {
+    *res = tptr;
+  }
+  else
+  if (tptr->type == t_UNDEF) {
+    CHECK(typed_pointer_create(tptr, type, 1));
+    *res = tptr;
+  }
+  else {
+    uint32 i;
+    typed_pointer *elements;
+    if (tptr->type != t_TUPLE) {
+      CHECK(tuple_promote(tptr));
+    }
+    else {
+      elements = (typed_pointer*)tptr->value;
+      for (i = 0; i < tptr->count; i++) {
+        if (elements[i].type == type) {
+          *res = &elements[i];
+          break;
+        }
+      }
+    }
+    if (*res == NULL) {
+      typed_pointer new_ptr;
+      typed_pointer_nullify(&new_ptr);
+      CHECK(typed_pointer_create(&new_ptr, type, 1));
+      CHECK(tuple_extend(tptr, &new_ptr, res));
+    }
+  }
+
+  FINALLY(ensure_has);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result ensure_is
+(
+  typed_pointer *tptr,
+  type_label type,
+  typed_pointer **res
+)
+{
+  TRY();
+
+  CHECK_POINTER(res);
+  *res = NULL;
+  CHECK_POINTER(tptr);
+
+  if (tptr->type != type) {
+    CHECK(typed_pointer_create(tptr, type, 1));
+  }
+  *res = tptr;
+
+  FINALLY(ensure_is);
+  RETURN();
 }
 
 /* end of file                                                                */

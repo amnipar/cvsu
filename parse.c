@@ -197,6 +197,7 @@ int main(int argc, char *argv[])
   CHECK(quad_forest_create(&forest, &src_image, max_size, min_size));
   PRINT0("updating forest...\n");
   CHECK(quad_forest_update(&forest));
+  forest.token = 1;
   switch (mode) {
     case m_STAT:
       PRINT0("parsing stat...\n");

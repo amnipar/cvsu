@@ -59,9 +59,9 @@ void quad_tree_link_destroy
 )
 {
   if (target != NULL) {
-    typed_pointer_destroy(&target->a.context.data);
-    typed_pointer_destroy(&target->b.context.data);
-    typed_pointer_destroy(&target->context.data);
+    typed_pointer_destroy(&target->a.annotation);
+    typed_pointer_destroy(&target->b.annotation);
+    typed_pointer_destroy(&target->annotation);
   }
 }
 
@@ -74,12 +74,8 @@ void quad_tree_destroy
 {
   if (tree != NULL) {
     /* must deallocate the memory pointed to by typed pointers, if set */
-    typed_pointer_destroy(&tree->annotation.data);
-    typed_pointer_destroy(&tree->context.data);
-
-    /* later will need a special function for destroying annotation and context */
-    list_destroy(&tree->intersection.edges);
-    list_destroy(&tree->intersection.chains);
+    typed_pointer_destroy(&tree->annotation);
+    typed_pointer_destroy(&tree->context);
 
     list_destroy(&tree->links);
 
@@ -646,7 +642,7 @@ result quad_tree_divide_with_overlap
 }
 
 /******************************************************************************/
-
+/* TODO: find all places that use this function and fix to use ensure */
 result quad_tree_get_edge_response
 (
   quad_forest *forest,
@@ -692,7 +688,7 @@ result quad_tree_get_edge_response
       }
     }
     hsum /= ((integral_value)box_width);
-    tree->edge.dx = hsum;
+    /* TODO: tree->edge.dx = hsum;*/
     if (dx != NULL) {
       *dx = hsum;
     }
@@ -722,18 +718,18 @@ result quad_tree_get_edge_response
       }
     }
     vsum /= ((integral_value)box_width);
-    tree->edge.dy = vsum;
+    /* tree->edge.dy = vsum; */
     if (dy != NULL) {
       *dy = vsum;
     }
     /*printf("dy %.3f ", vsum);*/
   }
 
-  tree->edge.mag = sqrt(hsum*hsum + vsum*vsum);
+  /* tree->edge.mag = sqrt(hsum*hsum + vsum*vsum); */
   /*if (tree->edge.mag > )*/
   ang = atan2(hsum, vsum);
   if (ang < 0) ang = ang + 2 * M_PI;
-  tree->edge.ang = ang;
+  /*tree->edge.ang = ang;*/
 
   FINALLY(quad_tree_get_edge_response);
   RETURN();
@@ -753,6 +749,7 @@ result quad_tree_ensure_edge_response
   sint32 srow, scol;
   integral_value hsum, vsum, ang;
   edge_response *resp;
+  typed_pointer *tptr;
   INTEGRAL_IMAGE_2BOX_VARIABLES();
 
   CHECK_POINTER(forest);
@@ -760,70 +757,75 @@ result quad_tree_ensure_edge_response
   CHECK_POINTER(eresp);
 
   *eresp = NULL;
-  CHECK(annotation_ensure_edge_response(&tree->annotation, &resp));
+  CHECK(ensure_has(&tree->annotation, t_EDGE_RESPONSE, &tptr));
+  resp = (edge_response*)tptr->value;
+  if (tptr->token != forest->token) {
+    box_width = tree->size;
+    /* box length should be at least 4 to get proper result */
+    box_length = (uint32)(getmax(((integral_value)box_width) / 2.0, 4.0));
+
+    /* calculate horizontal cumulative gradient */
+    {
+      INTEGRAL_IMAGE_INIT_HBOX(&forest->integral, box_length, box_width);
+      scol = ((signed)tree->x) - ((signed)box_length);
+      endcol = ((unsigned)(scol + ((signed)box_width)));
+      hsum = 0;
+      /*printf("col %lu endcol %lu ", col, endcol);*/
+      if (scol >= 0 && endcol + box_width + 1 <= forest->integral.width) {
+        col = ((unsigned)scol);
+        iA1 = I_1_data + tree->y * stride + col;
+        i2A1 = I_2_data + tree->y * stride + col;
+        while (col < endcol) {
+          sum1 = INTEGRAL_IMAGE_SUM_1();
+          sum2 = INTEGRAL_IMAGE_SUM_2();
+          sumsqr1 = INTEGRAL_IMAGE_SUMSQR_1();
+          sumsqr2 = INTEGRAL_IMAGE_SUMSQR_2();
+          g = edgel_fisher_signed(N, sum1, sum2, sumsqr1, sumsqr2);
+          hsum += g;
+          col++;
+          iA1++;
+          i2A1++;
+        }
+      }
+      hsum /= ((integral_value)box_width);
+      resp->dx = hsum;
+    }
+    /* calculate vertical cumulative gradient */
+    {
+      INTEGRAL_IMAGE_INIT_VBOX(&forest->integral, box_length, box_width);
+      srow = ((signed)tree->y) - ((signed)box_length);
+      endrow = ((unsigned)(srow + ((signed)box_width)));
+      vsum = 0;
+      /*printf("row %lu endrow %lu ", row, endrow);*/
+      if (srow >= 0 && endrow + box_width + 1 <= forest->integral.height) {
+        row = ((unsigned)srow);
+        iA1 = I_1_data + row * stride + tree->x;
+        i2A1 = I_2_data + row * stride + tree->x;
+        while (row < endrow) {
+          sum1 = INTEGRAL_IMAGE_SUM_1();
+          sum2 = INTEGRAL_IMAGE_SUM_2();
+          sumsqr1 = INTEGRAL_IMAGE_SUMSQR_1();
+          sumsqr2 = INTEGRAL_IMAGE_SUMSQR_2();
+          g = edgel_fisher_signed(N, sum1, sum2, sumsqr1, sumsqr2);
+          vsum += g;
+          row++;
+          iA1 += stride;
+          i2A1 += stride;
+        }
+      }
+      vsum /= ((integral_value)box_width);
+      resp->dy = vsum;
+    }
+
+    resp->mag = sqrt(hsum*hsum + vsum*vsum);
+    ang = atan2(hsum, vsum);
+    if (ang < 0) ang = ang + 2 * M_PI;
+    resp->ang = ang;
+
+    tptr->token = forest->token;
+  }
+
   *eresp = resp;
-
-  box_width = tree->size;
-  /* box length should be at least 4 to get proper result */
-  box_length = (uint32)(getmax(((integral_value)box_width) / 2.0, 4.0));
-
-  /* calculate horizontal cumulative gradient */
-  {
-    INTEGRAL_IMAGE_INIT_HBOX(&forest->integral, box_length, box_width);
-    scol = ((signed)tree->x) - ((signed)box_length);
-    endcol = ((unsigned)(scol + ((signed)box_width)));
-    hsum = 0;
-    /*printf("col %lu endcol %lu ", col, endcol);*/
-    if (scol >= 0 && endcol + box_width + 1 <= forest->integral.width) {
-      col = ((unsigned)scol);
-      iA1 = I_1_data + tree->y * stride + col;
-      i2A1 = I_2_data + tree->y * stride + col;
-      while (col < endcol) {
-        sum1 = INTEGRAL_IMAGE_SUM_1();
-        sum2 = INTEGRAL_IMAGE_SUM_2();
-        sumsqr1 = INTEGRAL_IMAGE_SUMSQR_1();
-        sumsqr2 = INTEGRAL_IMAGE_SUMSQR_2();
-        g = edgel_fisher_signed(N, sum1, sum2, sumsqr1, sumsqr2);
-        hsum += g;
-        col++;
-        iA1++;
-        i2A1++;
-      }
-    }
-    hsum /= ((integral_value)box_width);
-    resp->dx = hsum;
-  }
-  /* calculate vertical cumulative gradient */
-  {
-    INTEGRAL_IMAGE_INIT_VBOX(&forest->integral, box_length, box_width);
-    srow = ((signed)tree->y) - ((signed)box_length);
-    endrow = ((unsigned)(srow + ((signed)box_width)));
-    vsum = 0;
-    /*printf("row %lu endrow %lu ", row, endrow);*/
-    if (srow >= 0 && endrow + box_width + 1 <= forest->integral.height) {
-      row = ((unsigned)srow);
-      iA1 = I_1_data + row * stride + tree->x;
-      i2A1 = I_2_data + row * stride + tree->x;
-      while (row < endrow) {
-        sum1 = INTEGRAL_IMAGE_SUM_1();
-        sum2 = INTEGRAL_IMAGE_SUM_2();
-        sumsqr1 = INTEGRAL_IMAGE_SUMSQR_1();
-        sumsqr2 = INTEGRAL_IMAGE_SUMSQR_2();
-        g = edgel_fisher_signed(N, sum1, sum2, sumsqr1, sumsqr2);
-        vsum += g;
-        row++;
-        iA1 += stride;
-        i2A1 += stride;
-      }
-    }
-    vsum /= ((integral_value)box_width);
-    resp->dy = vsum;
-  }
-
-  resp->mag = sqrt(hsum*hsum + vsum*vsum);
-  ang = atan2(hsum, vsum);
-  if (ang < 0) ang = ang + 2 * M_PI;
-  resp->ang = ang;
 
   FINALLY(quad_tree_ensure_edge_response);
   RETURN();
@@ -937,7 +939,7 @@ result quad_tree_edge_response_to_line
 
   CHECK_POINTER(tree);
   CHECK_POINTER(lines);
-
+/* TODO: fix to use annotation
   if (tree->edge.mag > 0) {
     x = tree->x;
     y = tree->y;
@@ -954,299 +956,9 @@ result quad_tree_edge_response_to_line
 
     CHECK(list_append(lines, (pointer)&new_line));
   }
-
+*/
   FINALLY(quad_tree_edge_response_to_line);
   RETURN();
-}
-
-/******************************************************************************/
-/* private functions for managing graph propagation algorithms                */
-
-/*******************************************************************************
- * graph propagation is based on
- *  a) accumulator value that holds the current state of the node
- *  b) pool value that is the temporary state, modified by neighbors
- *  c) four neighbors that adjust the node's pool value
- * each node is first primed with an initial value, stored in acc; then each
- * node is given their chance to modify their neighbors' pool values; finally
- * the pool value is accumulated back to the acc value and possibly used in the
- * next round of propagation.
-*******************************************************************************/
-
-/* sets the acc value to the current pool value */
-void quad_tree_prime_with_pool(quad_tree *tree)
-{
-  tree->acc = tree->pool / 2;
-  tree->pool = tree->acc;
-  /* pool value is not squared as it already contains squared values */
-  tree->acc2 = tree->pool2 / 2;
-  tree->pool2 = tree->acc2;
-}
-
-/* sets the acc value to a constant value */
-void quad_tree_prime_with_constant(quad_tree *tree, integral_value constant)
-{
-  tree->acc = constant / 2;
-  tree->pool = tree->acc;
-  tree->acc2 = constant * tree->acc;
-  tree->pool2 = tree->acc2;
-}
-
-/* sets the acc value to the edge response magnitude */
-void quad_tree_prime_with_mag(quad_tree *tree)
-{
-  tree->acc = tree->edge.mag / 2;
-  tree->pool = tree->acc;
-  /* (a * a) / 2 = a * (a / 2) */
-  tree->acc2 = tree->edge.mag * tree->acc;
-  tree->pool2 = tree->acc2;
-}
-
-/* sets the acc value to the dy edge response value */
-void quad_tree_prime_with_dy(quad_tree *tree)
-{
-  tree->acc = tree->edge.dy / 2;
-  tree->pool = tree->acc;
-  /* (a * a) / 2 = a * (a / 2) */
-  tree->acc2 = tree->edge.dy * tree->acc;
-  tree->pool2 = tree->acc2;
-}
-
-/* sets the acc value to the dy edge response value */
-void quad_tree_prime_with_dx(quad_tree *tree)
-{
-  tree->acc = tree->edge.dx / 2;
-  tree->pool = tree->acc;
-  /* (a * a) / 2 = a * (a / 2) */
-  tree->acc2 = tree->edge.dx * tree->acc;
-  tree->pool2 = tree->acc2;
-}
-
-/* sets the acc value to acc if tree has edge, 0 otherwise */
-void quad_tree_prime_with_edge(quad_tree *tree, integral_value acc)
-{
-  if (IS_TRUE(tree->edge.has_edge)) {
-    tree->acc = acc / 2;
-    tree->pool = tree->acc;
-    tree->acc2 = acc * tree->acc;
-    tree->pool2 = tree->acc2;
-  }
-  else {
-    tree->acc = 0;
-    tree->pool = 0;
-    tree->acc2 = 0;
-    tree->pool2 = 0;
-  }
-}
-
-/* sets the acc value to horizontal difference */
-/* (dy + left and right neighbor dy - top and bottom neighbor dy) */
-void quad_tree_prime_with_hdiff(quad_tree *tree)
-{
-  integral_value acc;
-  acc += (tree->w == NULL ? 0 : tree->w->edge.dy);
-  acc += (tree->e == NULL ? 0 : tree->e->edge.dy);
-  acc -= (tree->n == NULL ? 0 : tree->n->edge.dy);
-  acc -= (tree->s == NULL ? 0 : tree->s->edge.dy);
-  tree->acc = acc / 2;
-  tree->pool = tree->acc;
-  tree->acc2 = acc * tree->acc;
-  tree->pool2 = tree->acc2;
-}
-
-/* sets the acc value to deviation */
-void quad_tree_prime_with_dev(quad_tree *tree)
-{
-  tree->acc = tree->stat.deviation / 2;
-  tree->pool = tree->acc;
-  tree->acc2 = tree->stat.deviation * tree->acc;
-  tree->pool2 = tree->acc2;
-}
-
-/* sets the acc value to mean */
-void quad_tree_prime_with_mean(quad_tree *tree)
-{
-  tree->acc = tree->stat.mean / 2;
-  tree->pool = tree->acc;
-  tree->acc2 = tree->stat.mean * tree->acc;
-  tree->pool2 = tree->acc2;
-}
-
-/* sets the new accumulator value from pool */
-void quad_tree_accumulate(quad_tree *tree)
-{
-  tree->acc = tree->pool;
-  tree->acc2 = tree->pool2;
-}
-
-/* propagates one quarter of the acc value to each of the four neighbors */
-void quad_tree_propagate(quad_tree *tree)
-{
-  integral_value pool, pool2;
-  /* effectively this is one eighth of original tree value */
-  pool = tree->acc / 4;
-  pool2 = tree->acc2 / 4;
-  /* neighbor n */
-  if (tree->n != NULL) {
-    tree->n->pool += pool;
-    tree->n->pool2 += pool2;
-  }
-  /* at edge, return back to own pool */
-  else {
-    tree->pool += pool;
-    tree->pool2 += pool2;
-  }
-  /* neighbor e */
-  if (tree->e != NULL) {
-    tree->e->pool += pool;
-    tree->e->pool2 += pool2;
-  }
-  /* at edge, return back to own pool */
-  else {
-    tree->pool += pool;
-    tree->pool2 += pool2;
-  }
-  /* neighbor s */
-  if (tree->s != NULL) {
-    tree->s->pool += pool;
-    tree->s->pool2 += pool2;
-  }
-  /* at edge, return back to own pool */
-  else {
-    tree->pool += pool;
-    tree->pool2 += pool2;
-  }
-  /* neighbor w */
-  if (tree->w != NULL) {
-    tree->w->pool += pool;
-    tree->w->pool2 += pool2;
-  }
-  /* at edge, return back to own pool */
-  else {
-    tree->pool += pool;
-    tree->pool2 += pool2;
-  }
-}
-
-/* propagates only in vertical directions */
-void quad_tree_propagate_v(quad_tree *tree)
-{
-  integral_value pool, pool2;
-  /* effectively this is one eighth of original tree value */
-  pool = tree->acc / 4;
-  pool2 = tree->acc2 / 4;
-  /* neighbor n */
-  if (tree->n != NULL) {
-    tree->n->pool += pool;
-    tree->n->pool2 += pool2;
-  }
-  /* at edge, return back to own pool */
-  else {
-    tree->pool += pool;
-    tree->pool2 += pool2;
-  }
-  /* neighbor s */
-  if (tree->s != NULL) {
-    tree->s->pool += pool;
-    tree->s->pool2 += pool2;
-  }
-  /* at edge, return back to own pool */
-  else {
-    tree->pool += pool;
-    tree->pool2 += pool2;
-  }
-}
-
-/* propagate only in horizontal directions */
-void quad_tree_propagate_h(quad_tree *tree)
-{
-  integral_value pool, pool2;
-  /* effectively this is one eighth of original tree value */
-  pool = tree->acc / 4;
-  pool2 = tree->acc2 / 4;
-  /* neighbor e */
-  if (tree->e != NULL) {
-    tree->e->pool += pool;
-    tree->e->pool2 += pool2;
-  }
-  /* at edge, return back to own pool */
-  else {
-    tree->pool += pool;
-    tree->pool2 += pool2;
-  }
-  /* neighbor w */
-  if (tree->w != NULL) {
-    tree->w->pool += pool;
-    tree->w->pool2 += pool2;
-  }
-  /* at edge, return back to own pool */
-  else {
-    tree->pool += pool;
-    tree->pool2 += pool2;
-  }
-}
-
-/* propagate in proportion of dx and dy */
-void quad_tree_propagate_m(quad_tree *tree)
-{
-  integral_value pool, pool2, dx, dy, m, mx, my;
-
-  dx = fabs(tree->edge.dx);
-  dy = fabs(tree->edge.dy);
-  m = dx + dy;
-  if (m < 0.01) {
-    mx = my = 0.5;
-  }
-  else {
-    mx = dx / m;
-    my = dy / m;
-  }
-
-  /* divide only by two, as the value is further divided in proportion of dx/dy */
-  /* effectively this is one fourth of original tree value */
-  pool = tree->acc / 2;
-  pool2 = tree->acc2 / 2;
-
-  /* neighbor n */
-  if (tree->n != NULL) {
-    tree->n->pool += mx * pool;
-    tree->n->pool2 += mx * pool2;
-  }
-  /* at edge, return back to own pool */
-  else {
-    tree->pool += mx * pool;
-    tree->pool2 += mx * pool2;
-  }
-  /* neighbor e */
-  if (tree->e != NULL) {
-    tree->e->pool += my * pool;
-    tree->e->pool2 += my * pool2;
-  }
-  /* at edge, return back to own pool */
-  else {
-    tree->pool += my * pool;
-    tree->pool2 += my * pool2;
-  }
-  /* neighbor s */
-  if (tree->s != NULL) {
-    tree->s->pool += mx * pool;
-    tree->s->pool2 += mx * pool2;
-  }
-  /* at edge, return back to own pool */
-  else {
-    tree->pool += mx * pool;
-    tree->pool2 += mx * pool2;
-  }
-  /* neighbor w */
-  if (tree->w != NULL) {
-    tree->w->pool += my * pool;
-    tree->w->pool2 += my * pool2;
-  }
-  /* at edge, return back to own pool */
-  else {
-    tree->pool += my * pool;
-    tree->pool2 += my * pool2;
-  }
 }
 
 /******************************************************************************/
