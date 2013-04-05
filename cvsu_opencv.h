@@ -91,6 +91,17 @@ result pixel_image_draw_lines
 );
 
 /**
+ * Draws a list of weighted lines multiplying the given color values with the
+ * weight. Uses OpenCV cvLine function for drawing.
+ */
+result pixel_image_draw_weighted_lines
+(
+  pixel_image *source,
+  list *lines,
+  byte color[4]
+);
+
+/**
  * Draw a list of rects over an image using OpenCV cvRectangle function.
  */
 result pixel_image_draw_rects

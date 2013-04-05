@@ -230,8 +230,6 @@ typedef uint32 SI_2_t;
 #define p_SI_1 p_U32
 #define p_SI_2 p_U32
 
-typedef sint8 edge_strength;
-
 /**
  * Different one-channel and multi-channel pixel formats.
  */

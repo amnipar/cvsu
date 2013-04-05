@@ -56,6 +56,7 @@ string quad_forest_get_segment_mask_name = "quad_forest_get_segment_mask";
 string quad_forest_get_segment_boundary_name = "quad_forest_get_segment_boundary";
 string quad_forest_get_edge_chain_name = "quad_forest_get_edge_chain";
 string quad_forest_get_path_sniffers_name = "quad_forest_get_path_sniffers";
+string quad_forest_get_links_name = "quad_forest_get_links";
 string quad_forest_draw_trees_name =  "quad_forest_draw_trees";
 string quad_forest_highlight_segments_name = "quad_forest_highlight_segments";
 string quad_forest_draw_image_name = "quad_forest_draw_image";
@@ -1636,13 +1637,15 @@ result quad_forest_get_path_sniffers
 result quad_forest_get_links
 (
   quad_forest *forest,
-  list *links
+  list *links,
+  link_visualization_mode mode
 )
 {
   TRY();
   list_item *items, *end;
   quad_tree *tree;
   quad_tree_link *link;
+  uint32 size;
   /*integral_value d;*/
   weighted_line new_line;
 
@@ -1652,17 +1655,43 @@ result quad_forest_get_links
 
   items = forest->links.first.next;
   end = &forest->links.last;
-  while (items != end) {
-    link = (quad_tree_link*)items->data;
-    tree = link->a.tree;
-    new_line.start.x = (signed)(tree->x + (uint32)(tree->size / 2));
-    new_line.start.y = (signed)(tree->y + (uint32)(tree->size / 2));
-    tree = link->b.tree;
-    new_line.end.x = (signed)(tree->x + (uint32)(tree->size / 2));
-    new_line.end.y = (signed)(tree->y + (uint32)(tree->size / 2));
-    new_line.weight = 1 / link->distance;
-    CHECK(list_append(links, (pointer)&new_line));
-
+  if (mode == v_LINK_DISTANCE) {
+    while (items != end) {
+      link = (quad_tree_link*)items->data;
+      tree = link->a.tree;
+      size = (uint32)(tree->size / 2);
+      new_line.start.x = (signed)(tree->x + size);
+      new_line.start.y = (signed)(tree->y + size);
+      tree = link->b.tree;
+      size = (uint32)(tree->size / 2);
+      new_line.end.x = (signed)(tree->x + size);
+      new_line.end.y = (signed)(tree->y + size);
+      new_line.weight = 1 / link->distance;
+      CHECK(list_append(links, (pointer)&new_line));
+      items = items->next;
+    }
+  }
+  else
+  if (mode == v_LINK_ANGLE_COST) {
+    edge_strength *estrength;
+    while (items != end) {
+      link = (quad_tree_link*)items->data;
+      estrength = has_edge_strength(&link->annotation);
+      if (estrength != NULL) {
+        tree = link->a.tree;
+        size = (uint32)(tree->size / 2);
+        new_line.start.x = (signed)(tree->x + size);
+        new_line.start.y = (signed)(tree->y + size);
+        tree = link->b.tree;
+        size = (uint32)(tree->size / 2);
+        new_line.end.x = (signed)(tree->x + size);
+        new_line.end.y = (signed)(tree->y + size);
+        new_line.weight = (1 - estrength->ridge_score) * (1 - estrength->angle_score);
+        CHECK(list_append(links, (pointer)&new_line));
+      }
+      items = items->next;
+    }
+  }
     /*
     new_line.start.x = tree->x + (uint32)(tree->size / 2);
     new_line.start.y = tree->y + (uint32)(tree->size / 2);
@@ -1683,8 +1712,7 @@ result quad_forest_get_links
     new_line.weight = 0.5;
     CHECK(list_append(links, (pointer)&new_line));
     */
-    items = items->next;
-  }
+
 /*
   items = forest->trees.first.next;
   end = &forest->trees.last;
@@ -1707,7 +1735,7 @@ result quad_forest_get_links
     items = items->next;
   }
 */
-  FINALLY(quad_forest_get_path_sniffers);
+  FINALLY(quad_forest_get_links);
   RETURN();
 }
 

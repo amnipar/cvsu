@@ -76,25 +76,23 @@ result quad_forest_calculate_neighborhood_stats
 (
   quad_forest *forest,
   truth_value calculate_weighted,
-  integral_value surround_weight,
-  truth_value calculate_overlap,
-  truth_value calculate_distance,
-  truth_value calculate_strength
+  integral_value surround_weight
 );
 
 typedef enum stat_visualization_mode_t {
   v_STAT = 0,
   v_NSTAT,
-  v_DIST,
   v_OVERLAP,
-  v_STRENGTH
+  v_STRENGTH,
+  v_RIDGE
 } stat_visualization_mode;
 
 result quad_forest_visualize_neighborhood_stats
 (
   quad_forest *forest,
   pixel_image *target,
-  stat_visualization_mode mode
+  stat_visualization_mode smode,
+  link_visualization_mode lmode
 );
 
 result quad_forest_calculate_accumulated_regs
@@ -128,11 +126,7 @@ result quad_forest_parse
 (
   quad_forest *forest,
   /** How many propagation rounds to use for determining devmean and devdev */
-  uint32 rounds,
-  /** The bias value used for determining devdev threshold for boundary */
-  integral_value bias,
-  /** The minimum length of edge chains _before_ starting to fill gaps */
-  uint32 min_length
+  uint32 rounds
 );
 
 result quad_forest_visualize_parse_result

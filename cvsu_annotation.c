@@ -222,8 +222,6 @@ result expect_neighborhood_stat
   TRY();
 
   CHECK_POINTER(nstat);
-  CHECK_POINTER(tptr);
-  CHECK_POINTER(tptr->value);
 
   *nstat = has_neighborhood_stat(tptr);
   if (*nstat == NULL) {
@@ -232,6 +230,42 @@ result expect_neighborhood_stat
 
   FINALLY(expect_neighborhood_stat);
   RETURN();
+}
+
+/******************************************************************************/
+
+truth_value is_edge_strength
+(
+  typed_pointer *tptr
+)
+{
+  if (tptr != NULL && tptr->type == t_EDGE_STRENGTH) {
+    return TRUE;
+  }
+  return FALSE;
+}
+
+/******************************************************************************/
+
+edge_strength *has_edge_strength
+(
+  typed_pointer *tptr
+)
+{
+  if (IS_TRUE(is_edge_strength(tptr))) {
+    return (edge_strength*)tptr->value;
+  }
+  if (IS_TRUE(is_tuple(tptr))) {
+    typed_pointer *element;
+    element = tuple_has_type(tptr, t_EDGE_STRENGTH, 1, 1);
+    if (element != NULL) {
+      if (IS_FALSE(is_edge_strength(element))) {
+        return NULL;
+      }
+      return (edge_strength*)element->value;
+    }
+  }
+  return NULL;
 }
 
 /******************************************************************************/

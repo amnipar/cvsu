@@ -76,6 +76,7 @@ uint32 typesize[] = {
   sizeof(neighborhood_stat),
   sizeof(accumulated_reg),
   sizeof(edge_response),
+  sizeof(edge_strength),
   sizeof(quad_forest_segment), /* TODO: change to segment */
   sizeof(quad_forest_edge), /* TODO: change to boundary? */
   sizeof(quad_forest_intersection), /* TODO: change to intersection? */

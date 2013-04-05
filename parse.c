@@ -46,7 +46,7 @@ void print_usage()
   PRINT0("Parses images using quad forests and propagation.\n\n");
   PRINT0("Usage:\n\n");
   PRINT0("parse mode max min rounds source target\n");
-  PRINT0("  mode: parsing mode [ stat | nstat | wstat | dist | overlap | strength | reg | ? ]\n");
+  PRINT0("  mode: parsing mode [ stat | nstat | wstat | overlap | strength | reg | ? ]\n");
   PRINT0("  max: maximum size for trees; suggested value 16 (larger than min)\n");
   PRINT0("  min: minimum size for tree;  suggested value 4 (smaller than max)\n");
   PRINT0("  rounds: number of propagation rounds (0..5]\n");
@@ -59,7 +59,6 @@ enum mode_t {
   m_UNDEF = 0,
   m_STAT,
   m_NSTAT,
-  m_DIST,
   m_OVERLAP,
   m_STRENGTH,
   m_REG,
@@ -96,10 +95,6 @@ int main(int argc, char *argv[])
     else
     if (strcmp(smode, "nstat") == 0) {
       mode = m_NSTAT;
-    }
-    else
-    if (strcmp(smode, "dist") == 0) {
-      mode = m_DIST;
     }
     else
     if (strcmp(smode, "overlap") == 0) {
@@ -203,31 +198,25 @@ int main(int argc, char *argv[])
       PRINT0("parsing stat...\n");
       /*CHECK(quad_forest_calculate_accumulated_stats(&forest, rounds));*/
       PRINT0("drawing image...\n");
-      CHECK(quad_forest_visualize_neighborhood_stats(&forest, &dst_image, v_STAT));
+      CHECK(quad_forest_visualize_neighborhood_stats(&forest, &dst_image, v_STAT, v_LINK_NONE));
       break;
     case m_NSTAT:
       PRINT0("parsing nstat...\n");
-      CHECK(quad_forest_calculate_neighborhood_stats(&forest, use_weighted, weight, FALSE, FALSE, FALSE));
+      CHECK(quad_forest_calculate_neighborhood_stats(&forest, use_weighted, weight));
       PRINT0("drawing image...\n");
-      CHECK(quad_forest_visualize_neighborhood_stats(&forest, &dst_image, v_NSTAT));
-      break;
-    case m_DIST:
-      PRINT0("parsing dist...\n");
-      CHECK(quad_forest_calculate_neighborhood_stats(&forest, use_weighted, weight, FALSE, TRUE, FALSE));
-      PRINT0("drawing image...\n");
-      CHECK(quad_forest_visualize_neighborhood_stats(&forest, &dst_image, v_DIST));
+      CHECK(quad_forest_visualize_neighborhood_stats(&forest, &dst_image, v_NSTAT, v_LINK_NONE));
       break;
     case m_OVERLAP:
       PRINT0("parsing overlap...\n");
-      CHECK(quad_forest_calculate_neighborhood_stats(&forest, use_weighted, weight, TRUE, FALSE, FALSE));
+      CHECK(quad_forest_calculate_neighborhood_stats(&forest, use_weighted, weight));
       PRINT0("drawing image...\n");
-      CHECK(quad_forest_visualize_neighborhood_stats(&forest, &dst_image, v_OVERLAP));
+      CHECK(quad_forest_visualize_neighborhood_stats(&forest, &dst_image, v_OVERLAP, v_LINK_NONE));
       break;
     case m_STRENGTH:
       PRINT0("parsing strength...\n");
-      CHECK(quad_forest_calculate_neighborhood_stats(&forest, use_weighted, weight, FALSE, FALSE, TRUE));
+      CHECK(quad_forest_calculate_neighborhood_stats(&forest, use_weighted, weight));
       PRINT0("drawing image...\n");
-      CHECK(quad_forest_visualize_neighborhood_stats(&forest, &dst_image, v_STRENGTH));
+      CHECK(quad_forest_visualize_neighborhood_stats(&forest, &dst_image, v_STRENGTH, v_LINK_DISTANCE));
       break;
     case m_REG:
       PRINT0("parsing regs...\n");
@@ -243,7 +232,7 @@ int main(int argc, char *argv[])
       break;
     case m_FULL:
       PRINT0("parsing...\n");
-      CHECK(quad_forest_parse(&forest, rounds, 5, 3));
+      CHECK(quad_forest_parse(&forest, rounds));
       PRINT0("drawing image...\n");
       CHECK(quad_forest_visualize_parse_result(&forest, &dst_image));
       break;

@@ -67,6 +67,7 @@ typedef enum type_label_t {
   t_NSTAT,
   t_AREG,
   t_EDGE_RESPONSE,
+  t_EDGE_STRENGTH,
   t_SEGMENT,
   t_BOUNDARY,
   t_INTERSECTION,

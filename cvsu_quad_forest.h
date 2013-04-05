@@ -256,7 +256,8 @@ result quad_forest_get_path_sniffers
 result quad_forest_get_links
 (
   quad_forest *forest,
-  list *links
+  list *links,
+  link_visualization_mode mode
 );
 
 /**

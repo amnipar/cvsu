@@ -87,11 +87,11 @@ result expect_accumulated_stat
 typedef struct neighborhood_stat_t {
   integral_value mean_mean;
   integral_value mean_dev;
-  integral_value mean_dist;
   integral_value dev_mean;
   integral_value dev_dev;
-  integral_value dev_dist;
   integral_value strength;
+  integral_value ridge_score;
+  integral_value ridge_diff;
   integral_value overlap;
 } neighborhood_stat;
 
@@ -114,6 +114,30 @@ neighborhood_stat *has_neighborhood_stat
 result expect_neighborhood_stat
 (
   neighborhood_stat **nstat,
+  typed_pointer *tptr
+);
+
+/******************************************************************************/
+
+typedef struct segment_strength_t {
+  integral_value mean_diff;
+  integral_value overlap;
+} segment_strength;
+
+/******************************************************************************/
+
+typedef struct edge_strength_t {
+  integral_value angle_score;
+  integral_value ridge_score;
+} edge_strength;
+
+truth_value is_edge_strength
+(
+  typed_pointer *tptr
+);
+
+edge_strength *has_edge_strength
+(
   typed_pointer *tptr
 );
 

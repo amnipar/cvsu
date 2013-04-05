@@ -84,7 +84,22 @@ void quad_tree_link_destroy
   quad_tree_link *target
 );
 
-void quad_tree_link_ensure_edge_strength();
+typedef enum link_visualization_mode_t {
+  v_LINK_NONE,
+  v_LINK_DISTANCE,
+  v_LINK_ANGLE_COST
+} link_visualization_mode;
+
+/* forward declaration */
+struct quad_forest_t;
+
+void quad_tree_link_ensure_edge_strength
+(
+  struct quad_forest_t *forest,
+  quad_tree_link *link,
+  edge_strength **estrength
+);
+
 void quad_tree_ensure_neighborhood_stat();
 void quad_tree_ensure_boundary_strength();
 void quad_tree_ensure_segment_strength();
@@ -132,8 +147,6 @@ typedef struct quad_tree_t {
   /* TODO: to be removed */
   quad_forest_segment segment;
 } quad_tree;
-
-struct quad_forest_t;
 
 void quad_tree_destroy
 (
