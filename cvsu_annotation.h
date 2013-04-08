@@ -138,7 +138,8 @@ truth_value is_edge_strength
 
 edge_strength *has_edge_strength
 (
-  typed_pointer *tptr
+  typed_pointer *tptr,
+  uint32 token
 );
 
 /******************************************************************************/

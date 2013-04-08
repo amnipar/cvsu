@@ -249,17 +249,21 @@ truth_value is_edge_strength
 
 edge_strength *has_edge_strength
 (
-  typed_pointer *tptr
+  typed_pointer *tptr,
+  uint32 token
 )
 {
   if (IS_TRUE(is_edge_strength(tptr))) {
+    if (tptr->token != token) {
+      return NULL;
+    }
     return (edge_strength*)tptr->value;
   }
   if (IS_TRUE(is_tuple(tptr))) {
     typed_pointer *element;
     element = tuple_has_type(tptr, t_EDGE_STRENGTH, 1, 1);
     if (element != NULL) {
-      if (IS_FALSE(is_edge_strength(element))) {
+      if (IS_FALSE(is_edge_strength(element)) || element->token != token) {
         return NULL;
       }
       return (edge_strength*)element->value;

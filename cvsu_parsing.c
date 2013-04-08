@@ -1152,12 +1152,10 @@ result quad_forest_visualize_neighborhood_stats
   }
 
   {
-    byte link_color[4] = {0,255,255,0};
-    PRINT0("get links\n");
+    byte link_color[4] = {255,255,0,0};
+    
     CHECK(quad_forest_get_links(forest, &links, lmode));
-    PRINT0("draw links\n");
     CHECK(pixel_image_draw_weighted_lines(target, &links, link_color));
-    PRINT0("done\n");
   }
 
   FINALLY(quad_forest_visualize_neighborhood_stats);
@@ -1446,10 +1444,9 @@ result quad_forest_parse
 
   CHECK_POINTER(forest);
   CHECK_PARAM(rounds > 0);
-  PRINT0("nstat\n");
+  
   CHECK(quad_forest_calculate_neighborhood_stats(forest, FALSE, 0));
-  PRINT0("done\n");
-
+  
   trees = forest->trees.first.next;
   endtrees = &forest->trees.last;
   while (trees != endtrees) {

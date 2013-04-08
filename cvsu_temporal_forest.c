@@ -244,7 +244,8 @@ result temporal_forest_update
 
     forest2->token = target->frames;
     /*CHECK(quad_forest_calculate_neighborhood_stats(forest2, TRUE, 2, TRUE, FALSE, TRUE));*/
-    CHECK(quad_forest_calculate_accumulated_regs(forest2, 5));
+    /*CHECK(quad_forest_calculate_accumulated_regs(forest2, 5));*/
+    CHECK(quad_forest_parse(forest2, 5));
     /*
     size = target->rows * target->cols;
     for (i = 0; i < size; i++) {
@@ -412,7 +413,8 @@ result temporal_forest_visualize
   */
 
   /*CHECK(quad_forest_visualize_neighborhood_stats(forest, &target->visual, v_OVERLAP));*/
-  CHECK(quad_forest_visualize_accumulated_regs(forest, &target->visual));
+  /*CHECK(quad_forest_visualize_accumulated_regs(forest, &target->visual));*/
+  CHECK(quad_forest_visualize_parse_result(forest, &target->visual));
   /*
   CHECK(list_create(&lines, 1000, sizeof(line), 1));
   trees = forest->trees.first.next;

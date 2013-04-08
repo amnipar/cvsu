@@ -1676,7 +1676,7 @@ result quad_forest_get_links
     edge_strength *estrength;
     while (items != end) {
       link = (quad_tree_link*)items->data;
-      estrength = has_edge_strength(&link->annotation);
+      estrength = has_edge_strength(&link->annotation, forest->token);
       if (estrength != NULL) {
         tree = link->a.tree;
         size = (uint32)(tree->size / 2);
