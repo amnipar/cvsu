@@ -1686,7 +1686,7 @@ result quad_forest_get_links
         size = (uint32)(tree->size / 2);
         new_line.end.x = (signed)(tree->x + size);
         new_line.end.y = (signed)(tree->y + size);
-        new_line.weight = (1 - estrength->ridge_score) * (1 - estrength->angle_score);
+        new_line.weight = (estrength->ridge_score) * (1 - estrength->angle_score);
         CHECK(list_append(links, (pointer)&new_line));
       }
       items = items->next;

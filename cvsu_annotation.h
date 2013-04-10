@@ -90,8 +90,8 @@ typedef struct neighborhood_stat_t {
   integral_value dev_mean;
   integral_value dev_dev;
   integral_value strength;
+  integral_value strength_score;
   integral_value ridge_score;
-  integral_value ridge_diff;
   integral_value overlap;
 } neighborhood_stat;
 
@@ -122,13 +122,28 @@ result expect_neighborhood_stat
 typedef struct segment_strength_t {
   integral_value mean_diff;
   integral_value overlap;
+  integral_value extent;
 } segment_strength;
+
+truth_value is_segment_strength
+(
+  typed_pointer *tptr
+);
+
+segment_strength *has_segment_strength
+(
+  typed_pointer *tptr,
+  uint32 token
+);
 
 /******************************************************************************/
 
 typedef struct edge_strength_t {
   integral_value angle_score;
+  integral_value straightness_score;
+  integral_value strength_score;
   integral_value ridge_score;
+  integral_value length_score;
 } edge_strength;
 
 truth_value is_edge_strength

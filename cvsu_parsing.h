@@ -74,25 +74,21 @@ result quad_forest_visualize_accumulated_stats
 
 result quad_forest_calculate_neighborhood_stats
 (
-  quad_forest *forest,
-  truth_value calculate_weighted,
-  integral_value surround_weight
+  quad_forest *forest
 );
 
 typedef enum stat_visualization_mode_t {
   v_STAT = 0,
   v_NSTAT,
   v_OVERLAP,
-  v_STRENGTH,
-  v_RIDGE
+  v_STRENGTH
 } stat_visualization_mode;
 
 result quad_forest_visualize_neighborhood_stats
 (
   quad_forest *forest,
   pixel_image *target,
-  stat_visualization_mode smode,
-  link_visualization_mode lmode
+  stat_visualization_mode smode
 );
 
 result quad_forest_calculate_accumulated_regs

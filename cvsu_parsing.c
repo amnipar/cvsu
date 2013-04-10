@@ -667,9 +667,7 @@ result quad_forest_visualize_accumulated_stats
 
 result quad_forest_calculate_neighborhood_stats
 (
-  quad_forest *forest,
-  truth_value calculate_weighted,
-  integral_value surround_weight
+  quad_forest *forest
 )
 {
   TRY();
@@ -790,6 +788,8 @@ result quad_forest_calculate_neighborhood_stats
       }
 
       nstat->strength = 0;
+      nstat->strength_score = 0;
+      nstat->ridge_score = 0;
 
       tptr->token = forest->token;
     }
@@ -805,23 +805,12 @@ result quad_forest_calculate_neighborhood_stats
     nstat = has_neighborhood_stat(&tree->annotation);
     if (nstat != NULL) {
       nstat->overlap = (nstat->overlap - min_overlap) / scale;
-      if (nstat->overlap < 0.25) {
-        nstat->overlap = 0;
-      }
-      else
-      if (nstat->overlap > 0.75) {
-        nstat->overlap = 1;
-      }
-      else {
-        nstat->overlap = 0.5;
-      }
     }
-
     trees = trees->next;
   }
 
   /* calculate strength */
-  weight = 0.5;
+  /*weight = 0.5;*/
   trees = forest->trees.first.next;
   endtrees = &forest->trees.last;
   while (trees != endtrees) {
@@ -836,42 +825,6 @@ result quad_forest_calculate_neighborhood_stats
     trees = trees->next;
   }
 
-  /* calculate ridge score */
-  {
-    integral_value strength, own_strength, max_strength, min_strength;
-    neighborhood_stat *nstat2;
-
-    trees = forest->trees.first.next;
-    endtrees = &forest->trees.last;
-    while (trees != endtrees) {
-      tree = (quad_tree*)trees->data;
-      nstat = has_neighborhood_stat(&tree->annotation);
-      if (nstat != NULL) {
-        own_strength = nstat->strength;
-        max_strength = own_strength;
-        links = tree->links.first.next;
-        endlinks = &tree->links.last;
-        while (links != endlinks) {
-          head = *((quad_tree_link_head**)links->data);
-          if (head->link->category != d_N6) {
-            nstat2 = has_neighborhood_stat(&head->other->tree->annotation);
-            if (nstat2 != NULL) {
-              strength = nstat2->strength;
-              if (strength > max_strength) {
-                max_strength = strength;
-              }
-            }
-          }
-          links = links->next;
-        }
-
-        nstat->ridge_score = max_strength * (1 - (max_strength - own_strength));
-        nstat->ridge_diff = max_strength - own_strength;
-      }
-      trees = trees->next;
-    }
-  }
-
   FINALLY(quad_forest_calculate_neighborhood_stats);
   RETURN();
 }
@@ -882,8 +835,7 @@ result quad_forest_visualize_neighborhood_stats
 (
   quad_forest *forest,
   pixel_image *target,
-  stat_visualization_mode smode,
-  link_visualization_mode lmode
+  stat_visualization_mode smode
 )
 {
   TRY();
@@ -892,7 +844,6 @@ result quad_forest_visualize_neighborhood_stats
   neighborhood_stat *nstat;
   uint32 x, y, width, height, stride, row_step, count;
   byte *target_data, *target_pos, color, color0, color1, color2;
-  list links;
 
   CHECK_POINTER(forest);
   CHECK_POINTER(target);
@@ -1062,8 +1013,10 @@ result quad_forest_visualize_neighborhood_stats
       break;
     case v_STRENGTH:
       {
-        integral_value strength;
+        integral_value strength, min_strength, max_strength;
 
+        min_strength = 1;
+        max_strength = 0;
         trees = forest->trees.first.next;
         end = &forest->trees.last;
         while (trees != end) {
@@ -1071,34 +1024,12 @@ result quad_forest_visualize_neighborhood_stats
           if (tree->nw == NULL) {
             nstat = has_neighborhood_stat(&tree->annotation);
             if (nstat != NULL) {
-              strength = nstat->strength;
-              color0 = (byte)(255 * strength);
-              color1 = 0;
-              color2 = (byte)(255 * (1 - strength));
-            }
-            width = tree->size;
-            height = width;
-            row_step = stride - 3 * width;
-            target_pos = target_data + tree->y * stride + 3 * tree->x;
-            for (y = 0; y < height; y++, target_pos += row_step) {
-              for (x = 0; x < width; x++) {
-                *target_pos = color0;
-                target_pos++;
-                *target_pos = color1;
-                target_pos++;
-                *target_pos = color2;
-                target_pos++;
-              }
+              strength = fabs(nstat->ridge_score);
+              if (strength > max_strength) max_strength = strength;
             }
           }
           trees = trees->next;
         }
-      }
-      break;
-    case v_RIDGE:
-      {
-        integral_value ridge;
-
         trees = forest->trees.first.next;
         end = &forest->trees.last;
         while (trees != end) {
@@ -1106,10 +1037,11 @@ result quad_forest_visualize_neighborhood_stats
           if (tree->nw == NULL) {
             nstat = has_neighborhood_stat(&tree->annotation);
             if (nstat != NULL) {
-              ridge = nstat->ridge_score;
-              color0 = (byte)(255 * ridge);
+              strength = fabs(nstat->ridge_score) / max_strength;
+              /*nstat->strength;*/
+              color0 = (byte)(255 * strength);
               color1 = 0;
-              color2 = (byte)(255 * (1 - ridge));
+              color2 = (byte)(255 * (1 - strength));
             }
             width = tree->size;
             height = width;
@@ -1134,15 +1066,7 @@ result quad_forest_visualize_neighborhood_stats
       ERROR(BAD_PARAM);
   }
 
-  {
-    byte link_color[4] = {255,255,0,0};
-
-    CHECK(quad_forest_get_links(forest, &links, lmode));
-    CHECK(pixel_image_draw_weighted_lines(target, &links, link_color));
-  }
-
   FINALLY(quad_forest_visualize_neighborhood_stats);
-  list_destroy(&links);
   RETURN();
 }
 
@@ -1163,7 +1087,7 @@ result quad_forest_calculate_accumulated_regs
 
   CHECK_POINTER(forest);
 
-  CHECK(quad_forest_calculate_neighborhood_stats(forest, TRUE, 2));
+  CHECK(quad_forest_calculate_neighborhood_stats(forest));
 
   CHECK(run_context_operation(forest, &forest->trees, NULL,
                               prime_reg_accumulator,
@@ -1419,16 +1343,17 @@ result quad_forest_parse
   quad_tree_link *link;
   neighborhood_stat *nstat1, *nstat2;
   edge_response *eresp1, *eresp2;
-  edge_strength *estrength;
+  edge_strength *estrength1, *estrength2, *estrength;
   typed_pointer *tptr;
   list treelist;
   list_item *trees, *endtrees, *links, *endlinks;
-  integral_value angle1, angle2, anglediff, anglesum;
+  integral_value strength, minstrength, maxstrength, count;
+  integral_value angle1, angle2, anglediff, anglescore, strengthdiff;
 
   CHECK_POINTER(forest);
   CHECK_PARAM(rounds > 0);
 
-  CHECK(quad_forest_calculate_neighborhood_stats(forest, FALSE, 0));
+  CHECK(quad_forest_calculate_neighborhood_stats(forest));
 
   trees = forest->trees.first.next;
   endtrees = &forest->trees.last;
@@ -1437,36 +1362,98 @@ result quad_forest_parse
     CHECK(expect_neighborhood_stat(&nstat1, &tree1->annotation));
     if (nstat1->overlap < 0.25) {
       CHECK(quad_tree_ensure_edge_response(forest, tree1, &eresp1));
+      angle1 = eresp1->ang;
+      if (angle1 > M_PI) angle1 -= M_PI;
+
+      strength = nstat1->strength;
+      minstrength = strength;
+      maxstrength = strength;
+      count = 0;
       links = tree1->links.first.next;
       endlinks = &tree1->links.last;
       while (links != endlinks) {
         head = *((quad_tree_link_head**)links->data);
+        tree2 = head->other->tree;
+        CHECK(expect_neighborhood_stat(&nstat2, &tree2->annotation));
+
         CHECK(ensure_has(&head->link->annotation, t_EDGE_STRENGTH, &tptr));
+        estrength = (edge_strength*)tptr->value;
         if (tptr->token != forest->token) {
-          angle1 = head->angle;
-          if (angle1 > M_PI) angle1 -= M_PI;
-          angle2 = eresp1->ang;
-          if (angle2 > M_PI) angle2 -= M_PI;
-          anglediff = fabs(angle1 - angle2);
-          if (anglediff > (M_PI / 2)) anglediff = M_PI - anglediff;
-          anglesum = anglediff / (M_PI / 2);
-          tree2 = head->other->tree;
+          tptr->token = forest->token;
+
           CHECK(quad_tree_ensure_edge_response(forest, tree2, &eresp2));
-          angle1 = head->other->angle;
-          if (angle1 > M_PI) angle1 -= M_PI;
           angle2 = eresp2->ang;
           if (angle2 > M_PI) angle2 -= M_PI;
-          anglediff = fabs(angle1 - angle2);
+          anglediff = fabs(angle2 - angle1);
           if (anglediff > (M_PI / 2)) anglediff = M_PI - anglediff;
-          anglesum += (anglediff / (M_PI / 2));
-
-          estrength = (edge_strength*)tptr->value;
-          estrength->angle_score = anglesum / 2;
-          CHECK(expect_neighborhood_stat(&nstat2, &tree2->annotation));
-          estrength->ridge_score = fabs(nstat1->ridge_score - nstat2->ridge_score);
-          tptr->token = forest->token;
+          anglediff /= (M_PI / 2);
+          estrength->straightness_score = anglediff;
         }
 
+        CHECK(ensure_has(&head->annotation, t_EDGE_STRENGTH, &tptr));
+        estrength1 = (edge_strength*)tptr->value;
+        if (tptr->token != forest->token) {
+          tptr->token = forest->token;
+          angle2 = head->angle;
+          if (angle2 > M_PI) angle2 -= M_PI;
+          anglediff = fabs(angle2 - angle1);
+          if (anglediff > (M_PI / 2)) anglediff = M_PI - anglediff;
+          anglediff /= (M_PI / 2);
+          estrength1->angle_score = anglediff;
+          strengthdiff = nstat1->strength - nstat2->strength;
+          estrength1->strength_score = strengthdiff;
+        }
+        else {
+          anglediff = estrength1->angle_score;
+          strengthdiff = estrength1->strength_score;
+        }
+
+        /* increase strength score for perpendicular nodes */
+        if (anglediff > 0.5) {
+          strength = nstat2->strength;
+          if (strength < minstrength) minstrength = strength;
+          if (strength > maxstrength) maxstrength = strength;
+          count += 1;
+        }
+        links = links->next;
+      }
+
+      if (count > 0) {
+        nstat1->ridge_score = nstat1->strength / maxstrength;
+      }
+      else {
+        nstat1->ridge_score = 0;
+      }
+    }
+    trees = trees->next;
+  }
+
+  trees = forest->trees.first.next;
+  endtrees = &forest->trees.last;
+  while (trees != endtrees) {
+    tree1 = (quad_tree*)trees->data;
+    CHECK(expect_neighborhood_stat(&nstat1, &tree1->annotation));
+    if (nstat1->overlap < 0.25) {
+      links = tree1->links.first.next;
+      endlinks = &tree1->links.last;
+      while (links != endlinks) {
+        head = *((quad_tree_link_head**)links->data);
+        tree2 = head->other->tree;
+        CHECK(expect_neighborhood_stat(&nstat2, &tree2->annotation));
+        estrength = has_edge_strength(&head->link->annotation, forest->token);
+        if (estrength != NULL) {
+          estrength->ridge_score = (nstat1->ridge_score + nstat2->ridge_score) / 2;
+          estrength1 = has_edge_strength(&head->annotation, forest->token);
+          if (estrength1 != NULL && estrength1->angle_score > 0.5) {
+            estrength2 = has_edge_strength(&head->other->annotation, forest->token);
+            if (estrength2 != NULL) {
+              estrength->angle_score = (estrength1->angle_score + estrength2->angle_score) / 2;
+            }
+            else {
+              estrength->angle_score = 1;
+            }
+          }
+        }
         links = links->next;
       }
     }
@@ -1486,13 +1473,23 @@ result quad_forest_visualize_parse_result
 )
 {
   TRY();
+  list links;
 
   CHECK_POINTER(forest);
   CHECK_POINTER(target);
 
-  CHECK(quad_forest_visualize_neighborhood_stats(forest, target, v_OVERLAP, v_LINK_NONE));
+  CHECK(quad_forest_visualize_neighborhood_stats(forest, target, v_STRENGTH));
+
+  {
+    byte link_color[4] = {255,255,0,0};
+
+    /*CHECK(quad_forest_get_links(forest, &links, v_LINK_NONE));*/
+    CHECK(quad_forest_get_links(forest, &links, v_LINK_ANGLE_COST));
+    CHECK(pixel_image_draw_weighted_lines(target, &links, link_color));
+  }
 
   FINALLY(quad_forest_visualize_parse_result);
+  list_destroy(&links);
   RETURN();
 }
 
