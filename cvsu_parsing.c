@@ -1424,6 +1424,8 @@ result quad_forest_parse
   while (trees != endtrees) {
     tree1 = *((quad_tree**)trees->data);
     CHECK(expect_neighborhood_stat(&nstat1, &tree1->annotation));
+    
+    /* handle trees with boundary strengths */
     bstrength1 = has_boundary_strength(&tree1->annotation, forest->token);
     if (bstrength1 != NULL) {
       links = tree1->links.first.next;
@@ -1455,6 +1457,8 @@ result quad_forest_parse
         links = links->next;
       }
     }
+    
+    /* handle trees with segment strength */
     sstrength1 = has_segment_strength(&tree1->annotation, forest->token);
     if (sstrength1 != NULL) {
       links = tree1->links.first.next;
