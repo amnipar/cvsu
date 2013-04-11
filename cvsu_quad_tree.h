@@ -87,20 +87,22 @@ void quad_tree_link_destroy
 typedef enum link_visualization_mode_t {
   v_LINK_NONE,
   v_LINK_DISTANCE,
-  v_LINK_ANGLE_COST
+  v_LINK_ANGLE_COST,
+  v_LINK_SIMILARITY
 } link_visualization_mode;
 
 /* forward declaration */
 struct quad_forest_t;
 
-void quad_tree_link_ensure_edge_strength
+void quad_tree_ensure_neighborhood_stat();
+
+void quad_tree_link_ensure_booundary_strength
 (
   struct quad_forest_t *forest,
   quad_tree_link *link,
-  edge_strength **estrength
+  boundary_strength **bstrength
 );
 
-void quad_tree_ensure_neighborhood_stat();
 void quad_tree_ensure_boundary_strength();
 void quad_tree_ensure_segment_strength();
 

@@ -119,7 +119,30 @@ result expect_neighborhood_stat
 
 /******************************************************************************/
 
+typedef struct boundary_strength_t {
+  uint32 round;
+  integral_value angle_score;
+  integral_value straightness_score;
+  integral_value strength_score;
+  integral_value ridge_score;
+  integral_value length_score;
+} boundary_strength;
+
+truth_value is_boundary_strength
+(
+  typed_pointer *tptr
+);
+
+boundary_strength *has_boundary_strength
+(
+  typed_pointer *tptr,
+  uint32 token
+);
+
+/******************************************************************************/
+
 typedef struct segment_strength_t {
+  uint32 round;
   integral_value mean_diff;
   integral_value overlap;
   integral_value extent;
@@ -131,27 +154,6 @@ truth_value is_segment_strength
 );
 
 segment_strength *has_segment_strength
-(
-  typed_pointer *tptr,
-  uint32 token
-);
-
-/******************************************************************************/
-
-typedef struct edge_strength_t {
-  integral_value angle_score;
-  integral_value straightness_score;
-  integral_value strength_score;
-  integral_value ridge_score;
-  integral_value length_score;
-} edge_strength;
-
-truth_value is_edge_strength
-(
-  typed_pointer *tptr
-);
-
-edge_strength *has_edge_strength
 (
   typed_pointer *tptr,
   uint32 token

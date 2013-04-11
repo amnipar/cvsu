@@ -234,12 +234,12 @@ result expect_neighborhood_stat
 
 /******************************************************************************/
 
-truth_value is_edge_strength
+truth_value is_boundary_strength
 (
   typed_pointer *tptr
 )
 {
-  if (tptr != NULL && tptr->type == t_EDGE_STRENGTH) {
+  if (tptr != NULL && tptr->type == t_BOUNDARY_STRENGTH) {
     return TRUE;
   }
   return FALSE;
@@ -247,26 +247,66 @@ truth_value is_edge_strength
 
 /******************************************************************************/
 
-edge_strength *has_edge_strength
+boundary_strength *has_boundary_strength
 (
   typed_pointer *tptr,
   uint32 token
 )
 {
-  if (IS_TRUE(is_edge_strength(tptr))) {
+  if (IS_TRUE(is_boundary_strength(tptr))) {
     if (tptr->token != token) {
       return NULL;
     }
-    return (edge_strength*)tptr->value;
+    return (boundary_strength*)tptr->value;
   }
   if (IS_TRUE(is_tuple(tptr))) {
     typed_pointer *element;
-    element = tuple_has_type(tptr, t_EDGE_STRENGTH, 1, 1);
+    element = tuple_has_type(tptr, t_BOUNDARY_STRENGTH, 1, 1);
     if (element != NULL) {
-      if (IS_FALSE(is_edge_strength(element)) || element->token != token) {
+      if (IS_FALSE(is_boundary_strength(element)) || element->token != token) {
         return NULL;
       }
-      return (edge_strength*)element->value;
+      return (boundary_strength*)element->value;
+    }
+  }
+  return NULL;
+}
+
+/******************************************************************************/
+
+truth_value is_segment_strength
+(
+  typed_pointer *tptr
+)
+{
+  if (tptr != NULL && tptr->type == t_SEGMENT_STRENGTH) {
+    return TRUE;
+  }
+  return FALSE;
+}
+
+/******************************************************************************/
+
+segment_strength *has_segment_strength
+(
+  typed_pointer *tptr,
+  uint32 token
+)
+{
+  if (IS_TRUE(is_segment_strength(tptr))) {
+    if (tptr->token != token) {
+      return NULL;
+    }
+    return (segment_strength*)tptr->value;
+  }
+  if (IS_TRUE(is_tuple(tptr))) {
+    typed_pointer *element;
+    element = tuple_has_type(tptr, t_SEGMENT_STRENGTH, 1, 1);
+    if (element != NULL) {
+      if (IS_FALSE(is_segment_strength(element)) || element->token != token) {
+        return NULL;
+      }
+      return (segment_strength*)element->value;
     }
   }
   return NULL;

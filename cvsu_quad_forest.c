@@ -1673,11 +1673,11 @@ result quad_forest_get_links
   }
   else
   if (mode == v_LINK_ANGLE_COST) {
-    edge_strength *estrength;
+    boundary_strength *bstrength;
     while (items != end) {
       link = (quad_tree_link*)items->data;
-      estrength = has_edge_strength(&link->annotation, forest->token);
-      if (estrength != NULL) {
+      bstrength = has_boundary_strength(&link->annotation, forest->token);
+      if (bstrength != NULL) {
         tree = link->a.tree;
         size = (uint32)(tree->size / 2);
         new_line.start.x = (signed)(tree->x + size);
@@ -1686,7 +1686,28 @@ result quad_forest_get_links
         size = (uint32)(tree->size / 2);
         new_line.end.x = (signed)(tree->x + size);
         new_line.end.y = (signed)(tree->y + size);
-        new_line.weight = (estrength->ridge_score) * (1 - estrength->angle_score);
+        new_line.weight = (1 - bstrength->angle_score);
+        CHECK(list_append(links, (pointer)&new_line));
+      }
+      items = items->next;
+    }
+  }
+  else
+  if (mode == v_LINK_SIMILARITY) {
+    segment_strength *sstrength;
+    while (items != end) {
+      link = (quad_tree_link*)items->data;
+      sstrength = has_segment_strength(&link->annotation, forest->token);
+      if (sstrength != NULL) {
+        tree = link->a.tree;
+        size = (uint32)(tree->size / 2);
+        new_line.start.x = (signed)(tree->x + size);
+        new_line.start.y = (signed)(tree->y + size);
+        tree = link->b.tree;
+        size = (uint32)(tree->size / 2);
+        new_line.end.x = (signed)(tree->x + size);
+        new_line.end.y = (signed)(tree->y + size);
+        new_line.weight = sstrength->overlap;
         CHECK(list_append(links, (pointer)&new_line));
       }
       items = items->next;
