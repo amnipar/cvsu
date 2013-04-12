@@ -139,10 +139,14 @@ boundary_strength *has_boundary_strength
   uint32 token
 );
 
-typedef struct boundary_similarity_t {
+typedef struct boundary_score_t {
   integral_value angle_score;
   integral_value strength_score;
-} boundary_similarity;
+} boundary_score;
+
+typedef struct ridge_score_t {
+
+}
 
 /******************************************************************************/
 
@@ -164,10 +168,10 @@ segment_strength *has_segment_strength
   uint32 token
 );
 
-typedef struct segment_distance_t {
+typedef struct segment_score_t {
   integral_value mean_score;
   integral_value overlap_score;
-} segment_distance;
+} segment_score;
 
 /******************************************************************************/
 
