@@ -76,6 +76,10 @@ uint32 typesize[] = {
   sizeof(neighborhood_stat),
   sizeof(accumulated_reg),
   sizeof(edge_response),
+  sizeof(ridge_potential),
+  sizeof(boundary_potential),
+  sizeof(boundary_link_category),
+  sizeof(segment_potential),
   sizeof(boundary_strength),
   sizeof(quad_forest_edge), /* TODO: change to boundary? */
   sizeof(segment_strength),
@@ -341,9 +345,7 @@ result tuple_ensure_has_unique
 typed_pointer *tuple_has_type
 (
   typed_pointer *tuple,
-  type_label type,
-  uint32 count,
-  uint32 index
+  type_label type
 )
 {
   if (tuple != NULL && tuple->type == t_TUPLE) {
@@ -357,35 +359,6 @@ typed_pointer *tuple_has_type
       }
     }
     return NULL;
-    /* if count is specified, first checks that the tuple has the correct */
-    /* number of items of specified type, then returns the item with given index */
-    /*
-    if (count > 0) {
-      num = 0;
-      for (i = 0; i < tuple->count; i++) {
-        if (elements[i].type == type) {
-          num++;
-        }
-      }
-      if (num == count && index <= count) {
-        return &elements[index-1];
-      }
-      else {
-        return NULL;
-      }
-    }
-    */
-    /* otherwise just returns the first occurrence of the specified type */
-    /*
-    else {
-      for (i = 0; i < tuple->count; i++) {
-        if (elements[i].type == type) {
-          return &elements[i];
-        }
-      }
-      return NULL;
-    }
-    */
   }
   return NULL;
 }

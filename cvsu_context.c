@@ -69,7 +69,7 @@ stat_accumulator *has_stat_accumulator
   if (IS_TRUE(is_tuple(tptr))) {
     typed_pointer *element;
     /* must have exactly one stat accumulator */
-    element = tuple_has_type(tptr, t_STAT_ACCUMULATOR, 1, 1);
+    element = tuple_has_type(tptr, t_STAT_ACCUMULATOR);
     if (element != NULL) {
       return (stat_accumulator*)element->value;
     }
@@ -144,7 +144,7 @@ reg_accumulator *has_reg_accumulator
   if (IS_TRUE(is_tuple(tptr))) {
     typed_pointer *element;
     /* must have exactly one stat accumulator */
-    element = tuple_has_type(tptr, t_REG_ACCUMULATOR, 1, 1);
+    element = tuple_has_type(tptr, t_REG_ACCUMULATOR);
     if (element != NULL) {
       return (reg_accumulator*)element->value;
     }
@@ -200,7 +200,7 @@ ridge_finder *has_ridge_finder
   if (IS_TRUE(is_tuple(tptr))) {
     typed_pointer *element;
     /* must have exactly one stat accumulator */
-    element = tuple_has_type(tptr, t_RIDGE_FINDER, 1, 1);
+    element = tuple_has_type(tptr, t_RIDGE_FINDER);
     if (element != NULL) {
       return (ridge_finder*)element->value;
     }

@@ -67,6 +67,10 @@ typedef enum type_label_t {
   t_NSTAT,
   t_AREG,
   t_EDGE_RESPONSE,
+  t_ridge_potential,
+  t_boundary_potential,
+  t_boundary_link_category,
+  t_segment_potential,
   t_BOUNDARY_STRENGTH,
   t_BOUNDARY,
   t_SEGMENT_STRENGTH,
@@ -203,9 +207,7 @@ result tuple_ensure_has_unique
 typed_pointer *tuple_has_type
 (
   typed_pointer *tuple,
-  type_label type,
-  uint32 count,
-  uint32 index
+  type_label type
 );
 
 /**
@@ -237,6 +239,26 @@ result ensure_is
   type_label type,
   typed_pointer **res
 );
+
+/******************************************************************************/
+/* macros for managing typed pointers and tuples                              */
+
+#define IS_TYPE(tptr,type)\
+  ((tptr != NULL && tptr->type == t_##type) ? (type*)tptr->value : NULL)
+
+#define HAS_TYPE(tptr,ttype,ttoken)\
+  (((tptr) != NULL && (tptr)->type == t_##ttype) ? \
+  ((tptr)->token == (ttoken) ? (ttype*)((tptr)->value) : NULL) : \
+  ({ typed_pointer *elem = tuple_has_type((tptr), t_##ttype, 1, 1);\
+    (elem != NULL && elem->token == (ttoken)) ? (ttype*)(elem->value) : NULL }))
+
+#define EXPECT_TYPE(tptr,type)\
+  ((tptr != NULL && tptr->type == t_##type) ? (type*)tptr->value : ERROR(BAD_TYPE))
+
+#define ENSURE_HAS(tptr,type)\
+  (tptr != NULL ? { typed_pointer *elem; CHECK(ensure_has(tptr, t_##type, &elem)); (type*)elem->value; } : NULL)
+
+
 
 #ifdef __cplusplus
 }

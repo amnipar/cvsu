@@ -119,7 +119,7 @@ accumulated_stat *has_accumulated_stat
   }
   if (IS_TRUE(is_tuple(tptr))) {
     typed_pointer *element;
-    element = tuple_has_type(tptr, t_ASTAT, 1, 1);
+    element = tuple_has_type(tptr, t_ASTAT);
     if (element != NULL) {
       if (IS_FALSE(is_accumulated_stat(element))) {
         return NULL;
@@ -200,7 +200,7 @@ neighborhood_stat *has_neighborhood_stat
   }
   if (IS_TRUE(is_tuple(tptr))) {
     typed_pointer *element;
-    element = tuple_has_type(tptr, t_NSTAT, 1, 1);
+    element = tuple_has_type(tptr, t_NSTAT);
     if (element != NULL) {
       if (IS_FALSE(is_neighborhood_stat(element))) {
         return NULL;
@@ -234,6 +234,138 @@ result expect_neighborhood_stat
 
 /******************************************************************************/
 
+truth_value is_ridge_potential
+(
+  typed_pointer *tptr
+)
+{
+  if (tptr != NULL && tptr->type == t_ridge_potential) {
+    return TRUE;
+  }
+  return FALSE;
+}
+
+/******************************************************************************/
+
+ridge_potential *has_ridge_potential
+(
+  typed_pointer *tptr,
+  uint32 token
+)
+{
+  if (IS_TRUE(is_ridge_potential(tptr)) && tptr->token == token) {
+    return (ridge_potential*)tptr->value;
+  }
+  else {
+    typed_pointer *element = tuple_has_type(tptr, t_ridge_potential);
+    if (element != NULL && element->token == token) {
+      return (ridge_potential*)element->value;
+    }
+  }
+  return NULL;
+}
+
+/******************************************************************************/
+
+truth_value is_boundary_potential
+(
+  typed_pointer *tptr
+)
+{
+  if (tptr != NULL && tptr->type == t_boundary_potential) {
+    return TRUE;
+  }
+  return FALSE;
+}
+
+/******************************************************************************/
+
+boundary_potential *has_boundary_potential
+(
+  typed_pointer *tptr,
+  uint32 token
+)
+{
+  if (IS_TRUE(is_boundary_potential(tptr)) && tptr->token == token) {
+    return (boundary_potential*)tptr->value;
+  }
+  else {
+    typed_pointer *element = tuple_has_type(tptr, t_boundary_potential);
+    if (element != NULL && element->token == token) {
+      return (boundary_potential*)element->value;
+    }
+  }
+  return NULL;
+}
+
+/******************************************************************************/
+
+truth_value is_segment_potential
+(
+  typed_pointer *tptr
+)
+{
+  if (tptr != NULL && tptr->type == t_segment_potential) {
+    return TRUE;
+  }
+  return FALSE;
+}
+
+/******************************************************************************/
+
+segment_potential *has_segment_potential
+(
+  typed_pointer *tptr,
+  uint32 token
+)
+{
+  if (IS_TRUE(is_segment_potential(tptr)) && tptr->token == token) {
+    return (segment_potential*)tptr->value;
+  }
+  else {
+    typed_pointer *element = tuple_has_type(tptr, t_segment_potential);
+    if (element != NULL && element->token == token) {
+      return (segment_potential*)element->value;
+    }
+  }
+  return NULL;
+}
+
+/******************************************************************************/
+
+truth_value is_boundary_link_category
+(
+  typed_pointer *tptr
+)
+{
+  if (tptr != NULL && tptr->type == t_boundary_link_category) {
+    return TRUE;
+  }
+  return FALSE;
+}
+
+/******************************************************************************/
+
+boundary_link_category *has_boundary_link_category
+(
+  typed_pointer *tptr,
+  uint32 token
+)
+{
+  if (IS_TRUE(is_boundary_link_category(tptr)) && tptr->token == token) {
+    return (boundary_link_category*)tptr->value;
+  }
+  else {
+    typed_pointer *element = tuple_has_type(tptr, t_boundary_link_category);
+    if (element != NULL && element->token == token) {
+      return (boundary_link_category*)element->value;
+    }
+  }
+  return NULL;
+}
+
+/******************************************************************************/
+
 truth_value is_boundary_strength
 (
   typed_pointer *tptr
@@ -261,7 +393,7 @@ boundary_strength *has_boundary_strength
   }
   if (IS_TRUE(is_tuple(tptr))) {
     typed_pointer *element;
-    element = tuple_has_type(tptr, t_BOUNDARY_STRENGTH, 1, 1);
+    element = tuple_has_type(tptr, t_BOUNDARY_STRENGTH);
     if (element != NULL) {
       if (IS_FALSE(is_boundary_strength(element)) || element->token != token) {
         return NULL;
@@ -301,7 +433,7 @@ segment_strength *has_segment_strength
   }
   if (IS_TRUE(is_tuple(tptr))) {
     typed_pointer *element;
-    element = tuple_has_type(tptr, t_SEGMENT_STRENGTH, 1, 1);
+    element = tuple_has_type(tptr, t_SEGMENT_STRENGTH);
     if (element != NULL) {
       if (IS_FALSE(is_segment_strength(element)) || element->token != token) {
         return NULL;
@@ -359,7 +491,7 @@ accumulated_reg *has_accumulated_reg
   }
   if (IS_TRUE(is_tuple(tptr))) {
     typed_pointer *element;
-    element = tuple_has_type(tptr, t_AREG, 1, 1);
+    element = tuple_has_type(tptr, t_AREG);
     if (element != NULL) {
       if (IS_FALSE(is_accumulated_reg(element))) {
         return NULL;
@@ -417,7 +549,7 @@ edge_response *has_edge_response
   }
   if (IS_TRUE(is_tuple(tptr))) {
     typed_pointer *element;
-    element = tuple_has_type(tptr, t_EDGE_RESPONSE, 1, 1);
+    element = tuple_has_type(tptr, t_EDGE_RESPONSE);
     if (element != NULL) {
       if (IS_FALSE(is_edge_response(element))) {
         return NULL;

@@ -295,6 +295,17 @@ result quad_tree_edge_response_to_line
 );
 
 /**
+ * Generates a line corresponding to edge response gradient direction (if edge
+ * response is found) and appends it to the list.
+ */
+result quad_tree_gradient_to_line
+(
+  quad_tree *tree,
+  list *lines
+);
+
+
+/**
  * Adds all immediate neighbors of a quad_tree to a list.
  * The neighbor links point to the direct neighbors, or to those trees that are
  * directly adjacent at the same or lower level, thus of the same or larger

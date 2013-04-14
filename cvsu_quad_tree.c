@@ -48,6 +48,7 @@ string quad_tree_get_edge_response_name = "quad_tree_get_edge_response";
 string quad_tree_ensure_edge_response_name = "quad_tree_ensure_edge_response";
 string quad_tree_get_child_edge_response_name = "quad_tree_get_child_edge_response";
 string quad_tree_edge_response_to_line_name = "quad_tree_edge_response_to_line";
+string quad_tree_gradient_to_line_name = "quad_tree_gradient_to_line";
 string quad_tree_get_neighbors_name = "quad_tree_get_neighbors";
 string quad_tree_find_link_name = "quad_tree_find_link";
 
@@ -818,7 +819,7 @@ result quad_tree_ensure_edge_response
     }
 
     resp->mag = sqrt(hsum*hsum + vsum*vsum);
-    ang = atan2(hsum, vsum);
+    ang = atan2(-vsum, hsum);
     if (ang < 0) ang = ang + 2 * M_PI;
     resp->ang = ang;
 
@@ -933,21 +934,23 @@ result quad_tree_edge_response_to_line
 )
 {
   TRY();
+  edge_response *eresp;
   uint32 x, y, d, dx, dy;
   integral_value m, radius;
   line new_line;
 
   CHECK_POINTER(tree);
   CHECK_POINTER(lines);
-/* TODO: fix to use annotation
-  if (tree->edge.mag > 0) {
+
+  eresp = has_edge_response(&tree->annotation);
+  if (eresp != NULL && eresp->mag > 0.001) {
     x = tree->x;
     y = tree->y;
     radius = ((integral_value)tree->size) / 2.0;
-    m = getmax(fabs(tree->edge.dx), fabs(tree->edge.dy));
+    m = getmax(fabs(eresp->dx), fabs(eresp->dy));
     d = (unsigned)getlround(radius);
-    dx = (unsigned)getlround(tree->edge.dy / m * radius);
-    dy = (unsigned)getlround(tree->edge.dx / m * radius);
+    dx = (unsigned)getlround(eresp->dy / m * radius);
+    dy = (unsigned)getlround(eresp->dx / m * radius);
 
     new_line.start.x = (signed)(x + d + dx);
     new_line.start.y = (signed)(y + d - dy);
@@ -956,8 +959,60 @@ result quad_tree_edge_response_to_line
 
     CHECK(list_append(lines, (pointer)&new_line));
   }
-*/
+
   FINALLY(quad_tree_edge_response_to_line);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result quad_tree_gradient_to_line
+(
+  quad_tree *tree,
+  list *lines
+)
+{
+  TRY();
+  edge_response *eresp;
+  sint32 x, y, dx, dy;
+  integral_value lineang, radius;
+  weighted_line new_line;
+
+  CHECK_POINTER(tree);
+  CHECK_POINTER(lines);
+
+  eresp = has_edge_response(&tree->annotation);
+  if (eresp != NULL && eresp->mag > 0.001) {
+    radius = ((integral_value)tree->size) / 2.0;
+    x = getlround((integral_value)tree->x + radius);
+    y = getlround((integral_value)tree->y + radius);
+
+    new_line.weight = 1;
+    new_line.start.x = x;
+    new_line.start.y = y;
+    
+    lineang = eresp->ang;
+    dx = getlround(cos(lineang) * radius);
+    dy = getlround(sin(lineang) * radius);
+
+    new_line.end.x = x + dx;
+    new_line.end.y = y - dy;
+
+    CHECK(list_append(lines, (pointer)&new_line));
+    
+    lineang = eresp->ang - M_PI / 2;
+    if (lineang < 0) lineang += 2 * M_PI;
+    dx = getlround(cos(lineang) * radius);
+    dy = getlround(sin(lineang) * radius);
+    
+    new_line.weight = 0.5;
+    new_line.end.x = x + dx;
+    new_line.end.y = y - dy;
+    
+    CHECK(list_append(lines, (pointer)&new_line));
+  }
+
+  FINALLY(quad_tree_gradient_to_line);
   RETURN();
 }
 

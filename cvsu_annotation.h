@@ -119,6 +119,91 @@ result expect_neighborhood_stat
 
 /******************************************************************************/
 
+/*
+needed structures and information:
+-annotating nodes with ridge potential, boundary potential, segment potential
+-what information these need to store?
+-link scores to store the propagation results
+
+separate structures for links, or use the same structures?
+*/
+typedef struct ridge_potential_t {
+  integral_value ridge_score;
+} ridge_potential;
+
+truth_value is_ridge_potential
+(
+  typed_pointer *tptr
+);
+
+ridge_potential *has_ridge_potential
+(
+  typed_pointer *tptr,
+  uint32 token
+);
+
+typedef struct boundary_potential_t {
+  uint32 length;
+  integral_value angle_score;
+  integral_value strength_score;
+  integral_value straightness_score;
+} boundary_potential;
+
+truth_value is_boundary_potential
+(
+  typed_pointer *tptr
+);
+
+boundary_potential *has_boundary_potential
+(
+  typed_pointer *tptr,
+  uint32 token
+);
+
+typedef struct segment_potential_t {
+  uint32 rank;
+  uint32 extent;
+  integral_value diff_score;
+  integral_value overlap_score;
+} segment_potential;
+
+truth_value is_segment_potential
+(
+  typed_pointer *tptr
+);
+
+segment_potential *has_segment_potential
+(
+  typed_pointer *tptr,
+  uint32 token
+);
+
+/*
+boundary links need to store also link category.
+but this needs to be stored in link *heads*.
+link head annotation also because propagating separately to both directions.
+*/
+typedef enum boundary_link_category_t {
+  bl_UNDEF = 0,
+  bl_TOWARDS,
+  bl_AGAINST,
+  bl_PERPENDICULAR
+} boundary_link_category;
+
+truth_value is_boundary_link_category
+(
+  typed_pointer *tptr
+);
+
+boundary_link_category *has_boundary_link_category
+(
+  typed_pointer *tptr,
+  uint32 token
+);
+
+/*
+do I need a separate structure for link heads, or just add category in its own annotation?
+*/
 typedef struct boundary_strength_t {
   uint32 round;
   integral_value angle_score;
@@ -142,11 +227,12 @@ boundary_strength *has_boundary_strength
 typedef struct boundary_score_t {
   integral_value angle_score;
   integral_value strength_score;
+  integral_value straightness_score;
 } boundary_score;
 
 typedef struct ridge_score_t {
-
-}
+  integral_value score;
+} ridge_score;
 
 /******************************************************************************/
 
