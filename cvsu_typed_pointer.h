@@ -69,7 +69,7 @@ typedef enum type_label_t {
   t_EDGE_RESPONSE,
   t_ridge_potential,
   t_boundary_potential,
-  t_boundary_link_category,
+  t_link_measure,
   t_segment_potential,
   t_BOUNDARY_STRENGTH,
   t_BOUNDARY,

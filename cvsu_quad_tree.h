@@ -88,7 +88,10 @@ typedef enum link_visualization_mode_t {
   v_LINK_NONE,
   v_LINK_DISTANCE,
   v_LINK_ANGLE_COST,
-  v_LINK_SIMILARITY
+  v_LINK_SIMILARITY,
+  v_LINK_MEASURE,
+  v_LINK_STRENGTH,
+  v_LINK_STRAIGHTNESS
 } link_visualization_mode;
 
 /* forward declaration */

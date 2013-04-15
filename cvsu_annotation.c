@@ -333,12 +333,12 @@ segment_potential *has_segment_potential
 
 /******************************************************************************/
 
-truth_value is_boundary_link_category
+truth_value is_link_measure
 (
   typed_pointer *tptr
 )
 {
-  if (tptr != NULL && tptr->type == t_boundary_link_category) {
+  if (tptr != NULL && tptr->type == t_link_measure) {
     return TRUE;
   }
   return FALSE;
@@ -346,19 +346,19 @@ truth_value is_boundary_link_category
 
 /******************************************************************************/
 
-boundary_link_category *has_boundary_link_category
+link_measure *has_link_measure
 (
   typed_pointer *tptr,
   uint32 token
 )
 {
-  if (IS_TRUE(is_boundary_link_category(tptr)) && tptr->token == token) {
-    return (boundary_link_category*)tptr->value;
+  if (IS_TRUE(is_link_measure(tptr)) && tptr->token == token) {
+    return (link_measure*)tptr->value;
   }
   else {
-    typed_pointer *element = tuple_has_type(tptr, t_boundary_link_category);
+    typed_pointer *element = tuple_has_type(tptr, t_link_measure);
     if (element != NULL && element->token == token) {
-      return (boundary_link_category*)element->value;
+      return (link_measure*)element->value;
     }
   }
   return NULL;

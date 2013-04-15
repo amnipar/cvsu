@@ -1653,9 +1653,9 @@ result quad_forest_get_links
 
   CHECK(list_create(links, forest->links.count * 2, sizeof(weighted_line), 1));
 
-  items = forest->links.first.next;
-  end = &forest->links.last;
   if (mode == v_LINK_DISTANCE) {
+    items = forest->links.first.next;
+    end = &forest->links.last;
     while (items != end) {
       link = (quad_tree_link*)items->data;
       tree = link->a.tree;
@@ -1674,6 +1674,8 @@ result quad_forest_get_links
   else
   if (mode == v_LINK_ANGLE_COST) {
     boundary_strength *bstrength;
+    items = forest->links.first.next;
+    end = &forest->links.last;
     while (items != end) {
       link = (quad_tree_link*)items->data;
       bstrength = has_boundary_strength(&link->annotation, forest->token);
@@ -1695,6 +1697,8 @@ result quad_forest_get_links
   else
   if (mode == v_LINK_SIMILARITY) {
     segment_strength *sstrength;
+    items = forest->links.first.next;
+    end = &forest->links.last;
     while (items != end) {
       link = (quad_tree_link*)items->data;
       sstrength = has_segment_strength(&link->annotation, forest->token);
@@ -1708,6 +1712,131 @@ result quad_forest_get_links
         new_line.end.x = (signed)(tree->x + size);
         new_line.end.y = (signed)(tree->y + size);
         new_line.weight = sstrength->overlap;
+        CHECK(list_append(links, (pointer)&new_line));
+      }
+      items = items->next;
+    }
+  }
+  else
+  if (mode == v_LINK_MEASURE) {
+    quad_tree_link_head *head;
+    link_measure *lmeasure;
+    integral_value radius;
+    sint32 x, y, dx, dy;
+    items = forest->links.first.next;
+    end = &forest->links.last;
+    while (items != end) {
+      link = (quad_tree_link*)items->data;
+      head = &link->a;
+      lmeasure = has_link_measure(&head->annotation, forest->token);
+      /* bl_AGAINST bl_TOWARDS bl_PERPENDICULAR */
+      if (lmeasure != NULL && lmeasure->category == bl_PERPENDICULAR) {
+        tree = head->tree;
+        radius = ((integral_value)tree->size) / 2.0;
+        x = getlround((integral_value)tree->x + radius);
+        y = getlround((integral_value)tree->y + radius);
+        dx = getlround(cos(head->angle) * radius);
+        dy = getlround(sin(head->angle) * radius);
+
+        new_line.start.x = x;
+        new_line.start.y = y;
+        new_line.end.x = x + dx;
+        new_line.end.y = y - dy;
+        new_line.weight = 1;
+        CHECK(list_append(links, (pointer)&new_line));
+      }
+      head = &link->b;
+      lmeasure = has_link_measure(&head->annotation, forest->token);
+      if (lmeasure != NULL && lmeasure->category == bl_PERPENDICULAR) {
+        tree = head->tree;
+        radius = ((integral_value)tree->size) / 2.0;
+        x = getlround((integral_value)tree->x + radius);
+        y = getlround((integral_value)tree->y + radius);
+        dx = getlround(cos(head->angle) * radius);
+        dy = getlround(sin(head->angle) * radius);
+
+        new_line.start.x = x;
+        new_line.start.y = y;
+        new_line.end.x = x + dx;
+        new_line.end.y = y - dy;
+        new_line.weight = 1;
+        CHECK(list_append(links, (pointer)&new_line));
+      }
+      items = items->next;
+    }
+  }
+  else
+  if (mode == v_LINK_STRENGTH) {
+    quad_tree_link_head *head;
+    boundary_potential *bstrength;
+    integral_value radius, max_strength;
+    sint32 x, y, dx, dy;
+
+    max_strength = 0;
+    items = forest->links.first.next;
+    end = &forest->links.last;
+    while (items != end) {
+      link = (quad_tree_link*)items->data;
+      head = &link->a;
+      bstrength = has_boundary_potential(&head->annotation, forest->token);
+      if (bstrength != NULL) {
+        if (bstrength->strength > max_strength) {
+          max_strength = bstrength->strength;
+        }
+      }
+      head = &link->b;
+      bstrength = has_boundary_potential(&head->annotation, forest->token);
+      if (bstrength != NULL) {
+        if (bstrength->strength > max_strength) {
+          max_strength = bstrength->strength;
+        }
+      }
+      items = items->next;
+    }
+    items = forest->links.first.next;
+    end = &forest->links.last;
+    while (items != end) {
+      link = (quad_tree_link*)items->data;
+      head = &link->a;
+      bstrength = has_boundary_potential(&head->annotation, forest->token);
+      if (bstrength != NULL) {
+        tree = head->tree;
+        radius = ((integral_value)tree->size) / 2.0;
+        x = getlround((integral_value)tree->x + radius);
+        y = getlround((integral_value)tree->y + radius);
+        dx = getlround(cos(head->angle) * radius);
+        dy = getlround(sin(head->angle) * radius);
+
+        new_line.start.x = x;
+        new_line.start.y = y;
+        new_line.end.x = x + dx;
+        new_line.end.y = y - dy;
+        new_line.weight = bstrength->strength / max_strength;
+        if (new_line.weight < 0) {
+          new_line.weight = 0;
+        }
+
+        CHECK(list_append(links, (pointer)&new_line));
+      }
+      head = &link->b;
+      bstrength = has_boundary_potential(&head->annotation, forest->token);
+      if (bstrength != NULL) {
+        tree = head->tree;
+        radius = ((integral_value)tree->size) / 2.0;
+        x = getlround((integral_value)tree->x + radius);
+        y = getlround((integral_value)tree->y + radius);
+        dx = getlround(cos(head->angle) * radius);
+        dy = getlround(sin(head->angle) * radius);
+
+        new_line.start.x = x;
+        new_line.start.y = y;
+        new_line.end.x = x + dx;
+        new_line.end.y = y - dy;
+        new_line.weight = bstrength->strength / max_strength;
+        if (new_line.weight < 0) {
+          new_line.weight = 0;
+        }
+
         CHECK(list_append(links, (pointer)&new_line));
       }
       items = items->next;

@@ -990,7 +990,7 @@ result quad_tree_gradient_to_line
     new_line.weight = 1;
     new_line.start.x = x;
     new_line.start.y = y;
-    
+
     lineang = eresp->ang;
     dx = getlround(cos(lineang) * radius);
     dy = getlround(sin(lineang) * radius);
@@ -999,16 +999,16 @@ result quad_tree_gradient_to_line
     new_line.end.y = y - dy;
 
     CHECK(list_append(lines, (pointer)&new_line));
-    
-    lineang = eresp->ang - M_PI / 2;
+
+    lineang = eresp->ang - M_PI_2;
     if (lineang < 0) lineang += 2 * M_PI;
     dx = getlround(cos(lineang) * radius);
     dy = getlround(sin(lineang) * radius);
-    
+
     new_line.weight = 0.5;
     new_line.end.x = x + dx;
     new_line.end.y = y - dy;
-    
+
     CHECK(list_append(lines, (pointer)&new_line));
   }
 
