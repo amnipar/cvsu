@@ -188,6 +188,7 @@ int main(int argc, char *argv[])
   CHECK(pixel_image_create_from_file(&src_image, source_file, p_U8, GREY));
   CHECK(pixel_image_create(&dst_image, p_U8, RGB, src_image.width, src_image.height,
                            3, 3 * src_image.width));
+  CHECK(convert_grey8_to_grey24(&src_image, &dst_image));
   PRINT0("create forest...\n");
   CHECK(quad_forest_create(&forest, &src_image, max_size, min_size));
   PRINT0("updating forest...\n");
