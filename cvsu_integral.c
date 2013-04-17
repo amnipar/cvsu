@@ -712,7 +712,7 @@ result integral_image_threshold_feng
       mean = stat.mean;
       dev1 = stat.deviation;
       if (IS_TRUE(estimate_min)) {
-        min = fmax(0, mean - alpha * dev1);
+        min = getmax(0, mean - alpha * dev1);
       }
       else {
         min = pixel_image_find_min_byte(source->original, x-radius1, y-radius1,
@@ -720,7 +720,7 @@ result integral_image_threshold_feng
       }
       dev2 = sqrt(integral_image_calculate_variance(source, x-radius2, y-radius2,
                                                     size2, size2, offset));
-      as = dev1 / fmax(1,dev2);
+      as = dev1 / getmax(1,dev2);
       asg = pow(as, g);
       a2 = k1 * asg;
       a3 = k2 * asg;
