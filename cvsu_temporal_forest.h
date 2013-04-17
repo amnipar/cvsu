@@ -103,7 +103,8 @@ result temporal_forest_update
 
 result temporal_forest_visualize
 (
-  temporal_forest *target
+  temporal_forest *target,
+  pixel_image *image
 );
 
 quad_forest *temporal_forest_get_current

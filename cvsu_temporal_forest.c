@@ -36,26 +36,6 @@
 #include <math.h>
 
 /******************************************************************************/
-/* some gcc versions seem to require these definitions to work properly       */
-/* remove them if they cause problems with other compilers                    */
-
-#ifdef NEED_MINMAX
-#if INTEGRAL_IMAGE_DATA_TYPE == INTEGRAL_IMAGE_USING_FLOAT
-float fminf(float __x, float __y);
-float fmaxf(float __x, float __y);
-#define getmin fminf
-#define getmax fmaxf
-#elif INTEGRAL_IMAGE_DATA_TYPE == INTEGRAL_IMAGE_USING_DOUBLE
-double fmin(double __x, double __y);
-double fmax(double __x, double __y);
-#define getmin fmin
-#define getmax fmax
-#else
-#error "integral image data type not defined"
-#endif
-#endif
-
-/******************************************************************************/
 /* constants for reporting function names in error messages                   */
 
 string temporal_forest_alloc_name = "temporal_forest_alloc";
@@ -388,7 +368,8 @@ result temporal_forest_update
 
 result temporal_forest_visualize
 (
-  temporal_forest *target
+  temporal_forest *target,
+  pixel_image *image
 )
 {
   TRY();
@@ -405,8 +386,21 @@ result temporal_forest_visualize
   forest = &target->forests[target->current];
   width = target->visual.width;
   height = target->visual.height;
-  stride = target->visual.stride;
-  target_data = (byte*)target->visual.data;
+  
+  if (image != NULL) {
+    CHECK_PARAM(image->width == width);
+    CHECK_PARAM(image->height == height);
+    CHECK_PARAM(image->type == p_U8);
+    CHECK_PARAM(image->format == RGB);
+    
+    stride = image->stride;
+    target_data = (byte*)image->data;
+  }
+  else {
+    stride = target->visual.stride;
+    target_data = (byte*)target->visual.data;
+  }
+  
   /*
   CHECK(pixel_image_clear(&target->visual));
   CHECK(convert_grey8_to_grey24(forest->source, &target->visual));
@@ -414,7 +408,12 @@ result temporal_forest_visualize
 
   /*CHECK(quad_forest_visualize_neighborhood_stats(forest, &target->visual, v_OVERLAP));*/
   /*CHECK(quad_forest_visualize_accumulated_regs(forest, &target->visual));*/
-  CHECK(quad_forest_visualize_parse_result(forest, &target->visual));
+  if (image != NULL) {
+    CHECK(quad_forest_visualize_parse_result(forest, image));
+  }
+  else {
+    CHECK(quad_forest_visualize_parse_result(forest, &target->visual));
+  }
   /*
   CHECK(list_create(&lines, 1000, sizeof(line), 1));
   trees = forest->trees.first.next;
