@@ -1681,6 +1681,12 @@ result quad_forest_visualize_parse_result
   CHECK_POINTER(forest);
   CHECK_POINTER(target);
 
+  CHECK_PARAM(target->type == p_U8);
+  CHECK_PARAM(target->format == RGB);
+  CHECK_PARAM(target->width >= forest->source->width);
+  CHECK_PARAM(target->height >= forest->source->height);
+  CHECK_PARAM(target->step == 3);
+  
   width = target->width;
   height = target->height;
   stride = target->stride;
@@ -1783,7 +1789,7 @@ result quad_forest_visualize_parse_result
     CHECK(pixel_image_draw_weighted_lines(target, &links, edge_color));
     */
     CHECK(quad_forest_get_links(forest, &links, v_LINK_MEASURE));
-    PRINT1("links: %d\n", links.count);
+    /*PRINT1("links: %d\n", links.count);*/
     /*
     trees = forest->trees.first.next;
     end = &forest->trees.last;
