@@ -43,6 +43,7 @@ extern "C" {
 #include "cvsu_list.h"
 
 struct quad_tree_t;
+struct quad_tree_link_head_t;
 
 /******************************************************************************/
 
@@ -145,11 +146,10 @@ ridge_potential *has_ridge_potential
 
 typedef struct boundary_potential_t {
   uint32 length;
-  integral_value angle_score;
+  integral_value mean_score;
   integral_value strength_score;
+  integral_value angle_score;
   integral_value straightness_score;
-  integral_value strength;
-  integral_value straightness;
 } boundary_potential;
 
 truth_value is_boundary_potential
@@ -205,6 +205,23 @@ truth_value is_link_measure
 );
 
 link_measure *has_link_measure
+(
+  typed_pointer *tptr,
+  uint32 token
+);
+
+typedef struct edge_links_t {
+  struct quad_tree_link_head_t *towards;
+  struct quad_tree_link_head_t *against;
+  integral_value edge_score;
+} edge_links;
+
+truth_value is_edge_links
+(
+  typed_pointer *tptr
+);
+
+edge_links *has_edge_links
 (
   typed_pointer *tptr,
   uint32 token
@@ -304,6 +321,7 @@ typedef struct edge_response_t
   integral_value dy;
   integral_value mag;
   integral_value ang;
+  integral_value confidence;
 } edge_response;
 
 result ensure_edge_response
@@ -319,7 +337,26 @@ truth_value is_edge_response
 
 edge_response *has_edge_response
 (
+  typed_pointer *tptr,
+  uint32 token
+);
+
+typedef struct smoothed_gradient_t
+{
+  integral_value mag;
+  integral_value ang;
+  integral_value confidence;
+} smoothed_gradient;
+
+truth_value is_smoothed_gradient
+(
   typed_pointer *tptr
+);
+
+smoothed_gradient *has_smoothed_gradient
+(
+  typed_pointer *tptr,
+  uint32 token
 );
 
 /******************************************************************************/

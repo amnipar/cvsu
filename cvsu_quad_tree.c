@@ -929,6 +929,7 @@ result quad_tree_get_child_edge_response
 
 result quad_tree_edge_response_to_line
 (
+  quad_forest *forest,
   quad_tree *tree,
   list *lines
 )
@@ -942,7 +943,7 @@ result quad_tree_edge_response_to_line
   CHECK_POINTER(tree);
   CHECK_POINTER(lines);
 
-  eresp = has_edge_response(&tree->annotation);
+  eresp = has_edge_response(&tree->annotation, forest->token);
   if (eresp != NULL && eresp->mag > 0.001) {
     x = tree->x;
     y = tree->y;
@@ -968,6 +969,7 @@ result quad_tree_edge_response_to_line
 
 result quad_tree_gradient_to_line
 (
+  quad_forest *forest,
   quad_tree *tree,
   list *lines
 )
@@ -981,7 +983,7 @@ result quad_tree_gradient_to_line
   CHECK_POINTER(tree);
   CHECK_POINTER(lines);
 
-  eresp = has_edge_response(&tree->annotation);
+  eresp = has_edge_response(&tree->annotation, forest->token);
   if (eresp != NULL && eresp->mag > 0.001) {
     radius = ((integral_value)tree->size) / 2.0;
     x = getlround((integral_value)tree->x + radius);

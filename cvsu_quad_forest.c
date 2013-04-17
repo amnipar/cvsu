@@ -1730,7 +1730,8 @@ result quad_forest_get_links
       head = &link->a;
       lmeasure = has_link_measure(&head->annotation, forest->token);
       /* bl_AGAINST bl_TOWARDS bl_PERPENDICULAR */
-      if (lmeasure != NULL && lmeasure->category == bl_PERPENDICULAR) {
+      if (lmeasure != NULL &&
+          (lmeasure->category == bl_TOWARDS || lmeasure->category == bl_AGAINST)) {
         tree = head->tree;
         radius = ((integral_value)tree->size) / 2.0;
         x = getlround((integral_value)tree->x + radius);
@@ -1747,7 +1748,8 @@ result quad_forest_get_links
       }
       head = &link->b;
       lmeasure = has_link_measure(&head->annotation, forest->token);
-      if (lmeasure != NULL && lmeasure->category == bl_PERPENDICULAR) {
+      if (lmeasure != NULL &&
+          (lmeasure->category == bl_TOWARDS || lmeasure->category == bl_AGAINST)) {
         tree = head->tree;
         radius = ((integral_value)tree->size) / 2.0;
         x = getlround((integral_value)tree->x + radius);
@@ -1780,15 +1782,15 @@ result quad_forest_get_links
       head = &link->a;
       bstrength = has_boundary_potential(&head->annotation, forest->token);
       if (bstrength != NULL) {
-        if (bstrength->strength > max_strength) {
-          max_strength = bstrength->strength;
+        if (bstrength->strength_score > max_strength) {
+          max_strength = bstrength->strength_score;
         }
       }
       head = &link->b;
       bstrength = has_boundary_potential(&head->annotation, forest->token);
       if (bstrength != NULL) {
-        if (bstrength->strength > max_strength) {
-          max_strength = bstrength->strength;
+        if (bstrength->strength_score > max_strength) {
+          max_strength = bstrength->strength_score;
         }
       }
       items = items->next;
@@ -1811,7 +1813,7 @@ result quad_forest_get_links
         new_line.start.y = y;
         new_line.end.x = x + dx;
         new_line.end.y = y - dy;
-        new_line.weight = bstrength->strength / max_strength;
+        new_line.weight = bstrength->strength_score / max_strength;
         if (new_line.weight < 0) {
           new_line.weight = 0;
         }
@@ -1832,12 +1834,59 @@ result quad_forest_get_links
         new_line.start.y = y;
         new_line.end.x = x + dx;
         new_line.end.y = y - dy;
-        new_line.weight = bstrength->strength / max_strength;
+        new_line.weight = bstrength->strength_score / max_strength;
         if (new_line.weight < 0) {
           new_line.weight = 0;
         }
 
         CHECK(list_append(links, (pointer)&new_line));
+      }
+      items = items->next;
+    }
+  }
+  else
+  if (mode == v_LINK_EDGE) {
+    quad_tree_link_head *head;
+    edge_links *elinks;
+    integral_value radius;
+    sint32 x, y, dx, dy;
+
+    items = forest->trees.first.next;
+    end = &forest->trees.last;
+    while (items != end) {
+      tree = (quad_tree*)items->data;
+      elinks = has_edge_links(&tree->annotation, forest->token);
+      if (elinks != NULL) {
+        if (elinks->towards != NULL) {
+          head = elinks->towards;
+          radius = ((integral_value)tree->size) / 2.0;
+          x = getlround((integral_value)tree->x + radius);
+          y = getlround((integral_value)tree->y + radius);
+          dx = getlround(cos(head->angle) * radius);
+          dy = getlround(sin(head->angle) * radius);
+
+          new_line.start.x = x;
+          new_line.start.y = y;
+          new_line.end.x = x + dx;
+          new_line.end.y = y - dy;
+          new_line.weight = 1;
+          CHECK(list_append(links, (pointer)&new_line));
+        }
+        if (elinks->against != NULL) {
+          head = elinks->against;
+          radius = ((integral_value)tree->size) / 2.0;
+          x = getlround((integral_value)tree->x + radius);
+          y = getlround((integral_value)tree->y + radius);
+          dx = getlround(cos(head->angle) * radius);
+          dy = getlround(sin(head->angle) * radius);
+
+          new_line.start.x = x;
+          new_line.start.y = y;
+          new_line.end.x = x + dx;
+          new_line.end.y = y - dy;
+          new_line.weight = 1;
+          CHECK(list_append(links, (pointer)&new_line));
+        }
       }
       items = items->next;
     }

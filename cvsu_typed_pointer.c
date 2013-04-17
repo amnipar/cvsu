@@ -76,9 +76,11 @@ uint32 typesize[] = {
   sizeof(neighborhood_stat),
   sizeof(accumulated_reg),
   sizeof(edge_response),
+  sizeof(smoothed_gradient),
   sizeof(ridge_potential),
   sizeof(boundary_potential),
   sizeof(link_measure),
+  sizeof(edge_links),
   sizeof(segment_potential),
   sizeof(boundary_strength),
   sizeof(quad_forest_edge), /* TODO: change to boundary? */

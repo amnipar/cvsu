@@ -366,6 +366,39 @@ link_measure *has_link_measure
 
 /******************************************************************************/
 
+truth_value is_edge_links
+(
+  typed_pointer *tptr
+)
+{
+  if (tptr != NULL && tptr->type == t_edge_links) {
+    return TRUE;
+  }
+  return FALSE;
+}
+
+/******************************************************************************/
+
+edge_links *has_edge_links
+(
+  typed_pointer *tptr,
+  uint32 token
+)
+{
+  if (IS_TRUE(is_edge_links(tptr)) && tptr->token == token) {
+    return (edge_links*)tptr->value;
+  }
+  else {
+    typed_pointer *element = tuple_has_type(tptr, t_edge_links);
+    if (element != NULL && element->token == token) {
+      return (edge_links*)element->value;
+    }
+  }
+  return NULL;
+}
+
+/******************************************************************************/
+
 truth_value is_boundary_strength
 (
   typed_pointer *tptr
@@ -541,20 +574,50 @@ truth_value is_edge_response
 
 edge_response *has_edge_response
 (
+  typed_pointer *tptr,
+  uint32 token
+)
+{
+  if (IS_TRUE(is_edge_response(tptr)) && tptr->token == token) {
+    return (edge_response*)tptr->value;
+  }
+  else {
+    typed_pointer *element = tuple_has_type(tptr, t_EDGE_RESPONSE);
+    if (element != NULL && element->token == token) {
+      return (edge_response*)element->value;
+    }
+  }
+  return NULL;
+}
+
+/******************************************************************************/
+
+truth_value is_smoothed_gradient
+(
   typed_pointer *tptr
 )
 {
-  if (IS_TRUE(is_edge_response(tptr))) {
-    return (edge_response*)tptr->value;
+  if (tptr != NULL && tptr->type == t_smoothed_gradient) {
+    return TRUE;
   }
-  if (IS_TRUE(is_tuple(tptr))) {
-    typed_pointer *element;
-    element = tuple_has_type(tptr, t_EDGE_RESPONSE);
-    if (element != NULL) {
-      if (IS_FALSE(is_edge_response(element))) {
-        return NULL;
-      }
-      return (edge_response*)element->value;
+  return FALSE;
+}
+
+/******************************************************************************/
+
+smoothed_gradient *has_smoothed_gradient
+(
+  typed_pointer *tptr,
+  uint32 token
+)
+{
+  if (IS_TRUE(is_smoothed_gradient(tptr)) && tptr->token == token) {
+    return (smoothed_gradient*)tptr->value;
+  }
+  else {
+    typed_pointer *element = tuple_has_type(tptr, t_smoothed_gradient);
+    if (element != NULL && element->token == token) {
+      return (smoothed_gradient*)element->value;
     }
   }
   return NULL;

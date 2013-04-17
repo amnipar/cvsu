@@ -91,7 +91,8 @@ typedef enum link_visualization_mode_t {
   v_LINK_SIMILARITY,
   v_LINK_MEASURE,
   v_LINK_STRENGTH,
-  v_LINK_STRAIGHTNESS
+  v_LINK_STRAIGHTNESS,
+  v_LINK_EDGE
 } link_visualization_mode;
 
 /* forward declaration */
@@ -293,6 +294,7 @@ result quad_tree_get_child_edge_response
  */
 result quad_tree_edge_response_to_line
 (
+  struct quad_forest_t *forest,
   quad_tree *tree,
   list *lines
 );
@@ -303,6 +305,7 @@ result quad_tree_edge_response_to_line
  */
 result quad_tree_gradient_to_line
 (
+  struct quad_forest_t *forest,
   quad_tree *tree,
   list *lines
 );
