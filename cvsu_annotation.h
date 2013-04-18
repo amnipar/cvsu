@@ -190,6 +190,9 @@ typedef enum link_category_t {
   bl_UNDEF = 0,
   bl_TOWARDS,
   bl_AGAINST,
+  bl_LEFT,
+  bl_RIGHT,
+  bl_PARALLEL,
   bl_PERPENDICULAR
 } link_category;
 

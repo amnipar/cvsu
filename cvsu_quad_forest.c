@@ -1729,9 +1729,9 @@ result quad_forest_get_links
       link = (quad_tree_link*)items->data;
       head = &link->a;
       lmeasure = has_link_measure(&head->annotation, forest->token);
-      /* bl_AGAINST bl_TOWARDS bl_PERPENDICULAR */
+      /* bl_AGAINST bl_TOWARDS bl_PERPENDICULAR bl_RIGHT bl_LEFT */
       if (lmeasure != NULL &&
-          (lmeasure->category == bl_TOWARDS || lmeasure->category == bl_AGAINST)) {
+          (lmeasure->category == bl_RIGHT || lmeasure->category == bl_RIGHT)) {
         tree = head->tree;
         radius = ((integral_value)tree->size) / 2.0;
         x = getlround((integral_value)tree->x + radius);
@@ -1749,7 +1749,7 @@ result quad_forest_get_links
       head = &link->b;
       lmeasure = has_link_measure(&head->annotation, forest->token);
       if (lmeasure != NULL &&
-          (lmeasure->category == bl_TOWARDS || lmeasure->category == bl_AGAINST)) {
+          (lmeasure->category == bl_RIGHT || lmeasure->category == bl_RIGHT)) {
         tree = head->tree;
         radius = ((integral_value)tree->size) / 2.0;
         x = getlround((integral_value)tree->x + radius);

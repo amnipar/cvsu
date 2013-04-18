@@ -799,6 +799,7 @@ result quad_forest_calculate_neighborhood_stats
   }
 
   /* scale overlap */
+  /*
   scale = max_overlap - min_overlap;
   trees = forest->trees.first.next;
   endtrees = &forest->trees.last;
@@ -810,6 +811,7 @@ result quad_forest_calculate_neighborhood_stats
     }
     trees = trees->next;
   }
+  */
 
   /* calculate strength */
   /*weight = 0.5;*/
@@ -1026,7 +1028,7 @@ result quad_forest_visualize_neighborhood_stats
           if (tree->nw == NULL) {
             nstat = has_neighborhood_stat(&tree->annotation);
             if (nstat != NULL) {
-              strength = fabs(nstat->ridge_score);
+              strength = fabs(nstat->strength);
               if (strength > max_strength) max_strength = strength;
             }
           }
@@ -1039,7 +1041,7 @@ result quad_forest_visualize_neighborhood_stats
           if (tree->nw == NULL) {
             nstat = has_neighborhood_stat(&tree->annotation);
             if (nstat != NULL) {
-              strength = fabs(nstat->ridge_score) / max_strength;
+              strength = fabs(nstat->strength) / max_strength;
               /*nstat->strength;*/
               color0 = (byte)(255 * strength);
               color1 = 0;
@@ -1359,29 +1361,32 @@ result quad_tree_link_head_ensure_measure
   if (tptr->token != forest->token) {
     angle1 = (eresp1->ang - M_PI_2);
     if (angle1 < 0) angle1 += 2 * M_PI;
-    angle2 = head->angle;
-
-    anglediff = fabs(angle1 - angle2);
-    if (anglediff > M_PI_2) {
-      anglediff = fabs(anglediff - M_PI);
-      if (anglediff < M_PI_4 + 0.001) {
-        measure->category = bl_AGAINST;
-      }
-      else {
-        measure->category = bl_PERPENDICULAR;
-      }
-      measure->angle_score = 1 - (anglediff / M_PI_2);
+    angle2 = head->angle - angle1;
+    if (angle2 < 0) angle2 += 2 * M_PI;
+    if (angle2 < M_PI_4) {
+      measure->category = bl_TOWARDS;
+      measure->angle_score = 1 - (angle2 / M_PI_2);
+    }
+    else
+    if (angle2 < 3 * M_PI_4) {
+      measure->category = bl_LEFT;
+      measure->angle_score = 1 - (fabs(angle2 - M_PI_2) / M_PI_2);
+    }
+    else
+    if (angle2 < 5 * M_PI_4) {
+      measure->category = bl_AGAINST;
+      measure->angle_score = 1 - (fabs(angle2 - M_PI) / M_PI_2);
+    }
+    else
+    if (angle2 < 7 * M_PI_4) {
+      measure->category = bl_RIGHT;
+      measure->angle_score = 1 - (fabs(angle2 - 3 * M_PI_2) / M_PI_2);
     }
     else {
-      if (anglediff < M_PI_4 + 0.001) {
-        measure->category = bl_TOWARDS;
-      }
-      else {
-        measure->category = bl_PERPENDICULAR;
-      }
-      measure->angle_score = 1 - (anglediff / M_PI_2);
+      measure->category = bl_TOWARDS;
+      measure->angle_score = 1 - (fabs(angle2 - 2 * M_PI) / M_PI_2);
     }
-
+    /*
     if (measure->category != bl_PERPENDICULAR) {
       tree2 = head->other->tree;
       CHECK(quad_tree_ensure_edge_response(forest, tree2, &eresp2));
@@ -1393,7 +1398,7 @@ result quad_tree_link_head_ensure_measure
     else {
       measure->straightness_score = 0;
     }
-
+    */
     tptr->token = forest->token;
   }
   *lmeasure = measure;
@@ -1540,9 +1545,11 @@ result quad_forest_parse
   list treelist;
   list_item *trees, *endtrees, *links, *endlinks;
   integral_value strength1, strength2, newstrength, minstrength, maxstrength, count;
-  integral_value angle1, angle2, anglediff, anglescore, strengthdiff;
+  integral_value angle1, angle2, anglediff, anglescore;
   uint32 i, min_rank, max_extent, new_ridge, new_segment, new_boundary;
   integral_value mag1, mag2, mag_max, mag_diff, mag_diff_min;
+  integral_value strengthdiff, maxstrengthdiff;
+  integral_value mean1, mean2, dev, meandiff, maxmeandiff;
 
   CHECK_POINTER(forest);
   CHECK_PARAM(rounds > 0);
@@ -1559,7 +1566,67 @@ result quad_forest_parse
   endtrees = &forest->trees.last;
   while (trees != endtrees) {
     tree1 = (quad_tree*)trees->data;
-    CHECK(expect_neighborhood_stat(&nstat1, &tree1->annotation));
+    dev = tree1->stat.deviation;
+    if (dev > 7) {
+      CHECK(ensure_has(&tree1->annotation, t_ridge_potential, &tptr));
+      ridge_tree = (ridge_potential*)tptr->value;
+      if (tptr->token != forest->token) {
+        tptr->token = forest->token;
+      }
+      ridge_tree->round = 0;
+      ridge_tree->ridge_score = 0;
+    }
+    else {
+      CHECK(expect_neighborhood_stat(&nstat1, &tree1->annotation));
+      strength1 = nstat1->strength;
+      maxstrength = strength1;
+      maxstrengthdiff = 0;
+      links = tree1->links.first.next;
+      endlinks = &tree1->links.last;
+      while (links != endlinks) {
+        head1 = *((quad_tree_link_head**)links->data);
+        tree2 = head1->other->tree;
+        CHECK(expect_neighborhood_stat(&nstat2, &tree2->annotation));
+        strength2 = nstat2->strength;
+        if (strength2 > maxstrength) maxstrength = strength2;
+        strengthdiff = strength1 - strength2;
+        if (strengthdiff > maxstrengthdiff) {
+          maxstrengthdiff = strengthdiff;
+        }
+        links = links->next;
+      }
+
+      if (maxstrengthdiff / strength1 > 0.5) {
+        CHECK(ensure_has(&tree1->annotation, t_ridge_potential, &tptr));
+        ridge_tree = (ridge_potential*)tptr->value;
+        if (tptr->token != forest->token) {
+          tptr->token = forest->token;
+        }
+        ridge_tree->round = 0;
+        ridge_tree->ridge_score = 0;
+        if (maxstrength > strength1) {
+          links = tree1->links.first.next;
+          endlinks = &tree1->links.last;
+          while (links != endlinks) {
+            head1 = *((quad_tree_link_head**)links->data);
+            tree2 = head1->other->tree;
+            CHECK(expect_neighborhood_stat(&nstat2, &tree2->annotation));
+            strength2 = nstat2->strength;
+            if (strength2 > strength1) {
+              CHECK(ensure_has(&tree1->annotation, t_ridge_potential, &tptr));
+              ridge_tree = (ridge_potential*)tptr->value;
+              if (tptr->token != forest->token) {
+                tptr->token = forest->token;
+              }
+              ridge_tree->round = 0;
+              ridge_tree->ridge_score = 0;
+            }
+            links = links->next;
+          }
+        }
+      }
+    }
+    /*
     if (nstat1->overlap < 0.25) {
       CHECK(ensure_has(&tree1->annotation, t_ridge_potential, &tptr));
       ridge_tree = (ridge_potential*)tptr->value;
@@ -1568,8 +1635,10 @@ result quad_forest_parse
       }
       ridge_tree->round = 0;
       ridge_tree->ridge_score = 0;
-      /*CHECK(list_append(&treelist, &tree1));*/
+
     }
+    */
+    /*CHECK(list_append(&treelist, &tree1));*/
     trees = trees->next;
   }
 
@@ -1671,12 +1740,14 @@ result quad_forest_visualize_parse_result
   list links;
   list_item *trees, *end;
   quad_tree *tree;
+  neighborhood_stat *nstat;
+  edge_response *eresp;
   ridge_potential *ridge1;
   boundary_potential *boundary1;
   segment_potential *segment1;
   uint32 x, y, width, height, stride, row_step;
   byte *target_data, *target_pos, color0, color1, color2;
-  integral_value max_ridge_score;
+  integral_value max_edge_mag, max_ridge_score;
 
   CHECK_POINTER(forest);
   CHECK_POINTER(target);
@@ -1686,7 +1757,7 @@ result quad_forest_visualize_parse_result
   CHECK_PARAM(target->width >= forest->source->width);
   CHECK_PARAM(target->height >= forest->source->height);
   CHECK_PARAM(target->step == 3);
-  
+
   width = target->width;
   height = target->height;
   stride = target->stride;
@@ -1694,6 +1765,21 @@ result quad_forest_visualize_parse_result
 
   /*CHECK(pixel_image_clear(target));*/
   CHECK(list_create(&links, 1000, sizeof(weighted_line), 1));
+
+  max_edge_mag = 0;
+  trees = forest->trees.first.next;
+  end = &forest->trees.last;
+  while (trees != end) {
+    tree = (quad_tree*)trees->data;
+    CHECK(expect_neighborhood_stat(&nstat, &tree->annotation));
+    eresp = has_edge_response(&tree->annotation, forest->token);
+    if (eresp != NULL) {
+      if (eresp->mag > max_edge_mag) {
+        max_edge_mag = eresp->mag;
+      }
+    }
+    trees = trees->next;
+  }
 
   max_ridge_score = 0;
   trees = forest->trees.first.next;
@@ -1714,6 +1800,7 @@ result quad_forest_visualize_parse_result
   end = &forest->trees.last;
   while (trees != end) {
     tree = (quad_tree*)trees->data;
+    CHECK(expect_neighborhood_stat(&nstat, &tree->annotation));
     if (tree->nw == NULL) {
       /*
       boundary1 = has_boundary_potential(&tree->annotation, forest->token);
@@ -1725,26 +1812,36 @@ result quad_forest_visualize_parse_result
       }
       */
 
-      ridge1 = has_ridge_potential(&tree->annotation, forest->token);
-      if (ridge1 != NULL) {
-        color0 = (byte)(255 * 1);/*(ridge1->ridge_score / max_ridge_score));*/
+      eresp = has_edge_response(&tree->annotation, forest->token);
+      if (eresp != NULL) {
+        color0 = (byte)(255 * (eresp->mag / max_edge_mag));
       }
       else {
         color0 = (byte)(255 * 0);
       }
 
+      ridge1 = has_ridge_potential(&tree->annotation, forest->token);
+      /*
+      if (ridge1 != NULL) {
+        color0 = (byte)(255 * (ridge1->ridge_score / max_ridge_score));
+      }
+      else {
+        color0 = (byte)(255 * 0);
+      }
+      */
       color1 = (byte)(255 * 0);
 
       boundary1 = has_boundary_potential(&tree->annotation, forest->token);
+      /*
       if (boundary1 != NULL) {
         color1 = (byte)(255 * 1);
       }
       else {
         color1 = (byte)(255 * 0);
       }
-
-      /*
+      */
       segment1 = has_segment_potential(&tree->annotation, forest->token);
+      /*
       if (segment1 != NULL) {
         color2 = (byte)(255 * 1);
       }
@@ -1752,7 +1849,8 @@ result quad_forest_visualize_parse_result
         color2 = (byte)(255 * 0);
       }
       */
-      color2 = (byte)(255 * 0);
+      /*color2 = (byte)(255 * 0);*/
+      color2 = 255 - color0;
 
       if (ridge1 != NULL || boundary1 != NULL)
       {
@@ -1771,12 +1869,13 @@ result quad_forest_visualize_parse_result
           }
         }
       }
+
     }
     trees = trees->next;
   }
-
+  /*CHECK(quad_forest_visualize_neighborhood_stats(forest, target, v_STRENGTH));*/
   {
-    byte edge_color_1[4] = {0,255,255,0};
+    byte edge_color_1[4] = {0,255,0,0};
     byte edge_color_2[4] = {0,255,0,0};
     byte segment_color[4] = {255,255,255,0};
 
@@ -1795,7 +1894,7 @@ result quad_forest_visualize_parse_result
     end = &forest->trees.last;
     while (trees != end) {
       tree = (quad_tree*)trees->data;
-      CHECK(quad_tree_edge_response_to_line(tree, &links));
+      CHECK(quad_tree_edge_response_to_line(forest, tree, &links));
       trees = trees->next;
     }
     */
