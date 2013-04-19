@@ -1884,7 +1884,22 @@ result quad_forest_get_links
           new_line.start.y = y;
           new_line.end.x = x + dx;
           new_line.end.y = y - dy;
-          new_line.weight = 1;
+          new_line.weight = 0.75;
+          CHECK(list_append(links, (pointer)&new_line));
+        }
+        if (elinks->other != NULL) {
+          head = elinks->other;
+          radius = ((integral_value)tree->size) / 2.0;
+          x = getlround((integral_value)tree->x + radius);
+          y = getlround((integral_value)tree->y + radius);
+          dx = getlround(cos(head->angle) * radius);
+          dy = getlround(sin(head->angle) * radius);
+
+          new_line.start.x = x;
+          new_line.start.y = y;
+          new_line.end.x = x + dx;
+          new_line.end.y = y - dy;
+          new_line.weight = 0.5;
           CHECK(list_append(links, (pointer)&new_line));
         }
       }

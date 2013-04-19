@@ -131,6 +131,7 @@ separate structures for links, or use the same structures?
 typedef struct ridge_potential_t {
   uint32 round;
   integral_value ridge_score;
+  struct quad_tree_t *better_ridge;
 } ridge_potential;
 
 truth_value is_ridge_potential
@@ -146,10 +147,10 @@ ridge_potential *has_ridge_potential
 
 typedef struct boundary_potential_t {
   uint32 length;
-  integral_value mean_score;
   integral_value strength_score;
   integral_value angle_score;
   integral_value straightness_score;
+  integral_value profile_score;
 } boundary_potential;
 
 truth_value is_boundary_potential
@@ -198,8 +199,11 @@ typedef enum link_category_t {
 
 typedef struct link_measure_t {
   link_category category;
+  integral_value strength_score;
+  integral_value magnitude_score;
   integral_value angle_score;
   integral_value straightness_score;
+  integral_value profile_score;
 } link_measure;
 
 truth_value is_link_measure
@@ -213,10 +217,27 @@ link_measure *has_link_measure
   uint32 token
 );
 
+typedef struct edge_profile_t {
+  integral_value direction_consistency;
+  integral_value edge_score;
+  integral_value mean_left;
+  integral_value mean_right;
+  integral_value dev_left;
+  integral_value dev_right;
+} edge_profile;
+
 typedef struct edge_links_t {
   struct quad_tree_link_head_t *towards;
   struct quad_tree_link_head_t *against;
+  struct quad_tree_link_head_t *other;
+  integral_value towards_consistency;
+  integral_value against_consistency;
+  integral_value direction_consistency;
   integral_value edge_score;
+  integral_value mean_left;
+  integral_value mean_right;
+  integral_value dev_left;
+  integral_value dev_right;
 } edge_links;
 
 truth_value is_edge_links
