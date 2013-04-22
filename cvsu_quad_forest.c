@@ -1721,8 +1721,10 @@ result quad_forest_get_links
   if (mode == v_LINK_MEASURE) {
     quad_tree_link_head *head;
     link_measure *lmeasure;
-    integral_value radius;
+    integral_value radius, str, max_str;
     sint32 x, y, dx, dy;
+
+    max_str = 0;
     items = forest->links.first.next;
     end = &forest->links.last;
     while (items != end) {
@@ -1731,7 +1733,21 @@ result quad_forest_get_links
       lmeasure = has_link_measure(&head->annotation, forest->token);
       /* bl_AGAINST bl_TOWARDS bl_PERPENDICULAR bl_RIGHT bl_LEFT */
       if (lmeasure != NULL &&
-          (lmeasure->category == bl_RIGHT || lmeasure->category == bl_RIGHT)) {
+          (lmeasure->category == bl_TOWARDS || lmeasure->category == bl_AGAINST)) {
+        str = lmeasure->angle_score * lmeasure->straightness_score;
+        if (str > max_str) max_str = str;
+      }
+      items = items->next;
+    }
+
+    items = forest->links.first.next;
+    end = &forest->links.last;
+    while (items != end) {
+      link = (quad_tree_link*)items->data;
+      head = &link->a;
+      lmeasure = has_link_measure(&head->annotation, forest->token);
+      /* bl_AGAINST bl_TOWARDS bl_PERPENDICULAR bl_RIGHT bl_LEFT */
+      if (lmeasure != NULL && (lmeasure->category == bl_TOWARDS || lmeasure->category == bl_AGAINST)) {
         tree = head->tree;
         radius = ((integral_value)tree->size) / 2.0;
         x = getlround((integral_value)tree->x + radius);
@@ -1743,13 +1759,15 @@ result quad_forest_get_links
         new_line.start.y = y;
         new_line.end.x = x + dx;
         new_line.end.y = y - dy;
-        new_line.weight = 1;
+
+        str = lmeasure->angle_score * lmeasure->straightness_score;
+        new_line.weight = str / max_str;
+
         CHECK(list_append(links, (pointer)&new_line));
       }
       head = &link->b;
       lmeasure = has_link_measure(&head->annotation, forest->token);
-      if (lmeasure != NULL &&
-          (lmeasure->category == bl_RIGHT || lmeasure->category == bl_RIGHT)) {
+      if (lmeasure != NULL && (lmeasure->category == bl_TOWARDS || lmeasure->category == bl_AGAINST)) {
         tree = head->tree;
         radius = ((integral_value)tree->size) / 2.0;
         x = getlround((integral_value)tree->x + radius);
@@ -1761,7 +1779,10 @@ result quad_forest_get_links
         new_line.start.y = y;
         new_line.end.x = x + dx;
         new_line.end.y = y - dy;
-        new_line.weight = 1;
+
+        str = lmeasure->angle_score * lmeasure->straightness_score;
+        new_line.weight = str / max_str;
+
         CHECK(list_append(links, (pointer)&new_line));
       }
       items = items->next;

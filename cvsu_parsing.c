@@ -1719,7 +1719,7 @@ result quad_forest_parse
         measure_link1 = has_link_measure(&head1->annotation, forest->token);
         if (measure_link1 != NULL) {
           if (measure_link1->category == bl_LEFT || measure_link1->category == bl_RIGHT) {
-            if (measure_link1->strength_score > -0.001 || measure_link1->magnitude_score > -0.001) {
+            if (measure_link1->strength_score < 0.0001 && measure_link1->magnitude_score < 0) {
               tree2 = head1->other->tree;
               CHECK(ensure_has(&tree2->annotation, t_boundary_potential, &tptr));
               if (tptr->token != forest->token) {
@@ -1906,7 +1906,7 @@ result quad_forest_visualize_parse_result
 
       eresp = has_edge_response(&tree->annotation, forest->token);
       if (eresp != NULL) {
-        color0 = (byte)(255 * (eresp->mag / max_edge_mag));
+        color0 = (byte)(255 * 1); /*(eresp->mag / max_edge_mag));*/
       }
       else {
         color0 = (byte)(255 * 0);
@@ -1915,7 +1915,7 @@ result quad_forest_visualize_parse_result
       ridge1 = has_ridge_potential(&tree->annotation, forest->token);
 
       if (ridge1 != NULL) {
-        color1 = (byte)(255 * (ridge1->ridge_score / max_ridge_score));
+        color1 = (byte)(255 * 1); /*(ridge1->ridge_score / max_ridge_score));*/
       }
       else {
         color1 = (byte)(255 * 0);
@@ -1944,7 +1944,7 @@ result quad_forest_visualize_parse_result
       /*color2 = (byte)(255 * 0);*/
       /*color2 = 255 - color0;*/
 
-      if (ridge1 != NULL || boundary1 != NULL)
+      if (ridge1 != NULL || boundary1 != NULL) /* ridge1 != NULL || */
       {
         width = tree->size;
         height = width;
@@ -1979,8 +1979,8 @@ result quad_forest_visualize_parse_result
     CHECK(quad_forest_get_links(forest, &links, v_LINK_ANGLE_COST));
     CHECK(pixel_image_draw_weighted_lines(target, &links, edge_color));
     */
-    /*CHECK(quad_forest_get_links(forest, &links, v_LINK_MEASURE));*/
-    CHECK(quad_forest_get_links(forest, &links, v_LINK_EDGE));
+    CHECK(quad_forest_get_links(forest, &links, v_LINK_MEASURE));
+    /*CHECK(quad_forest_get_links(forest, &links, v_LINK_EDGE));*/
     /*PRINT1("links: %d\n", links.count);*/
     /*
     trees = forest->trees.first.next;
