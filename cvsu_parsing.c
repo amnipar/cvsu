@@ -1422,7 +1422,8 @@ result quad_tree_ensure_edge_profiles
   edge_links **elinks
 )
 {
-  TRY();quad_tree *tree2;
+  TRY();
+  quad_tree *tree2;
   quad_tree_link_head *head1;
   list_item *links, *endlinks;
   typed_pointer *tptr;
@@ -1511,8 +1512,12 @@ result quad_tree_ensure_edge_links
   list_item *links, *endlinks;
   typed_pointer *tptr;
   link_measure *measure_link1;
+  edge_response *eresp;
   edge_links *links1, *links2;
   integral_value strength_score, profile_score, link_score, min_towards, min_against, min_other;
+  integral_value own_angle, mag, angle, own_sum1, own_sum2, own_n, own_mean, own_dev;
+  integral_value towards_sum1, towards_sum2, towards_n, towards_mean, towards_dev;
+  integral_value against_sum1, against_sum2, against_n, against_mean, against_dev;
   quad_tree_link_head *best_towards, *best_against, *best_other;
 
   CHECK_POINTER(forest);
@@ -1522,18 +1527,54 @@ result quad_tree_ensure_edge_links
 
   links1 = has_edge_links(&tree1->annotation, forest->token);
   if (links1 != NULL) {
+    CHECK(quad_tree_ensure_edge_response(forest, tree1, &eresp));
+    own_angle = eresp->ang - M_PI_2;
+    if (own_angle < 0) own_angle += 2 * M_PI;
+
+    own_sum1 = mag * angle;
+    own_sum2 = mag * angle * angle;
+    own_n = eresp->mag;
+    towards_sum1 = 0;
+    towards_sum2 = 0;
+    towards_n = 0;
+    against_sum1 = 0;
+    against_sum2 = 0;
+    against_n = 0;
     min_towards = 100;
     min_against = 100;
     min_other = 100;
     best_towards = NULL;
     best_against = NULL;
     best_other = NULL;
+
     links = tree1->links.first.next;
     endlinks = &tree1->links.last;
     while (links != endlinks) {
       head1 = *((quad_tree_link_head**)links->data);
       tree2 = head1->other->tree;
+
       CHECK(quad_tree_link_head_ensure_measure(forest, head1, &measure_link1));
+      CHECK(quad_tree_ensure_edge_response(forest, tree2, &eresp));
+      angle = eresp->ang - M_PI_2;
+      if (angle < 0) angle += 2 * M_PI;
+      mag = eresp->mag;
+      if (measure_link1->category == bl_TOWARDS) {
+        towards_sum1 += mag * angle;
+        towards_sum2 += mag * angle * angle;
+        towards_n += mag;
+      }
+      else
+      if (measure_link1->category == bl_AGAINST) {
+        against_sum1 += mag * angle;
+        against_sum2 += mag * angle * angle;
+        against_n += mag;
+      }
+      else {
+        own_sum1 += mag * angle;
+        own_sum2 += mag * angle * angle;
+        own_n += mag;
+      }
+
       links2 = has_edge_links(&tree2->annotation, forest->token);
       if (links2 != NULL) {
         profile_score  = fabs(links1->mean_left - links2->mean_left);
@@ -1569,6 +1610,21 @@ result quad_tree_ensure_edge_links
     links1->against = best_against;
     links1->other = best_other;
     links1->edge_score = (min_towards + min_against) / 2;
+
+    own_mean = own_sum1 / own_n;
+    own_dev = own_sum2 / own_n - own_mean * own_mean;
+    own_dev = own_dev < 0 ? 0 : sqrt(own_dev);
+    if (towards_n > 0) {
+      towards_mean = towards_sum1 / towards_n;
+      towards_dev = towards_sum2 / towards_n - towards_mean * towards_mean;
+      towards_dev = towards_dev < 0 ? 0 : sqrt(towards_dev);
+    }
+    if (against_n > 0) {
+      against_mean = against_sum1 / against_n;
+      against_dev = against_sum2 / against_n - against_mean * against_mean;
+      against_dev = against_dev < 0 ? 0 : sqrt(against_dev);
+    }
+
   }
   *elinks = links1;
 
