@@ -230,9 +230,11 @@ typedef struct edge_links_t {
   struct quad_tree_link_head_t *towards;
   struct quad_tree_link_head_t *against;
   struct quad_tree_link_head_t *other;
+  integral_value own_angle;
   integral_value towards_angle;
   integral_value against_angle;
   integral_value straightness;
+  integral_value own_consistency;
   integral_value towards_consistency;
   integral_value against_consistency;
   integral_value direction_consistency;

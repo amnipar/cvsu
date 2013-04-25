@@ -1515,7 +1515,7 @@ result quad_tree_ensure_edge_links
   edge_response *eresp;
   edge_links *links1, *links2;
   integral_value strength_score, profile_score, link_score, min_towards, min_against, min_other;
-  integral_value own_angle, mag, angle, own_sum1, own_sum2, own_n, own_mean, own_dev;
+  integral_value own_angle, mag, angle, consistency, own_sum1, own_sum2, own_n, own_mean, own_dev;
   integral_value towards_sum1, towards_sum2, towards_n, towards_mean, towards_dev;
   integral_value against_sum1, against_sum2, against_n, against_mean, against_dev;
   quad_tree_link_head *best_towards, *best_against, *best_other;
@@ -1531,8 +1531,8 @@ result quad_tree_ensure_edge_links
     own_angle = eresp->ang - M_PI_2;
     if (own_angle < 0) own_angle += 2 * M_PI;
 
-    own_sum1 = mag * angle;
-    own_sum2 = mag * angle * angle;
+    own_sum1 = 0;
+    own_sum2 = 0;
     own_n = eresp->mag;
     towards_sum1 = 0;
     towards_sum2 = 0;
@@ -1557,6 +1557,10 @@ result quad_tree_ensure_edge_links
       CHECK(quad_tree_ensure_edge_response(forest, tree2, &eresp));
       angle = eresp->ang - M_PI_2;
       if (angle < 0) angle += 2 * M_PI;
+      /* center angles around own angle */
+      angle -= own_angle;
+      /* if difference is larger than pi, need to wrap around at 0/2pi */
+      if (angle > M_PI) angle -= 2 * M_PI;
       mag = eresp->mag;
       if (measure_link1->category == bl_TOWARDS) {
         towards_sum1 += mag * angle;
@@ -1624,7 +1628,27 @@ result quad_tree_ensure_edge_links
       against_dev = against_sum2 / against_n - against_mean * against_mean;
       against_dev = against_dev < 0 ? 0 : sqrt(against_dev);
     }
+    consistency = 1 - (own_dev / M_PI);
+    if (consistency < 0) consistency = 0;
+    links1->own_consistency = consistency;
+    angle = own_angle + consistency * own_mean;
+    if (angle < 0) angle += 2 * M_PI;
+    links1->own_angle = angle;
 
+    consistency = 1 - (towards_dev / M_PI);
+    if (consistency < 0) consistency = 0;
+    links1->towards_consistency = consistency;
+    angle = own_angle + consistency * towards_mean;
+    if (angle < 0) angle += 2 * M_PI;
+    links1->towards_angle = angle;
+
+    consistency = 1 - (against_dev / M_PI);
+    if (consistency < 0) consistency = 0;
+    links1->against_consistency = consistency;
+    angle = own_angle + consistency * against_mean;
+    if (angle < 0) angle += 2 * M_PI;
+    links1->against_angle = angle;
+    links1->straightness = 1 - ((fabs(towards_mean) + fabs(against_mean)) / 2 * M_PI);
   }
   *elinks = links1;
 
@@ -1950,7 +1974,7 @@ result quad_forest_visualize_parse_result
     tree = (quad_tree*)trees->data;
     CHECK(expect_neighborhood_stat(&nstat, &tree->annotation));
     if (tree->nw == NULL) {
-      /*
+
       boundary1 = has_boundary_potential(&tree->annotation, forest->token);
       if (boundary1 != NULL) {
         color0 = (byte)(255 * 1);
@@ -1958,27 +1982,29 @@ result quad_forest_visualize_parse_result
       else {
         color0 = (byte)(255 * 0);
       }
-      */
 
+      /*
       eresp = has_edge_response(&tree->annotation, forest->token);
       if (eresp != NULL) {
-        color0 = (byte)(255 * 1); /*(eresp->mag / max_edge_mag));*/
+        color0 = (byte)(255 * 1);
       }
       else {
         color0 = (byte)(255 * 0);
       }
-
+      */
+      /*(eresp->mag / max_edge_mag));*/
+      /*
       ridge1 = has_ridge_potential(&tree->annotation, forest->token);
 
       if (ridge1 != NULL) {
-        color1 = (byte)(255 * 1); /*(ridge1->ridge_score / max_ridge_score));*/
+        color1 = (byte)(255 * 1);
       }
       else {
         color1 = (byte)(255 * 0);
       }
-
-      /*color1 = (byte)(255 * 0);*/
-
+      */
+      color1 = (byte)(255 * 0);
+      /*
       boundary1 = has_boundary_potential(&tree->annotation, forest->token);
 
       if (boundary1 != NULL) {
@@ -1987,7 +2013,7 @@ result quad_forest_visualize_parse_result
       else {
         color2 = (byte)(255 * 0);
       }
-
+      */
       segment1 = has_segment_potential(&tree->annotation, forest->token);
       /*
       if (segment1 != NULL) {
@@ -1997,10 +2023,10 @@ result quad_forest_visualize_parse_result
         color2 = (byte)(255 * 0);
       }
       */
-      /*color2 = (byte)(255 * 0);*/
+      color2 = (byte)(255 * 0);
       /*color2 = 255 - color0;*/
 
-      if (ridge1 != NULL || boundary1 != NULL) /* ridge1 != NULL || */
+      if (boundary1 != NULL) /* ridge1 != NULL || */
       {
         width = tree->size;
         height = width;
@@ -2035,8 +2061,9 @@ result quad_forest_visualize_parse_result
     CHECK(quad_forest_get_links(forest, &links, v_LINK_ANGLE_COST));
     CHECK(pixel_image_draw_weighted_lines(target, &links, edge_color));
     */
-    CHECK(quad_forest_get_links(forest, &links, v_LINK_MEASURE));
+    /*CHECK(quad_forest_get_links(forest, &links, v_LINK_MEASURE));*/
     /*CHECK(quad_forest_get_links(forest, &links, v_LINK_EDGE));*/
+    CHECK(quad_forest_get_links(forest, &links, v_LINK_STRAIGHT));
     /*PRINT1("links: %d\n", links.count);*/
     /*
     trees = forest->trees.first.next;

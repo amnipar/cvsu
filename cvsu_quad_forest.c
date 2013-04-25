@@ -1927,6 +1927,82 @@ result quad_forest_get_links
       items = items->next;
     }
   }
+  else
+  if (mode == v_LINK_STRAIGHT) {
+    quad_tree_link_head *head;
+    edge_links *elinks;
+    edge_response *eresp;
+    integral_value angle, radius;
+    sint32 x, y, dx, dy;
+
+    items = forest->trees.first.next;
+    end = &forest->trees.last;
+    while (items != end) {
+      tree = (quad_tree*)items->data;
+      elinks = has_edge_links(&tree->annotation, forest->token);
+      if (elinks != NULL) {
+        radius = ((integral_value)tree->size) / 2.0;
+        x = getlround((integral_value)tree->x + radius);
+        y = getlround((integral_value)tree->y + radius);
+        new_line.start.x = x;
+        new_line.start.y = y;
+
+        eresp = has_edge_response(&tree->annotation, forest->token);
+        if (eresp != NULL) {
+          angle = eresp->ang - M_PI_2;
+          if (angle < 0) angle += 2 * M_PI;
+          dx = getlround(cos(angle) * radius);
+          dy = getlround(sin(angle) * radius);
+          new_line.end.x = x + dx;
+          new_line.end.y = y - dy;
+          new_line.weight = 0;
+          CHECK(list_append(links, (pointer)&new_line));
+          angle -= M_PI;
+          if (angle < 0) angle += 2 * M_PI;
+          dx = getlround(cos(angle) * radius);
+          dy = getlround(sin(angle) * radius);
+          new_line.end.x = x + dx;
+          new_line.end.y = y - dy;
+          new_line.weight = 0;
+          /*CHECK(list_append(links, (pointer)&new_line));*/
+        }
+        angle = elinks->own_angle;
+        dx = getlround(cos(angle) * radius);
+        dy = getlround(sin(angle) * radius);
+        new_line.end.x = x + dx;
+        new_line.end.y = y - dy;
+        new_line.weight = elinks->straightness;
+        /*CHECK(list_append(links, (pointer)&new_line));*/
+        angle -= M_PI;
+        if (angle < 0) angle += 2 * M_PI;
+        dx = getlround(cos(angle) * radius);
+        dy = getlround(sin(angle) * radius);
+        new_line.end.x = x + dx;
+        new_line.end.y = y - dy;
+        new_line.weight = elinks->straightness;
+        /*CHECK(list_append(links, (pointer)&new_line));*/
+
+        angle = elinks->towards_angle;
+        dx = getlround(cos(angle) * radius);
+        dy = getlround(sin(angle) * radius);
+        new_line.end.x = x + dx;
+        new_line.end.y = y - dy;
+        new_line.weight = elinks->towards_consistency;
+        CHECK(list_append(links, (pointer)&new_line));
+
+        angle = elinks->against_angle;
+        angle -= M_PI;
+        if (angle < 0) angle += 2 * M_PI;
+        dx = getlround(cos(angle) * radius);
+        dy = getlround(sin(angle) * radius);
+        new_line.end.x = x + dx;
+        new_line.end.y = y - dy;
+        new_line.weight = elinks->against_consistency;
+        CHECK(list_append(links, (pointer)&new_line));
+      }
+      items = items->next;
+    }
+  }
     /*
     new_line.start.x = tree->x + (uint32)(tree->size / 2);
     new_line.start.y = tree->y + (uint32)(tree->size / 2);
