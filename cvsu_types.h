@@ -144,6 +144,17 @@ typedef struct rect_t {
   coord bottom;
 } rect;
 
+typedef struct uncertain_rect_t {
+  coord left;
+  coord left_uncertainty;
+  coord right;
+  coord right_uncertainty;
+  coord top;
+  coord top_uncertainty;
+  coord bottom;
+  coord bottom_uncertainty;
+} uncertain_rect;
+
 typedef enum result_t {
   SUCCESS = 0,
   FATAL,
@@ -395,6 +406,24 @@ void rect_create_from_points
   point first,
   point second
 );
+
+/* utility functions for angles */
+
+/**
+ * Calculates the combined angle; this means the total amount of rotation, if
+ * first rotate by angle1, then rotate more by angle2.
+ * Note: positive rotation direction is _counterclockwise_.
+ * Takes into account crossing the origin (0 / 2PI).
+ */
+integral_value angle_plus_angle(integral_value angle1, integral_value angle2);
+
+/**
+ * Calculates the angle distance; this means the amount of rotation needed to
+ * go from angle1 to angle2.
+ * Note: positive rotation direction is _counterclockwise_.
+ * Takes into account crossing the origin (0 / 2PI).
+ */
+integral_value angle_minus_angle(integral_value angle1, integral_value angle2);
 
 #ifdef __cplusplus
 }

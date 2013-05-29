@@ -31,6 +31,7 @@
 
 #include "cvsu_types.h"
 #include "cvsu_memory.h"
+#include "cvsu_macros.h"
 
 /******************************************************************************/
 
@@ -349,6 +350,46 @@ void rect_create_from_points
       target->bottom = first.y;
     }
   }
+}
+
+/******************************************************************************/
+/* utility functions for angles                                               */
+
+/**
+ * Calculates the combined angle; this means the total amount of rotation, if
+ * first rotate by angle1, then rotate more by angle2.
+ * Note: positive rotation direction is _counterclockwise_.
+ * Takes into account crossing the origin (0 / 2PI).
+ */
+integral_value angle_plus_angle
+(
+  integral_value angle1,
+  integral_value angle2
+)
+{
+  return 0;
+}
+
+/**
+ * Calculates the angle distance; this means the amount of rotation needed to
+ * go from angle2 to angle1, by _shortest path_.
+ * Note: positive rotation direction is _counterclockwise_.
+ * Takes into account crossing the origin (0 / 2PI).
+ */
+integral_value angle_minus_angle
+(
+  integral_value angle1,
+  integral_value angle2
+)
+{
+  integral_value diff = angle1 - angle2;
+  if (diff > M_PI) {
+    return diff - M_2PI;
+  }
+  if (diff < -M_PI) {
+    return diff + M_2PI;
+  }
+  return diff;
 }
 
 /* end of file                                                                */
