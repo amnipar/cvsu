@@ -161,6 +161,11 @@ truth_value quad_forest_is_null
   quad_forest *target
 );
 
+void quad_forest_set_init(quad_forest *forest);
+void quad_forest_set_update(quad_forest *forest);
+void quad_forest_set_parse(quad_forest *forest);
+truth_value quad_forest_has_parse(quad_forest *forest);
+
 /**
  * Updates a quad_forest structure; copies data from the original image,
  * possibly converting the format, cleans the data structure, updates the

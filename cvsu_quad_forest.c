@@ -64,18 +64,17 @@ string quad_forest_draw_image_name = "quad_forest_draw_image";
 /******************************************************************************/
 /* quad_forest_status possible values                                         */
 
+const quad_forest_status FOREST_UNINITIALIZED = 0x00;
 /* Forest has been initialized, but not yet updated. */
-const quad_forest_status FOREST_INITIALIZED;
+const quad_forest_status FOREST_INITIALIZED = 0x01;
 /* Forest has been updated, but no analysis performed. */
-const quad_forest_status FOREST_UPDATED;
+const quad_forest_status FOREST_UPDATED = 0x02;
 /* Segmentation operation has been performed. */
-const quad_forest_status FOREST_SEGMENTED;
+const quad_forest_status FOREST_SEGMENTED = 0x04;
 /* Edge detection operation has been performed. */
-const quad_forest_status FOREST_EDGES_DETECTED;
-
-/******************************************************************************/
-
-/******************************************************************************/
+const quad_forest_status FOREST_EDGES_DETECTED = 0x08;
+/* Parse operation has been performed. */
+const quad_forest_status FOREST_PARSED = 0x10;
 
 /******************************************************************************/
 /* a private function for initializing quad_forest structure                  */
@@ -330,6 +329,8 @@ result quad_forest_init
     }
   }
 
+  quad_forest_set_init(target);
+
   FINALLY(quad_forest_init);
   RETURN();
 }
@@ -472,6 +473,7 @@ result quad_forest_nullify
 
   CHECK_POINTER(target);
 
+  target->status = FOREST_UNINITIALIZED;
   target->original = NULL;
   target->source = NULL;
   CHECK(integral_image_nullify(&target->integral));
@@ -503,6 +505,31 @@ truth_value quad_forest_is_null
     if (target->original == NULL && target->source == NULL) {
       return TRUE;
     }
+  }
+  return FALSE;
+}
+
+/******************************************************************************/
+
+void quad_forest_set_init(quad_forest *forest)
+{
+  forest->status = FOREST_INITIALIZED;
+}
+
+void quad_forest_set_update(quad_forest *forest)
+{
+  forest->status = FOREST_INITIALIZED | FOREST_UPDATED;
+}
+
+void quad_forest_set_parse(quad_forest *forest)
+{
+  forest->status |= FOREST_PARSED;
+}
+
+truth_value quad_forest_has_parse(quad_forest *forest)
+{
+  if ((forest->status & FOREST_PARSED) != 0) {
+    return TRUE;
   }
   return FALSE;
 }
@@ -575,6 +602,8 @@ result quad_forest_update
       tree->se = NULL;
     }
   }
+
+  quad_forest_set_update(target);
 
   FINALLY(quad_forest_update);
   RETURN();
