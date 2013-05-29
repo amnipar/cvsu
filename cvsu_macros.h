@@ -66,14 +66,43 @@ long lround(double __x);
 #endif
 #endif
 
+/******************************************************************************/
+/* common mathematical constants                                              */
+
+#ifndef M_E
+#define M_E       2.718281828459045235360287471353 /* e */
+#endif
+
 #ifndef M_PI
-#define M_PI 3.14159265358979323846
+#define M_PI      3.141592653589793238462643383280 /* pi */
 #endif
+
+#ifndef M_2PI
+#define M_2PI     6.283185307179586476925286766559 /* 2*pi */
+#endif
+
 #ifndef M_PI_2
-#define M_PI_2 1.57079632679489661923
+#define M_PI_2    1.570796326794896619231321691640 /* pi/2 */
 #endif
+
 #ifndef M_PI_4
-#define M_PI_4 0.785398163397448309616
+#define M_PI_4    0.785398163397448309615660845820 /* pi/4 */
+#endif
+
+#ifndef M_1_PI
+#define M_1_PI    0.318309886183790671537767526745 /* 1/pi */
+#endif
+
+#ifndef M_2_PI
+#define M_2_PI    0.636619772367581343075535053490 /* 2/pi */
+#endif
+
+#ifndef M_SQRT2
+#define M_SQRT2   1.414213562373095048801688724210 /* sqrt(2) */
+#endif
+
+#ifndef M_SQRT1_2
+#define M_SQRT1_2 0.707106781186547524400844362105 /* 1/sqrt(2) */
 #endif
 
 /******************************************************************************/
@@ -86,7 +115,8 @@ long lround(double __x);
 
 #define CHECK(res) do {\
   r = SUCCESS;\
-  if ((res) != SUCCESS){\
+  if ((res) != SUCCESS) {\
+      r = res;\
       goto finally;\
   } } while (0)
 
