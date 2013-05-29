@@ -46,6 +46,7 @@ string ensure_neighborhood_stat_name = "annotation_ensure_neighborhood_stat";
 string expect_neighborhood_stat_name = "expect_neighborhood_stat";
 string ensure_accumulated_reg_name = "annotation_ensure_accumulated_reg";
 string ensure_edge_response_name = "annotation_ensure_edge_response";
+string ensure_boundary_fragment_name = "ensure_boundary_fragment";
 
 /******************************************************************************/
 
@@ -359,6 +360,37 @@ link_measure *has_link_measure
     typed_pointer *element = tuple_has_type(tptr, t_link_measure);
     if (element != NULL && element->token == token) {
       return (link_measure*)element->value;
+    }
+  }
+  return NULL;
+}
+
+/******************************************************************************/
+
+truth_value is_edge_profile
+(
+  typed_pointer *tptr
+)
+{
+  if (tptr != NULL && tptr->type == t_edge_profile) {
+    return TRUE;
+  }
+  return FALSE;
+}
+
+edge_profile *has_edge_profile
+(
+  typed_pointer *tptr,
+  uint32 token
+)
+{
+  if (IS_TRUE(is_edge_profile(tptr)) && tptr->token == token) {
+    return (edge_profile*)tptr->value;
+  }
+  else {
+    typed_pointer *element = tuple_has_type(tptr, t_edge_profile);
+    if (element != NULL && element->token == token) {
+      return (edge_profile*)element->value;
     }
   }
   return NULL;
@@ -789,6 +821,85 @@ int compare_segments(const void *a, const void *b)
   if (sa > sb) return 1;
   else if (sa < sb) return -1;
   else return 0;
+}
+
+/******************************************************************************/
+
+result ensure_boundary_fragment
+(
+  typed_pointer *annotation,
+  boundary_fragment **bfrag
+)
+{
+  TRY();
+  typed_pointer *tptr;
+
+  CHECK_POINTER(bfrag);
+  *bfrag = NULL;
+
+  CHECK(ensure_has(annotation, t_boundary_fragment, &tptr));
+
+  *bfrag = (boundary_fragment*)tptr->value;
+
+  FINALLY(ensure_boundary_fragment);
+  RETURN();
+}
+
+truth_value is_boundary_fragment
+(
+  typed_pointer *tptr
+)
+{
+  if (tptr != NULL && tptr->type == t_boundary_fragment) {
+    return TRUE;
+  }
+  return FALSE;
+}
+
+boundary_fragment *has_boundary_fragment
+(
+  typed_pointer *tptr,
+  uint32 token
+)
+{
+  if (IS_TRUE(is_boundary_fragment(tptr)) && tptr->token == token) {
+    return (edge_response*)tptr->value;
+  }
+  else {
+    typed_pointer *element = tuple_has_type(tptr, t_boundary_fragment);
+    if (element != NULL && element->token == token) {
+      return (boundary_fragment*)element->value;
+    }
+  }
+  return NULL;
+}
+
+/******************************************************************************/
+/* union-find implementation for boundary fragments                           */
+
+void boundary_fragment_create
+(
+  quad_tree *tree
+)
+{
+
+}
+
+void boundary_fragment_union
+(
+  quad_tree *tree1,
+  quad_tree *tree2
+)
+{
+
+}
+
+boundary_fragment *boundary_fragment_find
+(
+  quad_tree *tree
+)
+{
+  return NULL;
 }
 
 /* end of file                                                                */

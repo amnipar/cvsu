@@ -42,8 +42,11 @@ extern "C" {
 #include "cvsu_context.h"
 #include "cvsu_list.h"
 
+/* forward declarations */
+
 struct quad_tree_t;
 struct quad_tree_link_head_t;
+struct quad_forest_edge_chain_t;
 
 /******************************************************************************/
 
@@ -218,13 +221,24 @@ link_measure *has_link_measure
 );
 
 typedef struct edge_profile_t {
-  integral_value direction_consistency;
-  integral_value edge_score;
   integral_value mean_left;
   integral_value mean_right;
   integral_value dev_left;
   integral_value dev_right;
+  integral_value mean_score;
+  integral_value dev_score;
 } edge_profile;
+
+truth_value is_edge_profile
+(
+  typed_pointer *tptr
+);
+
+edge_profile *has_edge_profile
+(
+  typed_pointer *tptr,
+  uint32 token
+);
 
 typedef struct edge_links_t {
   struct quad_tree_link_head_t *towards;
@@ -234,15 +248,11 @@ typedef struct edge_links_t {
   integral_value towards_angle;
   integral_value against_angle;
   integral_value straightness;
+  integral_value curvature;
   integral_value own_consistency;
   integral_value towards_consistency;
   integral_value against_consistency;
   integral_value direction_consistency;
-  integral_value edge_score;
-  integral_value mean_left;
-  integral_value mean_right;
-  integral_value dev_left;
-  integral_value dev_right;
 } edge_links;
 
 truth_value is_edge_links
@@ -390,6 +400,65 @@ smoothed_gradient *has_smoothed_gradient
 
 /******************************************************************************/
 
+typedef enum fragment_type_t {
+  ft_UNDEF = 0,
+  ft_STRAIGHT,
+  ft_CURVED,
+  ft_CORNER
+} fragment_type;
+
+typedef struct boundary_fragment_t {
+  struct boundary_fragment_t *parent;
+  fragment_type type;
+  rect extent;
+  integral_value dir_a;
+  integral_value dir_b;
+  list *hypotheses;
+} boundary_fragment;
+
+result ensure_boundary_fragment
+(
+  typed_pointer *annotation,
+  boundary_fragment **bfrag
+);
+
+truth_value is_boundary_fragment
+(
+  typed_pointer *tptr
+);
+
+boundary_fragment *has_boundary_fragment
+(
+  typed_pointer *tptr,
+  uint32 token
+);
+
+void boundary_fragment_create
+(
+  struct quad_tree_t *tree
+);
+
+void boundary_fragment_union
+(
+  struct quad_tree_t *tree1,
+  struct quad_tree_t *tree2
+);
+
+boundary_fragment *boundary_fragment_find
+(
+  struct quad_tree_t *tree
+);
+
+/******************************************************************************/
+
+typedef struct object_hypothesis_t {
+  uint32 class_id;
+  uncertain_rect extent;
+  integral_value potential;
+} object_hypothesis;
+
+/******************************************************************************/
+
 typedef struct quad_forest_intersection_t {
   struct quad_tree_t *tree;
   list edges;
@@ -397,11 +466,6 @@ typedef struct quad_forest_intersection_t {
 } quad_forest_intersection;
 
 /******************************************************************************/
-
-/* forward declarations */
-
-struct quad_tree_t;
-struct quad_forest_edge_chain_t;
 
 /**
  * Stores edge information for edge and edge chain detection in quad_forest with
