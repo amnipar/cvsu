@@ -233,7 +233,7 @@ int main(int argc, char *argv[])
       break;
     case m_FULL:
       PRINT0("parsing...\n");
-      CHECK(quad_forest_parse(&forest, rounds));
+      CHECK(quad_forest_parse(&forest, rounds, FALSE));
       PRINT0("drawing image...\n");
       CHECK(quad_forest_visualize_parse_result(&forest, &dst_image));
       break;

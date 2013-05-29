@@ -61,6 +61,7 @@ string quad_forest_visualize_accumulated_bounds_name = "quad_forest_visualize_ac
 string quad_tree_link_head_ensure_measure_name = "quad_tree_link_head_ensure_measure";
 string quad_tree_ensure_edge_profiles_name = "quad_tree_ensure_edge_profiles";
 string quad_tree_ensure_edge_links_name = "quad_tree_ensure_edge_links";
+string quad_tree_ensure_ridge_potential_name = "quad_tree_ensure_ridge_potential";
 string quad_forest_parse_name = "quad_forest_parse";
 string quad_forest_visualize_parse_result_name = "quad_forest_visualize_parse_result";
 
@@ -1335,18 +1336,21 @@ result quad_forest_visualize_accumulated_bounds
 }
 
 /******************************************************************************/
+/*  */
 
 result quad_tree_link_head_ensure_measure
 (
   quad_forest *forest,
   quad_tree_link_head *head,
-  link_measure **lmeasure
+  link_measure **lmeasure,
+  truth_value use_edge_links
 )
 {
   TRY();
   quad_tree *tree1, *tree2;
   edge_response *eresp1, *eresp2;
   link_measure *measure;
+  edge_links *links1, *links2;
   typed_pointer *tptr;
   neighborhood_stat *nstat1, *nstat2;
   integral_value angle1, angle2, anglediff;
@@ -1359,37 +1363,72 @@ result quad_tree_link_head_ensure_measure
   tree1 = head->tree;
   CHECK(expect_neighborhood_stat(&nstat1, &tree1->annotation));
   CHECK(quad_tree_ensure_edge_response(forest, tree1, &eresp1));
+  links1 = has_edge_links(&tree1->annotation, forest->token);
   CHECK(ensure_has(&head->annotation, t_link_measure, &tptr));
   measure = (link_measure*)tptr->value;
   if (tptr->token != forest->token) {
-    angle1 = (eresp1->ang - M_PI_2);
-    if (angle1 < 0) angle1 += 2 * M_PI;
-    angle2 = head->angle - angle1;
-    if (angle2 < 0) angle2 += 2 * M_PI;
-    if (angle2 < M_PI_4) {
-      measure->category = bl_TOWARDS;
-      measure->angle_score = 1 - (angle2 / M_PI_2);
+    /* if edge links are present, adjust link category based on those */
+    /* ensuring there is always at least one left and right node?? */
+    if (links1 != NULL && IS_TRUE(use_edge_links)) {
+      angle1 = angle_minus_angle(head->angle, links1->towards_angle);
+      /* close to towards-angle -> category towards */
+      if (fabs(angle1) < M_PI_4) {
+        measure->category = bl_TOWARDS;
+        measure->angle_score = 1 - (angle1 / M_PI_2);
+      }
+      else {
+        angle2 = angle_minus_angle(head->angle, links1->against_angle);
+        /* close to against-angle -> category against */
+        if (fabs(angle2) < M_PI_4) {
+          measure->category = bl_AGAINST;
+          measure->angle_score = 1 - (angle2 / M_PI_2);
+        }
+        else {
+          /* larger than towards and smaller than against -> left */
+          if (angle1 > 0 && angle2 < 0) {
+            measure->category = bl_LEFT;
+            angle1 = getmax(angle1, -angle2);
+            measure->angle_score = 1 - (angle1 / M_PI_2);
+          }
+          /* smaller than towards and larger than against -> right */
+          else {
+            measure->category = bl_RIGHT;
+            angle1 = getmax(fabs(angle1), fabs(angle2));
+            measure->angle_score = 1 - (angle1 / M_PI_2);
+          }
+        }
+      }
     }
-    else
-    if (angle2 < 3 * M_PI_4) {
-      measure->category = bl_LEFT;
-      measure->angle_score = 1 - (fabs(angle2 - M_PI_2) / M_PI_2);
-    }
-    else
-    if (angle2 < 5 * M_PI_4) {
-      measure->category = bl_AGAINST;
-      measure->angle_score = 1 - (fabs(angle2 - M_PI) / M_PI_2);
-    }
-    else
-    if (angle2 < 7 * M_PI_4) {
-      measure->category = bl_RIGHT;
-      measure->angle_score = 1 - (fabs(angle2 - 3 * M_PI_2) / M_PI_2);
-    }
+    /* if edge links are not present, use edge response direction instead */
     else {
-      measure->category = bl_TOWARDS;
-      measure->angle_score = 1 - (fabs(angle2 - 2 * M_PI) / M_PI_2);
+      angle1 = (eresp1->ang - M_PI_2);
+      if (angle1 < 0) angle1 += 2 * M_PI;
+      angle2 = head->angle - angle1;
+      if (angle2 < 0) angle2 += 2 * M_PI;
+      if (angle2 < M_PI_4) {
+        measure->category = bl_TOWARDS;
+        measure->angle_score = 1 - (angle2 / M_PI_2);
+      }
+      else
+      if (angle2 < 3 * M_PI_4) {
+        measure->category = bl_LEFT;
+        measure->angle_score = 1 - (fabs(angle2 - M_PI_2) / M_PI_2);
+      }
+      else
+      if (angle2 < 5 * M_PI_4) {
+        measure->category = bl_AGAINST;
+        measure->angle_score = 1 - (fabs(angle2 - M_PI) / M_PI_2);
+      }
+      else
+      if (angle2 < 7 * M_PI_4) {
+        measure->category = bl_RIGHT;
+        measure->angle_score = 1 - (fabs(angle2 - 3 * M_PI_2) / M_PI_2);
+      }
+      else {
+        measure->category = bl_TOWARDS;
+        measure->angle_score = 1 - (fabs(angle2 - 2 * M_PI) / M_PI_2);
+      }
     }
-
 
     tree2 = head->other->tree;
 
@@ -1401,8 +1440,7 @@ result quad_tree_link_head_ensure_measure
 
     angle2 = (eresp2->ang - M_PI_2);
     if (angle2 < 0) angle2 += 2 * M_PI;
-    anglediff = fabs(angle1 - angle2);
-    if (anglediff > M_PI) anglediff = 2 * M_PI - anglediff;
+    anglediff = fabs(angle_minus_angle(angle1, angle2));
     measure->straightness_score = 1 - (anglediff / M_PI);
 
     tptr->token = forest->token;
@@ -1419,7 +1457,7 @@ result quad_tree_ensure_edge_profiles
 (
   quad_forest *forest,
   quad_tree *tree1,
-  edge_links **elinks
+  edge_profile **eprofile
 )
 {
   TRY();
@@ -1429,17 +1467,17 @@ result quad_tree_ensure_edge_profiles
   typed_pointer *tptr;
   neighborhood_stat *nstat1, *nstat2;
   link_measure *measure_link1;
-  edge_links *links1;
+  edge_profile *profile1;
   integral_value sum1_left, sum1_right, sum2_left, sum2_right, N_left, N_right;
   integral_value mean_left, mean_right, dev_left, dev_right, mean, dev;
 
   CHECK_POINTER(forest);
   CHECK_POINTER(tree1);
-  CHECK_POINTER(elinks);
-  *elinks = NULL;
+  CHECK_POINTER(eprofile);
+  *eprofile = NULL;
 
-  CHECK(ensure_has(&tree1->annotation, t_edge_links, &tptr));
-  links1 = (edge_links*)tptr->value;
+  CHECK(ensure_has(&tree1->annotation, t_edge_profile, &tptr));
+  profile1 = (edge_profile*)tptr->value;
   if (tptr->token != forest->token) {
     CHECK(expect_neighborhood_stat(&nstat1, &tree1->annotation));
 
@@ -1453,7 +1491,7 @@ result quad_tree_ensure_edge_profiles
     endlinks = &tree1->links.last;
     while (links != endlinks) {
       head1 = *((quad_tree_link_head**)links->data);
-      CHECK(quad_tree_link_head_ensure_measure(forest, head1, &measure_link1));
+      CHECK(quad_tree_link_head_ensure_measure(forest, head1, &measure_link1, FALSE));
       if (measure_link1->category == bl_LEFT) {
         tree2 = head1->other->tree;
         sum1_left += tree2->stat.sum;
@@ -1469,29 +1507,43 @@ result quad_tree_ensure_edge_profiles
       }
       links = links->next;
     }
+
+    mean = tree1->stat.mean;
+    dev = getmax(1, nstat1->mean_dev);
+
     if (N_left > 1) {
       mean_left = sum1_left / N_left;
       dev_left = sum2_left / N_left - mean_left*mean_left;
       dev_left = dev_left > 0 ? sqrt(dev_left) : 0;
+    }
+    else {
+      mean_left = mean;
+      dev_left = dev;
     }
     if (N_right > 1) {
       mean_right = sum1_right / N_right;
       dev_right = sum2_right / N_right - mean_right*mean_right;
       dev_right = dev_right > 0 ? sqrt(dev_right) : 0;
     }
+    else {
+      mean_right = mean;
+      dev_right = dev;
+    }
 
-    mean = tree1->stat.mean;
-    dev = getmax(1, nstat1->mean_dev);
-    links1->mean_left = (mean - mean_left) / dev;
-    links1->mean_right = (mean - mean_right) / dev;
+    profile1->mean_left = (mean - mean_left) / dev;
+    profile1->mean_right = (mean - mean_right) / dev;
+
     mean = tree1->stat.deviation;
     dev = getmax(1, nstat1->dev_dev);
-    links1->dev_left = (mean - dev_left) / dev;
-    links1->dev_right = (mean - dev_right) / dev;
+    profile1->dev_left = (mean - dev_left) / dev;
+    profile1->dev_right = (mean - dev_right) / dev;
+
+    profile1->mean_score = profile1->mean_left - profile1->mean_right;
+    profile1->dev_score  = profile1->dev_left - profile1->dev_right;
 
     tptr->token = forest->token;
   }
-  *elinks = links1;
+  *eprofile = profile1;
 
   FINALLY(quad_tree_ensure_edge_profiles);
   RETURN();
@@ -1503,7 +1555,8 @@ result quad_tree_ensure_edge_links
 (
   quad_forest *forest,
   quad_tree *tree1,
-  edge_links **elinks
+  edge_links **elinks,
+  truth_value update_edge_links
 )
 {
   TRY();
@@ -1525,8 +1578,10 @@ result quad_tree_ensure_edge_links
   CHECK_POINTER(elinks);
   *elinks = NULL;
 
-  links1 = has_edge_links(&tree1->annotation, forest->token);
-  if (links1 != NULL) {
+  CHECK(ensure_has(&tree1->annotation, t_edge_links, &tptr));
+  links1 = (edge_profile*)tptr->value;
+  /* if not yet created for this tree, create it using edge responses only */
+  if (tptr->token != forest->token) {
     CHECK(quad_tree_ensure_edge_response(forest, tree1, &eresp));
     own_angle = eresp->ang - M_PI_2;
     if (own_angle < 0) own_angle += 2 * M_PI;
@@ -1540,27 +1595,21 @@ result quad_tree_ensure_edge_links
     against_sum1 = 0;
     against_sum2 = 0;
     against_n = 0;
-    min_towards = 100;
-    min_against = 100;
-    min_other = 100;
-    best_towards = NULL;
-    best_against = NULL;
-    best_other = NULL;
 
+    /* calculate sums of angle differences */
     links = tree1->links.first.next;
     endlinks = &tree1->links.last;
     while (links != endlinks) {
       head1 = *((quad_tree_link_head**)links->data);
+      CHECK(quad_tree_link_head_ensure_measure(forest, head1, &measure_link1, FALSE));
       tree2 = head1->other->tree;
-
-      CHECK(quad_tree_link_head_ensure_measure(forest, head1, &measure_link1));
       CHECK(quad_tree_ensure_edge_response(forest, tree2, &eresp));
       angle = eresp->ang - M_PI_2;
       if (angle < 0) angle += 2 * M_PI;
       /* center angles around own angle */
-      angle -= own_angle;
+      angle = angle_minus_angle(angle, own_angle);
       /* if difference is larger than pi, need to wrap around at 0/2pi */
-      if (angle > M_PI) angle -= 2 * M_PI;
+      /* if (angle > M_PI) angle -= 2 * M_PI; */
       mag = eresp->mag;
       if (measure_link1->category == bl_TOWARDS) {
         towards_sum1 += mag * angle;
@@ -1578,42 +1627,8 @@ result quad_tree_ensure_edge_links
         own_sum2 += mag * angle * angle;
         own_n += mag;
       }
-
-      links2 = has_edge_links(&tree2->annotation, forest->token);
-      if (links2 != NULL) {
-        profile_score  = fabs(links1->mean_left - links2->mean_left);
-        profile_score += fabs(links1->mean_right - links2->mean_right);
-        profile_score += fabs(links1->dev_left - links2->dev_left);
-        profile_score += fabs(links1->dev_right - links2->dev_right);
-        measure_link1->profile_score = profile_score / 4;
-        link_score = measure_link1->profile_score; /*fabs(measure_link1->strength_score)*/
-        if (measure_link1->category == bl_TOWARDS) {
-          if (link_score < min_towards) {
-            best_towards = head1;
-            min_towards = link_score;
-          }
-        }
-        else
-        if (measure_link1->category == bl_AGAINST) {
-          if (link_score < min_against) {
-            best_against = head1;
-            min_against = link_score;
-          }
-        }
-        else {
-          if (link_score < min_other) {
-            best_other = head1;
-            min_other = link_score;
-          }
-        }
-      }
       links = links->next;
     }
-
-    links1->towards = best_towards;
-    links1->against = best_against;
-    links1->other = best_other;
-    links1->edge_score = (min_towards + min_against) / 2;
 
     own_mean = own_sum1 / own_n;
     own_dev = own_sum2 / own_n - own_mean * own_mean;
@@ -1623,10 +1638,18 @@ result quad_tree_ensure_edge_links
       towards_dev = towards_sum2 / towards_n - towards_mean * towards_mean;
       towards_dev = towards_dev < 0 ? 0 : sqrt(towards_dev);
     }
+    else {
+      towards_mean = own_mean;
+      towards_dev = own_dev;
+    }
     if (against_n > 0) {
       against_mean = against_sum1 / against_n;
       against_dev = against_sum2 / against_n - against_mean * against_mean;
       against_dev = against_dev < 0 ? 0 : sqrt(against_dev);
+    }
+    else {
+      against_mean = own_mean;
+      against_dev = own_dev;
     }
     consistency = 1 - (own_dev / M_PI);
     if (consistency < 0) consistency = 0;
@@ -1648,7 +1671,114 @@ result quad_tree_ensure_edge_links
     angle = own_angle + consistency * against_mean;
     if (angle < 0) angle += 2 * M_PI;
     links1->against_angle = angle;
-    links1->straightness = 1 - ((fabs(towards_mean) + fabs(against_mean)) / 2 * M_PI);
+
+    links1->straightness = 1 -
+        (angle_minus_angle(links1->towards_angle, links1->against_angle) / M_PI);
+
+    /* initially set the edge links as NULL */
+    /* these are set on the second round, involving boundary fragments */
+    links1->towards = NULL; /*best_towards;*/
+    links1->against = NULL; /*best_against;*/
+    links1->other = NULL; /*best_other;*/
+
+    tptr->token = forest->token;
+  }
+  /* if it is created, update it, using edge links where available */
+  else
+  if (IS_TRUE(update_edge_links)) {
+    own_sum1 = 0;
+    own_sum2 = 0;
+    own_n = 1;
+    towards_sum1 = 0;
+    towards_sum2 = 0;
+    towards_n = 0;
+    against_sum1 = 0;
+    against_sum2 = 0;
+    against_n = 0;
+
+    /* calculate sums of angle differences */
+    links = tree1->links.first.next;
+    endlinks = &tree1->links.last;
+    while (links != endlinks) {
+      head1 = *((quad_tree_link_head**)links->data);
+      CHECK(quad_tree_link_head_ensure_measure(forest, head1, &measure_link1, TRUE));
+      tree2 = head1->other->tree;
+      CHECK(quad_tree_ensure_edge_links(forest, tree2, links2, FALSE));
+
+      if (measure_link1->category == bl_TOWARDS) {
+        angle = angle_minus_angle(links1->towards_angle, links2->own_angle);
+        towards_sum1 += angle;
+        towards_sum2 += angle * angle;
+        towards_n += 1;
+      }
+      else
+      if (measure_link1->category == bl_AGAINST) {
+        angle = angle_minus_angle(links1->against_angle, links2->own_angle);
+        against_sum1 += angle;
+        against_sum2 += angle * angle;
+        against_n += 1;
+      }
+      else {
+        angle = angle_minus_angle(links1->own_angle, links2->own_angle);
+        own_sum1 += angle;
+        own_sum2 += angle * angle;
+        own_n += 1;
+      }
+      links = links->next;
+    }
+
+    own_mean = own_sum1 / own_n;
+    own_dev = own_sum2 / own_n - own_mean * own_mean;
+    own_dev = own_dev < 0 ? 0 : sqrt(own_dev);
+    if (towards_n > 0) {
+      towards_mean = towards_sum1 / towards_n;
+      towards_dev = towards_sum2 / towards_n - towards_mean * towards_mean;
+      towards_dev = towards_dev < 0 ? 0 : sqrt(towards_dev);
+    }
+    else {
+      towards_mean = own_mean;
+      towards_dev = own_dev;
+    }
+    if (against_n > 0) {
+      against_mean = against_sum1 / against_n;
+      against_dev = against_sum2 / against_n - against_mean * against_mean;
+      against_dev = against_dev < 0 ? 0 : sqrt(against_dev);
+    }
+    else {
+      against_mean = own_mean;
+      against_dev = own_dev;
+    }
+    consistency = 1 - (own_dev / M_PI);
+    if (consistency < 0) consistency = 0;
+    links1->own_consistency = consistency;
+    angle = own_angle + consistency * own_mean;
+    if (angle < 0) angle += 2 * M_PI;
+    links1->own_angle = angle;
+
+    consistency = 1 - (towards_dev / M_PI);
+    if (consistency < 0) consistency = 0;
+    links1->towards_consistency = consistency;
+    angle = own_angle + consistency * towards_mean;
+    if (angle < 0) angle += 2 * M_PI;
+    links1->towards_angle = angle;
+
+    consistency = 1 - (against_dev / M_PI);
+    if (consistency < 0) consistency = 0;
+    links1->against_consistency = consistency;
+    angle = own_angle + consistency * against_mean;
+    if (angle < 0) angle += 2 * M_PI;
+    links1->against_angle = angle;
+
+    links1->straightness = 1 -
+        (angle_minus_angle(links1->towards_angle, links1->against_angle) / M_PI);
+    links1->curvature = 0;
+
+    /* now should find the best towards and against links */
+    links1->towards = NULL; /*best_towards;*/
+    links1->against = NULL; /*best_against;*/
+    links1->other = NULL; /*best_other;*/
+
+    tptr->token = forest->token;
   }
   *elinks = links1;
 
@@ -1658,14 +1788,50 @@ result quad_tree_ensure_edge_links
 
 /******************************************************************************/
 
-result quad_forest_parse
+result quad_tree_ensure_ridge_potential
 (
   quad_forest *forest,
-  uint32 rounds
+  quad_tree *tree,
+  ridge_potential **ridge
 )
 {
   TRY();
-  quad_tree *tree1, *tree2;
+  typed_pointer *tptr;
+  edge_links *elinks;
+
+  CHECK_POINTER(forest);
+  CHECK_POINTER(tree);
+  CHECK_POINTER(ridge);
+  *ridge = NULL;
+
+  /* else add ridge to this node */
+  CHECK(ensure_has(&tree->annotation, t_ridge_potential, &tptr));
+  *ridge = (ridge_potential*)tptr->value;
+  if (tptr->token != forest->token) {
+    tptr->token = forest->token;
+  }
+  (*ridge)->round = 0;
+
+  CHECK(quad_tree_ensure_edge_links(forest, tree, &elinks, FALSE));
+
+  FINALLY(quad_tree_ensure_ridge_potential);
+  RETURN();
+}
+
+/******************************************************************************/
+
+/* parameters needed. */
+/* strength difference threshold */
+/* use dev threshold instead of truth value - thresh > 0 will trigger using it */
+result quad_forest_parse
+(
+  quad_forest *forest,
+  uint32 rounds,
+  truth_value use_dev
+)
+{
+  TRY();
+  quad_tree *tree1, *tree2, *bestneighbor, *hasridge;
   quad_tree_link_head *head1, *head2;
   quad_tree_link *link1, *link2;
   neighborhood_stat *nstat1, *nstat2;
@@ -1682,8 +1848,9 @@ result quad_forest_parse
   integral_value angle1, angle2, anglediff, anglescore;
   uint32 i, min_rank, max_extent, new_ridge, new_segment, new_boundary;
   integral_value mag1, mag2, mag_max, mag_diff, mag_diff_min;
-  integral_value strengthdiff, maxstrengthdiff;
+  integral_value strengthdiff, maxstrengthdiff, strength_threshold;
   integral_value mean1, mean2, dev, meandiff, maxmeandiff;
+  integral_value n_left, sum_left, n_right, sum_right;
 
   CHECK_POINTER(forest);
   CHECK_PARAM(rounds > 0);
@@ -1692,51 +1859,103 @@ result quad_forest_parse
 
   CHECK(quad_forest_calculate_neighborhood_stats(forest));
 
-  /* init loop. */
-  /* -find frontier regions between low-overlap and high-overlap regions */
-  /* -add ridge potentials and segment potentials */
-  /* -add segment link between the nodes with rank 0 */
-  trees = forest->trees.first.next;
-  endtrees = &forest->trees.last;
-  while (trees != endtrees) {
-    tree1 = (quad_tree*)trees->data;
-    ridge_tree = has_ridge_potential(&tree1->annotation, forest->token);
-    if (ridge_tree != NULL) {
-      trees = trees->next;
-      continue;
-    }
-    dev = tree1->stat.deviation;
-    if (dev > 7) {
-      CHECK(ensure_has(&tree1->annotation, t_ridge_potential, &tptr));
-      ridge_tree = (ridge_potential*)tptr->value;
-      if (tptr->token != forest->token) {
-        tptr->token = forest->token;
-      }
-      ridge_tree->round = 0;
-      ridge_tree->ridge_score = 0;
-      CHECK(quad_tree_ensure_edge_profiles(forest, tree1, &elinks));
-    }
-    else {
-      CHECK(expect_neighborhood_stat(&nstat1, &tree1->annotation));
-      strength1 = nstat1->strength;
-      maxstrength = strength1;
-      maxstrengthdiff = 0;
-      links = tree1->links.first.next;
-      endlinks = &tree1->links.last;
-      while (links != endlinks) {
-        head1 = *((quad_tree_link_head**)links->data);
-        tree2 = head1->other->tree;
-        CHECK(expect_neighborhood_stat(&nstat2, &tree2->annotation));
-        strength2 = nstat2->strength;
-        if (strength2 > maxstrength) maxstrength = strength2;
-        strengthdiff = strength1 - strength2;
-        if (strengthdiff > maxstrengthdiff) {
-          maxstrengthdiff = strengthdiff;
-        }
-        links = links->next;
+  /* during first round, accumulate the lowest strength value that triggers ridge */
+  strength_threshold = 1;
+  for (i = 0; i < 2; i++) {
+    /* first find ridge candidate trees and get the edge links */
+    trees = forest->trees.first.next;
+    endtrees = &forest->trees.last;
+    while (trees != endtrees) {
+      tree1 = (quad_tree*)trees->data;
+
+      /* if already has ridge potential, no need to process again */
+      ridge_tree = has_ridge_potential(&tree1->annotation, forest->token);
+      if (ridge_tree != NULL) {
+        trees = trees->next;
+        continue;
       }
 
-      if (maxstrengthdiff / strength1 > 0.5) {
+      /*
+        there are some hard-coded thresholds, need to parameterize or get rid of them.
+        -strengthdiff relative to strength
+      */
+
+      CHECK(expect_neighborhood_stat(&nstat1, &tree1->annotation));
+
+      /* triggering ridges by deviation threshold is not a very good idea always */
+      if (IS_TRUE(use_dev) && tree1->stat.deviation > 7) {
+        CHECK(quad_tree_ensure_ridge_potential(forest, tree1, &ridge_tree));
+        strength1 = nstat1->strength;
+        if (strength1 < strength_threshold) {
+          strength_threshold = strength1;
+        }
+      }
+      else {
+        /* use overlap or not? parameterize? */
+        strength1 = nstat1->strength;
+        /*
+        if (strength1 > strength_threshold) {
+          CHECK(quad_tree_ensure_ridge_potential(forest, tree1, &ridge_tree));
+        }
+        else {*/
+          maxstrength = strength1;
+          maxstrengthdiff = 0;
+          bestneighbor = NULL;
+          hasridge = NULL;
+          /* measure the maximum strength difference of node and its neighbors */
+          links = tree1->links.first.next;
+          endlinks = &tree1->links.last;
+          while (links != endlinks) {
+            head1 = *((quad_tree_link_head**)links->data);
+            tree2 = head1->other->tree;
+            CHECK(expect_neighborhood_stat(&nstat2, &tree2->annotation));
+            /* use overlap or not? parameterize? */
+            strength2 = nstat2->strength;
+            /*
+            ridge_link1 = has_ridge_potential(&tree2->annotation, forest->token);
+            if (ridge_link1 != NULL && strength1 - strength2 > -0.0001) {
+              hasridge = tree2;
+              break;
+            }
+            */
+            /* is this maxstrength needed? -> for comparison with tree strength */
+            if (strength2 > maxstrength) {
+              maxstrength = strength2;
+              bestneighbor = tree2;
+            }
+            /* 20130528 added fabs, may explain some problems earlier (or cause others) */
+            strengthdiff = fabs(strength1 - strength2);
+            if (strengthdiff > maxstrengthdiff) {
+              maxstrengthdiff = strengthdiff;
+            }
+            links = links->next;
+          }
+          /* if some neighbor with smaller or similar strength has ridge, this has too */
+          if (hasridge != NULL) {
+            CHECK(quad_tree_ensure_ridge_potential(forest, tree1, &ridge_tree));
+            if (strength1 < strength_threshold) {
+              strength_threshold = strength1;
+            }
+          }
+          else {
+            /* large strength difference indicates a ridge is near */
+            /* the ridge may be in this node, or in the neighbor with highest strength */
+            if (maxstrengthdiff / strength1 > 0.5) {
+              /* if neighbor is stronger, add ridge there */
+              if (maxstrength > strength1) {
+                tree1 = bestneighbor;
+              }
+              /* else add ridge to this node */
+              CHECK(quad_tree_ensure_ridge_potential(forest, tree1, &ridge_tree));
+              if (maxstrength < strength_threshold) {
+                strength_threshold = maxstrength;
+              }
+            }
+          }
+        /*}*/
+      }
+      /*
+      if (nstat1->overlap < 0.25) {
         CHECK(ensure_has(&tree1->annotation, t_ridge_potential, &tptr));
         ridge_tree = (ridge_potential*)tptr->value;
         if (tptr->token != forest->token) {
@@ -1744,71 +1963,55 @@ result quad_forest_parse
         }
         ridge_tree->round = 0;
         ridge_tree->ridge_score = 0;
-        CHECK(quad_tree_ensure_edge_profiles(forest, tree1, &elinks));
 
-        if (maxstrength > strength1) {
-          links = tree1->links.first.next;
-          endlinks = &tree1->links.last;
-          while (links != endlinks) {
-            head1 = *((quad_tree_link_head**)links->data);
-            tree2 = head1->other->tree;
-            CHECK(expect_neighborhood_stat(&nstat2, &tree2->annotation));
-            strength2 = nstat2->strength;
-            if (strength2 > strength1) {
-              CHECK(ensure_has(&tree2->annotation, t_ridge_potential, &tptr));
-              ridge_tree = (ridge_potential*)tptr->value;
-              if (tptr->token != forest->token) {
-                tptr->token = forest->token;
-              }
-              ridge_tree->round = 0;
-              ridge_tree->ridge_score = 0;
-              CHECK(quad_tree_ensure_edge_profiles(forest, tree2, &elinks));
-            }
-            links = links->next;
-          }
-        }
       }
+      */
+      /*CHECK(list_append(&treelist, &tree1));*/
+      trees = trees->next;
     }
-    /*
-    if (nstat1->overlap < 0.25) {
-      CHECK(ensure_has(&tree1->annotation, t_ridge_potential, &tptr));
-      ridge_tree = (ridge_potential*)tptr->value;
-      if (tptr->token != forest->token) {
-        tptr->token = forest->token;
-      }
-      ridge_tree->round = 0;
-      ridge_tree->ridge_score = 0;
-
-    }
-    */
-    /*CHECK(list_append(&treelist, &tree1));*/
-    trees = trees->next;
   }
 
+  /* could add ridge trees to tree list instead of iterating over all trees */
   trees = forest->trees.first.next;
   endtrees = &forest->trees.last;
   while (trees != endtrees) {
     tree1 = (quad_tree*)trees->data;
     ridge_tree = has_ridge_potential(&tree1->annotation, forest->token);
     if (ridge_tree != NULL) {
-      CHECK(quad_tree_ensure_edge_links(forest, tree1, &elinks));
+      CHECK(quad_tree_ensure_edge_links(forest, tree1, &elinks, FALSE));
+      n_left = 0;
+      sum_left = 0;
+      n_right = 0;
+      sum_right = 0;
       links = tree1->links.first.next;
       endlinks = &tree1->links.last;
       while (links != endlinks) {
         head1 = *((quad_tree_link_head**)links->data);
         measure_link1 = has_link_measure(&head1->annotation, forest->token);
         if (measure_link1 != NULL) {
-          if (measure_link1->category == bl_LEFT || measure_link1->category == bl_RIGHT) {
-            if (measure_link1->strength_score < 0.0001 && measure_link1->magnitude_score < 0) {
-              tree2 = head1->other->tree;
-              CHECK(ensure_has(&tree2->annotation, t_boundary_potential, &tptr));
-              if (tptr->token != forest->token) {
-                tptr->token = forest->token;
-              }
-            }
+          if (measure_link1->category == bl_LEFT) {
+            sum_left += measure_link1->strength_score;
+            n_left += 1;
+          }
+          else
+          if (measure_link1->category == bl_RIGHT) {
+            sum_right += measure_link1->strength_score;
+            n_right += 1;
           }
         }
         links = links->next;
+      }
+      if (n_left > 0) {
+        sum_left /= n_left;
+      }
+      if (n_right > 0) {
+        sum_right /= n_right;
+      }
+      if (sum_left > -0.0001 && sum_right > -0.0001) {
+        CHECK(ensure_has(&tree1->annotation, t_boundary_potential, &tptr));
+        if (tptr->token != forest->token) {
+          tptr->token = forest->token;
+        }
       }
     }
     trees = trees->next;
@@ -1833,27 +2036,33 @@ result quad_forest_parse
       if (ridge_tree != NULL) {
         if (ridge_tree->round == 0) {
           CHECK(quad_tree_ensure_edge_response(forest, tree1, &eresp1));
-          strength1 = nstat1->strength * (1 - nstat1->overlap);
+          /* use overlap or not? parameterize? */
+          /* strength1 = nstat1->strength * (1 - nstat1->overlap); */
+          strength1 = nstat1->strength;
           minstrength = strength1;
-          mag1 = eresp1->mag;
-          mag_max = mag1;
+          /* mag1 = eresp1->mag; */
+          /* mag_max = mag1; */
 
           maxstrength = 0;
           links = tree1->links.first.next;
           endlinks = &tree1->links.last;
           while (links != endlinks) {
             head1 = *((quad_tree_link_head**)links->data);
-            CHECK(quad_tree_link_head_ensure_measure(forest, head1, &measure_link1));
-            if (measure_link1->category == bl_PERPENDICULAR) {
+            /* should use edge links or not?? */
+            CHECK(quad_tree_link_head_ensure_measure(forest, head1, &measure_link1, TRUE));
+            if (measure_link1->category == bl_LEFT || measure_link1->category == bl_RIGHT) {
               tree2 = head1->other->tree;
               CHECK(quad_tree_ensure_edge_response(forest, tree2, &eresp2));
               CHECK(expect_neighborhood_stat(&nstat2, &tree2->annotation));
-              strength2 = nstat2->strength * (1 - nstat2->overlap);
-              mag2 = eresp2->mag;
-              mag_diff = (mag1 - mag2) / getmax(mag1, mag2);
-              strengthdiff = strength1 - strength2 + mag_diff;
-              if (mag_diff < mag_diff_min) mag_diff_min = mag_diff;
-              if (mag2 > mag_max) mag_max = mag2;
+              /* use overlap or not? parameterize? */
+              /* strength2 = nstat2->strength * (1 - nstat2->overlap); */
+              strength2 = nstat2->strength;
+              /* mag2 = eresp2->mag; */
+              /* use mag-diff or not? and how? parameterize? */
+              /* mag_diff = (mag1 - mag2) / getmax(mag1, mag2); */
+              strengthdiff = strength1 - strength2; /* + mag_diff; */
+              /* if (mag_diff < mag_diff_min) mag_diff_min = mag_diff; */
+              /* if (mag2 > mag_max) mag_max = mag2; */
               /* if the neighbor is downhill, make it a segment node */
               if (strengthdiff > 0.001) {
                 CHECK(ensure_has(&tree2->annotation, t_segment_potential, &tptr));
@@ -1878,22 +2087,33 @@ result quad_forest_parse
               tptr->token = forest->token;
             }
           }
-          ridge_tree->ridge_score = strength1 * (1 - ((mag_max - mag1) / mag_max));
+          ridge_tree->ridge_score = strength1; /* * (1 - ((mag_max - mag1) / mag_max)); */
           ridge_tree->round = 1;
         }
+        /*
         else
         if (ridge_tree->round == 1) {
           CHECK(quad_tree_ensure_edge_links(forest, tree1, &elinks));
         }
+        */
       }
 
+      /* this could be used for boundary fragment propagation */
+      /* replace boundary potential with boundary fragment? */
       if (boundary_tree != NULL) {
-        CHECK(quad_tree_ensure_edge_links(forest, tree1, &elinks));
+        /*CHECK(quad_tree_ensure_edge_links(forest, tree1, &elinks));*/
+      }
+
+      if (segment_tree != NULL) {
+        /* get segment links and propagate */
       }
 
       trees = trees->next;
     }
   }
+
+  quad_forest_set_parse(forest);
+
   /*PRINT0("finished\n");*/
   FINALLY(quad_forest_parse);
   list_destroy(&treelist);
@@ -1938,150 +2158,151 @@ result quad_forest_visualize_parse_result
   /*CHECK(pixel_image_clear(target));*/
   CHECK(list_create(&links, 1000, sizeof(weighted_line), 1));
 
-  max_edge_mag = 0;
-  trees = forest->trees.first.next;
-  end = &forest->trees.last;
-  while (trees != end) {
-    tree = (quad_tree*)trees->data;
-    CHECK(expect_neighborhood_stat(&nstat, &tree->annotation));
-    eresp = has_edge_response(&tree->annotation, forest->token);
-    if (eresp != NULL) {
-      if (eresp->mag > max_edge_mag) {
-        max_edge_mag = eresp->mag;
-      }
-    }
-    trees = trees->next;
-  }
-
-  max_ridge_score = 0;
-  trees = forest->trees.first.next;
-  end = &forest->trees.last;
-  while (trees != end) {
-    tree = (quad_tree*)trees->data;
-    ridge1 = has_ridge_potential(&tree->annotation, forest->token);
-    if (ridge1 != NULL) {
-      if (ridge1->ridge_score > max_ridge_score) {
-        max_ridge_score = ridge1->ridge_score;
-      }
-    }
-    trees = trees->next;
-  }
-  /*PRINT1("max ridge score %.3f\n", max_ridge_score);*/
-
-  trees = forest->trees.first.next;
-  end = &forest->trees.last;
-  while (trees != end) {
-    tree = (quad_tree*)trees->data;
-    CHECK(expect_neighborhood_stat(&nstat, &tree->annotation));
-    if (tree->nw == NULL) {
-
-      boundary1 = has_boundary_potential(&tree->annotation, forest->token);
-      if (boundary1 != NULL) {
-        color0 = (byte)(255 * 1);
-      }
-      else {
-        color0 = (byte)(255 * 0);
-      }
-
-      /*
-      eresp = has_edge_response(&tree->annotation, forest->token);
-      if (eresp != NULL) {
-        color0 = (byte)(255 * 1);
-      }
-      else {
-        color0 = (byte)(255 * 0);
-      }
-      */
-      /*(eresp->mag / max_edge_mag));*/
-      /*
-      ridge1 = has_ridge_potential(&tree->annotation, forest->token);
-
-      if (ridge1 != NULL) {
-        color1 = (byte)(255 * 1);
-      }
-      else {
-        color1 = (byte)(255 * 0);
-      }
-      */
-      color1 = (byte)(255 * 0);
-      /*
-      boundary1 = has_boundary_potential(&tree->annotation, forest->token);
-
-      if (boundary1 != NULL) {
-        color2 = (byte)(255 * 1);
-      }
-      else {
-        color2 = (byte)(255 * 0);
-      }
-      */
-      segment1 = has_segment_potential(&tree->annotation, forest->token);
-      /*
-      if (segment1 != NULL) {
-        color2 = (byte)(255 * 1);
-      }
-      else {
-        color2 = (byte)(255 * 0);
-      }
-      */
-      color2 = (byte)(255 * 0);
-      /*color2 = 255 - color0;*/
-
-      if (boundary1 != NULL) /* ridge1 != NULL || */
-      {
-        width = tree->size;
-        height = width;
-        row_step = stride - 3 * width;
-        target_pos = target_data + tree->y * stride + 3 * tree->x;
-        for (y = 0; y < height; y++, target_pos += row_step) {
-          for (x = 0; x < width; x++) {
-            *target_pos = color0;
-            target_pos++;
-            *target_pos = color1;
-            target_pos++;
-            *target_pos = color2;
-            target_pos++;
-          }
-        }
-      }
-
-    }
-    trees = trees->next;
-  }
-  /*CHECK(quad_forest_visualize_neighborhood_stats(forest, target, v_STRENGTH));*/
-  {
-    byte edge_color_1[4] = {0,255,0,0};
-    byte edge_color_2[4] = {0,255,0,0};
-    byte segment_color[4] = {255,255,255,0};
-
-    /*CHECK(quad_forest_get_links(forest, &links, v_LINK_NONE));*/
-    /*
-    CHECK(quad_forest_get_links(forest, &links, v_LINK_SIMILARITY));
-    CHECK(pixel_image_draw_weighted_lines(target, &links, segment_color));
-    CHECK(list_clear(&links));
-    CHECK(quad_forest_get_links(forest, &links, v_LINK_ANGLE_COST));
-    CHECK(pixel_image_draw_weighted_lines(target, &links, edge_color));
-    */
-    /*CHECK(quad_forest_get_links(forest, &links, v_LINK_MEASURE));*/
-    /*CHECK(quad_forest_get_links(forest, &links, v_LINK_EDGE));*/
-    CHECK(quad_forest_get_links(forest, &links, v_LINK_STRAIGHT));
-    /*PRINT1("links: %d\n", links.count);*/
-    /*
+  if (IS_TRUE(quad_forest_has_parse(forest))) {
+    max_edge_mag = 0;
     trees = forest->trees.first.next;
     end = &forest->trees.last;
     while (trees != end) {
       tree = (quad_tree*)trees->data;
-      CHECK(quad_tree_edge_response_to_line(forest, tree, &links));
+      CHECK(expect_neighborhood_stat(&nstat, &tree->annotation));
+      eresp = has_edge_response(&tree->annotation, forest->token);
+      if (eresp != NULL) {
+        if (eresp->mag > max_edge_mag) {
+          max_edge_mag = eresp->mag;
+        }
+      }
       trees = trees->next;
     }
-    */
-    /*CHECK(quad_tree_gradient_to_line(tree, &links));*/
-    CHECK(pixel_image_draw_weighted_lines(target, &links, edge_color_1));
 
-    /*
-    CHECK(list_clear(&links));
-    CHECK(quad_forest_get_links(forest, &links, v_LINK_STRENGTH));
-    CHECK(pixel_image_draw_weighted_lines(target, &links, edge_color));
-    */
+    max_ridge_score = 0;
+    trees = forest->trees.first.next;
+    end = &forest->trees.last;
+    while (trees != end) {
+      tree = (quad_tree*)trees->data;
+      ridge1 = has_ridge_potential(&tree->annotation, forest->token);
+      if (ridge1 != NULL) {
+        if (ridge1->ridge_score > max_ridge_score) {
+          max_ridge_score = ridge1->ridge_score;
+        }
+      }
+      trees = trees->next;
+    }
+    /*PRINT1("max ridge score %.3f\n", max_ridge_score);*/
+
+    trees = forest->trees.first.next;
+    end = &forest->trees.last;
+    while (trees != end) {
+      tree = (quad_tree*)trees->data;
+      CHECK(expect_neighborhood_stat(&nstat, &tree->annotation));
+      if (tree->nw == NULL) {
+
+        /*color0 = (byte)(255 * 0);*/
+        boundary1 = has_boundary_potential(&tree->annotation, forest->token);
+        if (boundary1 != NULL) {
+          color0 = (byte)(255 * 1);
+        }
+        else {
+          color0 = (byte)(255 * 0);
+        }
+
+        /*
+        eresp = has_edge_response(&tree->annotation, forest->token);
+        if (eresp != NULL) {
+          color0 = (byte)(255 * 1);
+        }
+        else {
+          color0 = (byte)(255 * 0);
+        }
+        */
+        /*(eresp->mag / max_edge_mag));*/
+
+        /*color1 = (byte)(255 * 0);*/
+        ridge1 = has_ridge_potential(&tree->annotation, forest->token);
+        if (ridge1 != NULL) {
+          color1 = (byte)(255 * 1);
+        }
+        else {
+          color1 = (byte)(255 * 0);
+        }
+
+
+        /*
+        boundary1 = has_boundary_potential(&tree->annotation, forest->token);
+
+        if (boundary1 != NULL) {
+          color2 = (byte)(255 * 1);
+        }
+        else {
+          color2 = (byte)(255 * 0);
+        }
+        */
+        color2 = (byte)(255 * 0);
+        segment1 = has_segment_potential(&tree->annotation, forest->token);
+        /*
+        if (segment1 != NULL) {
+          color2 = (byte)(255 * 1);
+        }
+        else {
+          color2 = (byte)(255 * 0);
+        }
+        */
+        /*color2 = 255 - color0;*/
+
+        if (ridge1 != NULL || boundary1 != NULL) { /*  */
+          width = tree->size;
+          height = width;
+          row_step = stride - 3 * width;
+          target_pos = target_data + tree->y * stride + 3 * tree->x;
+          for (y = 0; y < height; y++, target_pos += row_step) {
+            for (x = 0; x < width; x++) {
+              *target_pos = color0;
+              target_pos++;
+              *target_pos = color1;
+              target_pos++;
+              *target_pos = color2;
+              target_pos++;
+            }
+          }
+        }
+      }
+      trees = trees->next;
+    }
+    /*CHECK(quad_forest_visualize_neighborhood_stats(forest, target, v_STRENGTH));*/
+    {
+      byte edge_color_1[4] = {0,255,0,0};
+      byte edge_color_2[4] = {0,255,0,0};
+      byte segment_color[4] = {255,255,255,0};
+
+      /*CHECK(quad_forest_get_links(forest, &links, v_LINK_NONE));*/
+      /*
+      CHECK(quad_forest_get_links(forest, &links, v_LINK_SIMILARITY));
+      CHECK(pixel_image_draw_weighted_lines(target, &links, segment_color));
+      CHECK(list_clear(&links));
+      CHECK(quad_forest_get_links(forest, &links, v_LINK_ANGLE_COST));
+      CHECK(pixel_image_draw_weighted_lines(target, &links, edge_color));
+      */
+      /*CHECK(quad_forest_get_links(forest, &links, v_LINK_MEASURE));*/
+      /*CHECK(quad_forest_get_links(forest, &links, v_LINK_EDGE));*/
+      CHECK(quad_forest_get_links(forest, &links, v_LINK_STRAIGHT));
+      /*PRINT1("links: %d\n", links.count);*/
+      /*
+      trees = forest->trees.first.next;
+      end = &forest->trees.last;
+      while (trees != end) {
+        tree = (quad_tree*)trees->data;
+        CHECK(quad_tree_edge_response_to_line(forest, tree, &links));
+        trees = trees->next;
+      }
+      */
+      /*CHECK(quad_tree_gradient_to_line(tree, &links));*/
+      CHECK(pixel_image_draw_weighted_lines(target, &links, segment_color));
+
+      /*
+      CHECK(list_clear(&links));
+      CHECK(quad_forest_get_links(forest, &links, v_LINK_STRENGTH));
+      CHECK(pixel_image_draw_weighted_lines(target, &links, edge_color));
+      */
+    }
   }
 
   FINALLY(quad_forest_visualize_parse_result);

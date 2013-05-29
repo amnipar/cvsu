@@ -122,7 +122,8 @@ result quad_forest_parse
 (
   quad_forest *forest,
   /** How many propagation rounds to use for determining devmean and devdev */
-  uint32 rounds
+  uint32 rounds,
+  truth_value use_dev
 );
 
 result quad_forest_visualize_parse_result
