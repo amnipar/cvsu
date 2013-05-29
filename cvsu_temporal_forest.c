@@ -225,7 +225,7 @@ result temporal_forest_update
     forest2->token = target->frames;
     /*CHECK(quad_forest_calculate_neighborhood_stats(forest2, TRUE, 2, TRUE, FALSE, TRUE));*/
     /*CHECK(quad_forest_calculate_accumulated_regs(forest2, 5));*/
-    CHECK(quad_forest_parse(forest2, 5));
+    CHECK(quad_forest_parse(forest2, 5, TRUE));
     /*
     size = target->rows * target->cols;
     for (i = 0; i < size; i++) {
@@ -386,13 +386,13 @@ result temporal_forest_visualize
   forest = &target->forests[target->current];
   width = target->visual.width;
   height = target->visual.height;
-  
+
   if (image != NULL) {
     CHECK_PARAM(image->width == width);
     CHECK_PARAM(image->height == height);
     CHECK_PARAM(image->type == p_U8);
     CHECK_PARAM(image->format == RGB);
-    
+
     stride = image->stride;
     target_data = (byte*)image->data;
   }
@@ -400,7 +400,7 @@ result temporal_forest_visualize
     stride = target->visual.stride;
     target_data = (byte*)target->visual.data;
   }
-  
+
   /*
   CHECK(pixel_image_clear(&target->visual));
   CHECK(convert_grey8_to_grey24(forest->source, &target->visual));
