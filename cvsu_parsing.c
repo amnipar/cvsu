@@ -1831,7 +1831,7 @@ result quad_forest_parse
 )
 {
   TRY();
-  quad_tree *tree1, *tree2, *bestneighbor, *hasridge;
+  quad_tree *tree1, *tree2, *bestneighbor;
   quad_tree_link_head *head1, *head2;
   quad_tree_link *link1, *link2;
   neighborhood_stat *nstat1, *nstat2;
@@ -1842,7 +1842,7 @@ result quad_forest_parse
   link_measure *measure_link1, *measure_link2;
   edge_links *elinks;
   typed_pointer *tptr;
-  list treelist;
+  list ridgelist, nodelist;
   list_item *trees, *endtrees, *links, *endlinks;
   integral_value strength1, strength2, newstrength, minstrength, maxstrength, count;
   integral_value angle1, angle2, anglediff, anglescore;
@@ -1855,166 +1855,157 @@ result quad_forest_parse
   CHECK_POINTER(forest);
   CHECK_PARAM(rounds > 0);
 
-  CHECK(list_create(&treelist, 1000, sizeof(quad_tree*), 1));
+  CHECK(list_create(&ridgelist, 1000, sizeof(quad_tree*), 1));
+  CHECK(list_create(&nodelist, 1000, sizeof(quad_tree*), 1));
 
   CHECK(quad_forest_calculate_neighborhood_stats(forest));
 
-  /* during first round, accumulate the lowest strength value that triggers ridge */
-  strength_threshold = 1;
-  for (i = 0; i < 2; i++) {
-    /* first find ridge candidate trees and get the edge links */
-    trees = forest->trees.first.next;
-    endtrees = &forest->trees.last;
-    while (trees != endtrees) {
-      tree1 = (quad_tree*)trees->data;
-
-      /* if already has ridge potential, no need to process again */
-      ridge_tree = has_ridge_potential(&tree1->annotation, forest->token);
-      if (ridge_tree != NULL) {
-        trees = trees->next;
-        continue;
-      }
-
-      /*
-        there are some hard-coded thresholds, need to parameterize or get rid of them.
-        -strengthdiff relative to strength
-      */
-
-      CHECK(expect_neighborhood_stat(&nstat1, &tree1->annotation));
-
-      /* triggering ridges by deviation threshold is not a very good idea always */
-      if (IS_TRUE(use_dev) && tree1->stat.deviation > 7) {
-        CHECK(quad_tree_ensure_ridge_potential(forest, tree1, &ridge_tree));
-        strength1 = nstat1->strength;
-        if (strength1 < strength_threshold) {
-          strength_threshold = strength1;
-        }
-      }
-      else {
-        /* use overlap or not? parameterize? */
-        strength1 = nstat1->strength;
-        /*
-        if (strength1 > strength_threshold) {
-          CHECK(quad_tree_ensure_ridge_potential(forest, tree1, &ridge_tree));
-        }
-        else {*/
-          maxstrength = strength1;
-          maxstrengthdiff = 0;
-          bestneighbor = NULL;
-          hasridge = NULL;
-          /* measure the maximum strength difference of node and its neighbors */
-          links = tree1->links.first.next;
-          endlinks = &tree1->links.last;
-          while (links != endlinks) {
-            head1 = *((quad_tree_link_head**)links->data);
-            tree2 = head1->other->tree;
-            CHECK(expect_neighborhood_stat(&nstat2, &tree2->annotation));
-            /* use overlap or not? parameterize? */
-            strength2 = nstat2->strength;
-            /*
-            ridge_link1 = has_ridge_potential(&tree2->annotation, forest->token);
-            if (ridge_link1 != NULL && strength1 - strength2 > -0.0001) {
-              hasridge = tree2;
-              break;
-            }
-            */
-            /* is this maxstrength needed? -> for comparison with tree strength */
-            if (strength2 > maxstrength) {
-              maxstrength = strength2;
-              bestneighbor = tree2;
-            }
-            /* 20130528 added fabs, may explain some problems earlier (or cause others) */
-            strengthdiff = fabs(strength1 - strength2);
-            if (strengthdiff > maxstrengthdiff) {
-              maxstrengthdiff = strengthdiff;
-            }
-            links = links->next;
-          }
-          /* if some neighbor with smaller or similar strength has ridge, this has too */
-          if (hasridge != NULL) {
-            CHECK(quad_tree_ensure_ridge_potential(forest, tree1, &ridge_tree));
-            if (strength1 < strength_threshold) {
-              strength_threshold = strength1;
-            }
-          }
-          else {
-            /* large strength difference indicates a ridge is near */
-            /* the ridge may be in this node, or in the neighbor with highest strength */
-            if (maxstrengthdiff / strength1 > 0.5) {
-              /* if neighbor is stronger, add ridge there */
-              if (maxstrength > strength1) {
-                tree1 = bestneighbor;
-              }
-              /* else add ridge to this node */
-              CHECK(quad_tree_ensure_ridge_potential(forest, tree1, &ridge_tree));
-              if (maxstrength < strength_threshold) {
-                strength_threshold = maxstrength;
-              }
-            }
-          }
-        /*}*/
-      }
-      /*
-      if (nstat1->overlap < 0.25) {
-        CHECK(ensure_has(&tree1->annotation, t_ridge_potential, &tptr));
-        ridge_tree = (ridge_potential*)tptr->value;
-        if (tptr->token != forest->token) {
-          tptr->token = forest->token;
-        }
-        ridge_tree->round = 0;
-        ridge_tree->ridge_score = 0;
-
-      }
-      */
-      /*CHECK(list_append(&treelist, &tree1));*/
-      trees = trees->next;
-    }
-  }
-
-  /* could add ridge trees to tree list instead of iterating over all trees */
+  /* first find ridge candidate trees and get the edge links */
   trees = forest->trees.first.next;
   endtrees = &forest->trees.last;
   while (trees != endtrees) {
     tree1 = (quad_tree*)trees->data;
+
+    /* if already has ridge potential, no need to process again */
     ridge_tree = has_ridge_potential(&tree1->annotation, forest->token);
     if (ridge_tree != NULL) {
-      CHECK(quad_tree_ensure_edge_links(forest, tree1, &elinks, FALSE));
-      n_left = 0;
-      sum_left = 0;
-      n_right = 0;
-      sum_right = 0;
+      trees = trees->next;
+      continue;
+    }
+
+    /*
+      TODO: there are some hard-coded thresholds, need to parameterize or get rid of them.
+      -strengthdiff relative to strength
+      -dev threshold
+    */
+
+    /* triggering ridges by deviation threshold is not a very good idea always */
+    /* TODO: change to dev_threshold > 0 or similar */
+    if (IS_TRUE(use_dev) && tree1->stat.deviation > 7) {
+      CHECK(quad_tree_ensure_ridge_potential(forest, tree1, &ridge_tree));
+      CHECK(list_append(&ridgelist, &tree1));
+    }
+    else {
+      /* use overlap as component of strength or not? mag? parameterize? */
+      CHECK(expect_neighborhood_stat(&nstat1, &tree1->annotation));
+      strength1 = nstat1->strength;
+
+      maxstrength = strength1;
+      maxstrengthdiff = 0;
+      bestneighbor = NULL;
+      /* measure the maximum strength difference of node and its neighbors */
       links = tree1->links.first.next;
       endlinks = &tree1->links.last;
       while (links != endlinks) {
         head1 = *((quad_tree_link_head**)links->data);
-        measure_link1 = has_link_measure(&head1->annotation, forest->token);
-        if (measure_link1 != NULL) {
-          if (measure_link1->category == bl_LEFT) {
-            sum_left += measure_link1->strength_score;
-            n_left += 1;
-          }
-          else
-          if (measure_link1->category == bl_RIGHT) {
-            sum_right += measure_link1->strength_score;
-            n_right += 1;
-          }
+        tree2 = head1->other->tree;
+        CHECK(expect_neighborhood_stat(&nstat2, &tree2->annotation));
+        /* use overlap as component of strength or not? mag? parameterize? */
+        strength2 = nstat2->strength;
+
+        /* find out if some neighbor is stronger than this one */
+        if (strength2 > maxstrength) {
+          maxstrength = strength2;
+          bestneighbor = tree2;
+        }
+
+        strengthdiff = fabs(strength1 - strength2);
+        if (strengthdiff > maxstrengthdiff) {
+          maxstrengthdiff = strengthdiff;
         }
         links = links->next;
       }
-      if (n_left > 0) {
-        sum_left /= n_left;
-      }
-      if (n_right > 0) {
-        sum_right /= n_right;
-      }
-      if (sum_left > -0.0001 && sum_right > -0.0001) {
-        CHECK(ensure_has(&tree1->annotation, t_boundary_potential, &tptr));
-        if (tptr->token != forest->token) {
-          tptr->token = forest->token;
+
+      /* large strength difference indicates a ridge is near */
+      /* the ridge may be in this node, or in the neighbor with highest strength */
+      if (maxstrengthdiff / strength1 > 0.5) {
+        /* if neighbor is stronger, add ridge there */
+        if (maxstrength > strength1) {
+          tree1 = bestneighbor;
         }
+        /* else add ridge to this node */
+        CHECK(quad_tree_ensure_ridge_potential(forest, tree1, &ridge_tree));
+        /* collect all ridge nodes to a list */
+        CHECK(list_append(&ridgelist, &tree1));
       }
     }
     trees = trees->next;
+  }
+
+  /* in the next phase, include all neighbors of initial ridge nodes, that    */
+  /* are on the same strength level or higher                                 */
+  /* also add boundaries to a new list (?) */
+  trees = ridgelist.first.next;
+  endtrees = &ridgelist.last;
+  while (trees != endtrees) {
+    tree1 = *((quad_tree**)trees->data);
+    CHECK(expect_neighborhood_stat(&nstat1, &tree1->annotation));
+    strength1 = nstat1->strength;
+    CHECK(quad_tree_ensure_edge_links(forest, tree1, &elinks, FALSE));
+    n_left = 0;
+    sum_left = 0;
+    n_right = 0;
+    sum_right = 0;
+
+    links = tree1->links.first.next;
+    endlinks = &tree1->links.last;
+    while (links != endlinks) {
+      head1 = *((quad_tree_link_head**)links->data);
+      measure_link1 = has_link_measure(&head1->annotation, forest->token);
+      if (measure_link1 != NULL) {
+        if (measure_link1->category == bl_LEFT) {
+          sum_left += measure_link1->strength_score;
+          n_left += 1;
+        }
+        else
+        if (measure_link1->category == bl_RIGHT) {
+          sum_right += measure_link1->strength_score;
+          n_right += 1;
+        }
+      }
+      tree2 = head1->other->tree;
+      /* first check if this neighbor is already a ridge node */
+      ridge_link1 = has_ridge_potential(&tree2->annotation, forest->token);
+      if (ridge_link1 == NULL) {
+        CHECK(expect_neighborhood_stat(&nstat2, &tree2->annotation));
+        /* use overlap as component of strength or not? mag? parameterize? */
+        strength2 = nstat2->strength;
+
+        /* is this neighbor higher or at same level? */
+        if (strength1 - strength2 > 0) {
+          /* if yes, make it ridge node as well */
+          CHECK(quad_tree_ensure_ridge_potential(forest, tree2, &ridge_tree));
+          CHECK(list_append(&ridgelist, &tree2));
+        }
+      }
+      links = links->next;
+    }
+    if (n_left > 0) {
+      sum_left /= n_left;
+    }
+    if (n_right > 0) {
+      sum_right /= n_right;
+    }
+    if ((sum_left > -0.0001 && sum_right > 0.001) ||
+        (sum_left > 0.001 && sum_right > -0.0001)) {
+      CHECK(ensure_has(&tree1->annotation, t_boundary_potential, &tptr));
+      if (tptr->token != forest->token) {
+        tptr->token = forest->token;
+      }
+      CHECK(list_append(&nodelist, &tree1));
+    }
+    trees = trees->next;
+  }
+
+  /* in next phase, start propagating signals starting from boundary nodes */
+  for (i = 0; i < rounds; i++) {
+    trees = nodelist.first.next;
+    endtrees = &nodelist.last;
+    while (trees != endtrees) {
+      tree1 = *((quad_tree**)trees->data);
+
+      trees = trees->next;
+    }
   }
 
   /* main propagation loop. */
@@ -2116,7 +2107,8 @@ result quad_forest_parse
 
   /*PRINT0("finished\n");*/
   FINALLY(quad_forest_parse);
-  list_destroy(&treelist);
+  list_destroy(&ridgelist);
+  list_destroy(&nodelist);
   RETURN();
 }
 
@@ -2248,7 +2240,7 @@ result quad_forest_visualize_parse_result
         */
         /*color2 = 255 - color0;*/
 
-        if (ridge1 != NULL || boundary1 != NULL) { /*  */
+        if (boundary1 != NULL) { /* ridge1 != NULL ||  */
           width = tree->size;
           height = width;
           row_step = stride - 3 * width;

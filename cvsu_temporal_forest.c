@@ -225,7 +225,7 @@ result temporal_forest_update
     forest2->token = target->frames;
     /*CHECK(quad_forest_calculate_neighborhood_stats(forest2, TRUE, 2, TRUE, FALSE, TRUE));*/
     /*CHECK(quad_forest_calculate_accumulated_regs(forest2, 5));*/
-    CHECK(quad_forest_parse(forest2, 5, TRUE));
+    CHECK(quad_forest_parse(forest2, 5, FALSE));
     /*
     size = target->rows * target->cols;
     for (i = 0; i < size; i++) {
