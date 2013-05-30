@@ -1680,7 +1680,9 @@ result quad_forest_get_links
 
   CHECK_POINTER(forest);
 
-  CHECK(list_create(links, forest->links.count * 2, sizeof(weighted_line), 1));
+  /* caller should provide a list - should start using typed pointers so could */
+  /* check that the list has the correct type */
+  /* CHECK(list_create(links, forest->links.count * 2, sizeof(weighted_line), 1)); */
 
   if (mode == v_LINK_DISTANCE) {
     items = forest->links.first.next;

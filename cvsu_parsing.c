@@ -1582,6 +1582,7 @@ result quad_tree_ensure_edge_links
   links1 = (edge_profile*)tptr->value;
   /* if not yet created for this tree, create it using edge responses only */
   if (tptr->token != forest->token) {
+    tptr->token = forest->token;
     CHECK(quad_tree_ensure_edge_response(forest, tree1, &eresp));
     own_angle = eresp->ang - M_PI_2;
     if (own_angle < 0) own_angle += 2 * M_PI;
@@ -1681,7 +1682,6 @@ result quad_tree_ensure_edge_links
     links1->against = NULL; /*best_against;*/
     links1->other = NULL; /*best_other;*/
 
-    tptr->token = forest->token;
   }
   /* if it is created, update it, using edge links where available */
   else
@@ -1777,8 +1777,6 @@ result quad_tree_ensure_edge_links
     links1->towards = NULL; /*best_towards;*/
     links1->against = NULL; /*best_against;*/
     links1->other = NULL; /*best_other;*/
-
-    tptr->token = forest->token;
   }
   *elinks = links1;
 
@@ -1998,6 +1996,7 @@ result quad_forest_parse
   }
 
   /* in next phase, start propagating signals starting from boundary nodes */
+  /*
   for (i = 0; i < rounds; i++) {
     trees = nodelist.first.next;
     endtrees = &nodelist.last;
@@ -2007,7 +2006,7 @@ result quad_forest_parse
       trees = trees->next;
     }
   }
-
+  */
   /* main propagation loop. */
   /* ridges propagate uphill, updating the segment links as they go */
   /* segments evaluate their similarity with neighbors and propagate to opposite direction */
@@ -2275,6 +2274,7 @@ result quad_forest_visualize_parse_result
       */
       /*CHECK(quad_forest_get_links(forest, &links, v_LINK_MEASURE));*/
       /*CHECK(quad_forest_get_links(forest, &links, v_LINK_EDGE));*/
+      
       CHECK(quad_forest_get_links(forest, &links, v_LINK_STRAIGHT));
       /*PRINT1("links: %d\n", links.count);*/
       /*
