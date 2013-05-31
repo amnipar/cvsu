@@ -167,12 +167,42 @@ boundary_potential *has_boundary_potential
   uint32 token
 );
 
+/******************************************************************************/
+
+typedef struct segment_message_t {
+  uint32 extent;
+  integral_value strength_diff;
+} segment_message;
+
+result ensure_segment_message
+(
+  typed_pointer *annotation,
+  segment_message **smsg
+);
+
+truth_value is_segment_message
+(
+  typed_pointer *tptr
+);
+
+segment_message *has_segment_message
+(
+  typed_pointer *tptr,
+  uint32 token
+);
+
 typedef struct segment_potential_t {
   uint32 rank;
   uint32 extent;
   integral_value diff_score;
   integral_value overlap_score;
 } segment_potential;
+
+result ensure_segment_potential
+(
+  typed_pointer *annotation,
+  segment_potential **spot
+);
 
 truth_value is_segment_potential
 (
@@ -184,6 +214,8 @@ segment_potential *has_segment_potential
   typed_pointer *tptr,
   uint32 token
 );
+
+/******************************************************************************/
 
 /*
 boundary links need to store also link category.
@@ -400,19 +432,49 @@ smoothed_gradient *has_smoothed_gradient
 
 /******************************************************************************/
 
+typedef struct boundary_message_t {
+  integral_value own_curvature;
+  integral_value acc_curvature;
+  uint32 length;
+} boundary_message;
+
+result ensure_boundary_message
+(
+  typed_pointer *annotation,
+  boundary_message **bmsg
+);
+
+truth_value is_boundary_message
+(
+  typed_pointer *tptr
+);
+
+boundary_message *has_boundary_message
+(
+  typed_pointer *tptr,
+  uint32 token
+);
+
 typedef enum fragment_type_t {
   ft_UNDEF = 0,
   ft_STRAIGHT,
   ft_CURVED,
-  ft_CORNER
+  ft_CORNER,
+  ft_INTERSECTION
 } fragment_type;
 
 typedef struct boundary_fragment_t {
   struct boundary_fragment_t *parent;
   fragment_type type;
   rect extent;
+  uint32 round;
+  /** Average change in direction between nodes (later curvature?) */
+  integral_value dir_change;
+  /** Direction in the beginning of the fragment */
   integral_value dir_a;
+  /** Direction in the end of the fragment */
   integral_value dir_b;
+  /** Parent nodes will collect all hypotheses that this fragment affects */
   list *hypotheses;
 } boundary_fragment;
 
@@ -456,6 +518,11 @@ typedef struct object_hypothesis_t {
   uncertain_rect extent;
   integral_value potential;
 } object_hypothesis;
+
+typedef struct hypothesis_support_t {
+  object_hypothesis *hypothesis;
+  integral_value support;
+} hypothesis_support;
 
 /******************************************************************************/
 

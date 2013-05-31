@@ -1995,113 +1995,55 @@ result quad_forest_parse
     trees = trees->next;
   }
 
-  /* in next phase, start propagating signals starting from boundary nodes */
-  /*
+  /* in the next phase, start propagating signals starting from boundary nodes */
+  /* a number of message passing rounds are performed */
+  /* it is important to avoid _loops_ in message passing */
+  /* thus, nodes should not use information received from a node in the reply */
   for (i = 0; i < rounds; i++) {
+    /* message loop */
+    trees = nodelist.first.next;
+    endtrees = &nodelist.last;
+    /* initially list contains only boundary candidate nodes */
+    /* in this loop, new nodes are added to the list as messages propagate */
+    while (trees != endtrees) {
+      tree1 = *((quad_tree**)trees->data);
+      /* check if it is a boundary node */
+      /* if towards and against link is set, get received messages */
+      /* may have received from other than towards and against links */
+      /* in this case, change direction, check if direction changes too much */
+      /* if links are not set, find best towards and against node */
+      /* (has boundary, best direction, best strength) */
+      /* if has a neighbor, make a boundary fragment and send message */
+
+      /* check if it is a segment node */
+      /* get received messages, update, send to opposing direction */
+      trees = trees->next;
+    }
+    /* response loop */
     trees = nodelist.first.next;
     endtrees = &nodelist.last;
     while (trees != endtrees) {
       tree1 = *((quad_tree**)trees->data);
-
-      trees = trees->next;
-    }
-  }
-  */
-  /* main propagation loop. */
-  /* ridges propagate uphill, updating the segment links as they go */
-  /* segments evaluate their similarity with neighbors and propagate to opposite direction */
-  /* boundaries evaluate edge directions with neighbors and propagate length and straightness */
-  for (i = 0; i < 0; i++) {
-    /*PRINT1("round %d\n", i);*/
-    trees = forest->trees.first.next;
-    endtrees = &forest->trees.last;
-    while (trees != endtrees) {
-      tree1 = ((quad_tree*)trees->data);
-      CHECK(expect_neighborhood_stat(&nstat1, &tree1->annotation));
-
-      ridge_tree = has_ridge_potential(&tree1->annotation, forest->token);
-      segment_tree = has_segment_potential(&tree1->annotation, forest->token);
-      boundary_tree = has_boundary_potential(&tree1->annotation, forest->token);
-
-      if (ridge_tree != NULL) {
-        if (ridge_tree->round == 0) {
-          CHECK(quad_tree_ensure_edge_response(forest, tree1, &eresp1));
-          /* use overlap or not? parameterize? */
-          /* strength1 = nstat1->strength * (1 - nstat1->overlap); */
-          strength1 = nstat1->strength;
-          minstrength = strength1;
-          /* mag1 = eresp1->mag; */
-          /* mag_max = mag1; */
-
-          maxstrength = 0;
-          links = tree1->links.first.next;
-          endlinks = &tree1->links.last;
-          while (links != endlinks) {
-            head1 = *((quad_tree_link_head**)links->data);
-            /* should use edge links or not?? */
-            CHECK(quad_tree_link_head_ensure_measure(forest, head1, &measure_link1, TRUE));
-            if (measure_link1->category == bl_LEFT || measure_link1->category == bl_RIGHT) {
-              tree2 = head1->other->tree;
-              CHECK(quad_tree_ensure_edge_response(forest, tree2, &eresp2));
-              CHECK(expect_neighborhood_stat(&nstat2, &tree2->annotation));
-              /* use overlap or not? parameterize? */
-              /* strength2 = nstat2->strength * (1 - nstat2->overlap); */
-              strength2 = nstat2->strength;
-              /* mag2 = eresp2->mag; */
-              /* use mag-diff or not? and how? parameterize? */
-              /* mag_diff = (mag1 - mag2) / getmax(mag1, mag2); */
-              strengthdiff = strength1 - strength2; /* + mag_diff; */
-              /* if (mag_diff < mag_diff_min) mag_diff_min = mag_diff; */
-              /* if (mag2 > mag_max) mag_max = mag2; */
-              /* if the neighbor is downhill, make it a segment node */
-              if (strengthdiff > 0.001) {
-                CHECK(ensure_has(&tree2->annotation, t_segment_potential, &tptr));
-                segment_link1 = (segment_potential*)tptr->value;
-                if (tptr->token != forest->token) {
-                  tptr->token = forest->token;
-                  segment_link1->rank = 0;
-                  segment_link1->extent = 1;
-                }
-                else {
-                  segment_link1->rank = 0;
-                }
-              }
-              if (strengthdiff < minstrength) minstrength = strengthdiff;
-              if (strengthdiff > maxstrength) maxstrength = strengthdiff;
-            }
-            links = links->next;
-          }
-          if (minstrength > -0.001) {
-            CHECK(ensure_has(&tree1->annotation, t_boundary_potential, &tptr));
-            if (tptr->token != forest->token) {
-              tptr->token = forest->token;
-            }
-          }
-          ridge_tree->ridge_score = strength1; /* * (1 - ((mag_max - mag1) / mag_max)); */
-          ridge_tree->round = 1;
-        }
-        /*
-        else
-        if (ridge_tree->round == 1) {
-          CHECK(quad_tree_ensure_edge_links(forest, tree1, &elinks));
-        }
-        */
-      }
-
-      /* this could be used for boundary fragment propagation */
-      /* replace boundary potential with boundary fragment? */
-      if (boundary_tree != NULL) {
-        /*CHECK(quad_tree_ensure_edge_links(forest, tree1, &elinks));*/
-      }
-
-      if (segment_tree != NULL) {
-        /* get segment links and propagate */
-      }
-
+      /* check if it is a boundary node */
+      /* get received messages */
+      /* determine if the neighbor is similar enough, and possibly terminate */
+      /* check if it is a segment node */
+      /* respond with updated extent */
       trees = trees->next;
     }
   }
 
+  /* final belief accumulation loop */
+  /* maybe loop through all nodes? or add all neighbors not considered yet? */
+  trees = nodelist.first.next;
+  endtrees = &nodelist.last;
+  while (trees != endtrees) {
+    tree1 = *((quad_tree**)trees->data);
+
+    trees = trees->next;
+  }
+
+  /* set the state of forest */
   quad_forest_set_parse(forest);
 
   /*PRINT0("finished\n");*/
@@ -2274,7 +2216,7 @@ result quad_forest_visualize_parse_result
       */
       /*CHECK(quad_forest_get_links(forest, &links, v_LINK_MEASURE));*/
       /*CHECK(quad_forest_get_links(forest, &links, v_LINK_EDGE));*/
-      
+
       CHECK(quad_forest_get_links(forest, &links, v_LINK_STRAIGHT));
       /*PRINT1("links: %d\n", links.count);*/
       /*
