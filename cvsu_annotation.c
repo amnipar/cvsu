@@ -46,6 +46,7 @@ string ensure_neighborhood_stat_name = "annotation_ensure_neighborhood_stat";
 string expect_neighborhood_stat_name = "expect_neighborhood_stat";
 string ensure_accumulated_reg_name = "annotation_ensure_accumulated_reg";
 string ensure_edge_response_name = "annotation_ensure_edge_response";
+string ensure_boundary_potential_name = "ensure_boundary_potential";
 string ensure_boundary_message_name = "ensure_boundary_message";
 string ensure_boundary_fragment_name = "ensure_boundary_fragment";
 string ensure_segment_message_name = "ensure_segment_message";
@@ -271,43 +272,11 @@ ridge_potential *has_ridge_potential
 
 /******************************************************************************/
 
-truth_value is_boundary_potential
-(
-  typed_pointer *tptr
-)
-{
-  if (tptr != NULL && tptr->type == t_boundary_potential) {
-    return TRUE;
-  }
-  return FALSE;
-}
-
-/******************************************************************************/
-
-boundary_potential *has_boundary_potential
-(
-  typed_pointer *tptr,
-  uint32 token
-)
-{
-  if (IS_TRUE(is_boundary_potential(tptr)) && tptr->token == token) {
-    return (boundary_potential*)tptr->value;
-  }
-  else {
-    typed_pointer *element = tuple_has_type(tptr, t_boundary_potential);
-    if (element != NULL && element->token == token) {
-      return (boundary_potential*)element->value;
-    }
-  }
-  return NULL;
-}
-
-/******************************************************************************/
-
 result ensure_segment_message
 (
   typed_pointer *annotation,
-  segment_message **smsg
+  segment_message **smsg,
+  uint32 token
 )
 {
   TRY();
@@ -319,6 +288,7 @@ result ensure_segment_message
   CHECK(ensure_has(annotation, t_segment_message, &tptr));
 
   *smsg = (segment_message*)tptr->value;
+  tptr->token = token;
 
   FINALLY(ensure_segment_message);
   RETURN();
@@ -358,7 +328,8 @@ segment_message *has_segment_message
 result ensure_segment_potential
 (
   typed_pointer *annotation,
-  segment_potential **spot
+  segment_potential **spot,
+  uint32 token
 )
 {
   TRY();
@@ -370,6 +341,7 @@ result ensure_segment_potential
   CHECK(ensure_has(annotation, t_segment_potential, &tptr));
 
   *spot = (segment_potential*)tptr->value;
+  tptr->token = token;
 
   FINALLY(ensure_segment_potential);
   RETURN();
@@ -897,10 +869,64 @@ int compare_segments(const void *a, const void *b)
 
 /******************************************************************************/
 
+result ensure_boundary_potential
+(
+  typed_pointer *annotation,
+  boundary_potential **bpot,
+  uint32 token
+)
+{
+  TRY();
+  typed_pointer *tptr;
+
+  CHECK_POINTER(bpot);
+  *bpot = NULL;
+
+  CHECK(ensure_has(annotation, t_boundary_potential, &tptr));
+
+  *bpot = (boundary_potential*)tptr->value;
+  tptr->token = token;
+
+  FINALLY(ensure_boundary_potential);
+  RETURN();
+}
+
+truth_value is_boundary_potential
+(
+  typed_pointer *tptr
+)
+{
+  if (tptr != NULL && tptr->type == t_boundary_potential) {
+    return TRUE;
+  }
+  return FALSE;
+}
+
+boundary_potential *has_boundary_potential
+(
+  typed_pointer *tptr,
+  uint32 token
+)
+{
+  if (IS_TRUE(is_boundary_potential(tptr)) && tptr->token == token) {
+    return (boundary_potential*)tptr->value;
+  }
+  else {
+    typed_pointer *element = tuple_has_type(tptr, t_boundary_potential);
+    if (element != NULL && element->token == token) {
+      return (boundary_potential*)element->value;
+    }
+  }
+  return NULL;
+}
+
+/******************************************************************************/
+
 result ensure_boundary_message
 (
   typed_pointer *annotation,
-  boundary_message **bmsg
+  boundary_message **bmsg,
+  uint32 token
 )
 {
   TRY();
@@ -912,6 +938,7 @@ result ensure_boundary_message
   CHECK(ensure_has(annotation, t_boundary_message, &tptr));
 
   *bmsg = (boundary_message*)tptr->value;
+  tptr->token = token;
 
   FINALLY(ensure_boundary_message);
   RETURN();
@@ -951,7 +978,8 @@ boundary_message *has_boundary_message
 result ensure_boundary_fragment
 (
   typed_pointer *annotation,
-  boundary_fragment **bfrag
+  boundary_fragment **bfrag,
+  uint32 token
 )
 {
   TRY();
@@ -963,6 +991,7 @@ result ensure_boundary_fragment
   CHECK(ensure_has(annotation, t_boundary_fragment, &tptr));
 
   *bfrag = (boundary_fragment*)tptr->value;
+  tptr->token = token;
 
   FINALLY(ensure_boundary_fragment);
   RETURN();

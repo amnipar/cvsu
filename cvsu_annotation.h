@@ -148,25 +148,6 @@ ridge_potential *has_ridge_potential
   uint32 token
 );
 
-typedef struct boundary_potential_t {
-  uint32 length;
-  integral_value strength_score;
-  integral_value angle_score;
-  integral_value straightness_score;
-  integral_value profile_score;
-} boundary_potential;
-
-truth_value is_boundary_potential
-(
-  typed_pointer *tptr
-);
-
-boundary_potential *has_boundary_potential
-(
-  typed_pointer *tptr,
-  uint32 token
-);
-
 /******************************************************************************/
 
 typedef struct segment_message_t {
@@ -177,7 +158,8 @@ typedef struct segment_message_t {
 result ensure_segment_message
 (
   typed_pointer *annotation,
-  segment_message **smsg
+  segment_message **smsg,
+  uint32 token
 );
 
 truth_value is_segment_message
@@ -192,7 +174,7 @@ segment_message *has_segment_message
 );
 
 typedef struct segment_potential_t {
-  uint32 rank;
+  uint32 round;
   uint32 extent;
   integral_value diff_score;
   integral_value overlap_score;
@@ -201,7 +183,8 @@ typedef struct segment_potential_t {
 result ensure_segment_potential
 (
   typed_pointer *annotation,
-  segment_potential **spot
+  segment_potential **spot,
+  uint32 token
 );
 
 truth_value is_segment_potential
@@ -432,6 +415,33 @@ smoothed_gradient *has_smoothed_gradient
 
 /******************************************************************************/
 
+typedef struct boundary_potential_t {
+  uint32 round;
+  uint32 length;
+  integral_value strength_score;
+  integral_value angle_score;
+  integral_value straightness_score;
+  integral_value profile_score;
+} boundary_potential;
+
+result ensure_boundary_potential
+(
+  typed_pointer *annotation,
+  boundary_potential **bpot,
+  uint32 token
+);
+
+truth_value is_boundary_potential
+(
+  typed_pointer *tptr
+);
+
+boundary_potential *has_boundary_potential
+(
+  typed_pointer *tptr,
+  uint32 token
+);
+
 typedef struct boundary_message_t {
   integral_value own_curvature;
   integral_value acc_curvature;
@@ -441,7 +451,8 @@ typedef struct boundary_message_t {
 result ensure_boundary_message
 (
   typed_pointer *annotation,
-  boundary_message **bmsg
+  boundary_message **bmsg,
+  uint32 token
 );
 
 truth_value is_boundary_message
@@ -481,7 +492,8 @@ typedef struct boundary_fragment_t {
 result ensure_boundary_fragment
 (
   typed_pointer *annotation,
-  boundary_fragment **bfrag
+  boundary_fragment **bfrag,
+  uint32 token
 );
 
 truth_value is_boundary_fragment
