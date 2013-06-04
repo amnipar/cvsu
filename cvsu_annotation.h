@@ -151,6 +151,7 @@ ridge_potential *has_ridge_potential
 /******************************************************************************/
 
 typedef struct segment_message_t {
+  uint32 round;
   uint32 extent;
   integral_value strength_diff;
 } segment_message;
@@ -159,7 +160,8 @@ result ensure_segment_message
 (
   typed_pointer *annotation,
   segment_message **smsg,
-  uint32 token
+  uint32 token,
+  integral_value strength_diff
 );
 
 truth_value is_segment_message
@@ -177,7 +179,7 @@ typedef struct segment_potential_t {
   uint32 round;
   uint32 extent;
   integral_value diff_score;
-  integral_value overlap_score;
+  /*integral_value overlap_score;*/
 } segment_potential;
 
 result ensure_segment_potential
@@ -198,6 +200,13 @@ segment_potential *has_segment_potential
   uint32 token
 );
 
+result expect_segment_potential
+(
+  typed_pointer *tptr,
+  segment_potential **spot,
+  uint32 token
+);
+
 /******************************************************************************/
 
 /*
@@ -215,14 +224,22 @@ typedef enum link_category_t {
   bl_PERPENDICULAR
 } link_category;
 
+/******************************************************************************/
+
 typedef struct link_measure_t {
   link_category category;
   integral_value strength_score;
-  integral_value magnitude_score;
+  /*integral_value magnitude_score;*/
   integral_value angle_score;
   integral_value straightness_score;
-  integral_value profile_score;
+  /*integral_value profile_score;*/
 } link_measure;
+
+result ensure_link_measure
+(
+  typed_pointer *annotation,
+  link_measure **lmeasure
+);
 
 truth_value is_link_measure
 (
@@ -234,6 +251,15 @@ link_measure *has_link_measure
   typed_pointer *tptr,
   uint32 token
 );
+
+result expect_link_measure
+(
+  typed_pointer *tptr,
+  link_measure **lmeasure,
+  uint32 token
+);
+
+/******************************************************************************/
 
 typedef struct edge_profile_t {
   integral_value mean_left;
@@ -255,10 +281,12 @@ edge_profile *has_edge_profile
   uint32 token
 );
 
+/******************************************************************************/
+
 typedef struct edge_links_t {
   struct quad_tree_link_head_t *towards;
   struct quad_tree_link_head_t *against;
-  struct quad_tree_link_head_t *other;
+  /*struct quad_tree_link_head_t *other;*/
   integral_value own_angle;
   integral_value towards_angle;
   integral_value against_angle;
@@ -269,6 +297,13 @@ typedef struct edge_links_t {
   integral_value against_consistency;
   integral_value direction_consistency;
 } edge_links;
+
+result ensure_edge_links
+(
+  typed_pointer *annotation,
+  edge_links **elinks,
+  uint32 token
+);
 
 truth_value is_edge_links
 (
@@ -281,90 +316,11 @@ edge_links *has_edge_links
   uint32 token
 );
 
-/*
-do I need a separate structure for link heads, or just add category in its own annotation?
-*/
-typedef struct boundary_strength_t {
-  uint32 round;
-  integral_value angle_score;
-  integral_value straightness_score;
-  integral_value strength_score;
-  integral_value ridge_score;
-  integral_value length_score;
-} boundary_strength;
-
-truth_value is_boundary_strength
-(
-  typed_pointer *tptr
-);
-
-boundary_strength *has_boundary_strength
+result expect_edge_links
 (
   typed_pointer *tptr,
+  edge_links **elinks,
   uint32 token
-);
-
-typedef struct boundary_score_t {
-  integral_value angle_score;
-  integral_value strength_score;
-  integral_value straightness_score;
-} boundary_score;
-
-typedef struct ridge_score_t {
-  integral_value score;
-} ridge_score;
-
-/******************************************************************************/
-
-typedef struct segment_strength_t {
-  uint32 round;
-  integral_value mean_diff;
-  integral_value overlap;
-  integral_value extent;
-} segment_strength;
-
-truth_value is_segment_strength
-(
-  typed_pointer *tptr
-);
-
-segment_strength *has_segment_strength
-(
-  typed_pointer *tptr,
-  uint32 token
-);
-
-typedef struct segment_score_t {
-  integral_value mean_score;
-  integral_value overlap_score;
-} segment_score;
-
-/******************************************************************************/
-
-typedef struct accumulated_reg_t {
-  integral_value mdist_mean;
-  integral_value mdist_max;
-  integral_value sdist_mean;
-  integral_value sdist_max;
-  integral_value boundary_strength;
-  integral_value segment_strength;
-  integral_value spread_strength;
-} accumulated_reg;
-
-result ensure_accumulated_reg
-(
-  typed_pointer *annotation,
-  accumulated_reg **areg
-);
-
-truth_value is_accumulated_reg
-(
-  typed_pointer *tptr
-);
-
-accumulated_reg *has_accumulated_reg
-(
-  typed_pointer *tptr
 );
 
 /******************************************************************************/
@@ -394,6 +350,8 @@ edge_response *has_edge_response
   typed_pointer *tptr,
   uint32 token
 );
+
+/******************************************************************************/
 
 typedef struct smoothed_gradient_t
 {
@@ -442,17 +400,22 @@ boundary_potential *has_boundary_potential
   uint32 token
 );
 
+/******************************************************************************/
+
 typedef struct boundary_message_t {
+  uint32 round;
+  uint32 length;
   integral_value own_curvature;
   integral_value acc_curvature;
-  uint32 length;
+  integral_value acc_distance;
 } boundary_message;
 
 result ensure_boundary_message
 (
   typed_pointer *annotation,
   boundary_message **bmsg,
-  uint32 token
+  uint32 token,
+  integral_value own_curvature
 );
 
 truth_value is_boundary_message
@@ -465,6 +428,8 @@ boundary_message *has_boundary_message
   typed_pointer *tptr,
   uint32 token
 );
+
+/******************************************************************************/
 
 typedef enum fragment_type_t {
   ft_UNDEF = 0,

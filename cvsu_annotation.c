@@ -44,13 +44,17 @@ string ensure_accumulated_stat_name = "annotation_ensure_accumulated_stat";
 string expect_accumulated_stat_name = "expect_accumulated_stat";
 string ensure_neighborhood_stat_name = "annotation_ensure_neighborhood_stat";
 string expect_neighborhood_stat_name = "expect_neighborhood_stat";
-string ensure_accumulated_reg_name = "annotation_ensure_accumulated_reg";
 string ensure_edge_response_name = "annotation_ensure_edge_response";
+string ensure_link_measure_name = "ensure_link_measure";
+string expect_link_measure_name = "expect_link_measure";
+string ensure_edge_links_name = "ensure_edge_links";
+string expect_edge_links_name = "expect_edge_links";
 string ensure_boundary_potential_name = "ensure_boundary_potential";
 string ensure_boundary_message_name = "ensure_boundary_message";
 string ensure_boundary_fragment_name = "ensure_boundary_fragment";
 string ensure_segment_message_name = "ensure_segment_message";
 string ensure_segment_potential_name = "ensure_segment_potential";
+string expect_segment_potential_name = "expect_segment_potential";
 
 /******************************************************************************/
 
@@ -99,8 +103,6 @@ result ensure_accumulated_stat
   RETURN();
 }
 
-/******************************************************************************/
-
 truth_value is_accumulated_stat
 (
   typed_pointer *tptr
@@ -111,8 +113,6 @@ truth_value is_accumulated_stat
   }
   return FALSE;
 }
-
-/******************************************************************************/
 
 accumulated_stat *has_accumulated_stat
 (
@@ -134,8 +134,6 @@ accumulated_stat *has_accumulated_stat
   }
   return NULL;
 }
-
-/******************************************************************************/
 
 result expect_accumulated_stat
 (
@@ -180,8 +178,6 @@ result ensure_neighborhood_stat
   RETURN();
 }
 
-/******************************************************************************/
-
 truth_value is_neighborhood_stat
 (
   typed_pointer *tptr
@@ -192,8 +188,6 @@ truth_value is_neighborhood_stat
   }
   return FALSE;
 }
-
-/******************************************************************************/
 
 neighborhood_stat *has_neighborhood_stat
 (
@@ -215,8 +209,6 @@ neighborhood_stat *has_neighborhood_stat
   }
   return NULL;
 }
-
-/******************************************************************************/
 
 result expect_neighborhood_stat
 (
@@ -250,8 +242,6 @@ truth_value is_ridge_potential
   return FALSE;
 }
 
-/******************************************************************************/
-
 ridge_potential *has_ridge_potential
 (
   typed_pointer *tptr,
@@ -275,8 +265,7 @@ ridge_potential *has_ridge_potential
 result ensure_segment_message
 (
   typed_pointer *annotation,
-  segment_message **smsg,
-  uint32 token
+  segment_message **smsg
 )
 {
   TRY();
@@ -288,7 +277,6 @@ result ensure_segment_message
   CHECK(ensure_has(annotation, t_segment_message, &tptr));
 
   *smsg = (segment_message*)tptr->value;
-  tptr->token = token;
 
   FINALLY(ensure_segment_message);
   RETURN();
@@ -328,8 +316,7 @@ segment_message *has_segment_message
 result ensure_segment_potential
 (
   typed_pointer *annotation,
-  segment_potential **spot,
-  uint32 token
+  segment_potential **spot
 )
 {
   TRY();
@@ -341,7 +328,6 @@ result ensure_segment_potential
   CHECK(ensure_has(annotation, t_segment_potential, &tptr));
 
   *spot = (segment_potential*)tptr->value;
-  tptr->token = token;
 
   FINALLY(ensure_segment_potential);
   RETURN();
@@ -376,7 +362,47 @@ segment_potential *has_segment_potential
   return NULL;
 }
 
+result expect_segment_potential
+(
+  typed_pointer *tptr,
+  segment_potential **spot,
+  uint32 token
+)
+{
+  TRY();
+
+  CHECK_POINTER(spot);
+
+  *spot = has_segment_potential(tptr, token);
+  if (*spot == NULL) {
+    ERROR(NOT_FOUND);
+  }
+
+  FINALLY(expect_segment_potential);
+  RETURN();
+}
+
 /******************************************************************************/
+/* NOTE: ensures *should not* take token - need to be checked by caller */
+
+result ensure_link_measure
+(
+  typed_pointer *annotation,
+  link_measure **lmeasure
+)
+{
+  TRY();
+  typed_pointer *tptr;
+
+  CHECK_POINTER(lmeasure);
+  *lmeasure = NULL;
+
+  CHECK(ensure_has(annotation, t_link_measure, &tptr));
+  *lmeasure = (link_measure*)tptr->value;
+
+  FINALLY(ensure_link_measure);
+  RETURN();
+}
 
 truth_value is_link_measure
 (
@@ -388,8 +414,6 @@ truth_value is_link_measure
   }
   return FALSE;
 }
-
-/******************************************************************************/
 
 link_measure *has_link_measure
 (
@@ -407,6 +431,26 @@ link_measure *has_link_measure
     }
   }
   return NULL;
+}
+
+result expect_link_measure
+(
+  typed_pointer *tptr,
+  link_measure **lmeasure,
+  uint32 token
+)
+{
+  TRY();
+
+  CHECK_POINTER(lmeasure);
+
+  *lmeasure = has_link_measure(tptr, token);
+  if (*lmeasure == NULL) {
+    ERROR(NOT_FOUND);
+  }
+
+  FINALLY(expect_link_measure);
+  RETURN();
 }
 
 /******************************************************************************/
@@ -442,6 +486,25 @@ edge_profile *has_edge_profile
 
 /******************************************************************************/
 
+result ensure_edge_links
+(
+  typed_pointer *annotation,
+  edge_links **elinks
+)
+{
+  TRY();
+  typed_pointer *tptr;
+
+  CHECK_POINTER(elinks);
+  *elinks = NULL;
+
+  CHECK(ensure_has(annotation, t_edge_links, &tptr));
+  *elinks = (edge_links*)tptr->value;
+
+  FINALLY(ensure_edge_links);
+  RETURN();
+}
+
 truth_value is_edge_links
 (
   typed_pointer *tptr
@@ -452,8 +515,6 @@ truth_value is_edge_links
   }
   return FALSE;
 }
-
-/******************************************************************************/
 
 edge_links *has_edge_links
 (
@@ -473,142 +534,24 @@ edge_links *has_edge_links
   return NULL;
 }
 
-/******************************************************************************/
-
-truth_value is_boundary_strength
-(
-  typed_pointer *tptr
-)
-{
-  if (tptr != NULL && tptr->type == t_BOUNDARY_STRENGTH) {
-    return TRUE;
-  }
-  return FALSE;
-}
-
-/******************************************************************************/
-
-boundary_strength *has_boundary_strength
+result expect_edge_links
 (
   typed_pointer *tptr,
+  edge_links **elinks,
   uint32 token
-)
-{
-  if (IS_TRUE(is_boundary_strength(tptr))) {
-    if (tptr->token != token) {
-      return NULL;
-    }
-    return (boundary_strength*)tptr->value;
-  }
-  if (IS_TRUE(is_tuple(tptr))) {
-    typed_pointer *element;
-    element = tuple_has_type(tptr, t_BOUNDARY_STRENGTH);
-    if (element != NULL) {
-      if (IS_FALSE(is_boundary_strength(element)) || element->token != token) {
-        return NULL;
-      }
-      return (boundary_strength*)element->value;
-    }
-  }
-  return NULL;
-}
-
-/******************************************************************************/
-
-truth_value is_segment_strength
-(
-  typed_pointer *tptr
-)
-{
-  if (tptr != NULL && tptr->type == t_SEGMENT_STRENGTH) {
-    return TRUE;
-  }
-  return FALSE;
-}
-
-/******************************************************************************/
-
-segment_strength *has_segment_strength
-(
-  typed_pointer *tptr,
-  uint32 token
-)
-{
-  if (IS_TRUE(is_segment_strength(tptr))) {
-    if (tptr->token != token) {
-      return NULL;
-    }
-    return (segment_strength*)tptr->value;
-  }
-  if (IS_TRUE(is_tuple(tptr))) {
-    typed_pointer *element;
-    element = tuple_has_type(tptr, t_SEGMENT_STRENGTH);
-    if (element != NULL) {
-      if (IS_FALSE(is_segment_strength(element)) || element->token != token) {
-        return NULL;
-      }
-      return (segment_strength*)element->value;
-    }
-  }
-  return NULL;
-}
-
-/******************************************************************************/
-
-result ensure_accumulated_reg
-(
-  typed_pointer *annotation,
-  accumulated_reg **areg
 )
 {
   TRY();
-  typed_pointer *tptr;
 
-  CHECK_POINTER(areg);
-  *areg = NULL;
+  CHECK_POINTER(elinks);
 
-  CHECK(ensure_has(annotation, t_AREG, &tptr));
+  *elinks = has_edge_links(tptr, token);
+  if (*elinks == NULL) {
+    ERROR(NOT_FOUND);
+  }
 
-  *areg = (accumulated_reg*)tptr->value;
-
-  FINALLY(ensure_accumulated_reg);
+  FINALLY(expect_edge_links);
   RETURN();
-}
-
-/******************************************************************************/
-
-truth_value is_accumulated_reg
-(
-  typed_pointer *tptr
-)
-{
-  if (tptr != NULL && tptr->type == t_AREG) {
-    return TRUE;
-  }
-  return FALSE;
-}
-
-/******************************************************************************/
-
-accumulated_reg *has_accumulated_reg
-(
-  typed_pointer *tptr
-)
-{
-  if (IS_TRUE(is_accumulated_reg(tptr))) {
-    return (accumulated_reg*)tptr->value;
-  }
-  if (IS_TRUE(is_tuple(tptr))) {
-    typed_pointer *element;
-    element = tuple_has_type(tptr, t_AREG);
-    if (element != NULL) {
-      if (IS_FALSE(is_accumulated_reg(element))) {
-        return NULL;
-      }
-      return (accumulated_reg*)element->value;
-    }
-  }
-  return NULL;
 }
 
 /******************************************************************************/
@@ -633,8 +576,6 @@ result ensure_edge_response
   RETURN();
 }
 
-/******************************************************************************/
-
 truth_value is_edge_response
 (
   typed_pointer *tptr
@@ -645,8 +586,6 @@ truth_value is_edge_response
   }
   return FALSE;
 }
-
-/******************************************************************************/
 
 edge_response *has_edge_response
 (
@@ -678,8 +617,6 @@ truth_value is_smoothed_gradient
   }
   return FALSE;
 }
-
-/******************************************************************************/
 
 smoothed_gradient *has_smoothed_gradient
 (
@@ -872,8 +809,7 @@ int compare_segments(const void *a, const void *b)
 result ensure_boundary_potential
 (
   typed_pointer *annotation,
-  boundary_potential **bpot,
-  uint32 token
+  boundary_potential **bpot
 )
 {
   TRY();
@@ -885,7 +821,6 @@ result ensure_boundary_potential
   CHECK(ensure_has(annotation, t_boundary_potential, &tptr));
 
   *bpot = (boundary_potential*)tptr->value;
-  tptr->token = token;
 
   FINALLY(ensure_boundary_potential);
   RETURN();
@@ -925,8 +860,7 @@ boundary_potential *has_boundary_potential
 result ensure_boundary_message
 (
   typed_pointer *annotation,
-  boundary_message **bmsg,
-  uint32 token
+  boundary_message **bmsg
 )
 {
   TRY();
@@ -938,7 +872,6 @@ result ensure_boundary_message
   CHECK(ensure_has(annotation, t_boundary_message, &tptr));
 
   *bmsg = (boundary_message*)tptr->value;
-  tptr->token = token;
 
   FINALLY(ensure_boundary_message);
   RETURN();
@@ -978,8 +911,7 @@ boundary_message *has_boundary_message
 result ensure_boundary_fragment
 (
   typed_pointer *annotation,
-  boundary_fragment **bfrag,
-  uint32 token
+  boundary_fragment **bfrag
 )
 {
   TRY();
@@ -991,7 +923,6 @@ result ensure_boundary_fragment
   CHECK(ensure_has(annotation, t_boundary_fragment, &tptr));
 
   *bfrag = (boundary_fragment*)tptr->value;
-  tptr->token = token;
 
   FINALLY(ensure_boundary_fragment);
   RETURN();
