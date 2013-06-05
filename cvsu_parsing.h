@@ -91,30 +91,6 @@ result quad_forest_visualize_neighborhood_stats
   stat_visualization_mode smode
 );
 
-result quad_forest_calculate_accumulated_regs
-(
-  quad_forest *forest,
-  uint32 rounds
-);
-
-result quad_forest_visualize_accumulated_regs
-(
-  quad_forest *forest,
-  pixel_image *target
-);
-
-result quad_forest_calculate_accumulated_bounds
-(
-  quad_forest *forest,
-  uint32 rounds
-);
-
-result quad_forest_visualize_accumulated_bounds
-(
-  quad_forest *forest,
-  pixel_image *target
-);
-
 /**
  * Uses deviation propagation to find potential segment boundaries.
  */
