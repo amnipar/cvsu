@@ -79,67 +79,6 @@ result ensure_stat_accumulator
 
 /******************************************************************************/
 
-/**
- * Context value for accumulating region characteristics.
- */
-typedef struct reg_accumulator_t {
-  uint32 round;
-  integral_value cost_total;
-  integral_value cost_spread;
-  integral_value cost_max;
-  integral_value cost_min;
-  integral_value boundary_pool;
-  integral_value boundary_acc;
-  integral_value segment_pool;
-  integral_value segment_acc;
-} reg_accumulator;
-
-truth_value is_reg_accumulator
-(
-  typed_pointer *tptr
-);
-
-reg_accumulator *has_reg_accumulator
-(
-  typed_pointer *tptr
-);
-
-result ensure_reg_accumulator
-(
-  typed_pointer *context,
-  reg_accumulator **areg
-);
-
-/******************************************************************************/
-
-typedef struct ridge_finder_t {
-  uint32 round;
-  truth_value has_ridge;
-} ridge_finder;
-
-truth_value is_ridge_finder
-(
-  typed_pointer *tptr
-);
-
-ridge_finder *has_ridge_finder
-(
-  typed_pointer *tptr
-);
-
-result ensure_ridge_finder
-(
-  typed_pointer *context,
-  ridge_finder **rfind
-);
-
-/******************************************************************************/
-
-typedef struct boundary_finder_t {
-  uint32 round;
-
-} boundary_finder;
-
 struct quad_forest_edge_t;
 struct quad_forest_edge_chain_t;
 

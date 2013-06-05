@@ -81,8 +81,6 @@ result accumulated_stat_create
   RETURN();
 }
 
-/******************************************************************************/
-
 result ensure_accumulated_stat
 (
   typed_pointer *annotation,
@@ -265,18 +263,28 @@ ridge_potential *has_ridge_potential
 result ensure_segment_message
 (
   typed_pointer *annotation,
-  segment_message **smsg
+  segment_message **smsg,
+  uint32 token,
+  integral_value strength_diff
 )
 {
   TRY();
   typed_pointer *tptr;
+  segment_message *message;
 
   CHECK_POINTER(smsg);
   *smsg = NULL;
 
   CHECK(ensure_has(annotation, t_segment_message, &tptr));
 
-  *smsg = (segment_message*)tptr->value;
+  message = (segment_message*)tptr->value;
+  if (tptr->token != token) {
+    tptr->token = token;
+    message->round = 0;
+    message->extent = 0;
+    message->strength_diff = strength_diff;
+  }
+  *smsg = message;
 
   FINALLY(ensure_segment_message);
   RETURN();
@@ -316,18 +324,27 @@ segment_message *has_segment_message
 result ensure_segment_potential
 (
   typed_pointer *annotation,
-  segment_potential **spot
+  segment_potential **spot,
+  uint32 token
 )
 {
   TRY();
   typed_pointer *tptr;
+  segment_potential *potential;
 
   CHECK_POINTER(spot);
   *spot = NULL;
 
   CHECK(ensure_has(annotation, t_segment_potential, &tptr));
 
-  *spot = (segment_potential*)tptr->value;
+  potential = (segment_potential*)tptr->value;
+  if (tptr->token != token) {
+    tptr->token = token;
+    potential->round = 0;
+    potential->extent = 0;
+    potential->diff_score = 0;
+  }
+  *spot = potential;
 
   FINALLY(ensure_segment_potential);
   RETURN();
@@ -383,22 +400,31 @@ result expect_segment_potential
 }
 
 /******************************************************************************/
-/* NOTE: ensures *should not* take token - need to be checked by caller */
 
 result ensure_link_measure
 (
   typed_pointer *annotation,
-  link_measure **lmeasure
+  link_measure **lmeasure,
+  uint32 token
 )
 {
   TRY();
   typed_pointer *tptr;
+  link_measure *measure;
 
   CHECK_POINTER(lmeasure);
   *lmeasure = NULL;
 
   CHECK(ensure_has(annotation, t_link_measure, &tptr));
-  *lmeasure = (link_measure*)tptr->value;
+  measure = (link_measure*)tptr->value;
+  if (tptr->token != token) {
+    tptr->token = token;
+    measure->category = bl_UNDEF;
+    measure->strength_score = 0;
+    measure->angle_score = 0;
+    measure->straightness_score = 0;
+  }
+  *lmeasure = measure;
 
   FINALLY(ensure_link_measure);
   RETURN();
@@ -489,17 +515,34 @@ edge_profile *has_edge_profile
 result ensure_edge_links
 (
   typed_pointer *annotation,
-  edge_links **elinks
+  edge_links **elinks,
+  uint32 token
 )
 {
   TRY();
   typed_pointer *tptr;
+  edge_links *links;
 
   CHECK_POINTER(elinks);
   *elinks = NULL;
 
   CHECK(ensure_has(annotation, t_edge_links, &tptr));
-  *elinks = (edge_links*)tptr->value;
+  links = (edge_links*)tptr->value;
+  if (tptr->token != token) {
+    tptr->token = token;
+    links->towards = NULL;
+    links->against = NULL;
+    links->own_angle = 0;
+    links->towards_angle = 0;
+    links->against_angle = 0;
+    links->straightness = 0;
+    links->curvature = 0;
+    links->own_consistency = 0;
+    links->towards_consistency = 0;
+    links->against_consistency = 0;
+    links->direction_consistency = 0;
+  }
+  *elinks = links;
 
   FINALLY(ensure_edge_links);
   RETURN();
@@ -809,18 +852,29 @@ int compare_segments(const void *a, const void *b)
 result ensure_boundary_potential
 (
   typed_pointer *annotation,
-  boundary_potential **bpot
+  boundary_potential **bpot,
+  uint32 token
 )
 {
   TRY();
   typed_pointer *tptr;
+  boundary_potential *potential;
 
   CHECK_POINTER(bpot);
   *bpot = NULL;
 
   CHECK(ensure_has(annotation, t_boundary_potential, &tptr));
-
-  *bpot = (boundary_potential*)tptr->value;
+  potential = (boundary_potential*)tptr->value;
+  if (tptr->token != token) {
+    tptr->token = token;
+    potential->round = 0;
+    potential->length = 0;
+    potential->strength_score = 0;
+    potential->angle_score = 0;
+    potential->straightness_score = 0;
+    /*bpot->profile_score = 0;*/
+  }
+  *bpot = potential;
 
   FINALLY(ensure_boundary_potential);
   RETURN();
@@ -860,18 +914,30 @@ boundary_potential *has_boundary_potential
 result ensure_boundary_message
 (
   typed_pointer *annotation,
-  boundary_message **bmsg
+  boundary_message **bmsg,
+  uint32 token
 )
 {
   TRY();
   typed_pointer *tptr;
+  boundary_message *message;
 
   CHECK_POINTER(bmsg);
   *bmsg = NULL;
 
   CHECK(ensure_has(annotation, t_boundary_message, &tptr));
-
-  *bmsg = (boundary_message*)tptr->value;
+  message = (boundary_message*)tptr->value;
+  if (tptr->token != token) {
+    tptr->token = token;
+    message->round = 0;
+    message->pool_curvature = 0;
+    message->acc_curvature = 0;
+    message->pool_distance = 0;
+    message->acc_distance = 0;
+    message->pool_length = 0;
+    message->acc_length = 0;
+  }
+  *bmsg = message;
 
   FINALLY(ensure_boundary_message);
   RETURN();
@@ -911,18 +977,31 @@ boundary_message *has_boundary_message
 result ensure_boundary_fragment
 (
   typed_pointer *annotation,
-  boundary_fragment **bfrag
+  boundary_fragment **bfrag,
+  uint32 token
 )
 {
   TRY();
   typed_pointer *tptr;
+  boundary_fragment *fragment;
 
   CHECK_POINTER(bfrag);
   *bfrag = NULL;
 
   CHECK(ensure_has(annotation, t_boundary_fragment, &tptr));
-
-  *bfrag = (boundary_fragment*)tptr->value;
+  fragment = (boundary_fragment*)tptr->value;
+  if (tptr->token != token) {
+    tptr->token = token;
+    fragment->parent = NULL;
+    fragment->type = ft_UNDEF;
+    rect_create(&fragment->extent, 0, 0, 0, 0);
+    fragment->round = 0;
+    fragment->dir_change = 0;
+    fragment->dir_a = 0;
+    fragment->dir_b = 0;
+    fragment->hypotheses = NULL;
+  }
+  *bfrag = fragment;
 
   FINALLY(ensure_boundary_fragment);
   RETURN();

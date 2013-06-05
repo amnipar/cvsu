@@ -123,14 +123,6 @@ result expect_neighborhood_stat
 
 /******************************************************************************/
 
-/*
-needed structures and information:
--annotating nodes with ridge potential, boundary potential, segment potential
--what information these need to store?
--link scores to store the propagation results
-
-separate structures for links, or use the same structures?
-*/
 typedef struct ridge_potential_t {
   uint32 round;
   integral_value ridge_score;
@@ -209,11 +201,6 @@ result expect_segment_potential
 
 /******************************************************************************/
 
-/*
-boundary links need to store also link category.
-but this needs to be stored in link *heads*.
-link head annotation also because propagating separately to both directions.
-*/
 typedef enum link_category_t {
   bl_UNDEF = 0,
   bl_TOWARDS,
@@ -223,8 +210,6 @@ typedef enum link_category_t {
   bl_PARALLEL,
   bl_PERPENDICULAR
 } link_category;
-
-/******************************************************************************/
 
 typedef struct link_measure_t {
   link_category category;
@@ -238,7 +223,8 @@ typedef struct link_measure_t {
 result ensure_link_measure
 (
   typed_pointer *annotation,
-  link_measure **lmeasure
+  link_measure **lmeasure,
+  uint32 token
 );
 
 truth_value is_link_measure
@@ -379,7 +365,7 @@ typedef struct boundary_potential_t {
   integral_value strength_score;
   integral_value angle_score;
   integral_value straightness_score;
-  integral_value profile_score;
+  /*integral_value profile_score;*/
 } boundary_potential;
 
 result ensure_boundary_potential
@@ -404,18 +390,19 @@ boundary_potential *has_boundary_potential
 
 typedef struct boundary_message_t {
   uint32 round;
-  uint32 length;
-  integral_value own_curvature;
+  integral_value pool_curvature;
   integral_value acc_curvature;
+  integral_value pool_distance;
   integral_value acc_distance;
+  uint32 pool_length;
+  uint32 acc_length;
 } boundary_message;
 
 result ensure_boundary_message
 (
   typed_pointer *annotation,
   boundary_message **bmsg,
-  uint32 token,
-  integral_value own_curvature
+  uint32 token
 );
 
 truth_value is_boundary_message

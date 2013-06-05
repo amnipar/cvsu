@@ -46,7 +46,7 @@ void print_usage()
   PRINT0("Parses images using quad forests and propagation.\n\n");
   PRINT0("Usage:\n\n");
   PRINT0("parse mode max min rounds source target\n");
-  PRINT0("  mode: parsing mode [ stat | nstat | wstat | overlap | strength | reg | ? ]\n");
+  PRINT0("  mode: parsing mode [ stat | nstat | overlap | strength | full ]\n");
   PRINT0("  max: maximum size for trees; suggested value 16 (larger than min)\n");
   PRINT0("  min: minimum size for tree;  suggested value 4 (smaller than max)\n");
   PRINT0("  rounds: number of propagation rounds (0..5]\n");
@@ -61,8 +61,6 @@ enum mode_t {
   m_NSTAT,
   m_OVERLAP,
   m_STRENGTH,
-  m_REG,
-  m_BOUND,
   m_FULL
 };
 
@@ -103,14 +101,6 @@ int main(int argc, char *argv[])
     else
     if (strcmp(smode, "strength") == 0) {
       mode = m_STRENGTH;
-    }
-    else
-    if (strcmp(smode, "reg") == 0) {
-      mode = m_REG;
-    }
-    else
-    if (strcmp(smode, "bound") == 0) {
-      mode = m_BOUND;
     }
     else
     if (strcmp(smode, "full") == 0) {
@@ -218,18 +208,6 @@ int main(int argc, char *argv[])
       CHECK(quad_forest_calculate_neighborhood_stats(&forest));
       PRINT0("drawing image...\n");
       CHECK(quad_forest_visualize_neighborhood_stats(&forest, &dst_image, v_STRENGTH));
-      break;
-    case m_REG:
-      PRINT0("parsing regs...\n");
-      CHECK(quad_forest_calculate_accumulated_regs(&forest, rounds));
-      PRINT0("drawing image...\n");
-      CHECK(quad_forest_visualize_accumulated_regs(&forest, &dst_image));
-      break;
-    case m_BOUND:
-      PRINT0("parsing stat...\n");
-      CHECK(quad_forest_calculate_accumulated_bounds(&forest, rounds));
-      PRINT0("drawing image...\n");
-      CHECK(quad_forest_visualize_accumulated_bounds(&forest, &dst_image));
       break;
     case m_FULL:
       PRINT0("parsing...\n");

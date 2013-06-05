@@ -65,7 +65,6 @@ typedef enum type_label_t {
   t_STAT,
   t_ASTAT,
   t_NSTAT,
-  t_AREG,
   t_EDGE_RESPONSE,
   t_smoothed_gradient,
   t_ridge_potential,
@@ -77,15 +76,11 @@ typedef enum type_label_t {
   t_segment_potential,
   t_boundary_message,
   t_boundary_fragment,
-  t_BOUNDARY_STRENGTH,
   t_BOUNDARY,
-  t_SEGMENT_STRENGTH,
   t_SEGMENT,
   t_INTERSECTION,
   /* parsing context types */
   t_STAT_ACCUMULATOR,
-  t_REG_ACCUMULATOR,
-  t_RIDGE_FINDER,
   t_PATH_SNIFFER,
   t_EDGE_PARSER,
   t_SEGMENT_PARSER

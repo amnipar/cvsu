@@ -101,16 +101,6 @@ struct quad_forest_t;
 
 void quad_tree_ensure_neighborhood_stat();
 
-void quad_tree_link_ensure_booundary_strength
-(
-  struct quad_forest_t *forest,
-  quad_tree_link *link,
-  boundary_strength **bstrength
-);
-
-void quad_tree_ensure_boundary_strength();
-void quad_tree_ensure_segment_strength();
-
 /**
  * Stores a quad tree holding image data.
  */

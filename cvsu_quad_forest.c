@@ -1704,6 +1704,7 @@ result quad_forest_get_links
   }
   else
   if (mode == v_LINK_ANGLE_COST) {
+    /*
     boundary_strength *bstrength;
     items = forest->links.first.next;
     end = &forest->links.last;
@@ -1724,9 +1725,11 @@ result quad_forest_get_links
       }
       items = items->next;
     }
+    */
   }
   else
   if (mode == v_LINK_SIMILARITY) {
+    /*
     segment_strength *sstrength;
     items = forest->links.first.next;
     end = &forest->links.last;
@@ -1747,6 +1750,7 @@ result quad_forest_get_links
       }
       items = items->next;
     }
+    */
   }
   else
   if (mode == v_LINK_MEASURE) {
@@ -1939,6 +1943,7 @@ result quad_forest_get_links
           new_line.weight = 0.75;
           CHECK(list_append(links, (pointer)&new_line));
         }
+        /*
         if (elinks->other != NULL) {
           head = elinks->other;
           radius = ((integral_value)tree->size) / 2.0;
@@ -1954,6 +1959,7 @@ result quad_forest_get_links
           new_line.weight = 0.5;
           CHECK(list_append(links, (pointer)&new_line));
         }
+        */
       }
       items = items->next;
     }
