@@ -384,19 +384,23 @@ result ensure_has
 )
 {
   TRY();
+  typed_pointer *new_pointer;
 
-  CHECK_POINTER(res);
-  *res = NULL;
   CHECK_POINTER(tptr);
+  
+  new_pointer = NULL;
 
   if (tptr->type == type) {
-    *res = tptr;
+    new_pointer = tptr;
   }
-  else
+  /* turn also undef into tuple */
+  /*
+  else {
   if (tptr->type == t_UNDEF) {
     CHECK(typed_pointer_create(tptr, type, 1));
-    *res = tptr;
+    new_pointer = tptr;
   }
+  */
   else {
     uint32 i;
     typed_pointer *elements;
@@ -407,17 +411,22 @@ result ensure_has
       elements = (typed_pointer*)tptr->value;
       for (i = 0; i < tptr->count; i++) {
         if (elements[i].type == type) {
-          *res = &elements[i];
+          new_pointer = &elements[i];
           break;
         }
       }
     }
-    if (*res == NULL) {
-      typed_pointer new_ptr;
-      typed_pointer_nullify(&new_ptr);
-      CHECK(typed_pointer_create(&new_ptr, type, 1));
-      CHECK(tuple_extend(tptr, &new_ptr, res));
-    }
+  }
+  /* if not found, add to tuple */
+  if (new_pointer == NULL) {
+    typed_pointer new_element;
+    typed_pointer_nullify(&new_element);
+    CHECK(typed_pointer_create(&new_element, type, 1));
+    CHECK(tuple_extend(tptr, &new_element, &new_pointer));
+  }
+  
+  if (res != NULL) {
+    *res = new_pointer;
   }
 
   FINALLY(ensure_has);
