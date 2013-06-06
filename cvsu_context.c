@@ -50,7 +50,7 @@ truth_value is_stat_accumulator
   typed_pointer *tptr
 )
 {
-  if (tptr != NULL && tptr->type == t_STAT_ACCUMULATOR) {
+  if (tptr != NULL && tptr->type == t_stat_accumulator) {
     return TRUE;
   }
   return FALSE;
@@ -69,7 +69,7 @@ stat_accumulator *has_stat_accumulator
   if (IS_TRUE(is_tuple(tptr))) {
     typed_pointer *element;
     /* must have exactly one stat accumulator */
-    element = tuple_has_type(tptr, t_STAT_ACCUMULATOR);
+    element = tuple_has_type(tptr, t_stat_accumulator);
     if (element != NULL) {
       return (stat_accumulator*)element->value;
     }
@@ -110,99 +110,11 @@ result ensure_stat_accumulator
   CHECK_POINTER(acc);
   *acc = NULL;
 
-  CHECK(ensure_is(context, t_STAT_ACCUMULATOR, &tptr));
+  CHECK(ensure_is(context, t_stat_accumulator, &tptr));
 
   *acc = (stat_accumulator*)tptr->value;
 
   FINALLY(ensure_stat_accumulator);
-  RETURN();
-}
-
-/******************************************************************************/
-
-truth_value is_path_sniffer
-(
-  typed_pointer *tptr
-)
-{
-  if (tptr->type == t_PATH_SNIFFER) {
-    return TRUE;
-  }
-  return FALSE;
-}
-
-/******************************************************************************/
-
-result expect_path_sniffer
-(
-  path_sniffer **target,
-  typed_pointer *tptr
-)
-{
-  TRY();
-
-  CHECK_POINTER(target);
-  CHECK_POINTER(tptr);
-  CHECK_POINTER(tptr->value);
-
-  if (tptr->type == t_PATH_SNIFFER) {
-    *target = (path_sniffer*)tptr->value;
-  }
-  else {
-    ERROR(BAD_TYPE);
-  }
-
-  FINALLY(expect_path_sniffer);
-  RETURN();
-}
-
-/******************************************************************************/
-
-void make_edge_parser
-(
-  typed_pointer *tptr,
-  edge_parser *parser
-)
-{
-  tptr->type = t_EDGE_PARSER;
-  tptr->value = (pointer)parser;
-}
-
-/******************************************************************************/
-
-truth_value is_edge_parser
-(
-  typed_pointer *tptr
-)
-{
-  if (tptr->type == t_EDGE_PARSER) {
-    return TRUE;
-  }
-  return FALSE;
-}
-
-/******************************************************************************/
-
-result expect_edge_parser
-(
-  edge_parser **target,
-  const typed_pointer *tptr
-)
-{
-  TRY();
-
-  CHECK_POINTER(target);
-  CHECK_POINTER(tptr);
-  CHECK_POINTER(tptr->value);
-
-  if (tptr->type == t_EDGE_PARSER) {
-    *target = (edge_parser*)tptr->value;
-  }
-  else {
-    ERROR(BAD_TYPE);
-  }
-
-  FINALLY(expect_edge_parser);
   RETURN();
 }
 

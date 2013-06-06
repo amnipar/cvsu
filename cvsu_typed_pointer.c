@@ -52,6 +52,7 @@ string ensure_has_name = "ensure_has";
 
 uint32 typesize[] = {
   0,
+  /* basic types */
   sizeof(type_label),
   sizeof(truth_value),
   sizeof(pointer),
@@ -71,27 +72,23 @@ uint32 typesize[] = {
   sizeof(real64),
   sizeof(typed_pointer),
   sizeof(list),
+  /* tree annotation types */
   sizeof(statistics),
   sizeof(accumulated_stat),
   sizeof(neighborhood_stat),
   sizeof(edge_response),
   sizeof(smoothed_gradient),
   sizeof(ridge_potential),
-  sizeof(boundary_potential),
   sizeof(link_measure),
   sizeof(edge_profile),
   sizeof(edge_links),
-  sizeof(segment_message),
-  sizeof(segment_potential),
   sizeof(boundary_message),
-  sizeof(boundary_fragment),
-  sizeof(quad_forest_edge), /* TODO: change to boundary? */
-  sizeof(quad_forest_segment), /* TODO: change to segment */
-  sizeof(quad_forest_intersection), /* TODO: change to intersection? */
-  sizeof(stat_accumulator),
-  sizeof(path_sniffer),
-  sizeof(edge_parser),
-  sizeof(segment_parser)
+  sizeof(boundary_potential),
+  sizeof(boundary),
+  sizeof(segment_message),
+  sizeof(segment),
+  /* parsing context types */
+  sizeof(stat_accumulator)
 };
 
 /******************************************************************************/
@@ -124,7 +121,7 @@ void typed_pointer_destroy
 )
 {
   if (IS_FALSE(typed_pointer_is_null(tptr))) {
-    if (tptr->type == t_TUPLE) {
+    if (tptr->type == t_tuple) {
       tuple_destroy(tptr);
     }
     else {
@@ -174,7 +171,7 @@ truth_value is_typed_pointer
   typed_pointer *tptr
 )
 {
-  if (tptr != NULL && tptr->type == t_TPOINTER) {
+  if (tptr != NULL && tptr->type == t_typed_pointer) {
     return TRUE;
   }
   return FALSE;
@@ -195,7 +192,7 @@ result tuple_create
   /* ensure the possible previous data is destroyed */
   typed_pointer_destroy(tuple);
 
-  tuple->type = t_TUPLE;
+  tuple->type = t_tuple;
   CHECK(memory_allocate((data_pointer*)&tuple->value, count, sizeof(typed_pointer)));
   tuple->count = count;
 
@@ -210,7 +207,7 @@ void tuple_destroy
   typed_pointer *tuple
 )
 {
-  if (tuple != NULL && tuple->value != NULL && tuple->type == t_TUPLE) {
+  if (tuple != NULL && tuple->value != NULL && tuple->type == t_tuple) {
     uint32 i;
     typed_pointer *values;
     values = (typed_pointer*)tuple->value;
@@ -236,7 +233,7 @@ result tuple_promote
 
   /* make a copy of the previous content */
   element = *tptr;
-  tptr->type = t_TUPLE;
+  tptr->type = t_tuple;
   tptr->count = 0;
   CHECK(memory_allocate((data_pointer*)&values, 1, sizeof(typed_pointer)));
   values[0] = element;
@@ -270,7 +267,7 @@ result tuple_extend
   uint32 i, count;
 
   CHECK_POINTER(tuple);
-  CHECK_PARAM(tuple->type == t_TUPLE);
+  CHECK_PARAM(tuple->type == t_tuple);
 
   count = tuple->count + 1;
 
@@ -317,7 +314,7 @@ result tuple_ensure_has_unique
   else {
     uint32 i;
     typed_pointer *elements;
-    if (tuple->type != t_TUPLE) {
+    if (tuple->type != t_tuple) {
       CHECK(tuple_promote(tuple));
     }
     else {
@@ -349,7 +346,7 @@ typed_pointer *tuple_has_type
   type_label type
 )
 {
-  if (tuple != NULL && tuple->type == t_TUPLE) {
+  if (tuple != NULL && tuple->type == t_tuple) {
     uint32 i;
     typed_pointer *elements;
 
@@ -371,7 +368,7 @@ truth_value is_tuple
   typed_pointer *tptr
 )
 {
-  if (tptr != NULL && tptr->type == t_TUPLE) {
+  if (tptr != NULL && tptr->type == t_tuple) {
     return TRUE;
   }
   return FALSE;
@@ -403,7 +400,7 @@ result ensure_has
   else {
     uint32 i;
     typed_pointer *elements;
-    if (tptr->type != t_TUPLE) {
+    if (tptr->type != t_tuple) {
       CHECK(tuple_promote(tptr));
     }
     else {

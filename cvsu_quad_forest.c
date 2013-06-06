@@ -144,11 +144,6 @@ result quad_forest_init
     }
     CHECK(list_create(&target->trees, 8 * size, sizeof(quad_tree), 1));
 
-    if (!list_is_null(&target->edges)) {
-      CHECK(list_destroy(&target->edges));
-    }
-    CHECK(list_create(&target->edges, 100, sizeof(quad_forest_edge_chain), 1));
-
     if (!list_is_null(&target->links)) {
       CHECK(list_destroy(&target->links));
     }
@@ -450,7 +445,6 @@ result quad_forest_destroy
   }
 
   CHECK(list_destroy(&target->links));
-  CHECK(list_destroy(&target->edges));
   CHECK(memory_deallocate((data_pointer*)&target->roots));
   CHECK(integral_image_destroy(&target->integral));
   if (target->source != NULL) {
@@ -485,7 +479,6 @@ result quad_forest_nullify
   target->dx = 0;
   target->dy = 0;
   CHECK(list_nullify(&target->trees));
-  CHECK(list_nullify(&target->edges));
   CHECK(list_nullify(&target->links));
   target->last_root_tree = NULL;
   target->roots = NULL;
@@ -614,13 +607,13 @@ result quad_forest_update
 result quad_forest_get_segments
 (
   quad_forest *source,
-  quad_forest_segment **target
+  segment **target
 )
 {
   TRY();
   list_item *trees, *end;
   quad_tree *tree;
-  quad_forest_segment *segment, *parent;
+  segment *tree_segment, *parent;
   uint32 count;
 
   CHECK_POINTER(source);
@@ -637,10 +630,10 @@ result quad_forest_get_segments
   while (trees != end) {
     tree = (quad_tree *)trees->data;
     if (tree->nw == NULL) {
-      segment = &tree->segment;
+      tree_segment = quad_tree_get_segment(tree);
       parent = quad_tree_segment_find(tree);
-      if (parent == segment) {
-        target[count] = segment;
+      if (tree_segment != NULL && parent == tree_segment) {
+        target[count] = tree_segment;
         count++;
       }
     }
@@ -658,7 +651,7 @@ void quad_forest_collect_trees
 (
   quad_tree *tree,
   list *target,
-  quad_forest_segment **segments,
+  segment **segments,
   uint32 segment_count
 )
 {
@@ -671,13 +664,13 @@ void quad_forest_collect_trees
   }
   else {
     uint32 i;
-    quad_forest_segment *segment;
+    segment *tree_segment;
 
-    segment = quad_tree_segment_find(tree);
+    tree_segment = quad_tree_segment_find(tree);
 
     /* loop through all segments, if the tree belongs to one of them, add to list */
     for (i = 0; i < segment_count; i++) {
-      if (segment == segments[i]) {
+      if (tree_segment == segments[i]) {
         list_append(target, &tree);
         break;
       }
@@ -691,7 +684,7 @@ result quad_forest_get_segment_trees
 (
   list *target,
   quad_forest *forest,
-  quad_forest_segment **segments,
+  segment **segments,
   uint32 segment_count
 )
 {
@@ -747,7 +740,7 @@ void quad_tree_add_neighbor_segments
 (
   list *target,
   quad_tree *tree,
-  quad_forest_segment **segments,
+  segment **segments,
   uint32 segment_count,
   direction dir
 )
@@ -772,18 +765,18 @@ void quad_tree_add_neighbor_segments
     /* if the tree does not have children, check the segments and add */
     if (tree->nw == NULL) {
       uint32 i;
-      quad_forest_segment *segment;
+      segment *tree_segment;
 
-      segment = quad_tree_segment_find(tree);
-      if (segment != NULL) {
+      tree_segment = quad_tree_segment_find(tree);
+      if (tree_segment != NULL) {
         /* loop through all segments, if the tree doesn't belong to any of them, add to list */
         for (i = 0; i < segment_count; i++) {
-          if (segment == segments[i]) {
+          if (tree_segment == segments[i]) {
             goto found;
           }
         }
         /* segment was not found, it is a neighboring segment */
-        list_insert_unique(target, &segment, &compare_segments);
+        list_insert_unique(target, &tree_segment, &compare_segments);
       }
       found: ;
       /* otherwise the neighbor belongs to same collection of segments, don't add it */
@@ -829,7 +822,7 @@ result quad_forest_get_segment_neighbors
 (
   list *target,
   quad_forest *forest,
-  quad_forest_segment **segments,
+  segment **segments,
   uint32 segment_count
 )
 {
@@ -848,7 +841,7 @@ result quad_forest_get_segment_neighbors
     TERMINATE(SUCCESS);
   }
 
-  CHECK(list_create(target, 100, sizeof(quad_forest_segment*), 1));
+  CHECK(list_create(target, 100, sizeof(segment*), 1));
 
   CHECK(quad_forest_get_segment_trees(&tree_list, forest, segments, segment_count));
 
@@ -914,22 +907,14 @@ result quad_forest_draw_trees
         value0 = (byte)dev;
       }
       else {
-        if (IS_TRUE(tree->segment.has_boundary)) {
-          value0 = 255;
-          value1 = 255;
-          value2 = 0;
+        segment *tree_segment = quad_tree_segment_find(tree);
+        if (tree_segment != NULL) {
+          value0 = tree_segment->color[0];
+          value1 = tree_segment->color[1];
+          value2 = tree_segment->color[2];
         }
         else {
-          quad_forest_segment *segment;
-          segment = quad_tree_segment_find(tree);
-          if (segment != NULL) {
-            value0 = segment->color[0];
-            value1 = segment->color[1];
-            value2 = segment->color[2];
-          }
-          else {
-            value0 = value1 = value2 = 0;
-          }
+          value0 = value1 = value2 = 0;
         }
       }
 
@@ -962,7 +947,7 @@ void quad_forest_draw_segments
   pixel_image *target,
   uint32 dx,
   uint32 dy,
-  quad_forest_segment **segments,
+  segment **segments,
   uint32 segment_count,
   byte color[4],
   uint32 channels
@@ -977,14 +962,14 @@ void quad_forest_draw_segments
   else {
     uint32 i, x, y, width, height, row_step;
     byte *target_pos;
-    quad_forest_segment *segment;
+    segment *tree_segment;
 
-    segment = quad_tree_segment_find(tree);
+    tree_segment = quad_tree_segment_find(tree);
 
     /* loop through all segments, if the tree belongs to one of them, draw the pixels */
     if (channels == 1) {
       for (i = 0; i < segment_count; i++) {
-        if (segment == segments[i]) {
+        if (tree_segment == segments[i]) {
           width = tree->size;
           height = width;
           row_step = target->stride - width;
@@ -1002,7 +987,7 @@ void quad_forest_draw_segments
     else
     if (channels == 3) {
       for (i = 0; i < segment_count; i++) {
-        if (segment == segments[i]) {
+        if (tree_segment == segments[i]) {
           width = tree->size;
           height = width;
           row_step = target->stride - width * target->step;
@@ -1030,7 +1015,7 @@ result quad_forest_get_segment_mask
 (
   quad_forest *forest,
   pixel_image *target,
-  quad_forest_segment **segments,
+  segment **segments,
   uint32 segment_count,
   truth_value invert
 )
@@ -1109,7 +1094,7 @@ result quad_forest_get_segment_mask
   if (tree->s != NULL && tree->s->w != NULL) {\
     new_tree = tree->s->w;\
     new_segment = quad_tree_segment_find(new_tree);\
-    if (new_segment == segment) {\
+    if (new_segment == tree_segment) {\
       *next_tree = new_tree;\
       *next_dir = d_SW;\
       break;\
@@ -1120,7 +1105,7 @@ result quad_forest_get_segment_mask
   if (tree->w != NULL) {\
     new_tree = tree->w;\
     new_segment = quad_tree_segment_find(new_tree);\
-    if (new_segment == segment) {\
+    if (new_segment == tree_segment) {\
       *next_tree = new_tree;\
       *next_dir = d_W;\
       break;\
@@ -1131,7 +1116,7 @@ result quad_forest_get_segment_mask
   if (tree->n != NULL && tree->n->w != NULL) {\
     new_tree = tree->n->w;\
     new_segment = quad_tree_segment_find(new_tree);\
-    if (new_segment == segment) {\
+    if (new_segment == tree_segment) {\
       *next_tree = new_tree;\
       *next_dir = d_NW;\
       break;\
@@ -1142,7 +1127,7 @@ result quad_forest_get_segment_mask
   if (tree->n != NULL) {\
     new_tree = tree->n;\
     new_segment = quad_tree_segment_find(new_tree);\
-    if (new_segment == segment) {\
+    if (new_segment == tree_segment) {\
       *next_tree = new_tree;\
       *next_dir = d_N;\
       break;\
@@ -1153,7 +1138,7 @@ result quad_forest_get_segment_mask
   if (tree->n != NULL && tree->n->e != NULL) {\
     new_tree = tree->n->e;\
     new_segment = quad_tree_segment_find(new_tree);\
-    if (new_segment == segment) {\
+    if (new_segment == tree_segment) {\
       *next_tree = new_tree;\
       *next_dir = d_NE;\
       break;\
@@ -1164,7 +1149,7 @@ result quad_forest_get_segment_mask
   if (tree->e != NULL) {\
     new_tree = tree->e;\
     new_segment = quad_tree_segment_find(new_tree);\
-    if (new_segment == segment) {\
+    if (new_segment == tree_segment) {\
       *next_tree = new_tree;\
       *next_dir = d_E;\
       break;\
@@ -1175,7 +1160,7 @@ result quad_forest_get_segment_mask
   if (tree->s != NULL && tree->s->e != NULL) {\
     new_tree = tree->s->e;\
     new_segment = quad_tree_segment_find(new_tree);\
-    if (new_segment == segment) {\
+    if (new_segment == tree_segment) {\
       *next_tree = new_tree;\
       *next_dir = d_SE;\
       break;\
@@ -1186,7 +1171,7 @@ result quad_forest_get_segment_mask
   if (tree->s != NULL) {\
     new_tree = tree->s;\
     new_segment = quad_tree_segment_find(new_tree);\
-    if (new_segment == segment) {\
+    if (new_segment == tree_segment) {\
       *next_tree = new_tree;\
       *next_dir = d_S;\
       break;\
@@ -1196,14 +1181,14 @@ result quad_forest_get_segment_mask
 void get_next
 (
   quad_tree *tree,
-  quad_forest_segment *segment,
+  segment *tree_segment,
   direction arrival_dir,
   quad_tree **next_tree,
   direction *next_dir
 )
 {
   quad_tree *new_tree;
-  quad_forest_segment *new_segment;
+  segment *new_segment;
 
   switch (arrival_dir) {
     case d_NW:
@@ -1329,7 +1314,7 @@ void get_next
   point_b.y = (signed)tree->y + ((sint32)(tree->size / 2));\
   new_line.start = point_a;\
   new_line.end = point_b;\
-  list_append(boundary, (pointer)&new_line);\
+  list_append(segment_boundary, (pointer)&new_line);\
   point_a = point_b;}
 
 #define POINT_TOP(tree) {\
@@ -1337,7 +1322,7 @@ void get_next
   point_b.y = (signed)tree->y;\
   new_line.start = point_a;\
   new_line.end = point_b;\
-  list_append(boundary, (pointer)&new_line);\
+  list_append(segment_boundary, (pointer)&new_line);\
   point_a = point_b;}
 
 #define POINT_RIGHT(tree) {\
@@ -1345,7 +1330,7 @@ void get_next
   point_b.y = (signed)tree->y + ((sint32)(tree->size / 2));\
   new_line.start = point_a;\
   new_line.end = point_b;\
-  list_append(boundary, (pointer)&new_line);\
+  list_append(segment_boundary, (pointer)&new_line);\
   point_a = point_b;}
 
 #define POINT_BOTTOM(tree) {\
@@ -1353,39 +1338,39 @@ void get_next
   point_b.y = (signed)(tree->y + tree->size);\
   new_line.start = point_a;\
   new_line.end = point_b;\
-  list_append(boundary, (pointer)&new_line);\
+  list_append(segment_boundary, (pointer)&new_line);\
   point_a = point_b;}
 
 result quad_forest_get_segment_boundary
 (
   quad_forest *forest,
-  quad_forest_segment *segment,
-  list *boundary
+  segment *input_segment,
+  list *segment_boundary
 )
 {
   uint32 row, col, pos;
   quad_tree *tree, *next_tree, *end_tree;
-  quad_forest_segment *tree_segment;
+  segment *tree_segment;
   direction prev_dir, next_dir;
   point start_point, point_a, point_b;
   line new_line;
   TRY();
 
   CHECK_POINTER(forest);
-  CHECK_POINTER(segment);
-  CHECK_POINTER(boundary);
+  CHECK_POINTER(input_segment);
+  CHECK_POINTER(segment_boundary);
 
-  CHECK(list_create(boundary, 100, sizeof(line), 1));
+  CHECK(list_create(segment_boundary, 100, sizeof(line), 1));
 
-  if (segment->x2 - segment->x1 > 33 && segment->y2 - segment->y1 > 32) {
+  if (input_segment->x2 - input_segment->x1 > 33 && input_segment->y2 - input_segment->y1 > 32) {
     /* find the tree in center left of bounding box */
-    col = (uint32)((segment->x1 - forest->dx) / forest->tree_max_size);
-    row = (uint32)((((uint32)((segment->y1 + segment->y2) / 2)) - forest->dy) / forest->tree_max_size);
+    col = (uint32)((input_segment->x1 - forest->dx) / forest->tree_max_size);
+    row = (uint32)((((uint32)((input_segment->y1 + input_segment->y2) / 2)) - forest->dy) / forest->tree_max_size);
     pos = row * forest->cols + col;
 
     tree = forest->roots[pos];
     tree_segment = quad_tree_segment_find(tree);
-    while (tree_segment != segment) {
+    while (tree_segment != input_segment) {
       if (tree->e != NULL) {
         tree = tree->e;
         tree_segment = quad_tree_segment_find(tree);
@@ -1405,7 +1390,7 @@ result quad_forest_get_segment_boundary
     /*get_next(tree, segment, prev_dir, &next_tree, &next_dir);*/
     /*prev_dir = next_dir;*/
     do {
-      get_next(tree, segment, prev_dir, &next_tree, &next_dir);
+      get_next(tree, input_segment, prev_dir, &next_tree, &next_dir);
       switch (next_dir) {
         case d_NW:
         {
@@ -1567,97 +1552,9 @@ result quad_forest_get_segment_boundary
 
     new_line.start = point_a;
     new_line.end = start_point;
-    list_append(boundary, (pointer)&new_line);
+    list_append(segment_boundary, (pointer)&new_line);
   }
   FINALLY(quad_forest_get_segment_boundary);
-  RETURN();
-}
-
-/******************************************************************************/
-
-result quad_forest_get_edge_chain
-(
-  quad_forest_edge_chain *edge,
-  list *chain
-)
-{
-  TRY();
-  uint32 token;
-  quad_tree *tree;
-  quad_forest_edge *current;
-  point point_a, point_b;
-  line new_line;
-
-  CHECK_POINTER(edge);
-
-  CHECK(list_create(chain, edge->length, sizeof(line), 1));
-
-  current = edge->first;
-  token = current->token + 1;
-  if (current != NULL) {
-    tree = (quad_tree*)current->tree;
-    point_a.x = (signed)(tree->x + (uint32)(tree->size / 2));
-    point_a.y = (signed)(tree->y + (uint32)(tree->size / 2));
-    current->token = token;
-    current = current->next;
-    while (current != NULL) {
-      tree = (quad_tree*)current->tree;
-      point_b.x = (signed)(tree->x + (uint32)(tree->size / 2));
-      point_b.y = (signed)(tree->y + (uint32)(tree->size / 2));
-      new_line.start = point_a;
-      new_line.end = point_b;
-      CHECK(list_append(chain, (pointer)&new_line));
-      point_a = point_b;
-      if (current->token != token) {
-        current->token = token;
-        current = current->next;
-      }
-      else {
-        current = NULL;
-      }
-    }
-  }
-
-  FINALLY(quad_forest_get_edge_chain);
-  RETURN();
-}
-
-/******************************************************************************/
-
-result quad_forest_get_path_sniffers
-(
-  quad_forest *forest,
-  list *sniffers
-)
-{
-  TRY();
-  uint32 i, size;
-  quad_tree *tree, *prev;
-  path_sniffer *current;
-  line new_line;
-
-  CHECK_POINTER(forest);
-
-  size = forest->rows * forest->cols;
-
-  CHECK(list_create(sniffers, size, sizeof(line), 1));
-
-  for (i = 0; i < size; i++) {
-    tree = forest->roots[i];
-    if (IS_TRUE(is_path_sniffer(&tree->context))) {
-      CHECK(expect_path_sniffer(&current, &tree->context));
-      if (current->prev != NULL) {
-        prev = current->prev->tree;
-        new_line.start.x = (signed)(tree->x + (uint32)(tree->size / 2));
-        new_line.start.y = (signed)(tree->y + (uint32)(tree->size / 2));
-        new_line.end.x = (signed)(prev->x + (uint32)(prev->size / 2));
-        new_line.end.y = (signed)(prev->y + (uint32)(prev->size / 2));
-        CHECK(list_append(sniffers, (pointer)&new_line));
-      }
-    }
-  }
-
-  FINALLY(quad_forest_get_path_sniffers);
   RETURN();
 }
 
@@ -2093,7 +1990,7 @@ result quad_forest_highlight_segments
 (
   quad_forest *forest,
   pixel_image *target,
-  quad_forest_segment **segments,
+  segment **segments,
   uint32 segment_count,
   byte color[4]
 )
@@ -2158,7 +2055,7 @@ result quad_forest_draw_image
   TRY();
   list_item *trees;
   quad_tree *tree;
-  quad_forest_segment *parent;
+  segment *parent;
   uint32 x, y, width, height, stride, row_step;
   byte *target_data, *target_pos, color0, color1, color2;
 

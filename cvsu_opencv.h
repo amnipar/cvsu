@@ -107,7 +107,7 @@ result pixel_image_draw_weighted_lines
 result pixel_image_draw_rects
 (
   pixel_image *source,
-  quad_forest_segment **segments,
+  segment **segments,
   uint32 count
 );
 

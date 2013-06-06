@@ -77,8 +77,6 @@ typedef struct quad_forest_t {
   uint32 token;
   /** List of all trees in the forest, including the root trees */
   list trees;
-  /** List of edge chains found from the forest */
-  list edges;
   /** List of all links between the trees of the forest */
   list links;
   /** Pointer to the last root tree in the tree list for resetting the forest */
@@ -187,7 +185,7 @@ result quad_forest_get_segments
   /** The quad_forest where the segments will be collected. */
   quad_forest *source,
   /** A segment array, must be allocated by the caller to the correct size. */
-  quad_forest_segment **target
+  segment **target
 );
 
 /**
@@ -197,7 +195,7 @@ result quad_forest_get_segment_trees
 (
   list *target,
   quad_forest *forest,
-  quad_forest_segment **segments,
+  segment **segments,
   uint32 segment_count
 );
 
@@ -209,7 +207,7 @@ result quad_forest_get_segment_neighbors
 (
   list *target,
   quad_forest *forest,
-  quad_forest_segment **segments,
+  segment **segments,
   uint32 segment_count
 );
 
@@ -222,7 +220,7 @@ result quad_forest_get_segment_mask
 (
   quad_forest *forest,
   pixel_image *target,
-  quad_forest_segment **segments,
+  segment **segments,
   uint32 segment_count,
   truth_value invert
 );
@@ -233,26 +231,8 @@ result quad_forest_get_segment_mask
 result quad_forest_get_segment_boundary
 (
   quad_forest *forest,
-  quad_forest_segment *segment,
+  segment *segment,
   list *boundary
-);
-
-/**
- * Generates a list of lines corresponding to an edge chain
- */
-result quad_forest_get_edge_chain
-(
-  quad_forest_edge_chain *edge,
-  list *chain
-);
-
-/**
- * Generates a list of lines corresponding to path sniffer prev links
- */
-result quad_forest_get_path_sniffers
-(
-  quad_forest *forest,
-  list *sniffers
 );
 
 /**
@@ -273,7 +253,7 @@ result quad_forest_highlight_segments
 (
   quad_forest *forest,
   pixel_image *target,
-  quad_forest_segment **segments,
+  segment **segments,
   uint32 segment_count,
   byte color[4]
 );

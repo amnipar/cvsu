@@ -51,10 +51,12 @@ string ensure_edge_links_name = "ensure_edge_links";
 string expect_edge_links_name = "expect_edge_links";
 string ensure_boundary_potential_name = "ensure_boundary_potential";
 string ensure_boundary_message_name = "ensure_boundary_message";
-string ensure_boundary_fragment_name = "ensure_boundary_fragment";
 string ensure_segment_message_name = "ensure_segment_message";
 string ensure_segment_potential_name = "ensure_segment_potential";
 string expect_segment_potential_name = "expect_segment_potential";
+
+string quad_tree_ensure_boundary_name = "quad_tree_ensure_boundary";
+string quad_tree_ensure_segment_name = "quad_tree_ensure_segment";
 
 /******************************************************************************/
 
@@ -93,7 +95,7 @@ result ensure_accumulated_stat
   CHECK_POINTER(astat);
   *astat = NULL;
 
-  CHECK(ensure_has(annotation, t_ASTAT, &tptr));
+  CHECK(ensure_has(annotation, t_accumulated_stat, &tptr));
 
   *astat = (accumulated_stat*)tptr->value;
 
@@ -106,7 +108,7 @@ truth_value is_accumulated_stat
   typed_pointer *tptr
 )
 {
-  if (tptr != NULL && tptr->type == t_ASTAT) {
+  if (tptr != NULL && tptr->type == t_accumulated_stat) {
     return TRUE;
   }
   return FALSE;
@@ -122,7 +124,7 @@ accumulated_stat *has_accumulated_stat
   }
   if (IS_TRUE(is_tuple(tptr))) {
     typed_pointer *element;
-    element = tuple_has_type(tptr, t_ASTAT);
+    element = tuple_has_type(tptr, t_accumulated_stat);
     if (element != NULL) {
       if (IS_FALSE(is_accumulated_stat(element))) {
         return NULL;
@@ -168,7 +170,7 @@ result ensure_neighborhood_stat
   CHECK_POINTER(nstat);
   *nstat = NULL;
 
-  CHECK(ensure_has(annotation, t_NSTAT, &tptr));
+  CHECK(ensure_has(annotation, t_neighborhood_stat, &tptr));
 
   *nstat = (neighborhood_stat*)tptr->value;
 
@@ -181,7 +183,7 @@ truth_value is_neighborhood_stat
   typed_pointer *tptr
 )
 {
-  if (tptr != NULL && tptr->type == t_NSTAT) {
+  if (tptr != NULL && tptr->type == t_neighborhood_stat) {
     return TRUE;
   }
   return FALSE;
@@ -197,7 +199,7 @@ neighborhood_stat *has_neighborhood_stat
   }
   if (IS_TRUE(is_tuple(tptr))) {
     typed_pointer *element;
-    element = tuple_has_type(tptr, t_NSTAT);
+    element = tuple_has_type(tptr, t_neighborhood_stat);
     if (element != NULL) {
       if (IS_FALSE(is_neighborhood_stat(element))) {
         return NULL;
@@ -317,86 +319,6 @@ segment_message *has_segment_message
     }
   }
   return NULL;
-}
-
-/******************************************************************************/
-
-result ensure_segment_potential
-(
-  typed_pointer *annotation,
-  segment_potential **spot,
-  uint32 token
-)
-{
-  TRY();
-  typed_pointer *tptr;
-  segment_potential *potential;
-
-  CHECK_POINTER(spot);
-  *spot = NULL;
-
-  CHECK(ensure_has(annotation, t_segment_potential, &tptr));
-
-  potential = (segment_potential*)tptr->value;
-  if (tptr->token != token) {
-    tptr->token = token;
-    potential->round = 0;
-    potential->extent = 0;
-    potential->diff_score = 0;
-  }
-  *spot = potential;
-
-  FINALLY(ensure_segment_potential);
-  RETURN();
-}
-
-truth_value is_segment_potential
-(
-  typed_pointer *tptr
-)
-{
-  if (tptr != NULL && tptr->type == t_segment_potential) {
-    return TRUE;
-  }
-  return FALSE;
-}
-
-segment_potential *has_segment_potential
-(
-  typed_pointer *tptr,
-  uint32 token
-)
-{
-  if (IS_TRUE(is_segment_potential(tptr)) && tptr->token == token) {
-    return (segment_potential*)tptr->value;
-  }
-  else {
-    typed_pointer *element = tuple_has_type(tptr, t_segment_potential);
-    if (element != NULL && element->token == token) {
-      return (segment_potential*)element->value;
-    }
-  }
-  return NULL;
-}
-
-result expect_segment_potential
-(
-  typed_pointer *tptr,
-  segment_potential **spot,
-  uint32 token
-)
-{
-  TRY();
-
-  CHECK_POINTER(spot);
-
-  *spot = has_segment_potential(tptr, token);
-  if (*spot == NULL) {
-    ERROR(NOT_FOUND);
-  }
-
-  FINALLY(expect_segment_potential);
-  RETURN();
 }
 
 /******************************************************************************/
@@ -611,7 +533,7 @@ result ensure_edge_response
   CHECK_POINTER(eresp);
   *eresp = NULL;
 
-  CHECK(ensure_has(annotation, t_EDGE_RESPONSE, &tptr));
+  CHECK(ensure_has(annotation, t_edge_response, &tptr));
 
   *eresp = (edge_response*)tptr->value;
 
@@ -624,7 +546,7 @@ truth_value is_edge_response
   typed_pointer *tptr
 )
 {
-  if (tptr != NULL && tptr->type == t_EDGE_RESPONSE) {
+  if (tptr != NULL && tptr->type == t_edge_response) {
     return TRUE;
   }
   return FALSE;
@@ -640,7 +562,7 @@ edge_response *has_edge_response
     return (edge_response*)tptr->value;
   }
   else {
-    typed_pointer *element = tuple_has_type(tptr, t_EDGE_RESPONSE);
+    typed_pointer *element = tuple_has_type(tptr, t_edge_response);
     if (element != NULL && element->token == token) {
       return (edge_response*)element->value;
     }
@@ -677,174 +599,6 @@ smoothed_gradient *has_smoothed_gradient
     }
   }
   return NULL;
-}
-
-/******************************************************************************/
-
-void quad_tree_segment_create
-(
-  quad_tree *tree
-)
-{
-  quad_forest_segment *segment;
-  if (tree != NULL) {
-    segment = &tree->segment;
-    /* proceed only if the tree doesn't have its region info initialized yet */
-    if (segment->parent == NULL) {
-      /* one-tree segment is it's own parent, and has the rank of 0 */
-      segment->parent = segment;
-      segment->rank = 0;
-      segment->x1 = tree->x;
-      segment->y1 = tree->y;
-      segment->x2 = tree->x + tree->size - 1;
-      segment->y2 = tree->y + tree->size - 1;
-      memory_copy((data_pointer)&segment->stat, (data_pointer)&tree->stat, 1, sizeof(statistics));
-    }
-  }
-}
-
-/******************************************************************************/
-
-void quad_tree_segment_union
-(
-  quad_tree *tree1,
-  quad_tree *tree2
-)
-{
-  quad_forest_segment_union(
-      quad_tree_segment_find(tree1), quad_tree_segment_find(tree2));
-}
-
-/******************************************************************************/
-
-void quad_forest_segment_union
-(
-  quad_forest_segment *segment1,
-  quad_forest_segment *segment2
-)
-{
-  /* if the segments are already in the same class, no need for union */
-  if (segment1 != NULL && segment2 != NULL && segment1 != segment2) {
-    /* otherwise set the tree with higher class rank as id of the union */
-    statistics *stat;
-    integral_value N, mean, variance;
-    if (segment1->rank < segment2->rank) {
-      segment1->parent = segment2;
-      segment2->x1 = (segment1->x1 < segment2->x1) ? segment1->x1 : segment2->x1;
-      segment2->y1 = (segment1->y1 < segment2->y1) ? segment1->y1 : segment2->y1;
-      segment2->x2 = (segment1->x2 > segment2->x2) ? segment1->x2 : segment2->x2;
-      segment2->y2 = (segment1->y2 > segment2->y2) ? segment1->y2 : segment2->y2;
-      stat = &segment2->stat;
-      N = (stat->N += segment1->stat.N);
-      stat->sum += segment1->stat.sum;
-      stat->sum2 += segment1->stat.sum2;
-      mean = stat->mean = stat->sum / N;
-      variance = stat->sum2 / N - mean*mean;
-      if (variance < 0) variance = 0;
-      stat->variance = variance;
-      stat->deviation = sqrt(variance);
-    }
-    else {
-      segment2->parent = segment1;
-      /* when equal rank trees are combined, the root tree's rank is increased */
-      if (segment1->rank == segment2->rank) {
-        segment1->rank += 1;
-      }
-      segment1->x1 = (segment1->x1 < segment2->x1) ? segment1->x1 : segment2->x1;
-      segment1->y1 = (segment1->y1 < segment2->y1) ? segment1->y1 : segment2->y1;
-      segment1->x2 = (segment1->x2 > segment2->x2) ? segment1->x2 : segment2->x2;
-      segment1->y2 = (segment1->y2 > segment2->y2) ? segment1->y2 : segment2->y2;
-      stat = &segment1->stat;
-      N = (stat->N += segment2->stat.N);
-      stat->sum += segment2->stat.sum;
-      stat->sum2 += segment2->stat.sum2;
-      mean = stat->mean = stat->sum / N;
-      variance = stat->sum2 / N - mean*mean;
-      if (variance < 0) variance = 0;
-      stat->variance = variance;
-      stat->deviation = sqrt(variance);
-    }
-  }
-}
-
-/******************************************************************************/
-/* a private function that takes a segment instead of a tree                  */
-/* allows using quad_tree in the public interface                             */
-
-quad_forest_segment *segment_find
-(
-  quad_forest_segment *segment
-)
-{
-  if (segment != NULL) {
-    if (segment->parent != NULL && segment->parent != segment) {
-      segment->parent = segment_find(segment->parent);
-    }
-    return segment->parent;
-  }
-  return NULL;
-}
-
-/******************************************************************************/
-
-quad_forest_segment *quad_tree_segment_find
-(
-  quad_tree *tree
-)
-{
-  if (tree != NULL) {
-    return segment_find(&tree->segment);
-  }
-  return NULL;
-}
-
-/******************************************************************************/
-
-uint32 quad_tree_segment_get
-(
-  quad_tree *tree
-)
-{
-  return (uint32)quad_tree_segment_find(tree);
-}
-
-/******************************************************************************/
-
-truth_value quad_tree_is_segment_parent
-(
-  quad_tree *tree
-)
-{
-  if (tree != NULL) {
-    if (quad_tree_segment_find(tree) == &tree->segment) {
-      return TRUE;
-    }
-  }
-  return FALSE;
-}
-
-/******************************************************************************/
-/* comparator function for quad_forest_segments                               */
-
-int compare_segments(const void *a, const void *b)
-{
-  const quad_forest_segment *sa, *sb;
-
-  sa = *((const quad_forest_segment* const *)a);
-  if (sa == NULL) {
-    PRINT0("warning: tree is null in compare_segments\n");
-    return -1;
-  }
-  sb = *((const quad_forest_segment* const *)b);
-
-  if (sb == NULL) {
-    PRINT0("warning: tree is null in compare_segments\n");
-    return -1;
-  }
-
-  if (sa > sb) return 1;
-  else if (sa < sb) return -1;
-  else return 0;
 }
 
 /******************************************************************************/
@@ -973,64 +727,63 @@ boundary_message *has_boundary_message
 }
 
 /******************************************************************************/
+/* boundary structures and functions                                           */
+/******************************************************************************/
 
-result ensure_boundary_fragment
-(
-  typed_pointer *annotation,
-  boundary_fragment **bfrag,
-  uint32 token
-)
+int compare_boundaries(const void *a, const void *b)
 {
-  TRY();
-  typed_pointer *tptr;
-  boundary_fragment *fragment;
+  const boundary *sa, *sb;
 
-  CHECK_POINTER(bfrag);
-  *bfrag = NULL;
-
-  CHECK(ensure_has(annotation, t_boundary_fragment, &tptr));
-  fragment = (boundary_fragment*)tptr->value;
-  if (tptr->token != token) {
-    tptr->token = token;
-    fragment->parent = NULL;
-    fragment->type = ft_UNDEF;
-    rect_create(&fragment->extent, 0, 0, 0, 0);
-    fragment->round = 0;
-    fragment->dir_change = 0;
-    fragment->dir_a = 0;
-    fragment->dir_b = 0;
-    fragment->hypotheses = NULL;
+  sa = *((const boundary* const *)a);
+  if (sa == NULL) {
+    PRINT0("warning: tree is null in compare_boundaries\n");
+    return -1;
   }
-  *bfrag = fragment;
 
-  FINALLY(ensure_boundary_fragment);
-  RETURN();
+  sb = *((const boundary* const *)b);
+  if (sb == NULL) {
+    PRINT0("warning: tree is null in compare_boundaries\n");
+    return -1;
+  }
+
+  if (sa > sb) return 1;
+  else if (sa < sb) return -1;
+  else return 0;
 }
 
-truth_value is_boundary_fragment
+/******************************************************************************/
+
+truth_value is_boundary
 (
-  typed_pointer *tptr
+  typed_pointer *input_pointer
 )
 {
-  if (tptr != NULL && tptr->type == t_boundary_fragment) {
+  if (input_pointer != NULL && input_pointer->type == t_boundary) {
     return TRUE;
   }
   return FALSE;
 }
 
-boundary_fragment *has_boundary_fragment
+/******************************************************************************/
+
+boundary *has_boundary
 (
-  typed_pointer *tptr,
+  typed_pointer *input_pointer,
   uint32 token
 )
 {
-  if (IS_TRUE(is_boundary_fragment(tptr)) && tptr->token == token) {
-    return (boundary_fragment*)tptr->value;
-  }
-  else {
-    typed_pointer *element = tuple_has_type(tptr, t_boundary_fragment);
-    if (element != NULL && element->token == token) {
-      return (boundary_fragment*)element->value;
+  if (input_pointer != NULL) {
+    if (token == 0) {
+      token = input_pointer->token;
+    }
+    if (IS_TRUE(is_boundary(input_pointer)) && input_pointer->token == token) {
+      return (boundary*)input_pointer->value;
+    }
+    else {
+      typed_pointer *element = tuple_has_type(input_pointer, t_boundary);
+      if (element != NULL && element->token == token) {
+        return (boundary*)element->value;
+      }
     }
   }
   return NULL;
@@ -1039,29 +792,436 @@ boundary_fragment *has_boundary_fragment
 /******************************************************************************/
 /* union-find implementation for boundary fragments                           */
 
-void boundary_fragment_create
+result quad_tree_ensure_boundary
 (
-  quad_tree *tree
+  quad_tree *input_tree,
+  boundary **output_boundary
 )
 {
+  TRY();
+  typed_pointer *annotation, *new_pointer;
 
+  CHECK_POINTER(input_tree);
+
+  if (output_boundary != NULL) {
+    *output_boundary = NULL;
+  }
+
+  annotation = &input_tree->annotation;
+  CHECK(ensure_has(annotation, t_boundary, &new_pointer));
+  /* proceed only if the boundary hasn't been initialized yet in this frame */
+  if (new_pointer->token != annotation->token) {
+    boundary *tree_boundary;
+    /* still need to check also the parent? */
+    /* if (tree_boundary->parent == NULL) ?? */
+    new_pointer->token = annotation->token;
+    tree_boundary = (boundary*)new_pointer->value;
+    /* one-tree segment is it's own parent, and has the rank of 0 */
+    tree_boundary->parent = tree_boundary;
+    tree_boundary->category = fc_UNDEF;
+    tree_boundary->rank = 0;
+    tree_boundary->x1 = input_tree->x;
+    tree_boundary->y1 = input_tree->y;
+    tree_boundary->x2 = input_tree->x + input_tree->size - 1;
+    tree_boundary->y2 = input_tree->y + input_tree->size - 1;
+    tree_boundary->length = 1;
+    tree_boundary->curvature = 0;
+    tree_boundary->dir_a = 0;
+    tree_boundary->dir_b = 0;
+    tree_boundary->hypotheses = NULL;
+
+    if (output_boundary != NULL) {
+      *output_boundary = tree_boundary;
+    }
+  }
+
+  FINALLY(quad_tree_ensure_boundary);
+  RETURN();
 }
 
-void boundary_fragment_union
+/******************************************************************************/
+
+void boundary_union
 (
-  quad_tree *tree1,
-  quad_tree *tree2
+  boundary *input_boundary_1,
+  boundary *input_boundary_2
 )
 {
+  if (input_boundary_1 != NULL && input_boundary_2 != NULL && input_boundary_1 != input_boundary_2) {
+    if (input_boundary_1->rank < input_boundary_2->rank) {
+      input_boundary_1->parent = input_boundary_2;
 
+      /* choose smaller of x1 (left) coordinates */
+      input_boundary_2->x1 = (input_boundary_1->x1 < input_boundary_2->x1) ?
+          input_boundary_1->x1 : input_boundary_2->x1;
+      /* choose smaller of y1 (top) coordinates */
+      input_boundary_2->y1 = (input_boundary_1->y1 < input_boundary_2->y1) ?
+          input_boundary_1->y1 : input_boundary_2->y1;
+      /* choose larger of x2 (right) coordinates */
+      input_boundary_2->x2 = (input_boundary_1->x2 > input_boundary_2->x2) ?
+          input_boundary_1->x2 : input_boundary_2->x2;
+      /* choose larger of y2 (bottom) coordinates */
+      input_boundary_2->y2 = (input_boundary_1->y2 > input_boundary_2->y2) ?
+          input_boundary_1->y2 : input_boundary_2->y2;
+
+      input_boundary_2->length += input_boundary_1->length;
+    }
+    else {
+      input_boundary_2->parent = input_boundary_1;
+      if (input_boundary_1->rank == input_boundary_2->rank) {
+        input_boundary_1->rank += 1;
+      }
+      /* choose smaller of x1 (left) coordinates */
+      input_boundary_1->x1 = (input_boundary_1->x1 < input_boundary_2->x1) ?
+          input_boundary_1->x1 : input_boundary_2->x1;
+      /* choose smaller of y1 (top) coordinates */
+      input_boundary_1->y1 = (input_boundary_1->y1 < input_boundary_2->y1) ?
+          input_boundary_1->y1 : input_boundary_2->y1;
+      /* choose larger of x2 (right) coordinates */
+      input_boundary_1->x2 = (input_boundary_1->x2 > input_boundary_2->x2) ?
+          input_boundary_1->x2 : input_boundary_2->x2;
+      /* choose larger of y2 (bottom) coordinates */
+      input_boundary_1->y2 = (input_boundary_1->y2 > input_boundary_2->y2) ?
+          input_boundary_1->y2 : input_boundary_2->y2;
+
+      input_boundary_1->length += input_boundary_2->length;
+    }
+  }
 }
 
-boundary_fragment *boundary_fragment_find
+/******************************************************************************/
+
+void quad_tree_boundary_union
 (
-  quad_tree *tree
+  quad_tree *input_tree_1,
+  quad_tree *input_tree_2
 )
 {
+  boundary_union(
+      quad_tree_boundary_find(input_tree_1),
+      quad_tree_boundary_find(input_tree_2));
+}
+
+/******************************************************************************/
+
+boundary *boundary_find
+(
+  boundary *input_boundary
+)
+{
+  if (input_boundary != NULL) {
+    if (input_boundary->parent != NULL && input_boundary->parent != input_boundary) {
+      input_boundary->parent = boundary_find(input_boundary->parent);
+    }
+    return input_boundary->parent;
+  }
   return NULL;
+}
+
+/******************************************************************************/
+
+boundary *quad_tree_boundary_find
+(
+  quad_tree *input_tree
+)
+{
+  if (input_tree != NULL) {
+    boundary *tree_boundary = has_boundary(&input_tree->annotation, 0);
+    return boundary_find(tree_boundary);
+  }
+  return NULL;
+}
+
+/******************************************************************************/
+
+uint32 quad_tree_boundary_id
+(
+  quad_tree *input_tree
+)
+{
+  return (uint32)quad_tree_boundary_find(input_tree);
+}
+
+/******************************************************************************/
+
+truth_value quad_tree_is_boundary_parent
+(
+  quad_tree *input_tree
+)
+{
+  if (input_tree != NULL) {
+    boundary *tree_boundary = has_boundary(&input_tree->annotation, 0);
+    if (tree_boundary != NULL) {
+      if (boundary_find(tree_boundary) == tree_boundary) {
+        return TRUE;
+      }
+    }
+  }
+  return FALSE;
+}
+
+/******************************************************************************/
+/* segment structures and functions                                           */
+/******************************************************************************/
+
+int compare_segments(const void *a, const void *b)
+{
+  const segment *sa, *sb;
+
+  sa = *((const segment* const *)a);
+  if (sa == NULL) {
+    PRINT0("warning: tree is null in compare_segments\n");
+    return -1;
+  }
+
+  sb = *((const segment* const *)b);
+  if (sb == NULL) {
+    PRINT0("warning: tree is null in compare_segments\n");
+    return -1;
+  }
+
+  if (sa > sb) return 1;
+  else if (sa < sb) return -1;
+  else return 0;
+}
+
+/******************************************************************************/
+
+truth_value is_segment
+(
+  typed_pointer *input_pointer
+)
+{
+  if (input_pointer != NULL && input_pointer->type == t_segment) {
+    return TRUE;
+  }
+  return FALSE;
+}
+
+/******************************************************************************/
+
+segment *has_segment
+(
+  typed_pointer *input_pointer,
+  uint32 token
+)
+{
+  if (input_pointer != NULL) {
+    if (token == 0) {
+      token = input_pointer->token;
+    }
+    if (IS_TRUE(is_segment(input_pointer)) && input_pointer->token == token) {
+      return (segment*)input_pointer->value;
+    }
+    else {
+      typed_pointer *element = tuple_has_type(input_pointer, t_segment);
+      if (element != NULL && element->token == token) {
+        return (segment*)element->value;
+      }
+    }
+  }
+  return NULL;
+}
+
+/******************************************************************************/
+
+result quad_tree_ensure_segment
+(
+  quad_tree *input_tree,
+  segment **output_segment
+)
+{
+  TRY();
+  typed_pointer *annotation, *new_pointer;
+
+  CHECK_POINTER(input_tree);
+
+  if (output_segment != NULL) {
+    *output_segment = NULL;
+  }
+
+  annotation = &input_tree->annotation;
+  CHECK(ensure_has(annotation, t_segment, &new_pointer));
+  /* proceed only if the segment hasn't been initialized yet in this frame */
+  if (new_pointer->token != annotation->token) {
+    segment *tree_segment;
+    /* still need to check also the parent? */
+    /* if (tree_segment->parent == NULL) ?? */
+    new_pointer->token = annotation->token;
+    tree_segment = (segment*)new_pointer->value;
+    /* one-tree segment is it's own parent, and has the rank of 0 */
+    tree_segment->parent = tree_segment;
+    tree_segment->rank = 0;
+    tree_segment->x1 = input_tree->x;
+    tree_segment->y1 = input_tree->y;
+    tree_segment->x2 = input_tree->x + input_tree->size - 1;
+    tree_segment->y2 = input_tree->y + input_tree->size - 1;
+    memory_copy((data_pointer)&tree_segment->stat,
+                (data_pointer)&tree_segment->stat, 1, sizeof(statistics));
+
+    if (output_segment != NULL) {
+      *output_segment = tree_segment;
+    }
+  }
+
+  FINALLY(quad_tree_ensure_segment);
+  RETURN();
+}
+
+/******************************************************************************/
+
+segment *quad_tree_get_segment
+(
+  quad_tree *input_tree
+)
+{
+  if (input_tree != NULL) {
+    return has_segment(&input_tree->annotation, 0);
+  }
+  return NULL;
+}
+
+/******************************************************************************/
+
+void segment_union
+(
+  segment *input_segment_1,
+  segment *input_segment_2
+)
+{
+  /* if the segments are already in the same class, no need for union */
+  if (input_segment_1 != NULL && input_segment_2 != NULL && input_segment_1 != input_segment_2) {
+    /* otherwise set the tree with higher class rank as id of the union */
+    statistics *stat;
+    integral_value N, mean, variance;
+    if (input_segment_1->rank < input_segment_2->rank) {
+      input_segment_1->parent = input_segment_2;
+
+      /* choose smaller of x1 (left) coordinates */
+      input_segment_2->x1 = (input_segment_1->x1 < input_segment_2->x1) ?
+          input_segment_1->x1 : input_segment_2->x1;
+      /* choose smaller of y1 (top) coordinates */
+      input_segment_2->y1 = (input_segment_1->y1 < input_segment_2->y1) ?
+          input_segment_1->y1 : input_segment_2->y1;
+      /* choose larger of x2 (right) coordinates */
+      input_segment_2->x2 = (input_segment_1->x2 > input_segment_2->x2) ?
+          input_segment_1->x2 : input_segment_2->x2;
+      /* choose larger of y2 (bottom) coordinates */
+      input_segment_2->y2 = (input_segment_1->y2 > input_segment_2->y2) ?
+          input_segment_1->y2 : input_segment_2->y2;
+
+      stat = &input_segment_2->stat;
+      N = (stat->N += input_segment_1->stat.N);
+      stat->sum += input_segment_1->stat.sum;
+      stat->sum2 += input_segment_1->stat.sum2;
+      mean = stat->mean = stat->sum / N;
+      variance = stat->sum2 / N - mean*mean;
+      if (variance < 0) variance = 0;
+      stat->variance = variance;
+      stat->deviation = sqrt(variance);
+    }
+    else {
+      input_segment_2->parent = input_segment_1;
+      /* when equal rank trees are combined, the root tree's rank is increased */
+      if (input_segment_1->rank == input_segment_2->rank) {
+        input_segment_1->rank += 1;
+      }
+
+      /* choose smaller of x1 (left) coordinates */
+      input_segment_1->x1 = (input_segment_1->x1 < input_segment_2->x1) ?
+          input_segment_1->x1 : input_segment_2->x1;
+      /* choose smaller of y1 (top) coordinates */
+      input_segment_1->y1 = (input_segment_1->y1 < input_segment_2->y1) ?
+          input_segment_1->y1 : input_segment_2->y1;
+      /* choose larger of x2 (right) coordinates */
+      input_segment_1->x2 = (input_segment_1->x2 > input_segment_2->x2) ?
+          input_segment_1->x2 : input_segment_2->x2;
+      /* choose larger of y2 (bottom) coordinates */
+      input_segment_1->y2 = (input_segment_1->y2 > input_segment_2->y2) ?
+          input_segment_1->y2 : input_segment_2->y2;
+
+      stat = &input_segment_1->stat;
+      N = (stat->N += input_segment_2->stat.N);
+      stat->sum += input_segment_2->stat.sum;
+      stat->sum2 += input_segment_2->stat.sum2;
+      mean = stat->mean = stat->sum / N;
+      variance = stat->sum2 / N - mean*mean;
+      if (variance < 0) variance = 0;
+      stat->variance = variance;
+      stat->deviation = sqrt(variance);
+    }
+  }
+}
+
+/******************************************************************************/
+
+void quad_tree_segment_union
+(
+  quad_tree *input_tree_1,
+  quad_tree *input_tree_2
+)
+{
+  segment_union(
+      quad_tree_segment_find(input_tree_1),
+      quad_tree_segment_find(input_tree_2));
+}
+
+/******************************************************************************/
+
+segment *segment_find
+(
+  segment *input_segment
+)
+{
+  if (input_segment != NULL) {
+    if (input_segment->parent != NULL && input_segment->parent != input_segment) {
+      input_segment->parent = segment_find(input_segment->parent);
+    }
+    return input_segment->parent;
+  }
+  return NULL;
+}
+
+/******************************************************************************/
+
+segment *quad_tree_segment_find
+(
+  quad_tree *input_tree
+)
+{
+  if (input_tree != NULL) {
+    segment *tree_segment = has_segment(&input_tree->annotation, 0);
+    return segment_find(tree_segment);
+  }
+  return NULL;
+}
+
+/******************************************************************************/
+
+uint32 quad_tree_segment_id
+(
+  quad_tree *input_tree
+)
+{
+  return (uint32)quad_tree_segment_find(input_tree);
+}
+
+/******************************************************************************/
+
+truth_value quad_tree_is_segment_parent
+(
+  quad_tree *input_tree
+)
+{
+  if (input_tree != NULL) {
+    segment *tree_segment = has_segment(&input_tree->annotation, 0);
+    if (tree_segment != NULL) {
+      if (segment_find(tree_segment) == tree_segment) {
+        return TRUE;
+      }
+    }
+  }
+  return FALSE;
 }
 
 /* end of file                                                                */

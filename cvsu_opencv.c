@@ -346,7 +346,7 @@ result pixel_image_draw_weighted_lines
 result pixel_image_draw_rects
 (
   pixel_image *source,
-  quad_forest_segment **segments,
+  segment **segments,
   uint32 count
 )
 {
@@ -354,7 +354,7 @@ result pixel_image_draw_rects
   IplImage *dst;
   CvSize size;
   list_item *items, *end;
-  quad_forest_segment *segment;
+  segment *tree_segment;
   rect *this_rect;
   uint32 i;
   struct timeval finish;
@@ -377,12 +377,12 @@ result pixel_image_draw_rects
   */
   for (i = 0; i < count; i++) {
     /*this_line = (line*)items->data;*/
-    segment = segments[i];
-    if (segment->x2 - segment->x1 > 30 && segment->y2 - segment->y1 > 20) {
+    tree_segment = segments[i];
+    if (tree_segment->x2 - tree_segment->x1 > 30 && tree_segment->y2 - tree_segment->y1 > 20) {
       cvRectangle(dst,
-             cvPoint(segment->x1, segment->y1),
-             cvPoint(segment->x2, segment->y2),
-             cvScalar(0,255,255,0), 2, 8, 0);
+          cvPoint(tree_segment->x1, tree_segment->y1),
+          cvPoint(tree_segment->x2, tree_segment->y2),
+          cvScalar(0,255,255,0), 2, 8, 0);
     }
   }
   /*

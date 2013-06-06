@@ -53,7 +53,7 @@ result quad_forest_refresh_segments
   TRY();
   list_item *trees, *end;
   quad_tree *tree;
-  quad_forest_segment *parent, *segment;
+  segment *parent, *tree_segment;
   uint32 count;
 
   CHECK_POINTER(target);
@@ -67,13 +67,13 @@ result quad_forest_refresh_segments
   while (trees != end) {
     tree = (quad_tree *)trees->data;
     if (tree->nw == NULL) {
-      segment = &tree->segment;
-      if (segment != NULL) {
+      tree_segment = quad_tree_get_segment(tree);
+      if (tree_segment != NULL) {
         parent = quad_tree_segment_find(tree);
-        if (parent == segment) {
-          segment->color[0] = (byte)(rand() % 256);
-          segment->color[1] = (byte)(rand() % 256);
-          segment->color[2] = (byte)(rand() % 256);
+        if (parent == tree_segment) {
+          tree_segment->color[0] = (byte)(rand() % 256);
+          tree_segment->color[1] = (byte)(rand() % 256);
+          tree_segment->color[2] = (byte)(rand() % 256);
           count++;
         }
       }
@@ -104,7 +104,7 @@ result quad_forest_segment_with_deviation
   TRY();
   list_item *trees, *end;
   quad_tree *tree, *neighbor, *best_neighbor;
-  quad_forest_segment *tree_segment, *neighbor_segment;
+  segment *tree_segment, *neighbor_segment;
   statistics *stat;
   integral_value tm, nm, dist, best_dist;
   uint32 min_size;
@@ -125,11 +125,11 @@ result quad_forest_segment_with_deviation
         CHECK(quad_tree_divide(target, tree));
       }
       else {
-        quad_tree_segment_create(tree);
+        CHECK(quad_tree_ensure_segment(tree, NULL));
       }
     }
     else {
-      quad_tree_segment_create(tree);
+      CHECK(quad_tree_ensure_segment(tree, NULL));
     }
     trees = trees->next;
   }
@@ -306,7 +306,7 @@ result quad_forest_segment_with_overlap
   TRY();
   list_item *trees, *end;
   quad_tree *tree, *neighbor, *best_neighbor;
-  quad_forest_segment *tree_segment, *neighbor_segment;
+  segment *tree_segment, *neighbor_segment;
   statistics *stat;
   integral_value tm, ts, nm, ns, x1, x2, x1min, x1max, x2min, x2max, I, U, overlap, best_overlap;
 

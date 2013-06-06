@@ -42,11 +42,11 @@ extern "C" {
 typedef enum type_label_t {
   t_UNDEF = 0,
   /* basic types */
-  t_TYPE,
-  t_TRUTH,
-  t_POINTER,
-  t_TPOINTER,
-  t_STRING,
+  t_type,
+  t_truth_value,
+  t_pointer,
+  t_typed_pointer,
+  t_string,
   t_S8,
   t_U8,
   t_S16,
@@ -59,31 +59,25 @@ typedef enum type_label_t {
 */
   t_F32,
   t_F64,
-  t_TUPLE,
-  t_LIST,
+  t_tuple,
+  t_list,
   /* tree annotation types */
-  t_STAT,
-  t_ASTAT,
-  t_NSTAT,
-  t_EDGE_RESPONSE,
+  t_statistics,
+  t_accumulated_stat,
+  t_neighborhood_stat,
+  t_edge_response,
   t_smoothed_gradient,
   t_ridge_potential,
-  t_boundary_potential,
   t_link_measure,
   t_edge_profile,
   t_edge_links,
-  t_segment_message,
-  t_segment_potential,
   t_boundary_message,
-  t_boundary_fragment,
-  t_BOUNDARY,
-  t_SEGMENT,
-  t_INTERSECTION,
+  t_boundary_potential,
+  t_boundary,
+  t_segment_message,
+  t_segment,
   /* parsing context types */
-  t_STAT_ACCUMULATOR,
-  t_PATH_SNIFFER,
-  t_EDGE_PARSER,
-  t_SEGMENT_PARSER
+  t_stat_accumulator
 } type_label;
 
 /**

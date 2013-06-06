@@ -630,11 +630,11 @@ result quad_tree_divide_with_overlap
         quad_tree_cache_neighbors(target);
       }
       else {
-        quad_tree_segment_create(target);
+        CHECK(quad_tree_ensure_segment(target, NULL));
       }
     }
     else {
-      quad_tree_segment_create(target);
+      CHECK(quad_tree_ensure_segment(target, NULL));
     }
   }
 
@@ -758,7 +758,7 @@ result quad_tree_ensure_edge_response
   CHECK_POINTER(eresp);
 
   *eresp = NULL;
-  CHECK(ensure_has(&tree->annotation, t_EDGE_RESPONSE, &tptr));
+  CHECK(ensure_has(&tree->annotation, t_edge_response, &tptr));
   resp = (edge_response*)tptr->value;
   if (tptr->token != forest->token) {
     box_width = tree->size;

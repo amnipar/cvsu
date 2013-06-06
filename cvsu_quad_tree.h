@@ -140,9 +140,6 @@ typedef struct quad_tree_t {
   /** Context data used in image parsing operations */
   typed_pointer context;
   typed_pointer annotation;
-
-  /* TODO: to be removed */
-  quad_forest_segment segment;
 } quad_tree;
 
 void quad_tree_destroy
