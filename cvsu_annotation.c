@@ -1049,7 +1049,7 @@ result quad_tree_ensure_segment
     /* if (tree_segment->parent == NULL) ?? */
     new_pointer->token = annotation->token;
     tree_segment = (segment*)new_pointer->value;
-    /* one-tree segment is it's own parent, and has the rank of 0 */
+    /* one-tree segment is its own parent, and has the rank of 0 */
     tree_segment->parent = tree_segment;
     tree_segment->rank = 0;
     tree_segment->x1 = input_tree->x;
@@ -1057,7 +1057,7 @@ result quad_tree_ensure_segment
     tree_segment->x2 = input_tree->x + input_tree->size - 1;
     tree_segment->y2 = input_tree->y + input_tree->size - 1;
     memory_copy((data_pointer)&tree_segment->stat,
-                (data_pointer)&tree_segment->stat, 1, sizeof(statistics));
+                (data_pointer)&input_tree->stat, 1, sizeof(statistics));
 
     if (output_segment != NULL) {
       *output_segment = tree_segment;
