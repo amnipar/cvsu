@@ -316,7 +316,7 @@ result quad_forest_segment_with_overlap
   CHECK_PARAM(threshold_segments > 0);
 
   /* first, divide until all trees are consistent */
-  /*printf("starting to divide trees\n");*/
+  /*PRINT0("starting to divide trees\n");*/
   trees = target->trees.first.next;
   while (trees != &target->trees.last) {
     tree = (quad_tree *)trees->data;
@@ -325,7 +325,7 @@ result quad_forest_segment_with_overlap
   }
 
   /* then, merge each tree with the best neighboring tree that is close enough */
-  /*printf("starting to merge trees\n");*/
+  /*PRINT0("starting to merge trees\n");*/
   trees = target->trees.first.next;
   end = &target->trees.last;
   while (trees != end) {
@@ -396,14 +396,14 @@ result quad_forest_segment_with_overlap
   }
 
   /* then, merge those neighboring regions that are consistent together */
-  /*printf("starting to merge regions\n");*/
+  /*PRINT0("starting to merge regions\n");*/
   trees = target->trees.first.next;
   end = &target->trees.last;
   while (trees != end) {
     tree = (quad_tree *)trees->data;
     tree_segment = quad_tree_segment_find(tree);
     /* only consider consistent trees (those that have not been divided) */
-    if (tree->nw == NULL) {
+    if (tree->nw == NULL && tree_segment != NULL) {
       stat = &tree_segment->stat;
       tm = stat->mean;
       ts = getmax(alpha, alpha * stat->deviation);
@@ -455,10 +455,10 @@ result quad_forest_segment_with_overlap
     }
     trees = trees->next;
   }
-
+  /*PRINT0("refreshing segments\n");*/
   /* finally, count regions and assign colors */
   CHECK(quad_forest_refresh_segments(target));
-
+  
   FINALLY(quad_forest_segment_with_overlap);
   RETURN();
 }

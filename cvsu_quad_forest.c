@@ -587,12 +587,12 @@ result quad_forest_update
       stat->variance = var;
       stat->deviation = sqrt(var);
 
-      /* TODO: decide where the segments are created */
-      /*quad_tree_segment_create(tree);*/
       tree->nw = NULL;
       tree->ne = NULL;
       tree->sw = NULL;
       tree->se = NULL;
+      
+      tree->annotation.token = target->token;
     }
   }
 

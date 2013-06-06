@@ -233,6 +233,7 @@ result quad_tree_divide
         /*quad_tree_segment_create(child_tree);*/
         child_tree->level = level;
         child_tree->parent = target;
+        child_tree->annotation.token = target->annotation.token;
         target->nw = child_tree;
 
         /* ne child block */
@@ -240,6 +241,7 @@ result quad_tree_divide
         /*quad_tree_segment_create(child_tree);*/
         child_tree->level = level;
         child_tree->parent = target;
+        child_tree->annotation.token = target->annotation.token;
         target->ne = child_tree;
 
         /* sw child block */
@@ -247,6 +249,7 @@ result quad_tree_divide
         /*quad_tree_segment_create(child_tree);*/
         child_tree->level = level;
         child_tree->parent = target;
+        child_tree->annotation.token = target->annotation.token;
         target->sw = child_tree;
 
         /* se child block */
@@ -254,6 +257,7 @@ result quad_tree_divide
         /*quad_tree_segment_create(child_tree);*/
         child_tree->level = level;
         child_tree->parent = target;
+        child_tree->annotation.token = target->annotation.token;
         target->se = child_tree;
 
         quad_tree_cache_neighbors(target);
@@ -604,6 +608,7 @@ result quad_tree_divide_with_overlap
         /*quad_tree_segment_create(child_tree);*/
         child_tree->parent = target;
         child_tree->level = level;
+        child_tree->annotation.token = target->annotation.token;
         target->nw = child_tree;
 
         /* ne child block */
@@ -611,6 +616,7 @@ result quad_tree_divide_with_overlap
         /*quad_tree_segment_create(child_tree);*/
         child_tree->parent = target;
         child_tree->level = level;
+        child_tree->annotation.token = target->annotation.token;
         target->ne = child_tree;
 
         /* sw child block */
@@ -618,6 +624,7 @@ result quad_tree_divide_with_overlap
         /*quad_tree_segment_create(child_tree);*/
         child_tree->parent = target;
         child_tree->level = level;
+        child_tree->annotation.token = target->annotation.token;
         target->sw = child_tree;
 
         /* se child block */
@@ -625,6 +632,7 @@ result quad_tree_divide_with_overlap
         /*quad_tree_segment_create(child_tree);*/
         child_tree->parent = target;
         child_tree->level = level;
+        child_tree->annotation.token = target->annotation.token;
         target->se = child_tree;
 
         quad_tree_cache_neighbors(target);

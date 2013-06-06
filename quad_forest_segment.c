@@ -140,6 +140,7 @@ int main(int argc, char *argv[])
   printf("create forest...\n");
   CHECK(quad_forest_create(&forest, &src_image, max_size, min_size));
   printf("updating forest...\n");
+  forest.token = 1;
   CHECK(quad_forest_update(&forest));
   printf("segmenting...\n");
   CHECK(quad_forest_segment_with_overlap(&forest, alpha, tree_overlap, segment_overlap));
