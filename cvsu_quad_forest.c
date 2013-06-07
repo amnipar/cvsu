@@ -591,7 +591,7 @@ result quad_forest_update
       tree->ne = NULL;
       tree->sw = NULL;
       tree->se = NULL;
-      
+
       tree->annotation.token = target->token;
     }
   }
@@ -1201,7 +1201,7 @@ void get_next
       TRY_E()
       TRY_SE()
       TRY_S()
-      *next_dir = d_NULL;
+      *next_dir = d_UNDEF;
       PRINT0("not found: nw");
       break;
     }
@@ -1215,7 +1215,7 @@ void get_next
       TRY_S()
       TRY_SW()
       TRY_W()
-      *next_dir = d_NULL;
+      *next_dir = d_UNDEF;
       PRINT0("not found: w");
       break;
     }
@@ -1229,7 +1229,7 @@ void get_next
       TRY_S()
       TRY_SW()
       TRY_W()
-      *next_dir = d_NULL;
+      *next_dir = d_UNDEF;
       PRINT0("not found: nw");
       break;
     }
@@ -1243,7 +1243,7 @@ void get_next
       TRY_W()
       TRY_NW()
       TRY_N()
-      *next_dir = d_NULL;
+      *next_dir = d_UNDEF;
       PRINT0("not found: e");
       break;
     }
@@ -1257,7 +1257,7 @@ void get_next
       TRY_W()
       TRY_NW()
       TRY_N()
-      *next_dir = d_NULL;
+      *next_dir = d_UNDEF;
       PRINT0("not found: se");
       break;
     }
@@ -1271,7 +1271,7 @@ void get_next
       TRY_N()
       TRY_NE()
       TRY_E()
-      *next_dir = d_NULL;
+      *next_dir = d_UNDEF;
       PRINT0("not found: s");
       break;
     }
@@ -1285,7 +1285,7 @@ void get_next
       TRY_N()
       TRY_NE()
       TRY_E()
-      *next_dir = d_NULL;
+      *next_dir = d_UNDEF;
       PRINT0("not found: sw");
       break;
     }
@@ -1299,12 +1299,12 @@ void get_next
       TRY_E()
       TRY_SE()
       TRY_S()
-      *next_dir = d_NULL;
+      *next_dir = d_UNDEF;
       PRINT0("not found: w");
       break;
     }
     default:
-      *next_dir = d_NULL;
+      *next_dir = d_UNDEF;
       PRINT0("wrong direction!");
   }
 }
@@ -1545,7 +1545,7 @@ result quad_forest_get_segment_boundary
         default: ;
           /*PRINT1("incorrect next_dir: %d", next_dir);*/
       }
-      if (next_dir == d_NULL) break;
+      if (next_dir == d_UNDEF) break;
       tree = next_tree;
       prev_dir = next_dir;
     } while (tree != end_tree);

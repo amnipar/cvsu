@@ -210,15 +210,28 @@ smoothed_gradient *has_smoothed_gradient
 /* link measure structures and functions                                      */
 /******************************************************************************/
 
+/**
+ * Defines categories for link directions relative to edge direction.
+ * Links may go in parallel or perpendicular direction relative to edge.
+ * Parallel links may go towards or against the edge direction.
+ * Perpendicular links may go left or right relative to the edge direction.
+ * There is a two-level hierarchy for grouping the categories.
+ *
+ * Following macros are available for checking the top-level category:
+ * IS_PARALLEL, IS_PERPENDICULAR
+ */
 typedef enum link_category_t {
-  bl_UNDEF = 0,
-  bl_TOWARDS,
-  bl_AGAINST,
-  bl_LEFT,
-  bl_RIGHT,
-  bl_PARALLEL,
-  bl_PERPENDICULAR
+  bl_UNDEF         = 0b00000000,
+  bl_TOWARDS       = 0b00010001, /* parallel */
+  bl_AGAINST       = 0b00010010, /* parallel */
+  bl_LEFT          = 0b00100100, /* perpendicular */
+  bl_RIGHT         = 0b00101000, /* perpendicular */
+  bl_PARALLEL      = 0b00010000,
+  bl_PERPENDICULAR = 0b00100000
 } link_category;
+
+#define IS_PARALLEL(expr) (((expr) & bl_PARALLEL) != 0)
+#define IS_PERPENDICULAR(expr) (((expr) & bl_PERPENDICULAR) != 0)
 
 /******************************************************************************/
 
@@ -480,6 +493,15 @@ segment_message *has_segment_message
 );
 
 /******************************************************************************/
+
+result expect_segment_message
+(
+  typed_pointer *tptr,
+  segment_message **smsg,
+  uint32 token
+);
+
+/******************************************************************************/
 /* boundary structures and functions                                          */
 /******************************************************************************/
 
@@ -523,7 +545,9 @@ typedef struct boundary_t {
   /** Length of the boundary fragment in nodes */
   uint32 length;
   /** Average curvature (change in direction) between nodes */
-  integral_value curvature;
+  integral_value curvature_mean;
+  /** Sum of curvatures for calculating the mean */
+  integral_value curvature_sum;
   /** Direction in the beginning of the boundary fragment */
   integral_value dir_a;
   /** Direction in the end of the fragment */
@@ -571,7 +595,8 @@ boundary *has_boundary
 result quad_tree_ensure_boundary
 (
   struct quad_tree_t *tree,
-  boundary **output_boundary
+  boundary **output_boundary,
+  edge_links *elinks
 );
 
 /******************************************************************************/

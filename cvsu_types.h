@@ -78,40 +78,54 @@ typedef uint32 truth_value;
 #endif
 #define TRUE ((truth_value) +1)
 
+/**
+ * Defines directions and direction categories.
+ * Each direction belongs to multiple catetories that may be useful.
+ *
+ * Following macros are available for checking the categories:
+ * IS_H, IS_V, IS_R, IS_F, IS_N4, IS_N8
+ */
 typedef enum direction_t {
   /** Unspecified direction */
-  d_NULL = 0,
+  d_UNDEF = 0,
   /** Direction north / up */
-  d_N,
+  d_N  = 0b0011001000000001, /* N8 + N4 + V + N */
   /** Direction northeast / up&right */
-  d_NE,
+  d_NE = 0b0010010000000010, /* N8 + R + NE */
   /** Direction east / right */
-  d_E,
+  d_E  = 0b0011000100000100, /* N8 + N4 + H + E */
   /** Direction southeast / down&right */
-  d_SE,
+  d_SE = 0b0010100000001000, /* N8 + F + SE */
   /** Direction south / down */
-  d_S,
+  d_S  = 0b0011001000010000, /* N8 + N4 + V + S */
   /** Direction southwest / down&left */
-  d_SW,
+  d_SW = 0b0010010000100000, /* N8 + R + SW */
   /** Direction west / left */
-  d_W,
+  d_W  = 0b0011000101000000, /* N8 + N4 + H + W */
   /** Direction northwest / up&left */
-  d_NW,
+  d_NW = 0b0010100010000000, /* N8 + F + NW */
   /** Combined horizontal directions (E+W) */
-  d_H,
+  d_H  = 0b0000000100000000,
   /** Combined vertical directions (N+S) */
-  d_V,
+  d_V  = 0b0000001000000000,
   /** Combined 'rising' directions (SW+NE) */
-  d_R,
+  d_R  = 0b0000010000000000,
   /** Combined 'falling' directions (NW+SE) */
-  d_F,
+  d_F  = 0b0000100000000000,
   /** Combined 4-neighborhood directions (N+E+S+W) */
-  d_N4,
+  d_N4 = 0b0001000000000000,
   /** Combined 8-neighborhood directions */
-  d_N8,
+  d_N8 = 0b0010000000000000,
   /** Mid-range 6-neighborhood directions */
-  d_N6
+  d_N6 = 0b0100000000000000
 } direction;
+
+#define IS_H(expr) (((expr) & d_H) != 0)
+#define IS_V(expr) (((expr) & d_V) != 0)
+#define IS_R(expr) (((expr) & d_R) != 0)
+#define IS_F(expr) (((expr) & d_F) != 0)
+#define IS_N4(expr) (((expr) & d_N4) != 0)
+#define IS_N8(expr) (((expr) & d_N8) != 0)
 
 typedef sint32 coord;
 

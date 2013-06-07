@@ -52,6 +52,7 @@ string expect_edge_links_name = "expect_edge_links";
 string ensure_boundary_potential_name = "ensure_boundary_potential";
 string ensure_boundary_message_name = "ensure_boundary_message";
 string ensure_segment_message_name = "ensure_segment_message";
+string expect_segment_message_name = "expect_segment_message";
 string ensure_segment_potential_name = "ensure_segment_potential";
 string expect_segment_potential_name = "expect_segment_potential";
 
@@ -319,6 +320,26 @@ segment_message *has_segment_message
     }
   }
   return NULL;
+}
+
+result expect_segment_message
+(
+  typed_pointer *tptr,
+  segment_message **smsg,
+  uint32 token
+)
+{
+  TRY();
+
+  CHECK_POINTER(smsg);
+
+  *smsg = has_segment_message(tptr, token);
+  if (*smsg == NULL) {
+    ERROR(NOT_FOUND);
+  }
+
+  FINALLY(expect_segment_message);
+  RETURN();
 }
 
 /******************************************************************************/
@@ -795,11 +816,13 @@ boundary *has_boundary
 result quad_tree_ensure_boundary
 (
   quad_tree *input_tree,
-  boundary **output_boundary
+  boundary **output_boundary,
+  edge_links *elinks
 )
 {
   TRY();
   typed_pointer *annotation, *new_pointer;
+  integral_value curvature;
 
   CHECK_POINTER(input_tree);
 
@@ -818,16 +841,27 @@ result quad_tree_ensure_boundary
     tree_boundary = (boundary*)new_pointer->value;
     /* one-tree segment is it's own parent, and has the rank of 0 */
     tree_boundary->parent = tree_boundary;
-    tree_boundary->category = fc_UNDEF;
+    curvature = elinks->curvature;
+    if (curvature < 0.1) {
+      tree_boundary->category = fc_STRAIGHT;
+    }
+    else
+    if (curvature > M_PI_2) {
+      tree_boundary->category = fc_CORNER;
+    }
+    else {
+      tree_boundary->category = fc_CURVED;
+    }
     tree_boundary->rank = 0;
     tree_boundary->x1 = input_tree->x;
     tree_boundary->y1 = input_tree->y;
     tree_boundary->x2 = input_tree->x + input_tree->size - 1;
     tree_boundary->y2 = input_tree->y + input_tree->size - 1;
     tree_boundary->length = 1;
-    tree_boundary->curvature = 0;
-    tree_boundary->dir_a = 0;
-    tree_boundary->dir_b = 0;
+    tree_boundary->curvature_mean = curvature;
+    tree_boundary->curvature_sum = curvature;
+    tree_boundary->dir_a = elinks->against_angle;
+    tree_boundary->dir_b = elinks->towards_angle;
     tree_boundary->hypotheses = NULL;
 
     if (output_boundary != NULL) {
@@ -865,6 +899,13 @@ void boundary_union
           input_boundary_1->y2 : input_boundary_2->y2;
 
       input_boundary_2->length += input_boundary_1->length;
+      if (input_boundary_1->category != input_boundary_2->category) {
+        input_boundary_2->category = fc_CLUTTER;
+      }
+      input_boundary_2->curvature_sum += input_boundary_1->curvature_sum;
+      input_boundary_2->curvature_mean = input_boundary_2->curvature_sum /
+          ((integral_value)input_boundary_2->length);
+      input_boundary_2->dir_a = input_boundary_1->dir_a;
     }
     else {
       input_boundary_2->parent = input_boundary_1;
@@ -885,6 +926,12 @@ void boundary_union
           input_boundary_1->y2 : input_boundary_2->y2;
 
       input_boundary_1->length += input_boundary_2->length;
+      if (input_boundary_1->category != input_boundary_2->category) {
+        input_boundary_1->category = fc_CLUTTER;
+      }
+      input_boundary_1->curvature_sum += input_boundary_2->curvature_sum;
+      input_boundary_1->curvature_mean = input_boundary_1->curvature_sum / input_boundary_1->length;
+      input_boundary_1->dir_b = input_boundary_1->dir_b;
     }
   }
 }
@@ -1033,22 +1080,21 @@ result quad_tree_ensure_segment
 {
   TRY();
   typed_pointer *annotation, *new_pointer;
+  segment *tree_segment;
 
   CHECK_POINTER(input_tree);
 
-  if (output_segment != NULL) {
-    *output_segment = NULL;
-  }
+  tree_segment = NULL;
 
   annotation = &input_tree->annotation;
   CHECK(ensure_has(annotation, t_segment, &new_pointer));
+  tree_segment = (segment*)new_pointer->value;
   /* proceed only if the segment hasn't been initialized yet in this frame */
   if (new_pointer->token != annotation->token) {
-    segment *tree_segment;
     /* still need to check also the parent? */
     /* if (tree_segment->parent == NULL) ?? */
     new_pointer->token = annotation->token;
-    tree_segment = (segment*)new_pointer->value;
+
     /* one-tree segment is its own parent, and has the rank of 0 */
     tree_segment->parent = tree_segment;
     tree_segment->rank = 0;
@@ -1058,10 +1104,9 @@ result quad_tree_ensure_segment
     tree_segment->y2 = input_tree->y + input_tree->size - 1;
     memory_copy((data_pointer)&tree_segment->stat,
                 (data_pointer)&input_tree->stat, 1, sizeof(statistics));
-
-    if (output_segment != NULL) {
-      *output_segment = tree_segment;
-    }
+  }
+  if (output_segment != NULL) {
+    *output_segment = tree_segment;
   }
 
   FINALLY(quad_tree_ensure_segment);

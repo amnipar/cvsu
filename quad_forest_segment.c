@@ -34,6 +34,7 @@
 #include "cvsu_pixel_image.h"
 #include "cvsu_opencv.h"
 #include "cvsu_quad_forest.h"
+#include "cvsu_segmentation.h"
 
 string main_name = "quad_forest_segment";
 
