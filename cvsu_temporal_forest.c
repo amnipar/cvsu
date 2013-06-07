@@ -201,7 +201,7 @@ result temporal_forest_update
   integral_value mean1, mean2, dev1, dev2, dev;
   quad_forest *forest1, *forest2;
   quad_tree *tree1, *tree2;
-  quad_forest_segment *parent, *neighbor_parent;
+  segment *parent, *neighbor_parent;
 
   CHECK_POINTER(target);
   CHECK_POINTER(source);
@@ -211,8 +211,9 @@ result temporal_forest_update
     target->current = 0;
   }
   CHECK(pixel_image_copy(target->forests[target->current].source, source));
-  CHECK(quad_forest_update(&target->forests[target->current]));
   target->frames++;
+  target->forests[target->current].token = target->frames;
+  CHECK(quad_forest_update(&target->forests[target->current]));
   if (target->frames > 1) {
     if (target->current == 0) {
       forest1 = &target->forests[target->count - 1];
@@ -222,7 +223,7 @@ result temporal_forest_update
     }
     forest2 = &target->forests[target->current];
 
-    forest2->token = target->frames;
+    /*forest2->token = target->frames;*/
     /*CHECK(quad_forest_calculate_neighborhood_stats(forest2, TRUE, 2, TRUE, FALSE, TRUE));*/
     /*CHECK(quad_forest_calculate_accumulated_regs(forest2, 5));*/
     CHECK(quad_forest_parse(forest2, 5, FALSE));
@@ -376,7 +377,7 @@ result temporal_forest_visualize
   list_item *trees, *end;
   quad_forest *forest;
   quad_tree *tree;
-  quad_forest_segment *parent;
+  segment *parent;
   uint32 x, y, width, height, stride, row_step;
   byte *target_data, *target_pos, color0, color1, color2;
   list lines;
@@ -504,7 +505,7 @@ uint32 temporal_forest_segment_count
 result temporal_forest_get_segments
 (
   temporal_forest *forest,
-  quad_forest_segment **segments
+  segment **segments
 )
 {
   TRY();
@@ -520,13 +521,13 @@ result temporal_forest_get_segments
 result temporal_forest_get_segment_boundary
 (
   temporal_forest *forest,
-  quad_forest_segment *segment,
-  list *boundary
+  segment *input_segment,
+  list *boundary_list
 )
 {
   TRY();
 
-  CHECK(quad_forest_get_segment_boundary(temporal_forest_get_current(forest), segment, boundary));
+  CHECK(quad_forest_get_segment_boundary(temporal_forest_get_current(forest), input_segment, boundary_list));
 
   FINALLY(temporal_forest_get_segment_boundary);
   RETURN();

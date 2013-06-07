@@ -120,14 +120,14 @@ uint32 temporal_forest_segment_count
 result temporal_forest_get_segments
 (
   temporal_forest *forest,
-  quad_forest_segment **segments
+  segment **segments
 );
 
 result temporal_forest_get_segment_boundary
 (
   temporal_forest *forest,
-  quad_forest_segment *segment,
-  list *boundary
+  segment *input_segment,
+  list *boundary_list
 );
 
 #ifdef __cplusplus
