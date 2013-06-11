@@ -283,8 +283,8 @@ result ensure_segment_message
   message = (segment_message*)tptr->value;
   if (tptr->token != token) {
     tptr->token = token;
-    message->round = 0;
     message->extent = 0;
+    message->echo = FALSE;
     message->strength_diff = strength_diff;
   }
   *smsg = message;
@@ -642,11 +642,12 @@ result ensure_boundary_potential
   potential = (boundary_potential*)tptr->value;
   if (tptr->token != token) {
     tptr->token = token;
-    potential->round = 0;
     potential->length = 0;
-    potential->strength_score = 0;
-    potential->angle_score = 0;
-    potential->straightness_score = 0;
+    potential->angle = 0;
+    potential->curvature = 0;
+    potential->acc_angle = 0;
+    potential->parent = NULL;
+    potential->prev = NULL;
     /*bpot->profile_score = 0;*/
   }
   *bpot = potential;
@@ -842,7 +843,7 @@ result quad_tree_ensure_boundary
     /* one-tree segment is it's own parent, and has the rank of 0 */
     tree_boundary->parent = tree_boundary;
     curvature = elinks->curvature;
-    if (curvature < 0.1) {
+    if (curvature < 0.2) {
       tree_boundary->category = fc_STRAIGHT;
     }
     else
@@ -1164,6 +1165,16 @@ void segment_union
       if (variance < 0) variance = 0;
       stat->variance = variance;
       stat->deviation = sqrt(variance);
+      
+      if (input_segment_1->extent > input_segment_2->extent) {
+        input_segment_2->extent = input_segment_1->extent;
+      }
+      if (input_segment_2->extent < 3) {
+        input_segment_2->category = sc_CLUTTER;
+      }
+      else {
+        input_segment_2->category = sc_FOREGROUND;
+      }
     }
     else {
       input_segment_2->parent = input_segment_1;
@@ -1194,6 +1205,16 @@ void segment_union
       if (variance < 0) variance = 0;
       stat->variance = variance;
       stat->deviation = sqrt(variance);
+      
+      if (input_segment_2->extent > input_segment_1->extent) {
+        input_segment_1->extent = input_segment_2->extent;
+      }
+      if (input_segment_1->extent < 3) {
+        input_segment_1->category = sc_CLUTTER;
+      }
+      else {
+        input_segment_1->category = sc_FOREGROUND;
+      }
     }
   }
 }

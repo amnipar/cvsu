@@ -1722,6 +1722,7 @@ result quad_forest_get_links
   }
   else
   if (mode == v_LINK_STRENGTH) {
+    /*
     quad_tree_link_head *head;
     boundary_potential *bstrength;
     integral_value radius, max_strength;
@@ -1796,6 +1797,7 @@ result quad_forest_get_links
       }
       items = items->next;
     }
+   */ 
   }
   else
   if (mode == v_LINK_EDGE) {

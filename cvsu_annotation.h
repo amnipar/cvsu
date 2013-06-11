@@ -387,12 +387,12 @@ ridge_potential *has_ridge_potential
 /******************************************************************************/
 
 typedef struct boundary_potential_t {
-  uint32 round;
   uint32 length;
-  integral_value strength_score;
-  integral_value angle_score;
-  integral_value straightness_score;
-  /*integral_value profile_score;*/
+  integral_value angle;
+  integral_value curvature;
+  integral_value acc_angle;
+  struct boundary_t *parent;
+  struct boundary_potential_t *prev;
 } boundary_potential;
 
 /******************************************************************************/
@@ -462,8 +462,8 @@ boundary_message *has_boundary_message
 /******************************************************************************/
 
 typedef struct segment_message_t {
-  uint32 round;
   uint32 extent;
+  truth_value echo;
   integral_value strength_diff;
 } segment_message;
 
