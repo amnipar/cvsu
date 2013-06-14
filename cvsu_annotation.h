@@ -512,6 +512,7 @@ result expect_segment_message
  */
 typedef enum boundary_category_t {
   fc_UNDEF = 0,
+  fc_UNKNOWN,
   fc_STRAIGHT,
   fc_CURVED,
   fc_CORNER,
@@ -589,10 +590,31 @@ boundary *has_boundary
 /******************************************************************************/
 
 /**
- * Ensures that the tree has a boundary fragment annotation, and initializes it.
+ * Ensures that the tree has a boundary fragment annotation, but does not init.
  * Part of the Union-Find implementation for boundary nodes.
  */
 result quad_tree_ensure_boundary
+(
+  struct quad_tree_t *tree,
+  boundary **output_boundary
+);
+
+/**
+ * Initializing the boundary values needs to be separated from creating the
+ * boundary fragment structure, since the final values are not always known at
+ * the time of creating the structure. Remember to call this before trying to
+ * merge fragments.
+ */
+void boundary_init
+(
+  boundary *input_boundary,
+  edge_links *elinks
+);
+
+/**
+ * Ensures that the tree has a boundary fragment annotation, and initializes it.
+ */
+result quad_tree_boundary_init
 (
   struct quad_tree_t *tree,
   boundary **output_boundary,

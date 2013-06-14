@@ -57,6 +57,7 @@ string ensure_segment_potential_name = "ensure_segment_potential";
 string expect_segment_potential_name = "expect_segment_potential";
 
 string quad_tree_ensure_boundary_name = "quad_tree_ensure_boundary";
+string quad_tree_boundary_init_name = "quad_tree_boundary_init";
 string quad_tree_ensure_segment_name = "quad_tree_ensure_segment";
 
 /******************************************************************************/
@@ -817,13 +818,12 @@ boundary *has_boundary
 result quad_tree_ensure_boundary
 (
   quad_tree *input_tree,
-  boundary **output_boundary,
-  edge_links *elinks
+  boundary **output_boundary
 )
 {
   TRY();
   typed_pointer *annotation, *new_pointer;
-  integral_value curvature;
+  boundary *tree_boundary;
 
   CHECK_POINTER(input_tree);
 
@@ -833,44 +833,69 @@ result quad_tree_ensure_boundary
 
   annotation = &input_tree->annotation;
   CHECK(ensure_has(annotation, t_boundary, &new_pointer));
+  tree_boundary = (boundary*)new_pointer->value;
   /* proceed only if the boundary hasn't been initialized yet in this frame */
   if (new_pointer->token != annotation->token) {
-    boundary *tree_boundary;
     /* still need to check also the parent? */
     /* if (tree_boundary->parent == NULL) ?? */
     new_pointer->token = annotation->token;
-    tree_boundary = (boundary*)new_pointer->value;
     /* one-tree segment is it's own parent, and has the rank of 0 */
     tree_boundary->parent = tree_boundary;
-    curvature = elinks->curvature;
-    if (curvature < 0.2) {
-      tree_boundary->category = fc_STRAIGHT;
-    }
-    else
-    if (curvature > M_PI_2) {
-      tree_boundary->category = fc_CORNER;
-    }
-    else {
-      tree_boundary->category = fc_CURVED;
-    }
+    tree_boundary->category = fc_UNDEF;
     tree_boundary->rank = 0;
     tree_boundary->x1 = input_tree->x;
     tree_boundary->y1 = input_tree->y;
     tree_boundary->x2 = input_tree->x + input_tree->size - 1;
     tree_boundary->y2 = input_tree->y + input_tree->size - 1;
     tree_boundary->length = 1;
+    tree_boundary->curvature_mean = 0;
+    tree_boundary->curvature_sum = 0;
+    tree_boundary->dir_a = 0;
+    tree_boundary->dir_b = 0;
+    tree_boundary->hypotheses = NULL;
+  }
+
+  if (output_boundary != NULL) {
+    *output_boundary = tree_boundary;
+  }
+
+  FINALLY(quad_tree_ensure_boundary);
+  RETURN();
+}
+
+/******************************************************************************/
+
+void boundary_init
+(
+  boundary *input_boundary,
+  edge_links *elinks
+)
+{
+  integral_value curvature;
+  if (input_boundary != NULL && elinks != NULL && input_boundary->length <= 1) {
+    curvature = elinks->curvature;
+    /* for a fragment of one node, the category is still unknown. */
+    tree_boundary->category = fc_UNKNOWN;
     tree_boundary->curvature_mean = curvature;
     tree_boundary->curvature_sum = curvature;
     tree_boundary->dir_a = elinks->against_angle;
     tree_boundary->dir_b = elinks->towards_angle;
-    tree_boundary->hypotheses = NULL;
-
-    if (output_boundary != NULL) {
-      *output_boundary = tree_boundary;
-    }
   }
+}
 
-  FINALLY(quad_tree_ensure_boundary);
+/******************************************************************************/
+
+result quad_tree_boundary_init
+(
+  struct quad_tree_t *tree,
+  boundary **output_boundary,
+  edge_links *elinks
+)
+{
+  TRY();
+  CHECK(quad_tree_ensure_boundary(tree, output_boundary));
+  boundary_init(*output_boundary, elinks);
+  FINALLY(quad_tree_boundary_init);
   RETURN();
 }
 
@@ -882,6 +907,7 @@ void boundary_union
   boundary *input_boundary_2
 )
 {
+  integral_value total_curvature;
   if (input_boundary_1 != NULL && input_boundary_2 != NULL && input_boundary_1 != input_boundary_2) {
     if (input_boundary_1->rank < input_boundary_2->rank) {
       input_boundary_1->parent = input_boundary_2;
@@ -900,13 +926,17 @@ void boundary_union
           input_boundary_1->y2 : input_boundary_2->y2;
 
       input_boundary_2->length += input_boundary_1->length;
-      if (input_boundary_1->category != input_boundary_2->category) {
-        input_boundary_2->category = fc_CLUTTER;
-      }
       input_boundary_2->curvature_sum += input_boundary_1->curvature_sum;
       input_boundary_2->curvature_mean = input_boundary_2->curvature_sum /
           ((integral_value)input_boundary_2->length);
       input_boundary_2->dir_a = input_boundary_1->dir_a;
+      total_curvature = input_boundary_2->dir_a - input_boundary_2->dir_b;
+      if (total_curvature > 0.1) {
+        input_boundary_2->category = fc_CURVED
+      }
+      else {
+        input_boundary_2->category = fc_STRAIGHT;
+      }
     }
     else {
       input_boundary_2->parent = input_boundary_1;
@@ -927,12 +957,17 @@ void boundary_union
           input_boundary_1->y2 : input_boundary_2->y2;
 
       input_boundary_1->length += input_boundary_2->length;
-      if (input_boundary_1->category != input_boundary_2->category) {
-        input_boundary_1->category = fc_CLUTTER;
-      }
       input_boundary_1->curvature_sum += input_boundary_2->curvature_sum;
-      input_boundary_1->curvature_mean = input_boundary_1->curvature_sum / input_boundary_1->length;
-      input_boundary_1->dir_b = input_boundary_1->dir_b;
+      input_boundary_1->curvature_mean = input_boundary_1->curvature_sum /
+          ((integral_value)input_boundary_1->length);
+      input_boundary_1->dir_b = input_boundary_2->dir_b;
+      total_curvature = input_boundary_1->dir_a - input_boundary_1->dir_b;
+      if (total_curvature > 0.1) {
+        input_boundary_1->category = fc_CURVED
+      }
+      else {
+        input_boundary_1->category = fc_STRAIGHT;
+      }
     }
   }
 }
@@ -1165,7 +1200,7 @@ void segment_union
       if (variance < 0) variance = 0;
       stat->variance = variance;
       stat->deviation = sqrt(variance);
-      
+
       if (input_segment_1->extent > input_segment_2->extent) {
         input_segment_2->extent = input_segment_1->extent;
       }
@@ -1205,7 +1240,7 @@ void segment_union
       if (variance < 0) variance = 0;
       stat->variance = variance;
       stat->deviation = sqrt(variance);
-      
+
       if (input_segment_2->extent > input_segment_1->extent) {
         input_segment_1->extent = input_segment_2->extent;
       }
