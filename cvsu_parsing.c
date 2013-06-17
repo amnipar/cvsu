@@ -1570,7 +1570,7 @@ result quad_forest_parse
     if ((sum_left > -0.0001 && sum_right > 0.001) ||
         (sum_left > 0.001 && sum_right > -0.0001)) {
       /*CHECK(quad_tree_ensure_edge_links(forest, tree1, &elinks_tree, TRUE));*/
-      CHECK(quad_tree_ensure_boundary(tree1, &bfrag_tree, elinks_tree));
+      CHECK(quad_tree_ensure_boundary(tree1, &bfrag_tree));
       CHECK(list_append(&boundarylist, &tree1));
     }
     trees = trees->next;
@@ -1581,6 +1581,8 @@ result quad_forest_parse
     integral_value curvature_own, curvature_towards, curvature_against;
     integral_value distance, towards_score, towards_max, against_score, against_max;
     boundary *bfrag_towards, *bfrag_against, *bpar_tree, *bpar_towards, *bpar_against;
+    boundary *bfrag_new;
+    boundary_potential *bpot_towards, *bpot_against, *bpot_tree, *bpot_current;
 
     /* in the next phase, start propagating signals starting from boundary nodes */
     /* a number of message passing rounds are performed */
@@ -1596,7 +1598,8 @@ result quad_forest_parse
       while (trees != endtrees) {
         tree1 = *((quad_tree**)trees->data);
         bfrag_tree = has_boundary(&tree1->annotation, forest->token);
-        boundary_tree = has_boundary_potential(&tree1->annotation, forest->token);
+        bpar_tree = NULL;
+        bpot_tree = has_boundary_potential(&tree1->annotation, forest->token);
         /* after this, I have the best towards and against links in elinks */
         CHECK(quad_tree_ensure_edge_links(forest, tree1, &elinks_tree, TRUE));
         /*CHECK(expect_edge_links(&tree1->annotation, &elinks_tree, forest->token));*/
@@ -1610,100 +1613,160 @@ result quad_forest_parse
           CHECK(quad_tree_ensure_edge_links(forest, tree2, &elinks_towards, TRUE));
 
           bfrag_towards = has_boundary(&tree2->annotation, forest->token);
-          boundary_link2 = has_boundary_potential(&tree2->annotation, forest->token);
-
           /* if best link has boundary, check curvature */
           if (bfrag_towards != NULL) {
-            bpar_towards = boundary_find(bfrag_towards);
+            /* if tree doesn't have boundary, and best link isn't the parent, connect */
             if (bfrag_tree == NULL) {
               /* if fragment isn't there, potential should be; otherwise error */
-              CHECK_POINTER(boundary_tree);
-              CHECK(quad_tree_ensure_boundary(tree1, &bfrag_tree, elinks_tree));
+              CHECK_POINTER(bpot_tree);
+              /* encountered fragment from another chain, collapse to fragments */
+              if (bpot_tree->parent != bfrag_towards) {
+                CHECK(quad_tree_ensure_boundary(tree1, &bfrag_tree));
+              }
             }
           }
-          else
-          /* if best link doesn't have boundary, create boundary and add to list */
-          if (boundary_link2 == NULL) {
-            if (bfrag_tree != NULL) {
-              CHECK(ensure_boundary_potential(&tree2->annotation, &boundary_link2,
-                                              forest->token));
-              boundary_link2->parent = bfrag_tree;
-              boundary_link2->prev = NULL;
-              boundary_link2->length = 1;
-              boundary_link2->angle = elinks_tree->towards_angle;
-              boundary_link2->curvature = elinks_tree->curvature;
-              CHECK(list_append(&boundarylist, &tree2));
+          else {
+            bpot_towards = has_boundary_potential(&tree2->annotation, forest->token);
+            /* if best link doesn't have boundary, create boundary and add to list */
+            if (bpot_towards == NULL) {
+              /* if even tree doesn't have a fragment, add to chain */
+              if (bfrag_tree == NULL) {
+                /* if fragment isn't there, potential should be; otherwise error */
+                CHECK_POINTER(bpot_tree);
+                /* must not reach too far from established fragments */
+                if (bpot_tree->length < 3) {
+                  CHECK(ensure_boundary_potential(&tree2->annotation, &bpot_towards,
+                                                  forest->token));
+                  bpot_towards->parent = bpot_tree->parent;
+                  bpot_towards->prev = bpot_tree;
+                  bpot_towards->length = bpot_tree->length + 1;
+                  bpot_towards->angle = elinks_tree->towards_angle;
+                  bpot_towards->curvature = elinks_tree->curvature;
+                  CHECK(list_append(&boundarylist, &tree2));
+                }
+              }
+              /* if tree has a fragment, create a new chain starting from the tree */
+              else {
+                CHECK(ensure_boundary_potential(&tree2->annotation, &bpot_towards,
+                                                forest->token));
+                bpot_towards->parent = bfrag_tree;
+                bpot_towards->prev = NULL;
+                bpot_towards->length = 1;
+                bpot_towards->angle = elinks_tree->towards_angle;
+                bpot_towards->curvature = elinks_tree->curvature;
+                CHECK(list_append(&boundarylist, &tree2));
+              }
             }
-            else
-            if (boundary_tree != NULL && boundary_tree->length < 1) {
-              CHECK(ensure_boundary_potential(&tree2->annotation, &boundary_link2,
-                                              forest->token));
-              boundary_link2->parent = boundary_tree->parent;
-              boundary_link2->prev = boundary_tree;
-              boundary_link2->length = boundary_tree->length + 1;
-              boundary_link2->angle = elinks_tree->towards_angle;
-              boundary_link2->curvature = elinks_tree->curvature;
-              CHECK(list_append(&boundarylist, &tree2));
+            /* if best link has boundary, check is it from another fragment */
+            else {
+              if (bfrag_tree == NULL) {
+                /* if fragment isn't there, potential should be; otherwise error */
+                CHECK_POINTER(bpot_tree);
+                /* two potential chains meet, collapse both to fragments */
+                if (bpot_towards->parent != bpot_tree->parent) {
+                  CHECK(quad_tree_ensure_boundary(tree1, &bfrag_tree));
+                  CHECK(quad_tree_ensure_boundary(tree2, &bfrag_towards));
+                }
+              }
+              else {
+                /* meeting potential chain from another node, collapse to fragments */
+                if (bpot_towards->parent != bfrag_tree) {
+                  CHECK(quad_tree_ensure_boundary(tree2, &bfrag_towards));
+                }
+              }
             }
           }
         }
 
+        bfrag_against = NULL;
+        bpar_against = NULL;
         if (elinks_tree->against != NULL) {
           tree2 = elinks_tree->against->other->tree;
           CHECK(quad_tree_ensure_edge_links(forest, tree2, &elinks_against, TRUE));
 
           bfrag_against = has_boundary(&tree2->annotation, forest->token);
-          boundary_link2 = has_boundary_potential(&tree2->annotation, forest->token);
           /* if best link has boundary but tree doesn't, check if could add it */
           if (bfrag_against != NULL) {
             if (bfrag_tree == NULL) {
               /* if fragment isn't there, potential should be; otherwise error */
-              CHECK_POINTER(boundary_tree);
-              if (boundary_tree->parent != bfrag_against) {
+              CHECK_POINTER(bpot_tree);
+              if (bpot_tree->parent != bfrag_against) {
                 CHECK(quad_tree_ensure_boundary(tree1, &bfrag_tree));
               }
             }
           }
-          else
-          /* add boundary to tree if best link has potential with different parent */
-          /* if best link doesn't have boundary, create boundary and add to list */
-          if (boundary_link2 == NULL) {
-            if (bfrag_tree != NULL) {
-              CHECK(ensure_boundary_potential(&tree2->annotation, &boundary_link2,
-                                              forest->token));
-              boundary_link2->parent = bfrag_tree;
-              boundary_link2->prev = NULL;
-              boundary_link2->length = 1;
-              boundary_link2->angle = elinks_tree->against_angle;
-              boundary_link2->curvature = elinks_tree->curvature;
-              CHECK(list_append(&boundarylist, &tree2));
+          else {
+            bpot_against = has_boundary_potential(&tree2->annotation, forest->token);
+            /* add boundary to tree if best link has potential with different parent */
+            /* if best link doesn't have boundary, create boundary and add to list */
+            if (bpot_against == NULL) {
+              if (bfrag_tree == NULL) {
+                CHECK_POINTER(bpot_tree);
+                if (bpot_tree->length < 3) {
+                  CHECK(ensure_boundary_potential(&tree2->annotation, &bpot_against,
+                                                  forest->token));
+                  bpot_against->parent = bpot_tree->parent;
+                  bpot_against->prev = bpot_tree;
+                  bpot_against->length = bpot_tree->length + 1;
+                  bpot_against->angle = elinks_tree->against_angle;
+                  bpot_against->curvature = elinks_tree->curvature;
+                  CHECK(list_append(&boundarylist, &tree2));
+                }
+              }
+              else {
+                CHECK(ensure_boundary_potential(&tree2->annotation, &bpot_against,
+                                                forest->token));
+                bpot_against->parent = bfrag_tree;
+                bpot_against->prev = NULL;
+                bpot_against->length = 1;
+                bpot_against->angle = elinks_tree->against_angle;
+                bpot_against->curvature = elinks_tree->curvature;
+                CHECK(list_append(&boundarylist, &tree2));
+              }
             }
-            else
-            if (boundary_tree != NULL && boundary_tree->length < 1) {
-              CHECK(ensure_boundary_potential(&tree2->annotation, &boundary_link2,
-                                              forest->token));
-              boundary_link2->parent = boundary_tree->parent;
-              boundary_link2->prev = boundary_tree;
-              boundary_link2->length = boundary_tree->length + 1;
-              boundary_link2->angle = elinks_tree->against_angle;
-              boundary_link2->curvature = elinks_tree->curvature;
-              CHECK(list_append(&boundarylist, &tree2));
+            else {
+              if (bfrag_tree == NULL) {
+                CHECK_POINTER(bpot_tree);
+                if (bpot_against->parent != bpot_tree->parent) {
+                  CHECK(quad_tree_ensure_boundary(tree1, &bfrag_tree));
+                  CHECK(quad_tree_ensure_boundary(tree2, &bfrag_against));
+                }
+              }
+              else {
+                if (bpot_against->parent != bfrag_tree) {
+                  CHECK(quad_tree_ensure_boundary(tree2, &bfrag_against));
+                }
+              }
             }
           }
         }
-        /* make union with best neighbor fragment, remove list if checked both neighbors */
-        if (bfrag_tree->category == bfrag_link2->category) {
-          curvature_towards = elinks_towards->curvature;
-          towards_score = fabs(curvature_own - curvature_towards);
-          if (towards_score < 0.15) {
-            boundary_union(bfrag_tree, bfrag_link2);
+
+        if (bfrag_tree != NULL) {
+          bpar_tree = boundary_find(bfrag_tree);
+          if (bpar_tree->category == fc_UNDEF) {
+            boundary_init(bpar_tree, elinks_tree);
           }
-        }
-        if (bfrag_tree->category == bfrag_link2->category) {
-          curvature_against = elinks_against->curvature;
-          against_score = fabs(curvature_against - curvature_own);
-          if (against_score < 0.15) {
-            boundary_union(bfrag_link2, bfrag_tree);
+          if (bfrag_towards != NULL) {
+            bpar_towards = boundary_find(bfrag_towards);
+            if (bpar_towards->category == fc_UNDEF) {
+              boundary_init(bpar_towards, elinks_towards);
+            }
+            if (bpar_towards != bpar_tree) {
+              if (fabs(bpar_towards->curvature_mean - bpar_tree->curvature_mean) < 0.1) {
+                boundary_union(bpar_tree, bpar_towards);
+              }
+            }
+          }
+          if (bfrag_against != NULL) {
+            bpar_against = boundary_find(bfrag_against);
+            if (bpar_against->category == fc_UNDEF) {
+              boundary_init(bpar_against, elinks_against);
+            }
+            if (bpar_against != bpar_tree) {
+              if (fabs(bpar_against->curvature_mean - bpar_tree->curvature_mean) < 0.1) {
+                boundary_union(bpar_against, bpar_tree);
+              }
+            }
           }
         }
 

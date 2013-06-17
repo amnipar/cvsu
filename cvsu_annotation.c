@@ -875,11 +875,11 @@ void boundary_init
   if (input_boundary != NULL && elinks != NULL && input_boundary->length <= 1) {
     curvature = elinks->curvature;
     /* for a fragment of one node, the category is still unknown. */
-    tree_boundary->category = fc_UNKNOWN;
-    tree_boundary->curvature_mean = curvature;
-    tree_boundary->curvature_sum = curvature;
-    tree_boundary->dir_a = elinks->against_angle;
-    tree_boundary->dir_b = elinks->towards_angle;
+    input_boundary->category = fc_UNKNOWN;
+    input_boundary->curvature_mean = curvature;
+    input_boundary->curvature_sum = curvature;
+    input_boundary->dir_a = elinks->against_angle;
+    input_boundary->dir_b = elinks->towards_angle;
   }
 }
 
@@ -932,7 +932,7 @@ void boundary_union
       input_boundary_2->dir_a = input_boundary_1->dir_a;
       total_curvature = input_boundary_2->dir_a - input_boundary_2->dir_b;
       if (total_curvature > 0.1) {
-        input_boundary_2->category = fc_CURVED
+        input_boundary_2->category = fc_CURVED;
       }
       else {
         input_boundary_2->category = fc_STRAIGHT;
@@ -963,7 +963,7 @@ void boundary_union
       input_boundary_1->dir_b = input_boundary_2->dir_b;
       total_curvature = input_boundary_1->dir_a - input_boundary_1->dir_b;
       if (total_curvature > 0.1) {
-        input_boundary_1->category = fc_CURVED
+        input_boundary_1->category = fc_CURVED;
       }
       else {
         input_boundary_1->category = fc_STRAIGHT;
