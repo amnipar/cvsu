@@ -837,7 +837,7 @@ result quad_tree_ensure_boundary
   /* proceed only if the boundary hasn't been initialized yet in this frame */
   if (new_pointer->token != annotation->token) {
     /* still need to check also the parent? */
-    /* if (tree_boundary->parent == NULL) ?? */
+    /*if (tree_boundary->parent == NULL)*/
     new_pointer->token = annotation->token;
     /* one-tree segment is it's own parent, and has the rank of 0 */
     tree_boundary->parent = tree_boundary;
@@ -872,14 +872,19 @@ void boundary_init
 )
 {
   integral_value curvature;
-  if (input_boundary != NULL && elinks != NULL && input_boundary->length <= 1) {
-    curvature = elinks->curvature;
-    /* for a fragment of one node, the category is still unknown. */
-    input_boundary->category = fc_UNKNOWN;
-    input_boundary->curvature_mean = curvature;
-    input_boundary->curvature_sum = curvature;
-    input_boundary->dir_a = elinks->against_angle;
-    input_boundary->dir_b = elinks->towards_angle;
+  if (input_boundary != NULL && elinks != NULL) {
+    boundary *parent;
+    parent = boundary_find(input_boundary);
+    if (parent == input_boundary && parent->length <= 1) {
+      curvature = elinks->curvature;
+      /* for a fragment of one node, the category is still unknown. */
+      input_boundary->category = fc_UNKNOWN;
+      input_boundary->length = 1;
+      input_boundary->curvature_mean = curvature;
+      input_boundary->curvature_sum = curvature;
+      input_boundary->dir_a = elinks->against_angle;
+      input_boundary->dir_b = elinks->towards_angle;
+    }
   }
 }
 
@@ -907,66 +912,70 @@ void boundary_union
   boundary *input_boundary_2
 )
 {
+  boundary *parent_1, *parent_2;
+
+  parent_1 = boundary_find(input_boundary_1);
+  parent_2 = boundary_find(input_boundary_2);
   integral_value total_curvature;
-  if (input_boundary_1 != NULL && input_boundary_2 != NULL && input_boundary_1 != input_boundary_2) {
-    if (input_boundary_1->rank < input_boundary_2->rank) {
-      input_boundary_1->parent = input_boundary_2;
+  if (parent_1 != NULL && parent_2 != NULL && parent_1 != parent_2) {
+    if (parent_1->rank < parent_2->rank) {
+      parent_1->parent = parent_2;
 
       /* choose smaller of x1 (left) coordinates */
-      input_boundary_2->x1 = (input_boundary_1->x1 < input_boundary_2->x1) ?
-          input_boundary_1->x1 : input_boundary_2->x1;
+      parent_2->x1 = (parent_1->x1 < parent_2->x1) ?
+          parent_1->x1 : parent_2->x1;
       /* choose smaller of y1 (top) coordinates */
-      input_boundary_2->y1 = (input_boundary_1->y1 < input_boundary_2->y1) ?
-          input_boundary_1->y1 : input_boundary_2->y1;
+      parent_2->y1 = (parent_1->y1 < parent_2->y1) ?
+          parent_1->y1 : parent_2->y1;
       /* choose larger of x2 (right) coordinates */
-      input_boundary_2->x2 = (input_boundary_1->x2 > input_boundary_2->x2) ?
-          input_boundary_1->x2 : input_boundary_2->x2;
+      parent_2->x2 = (parent_1->x2 > parent_2->x2) ?
+          parent_1->x2 : parent_2->x2;
       /* choose larger of y2 (bottom) coordinates */
-      input_boundary_2->y2 = (input_boundary_1->y2 > input_boundary_2->y2) ?
-          input_boundary_1->y2 : input_boundary_2->y2;
+      parent_2->y2 = (parent_1->y2 > parent_2->y2) ?
+          parent_1->y2 : parent_2->y2;
 
-      input_boundary_2->length += input_boundary_1->length;
-      input_boundary_2->curvature_sum += input_boundary_1->curvature_sum;
-      input_boundary_2->curvature_mean = input_boundary_2->curvature_sum /
-          ((integral_value)input_boundary_2->length);
-      input_boundary_2->dir_a = input_boundary_1->dir_a;
-      total_curvature = input_boundary_2->dir_a - input_boundary_2->dir_b;
-      if (total_curvature > 0.1) {
-        input_boundary_2->category = fc_CURVED;
+      parent_2->length += parent_1->length;
+      parent_2->curvature_sum += parent_1->curvature_sum;
+      parent_2->curvature_mean = parent_2->curvature_sum /
+      ((integral_value)parent_2->length);
+      parent_2->dir_a = parent_1->dir_a;
+      total_curvature = angle_minus_angle(parent_2->dir_a, parent_2->dir_b);
+      if (fabs(total_curvature) > 0.15) {
+        parent_2->category = fc_CURVED;
       }
       else {
-        input_boundary_2->category = fc_STRAIGHT;
+        parent_2->category = fc_STRAIGHT;
       }
     }
     else {
-      input_boundary_2->parent = input_boundary_1;
-      if (input_boundary_1->rank == input_boundary_2->rank) {
-        input_boundary_1->rank += 1;
+      parent_2->parent = parent_1;
+      if (parent_1->rank == parent_2->rank) {
+        parent_1->rank += 1;
       }
       /* choose smaller of x1 (left) coordinates */
-      input_boundary_1->x1 = (input_boundary_1->x1 < input_boundary_2->x1) ?
-          input_boundary_1->x1 : input_boundary_2->x1;
+      parent_1->x1 = (parent_1->x1 < parent_2->x1) ?
+          parent_1->x1 : parent_2->x1;
       /* choose smaller of y1 (top) coordinates */
-      input_boundary_1->y1 = (input_boundary_1->y1 < input_boundary_2->y1) ?
-          input_boundary_1->y1 : input_boundary_2->y1;
+      parent_1->y1 = (parent_1->y1 < parent_2->y1) ?
+          parent_1->y1 : parent_2->y1;
       /* choose larger of x2 (right) coordinates */
-      input_boundary_1->x2 = (input_boundary_1->x2 > input_boundary_2->x2) ?
-          input_boundary_1->x2 : input_boundary_2->x2;
+      parent_1->x2 = (parent_1->x2 > parent_2->x2) ?
+          parent_1->x2 : parent_2->x2;
       /* choose larger of y2 (bottom) coordinates */
-      input_boundary_1->y2 = (input_boundary_1->y2 > input_boundary_2->y2) ?
-          input_boundary_1->y2 : input_boundary_2->y2;
+      parent_1->y2 = (parent_1->y2 > parent_2->y2) ?
+          parent_1->y2 : parent_2->y2;
 
-      input_boundary_1->length += input_boundary_2->length;
-      input_boundary_1->curvature_sum += input_boundary_2->curvature_sum;
-      input_boundary_1->curvature_mean = input_boundary_1->curvature_sum /
-          ((integral_value)input_boundary_1->length);
-      input_boundary_1->dir_b = input_boundary_2->dir_b;
-      total_curvature = input_boundary_1->dir_a - input_boundary_1->dir_b;
-      if (total_curvature > 0.1) {
-        input_boundary_1->category = fc_CURVED;
+      parent_1->length += parent_2->length;
+      parent_1->curvature_sum += parent_2->curvature_sum;
+      parent_1->curvature_mean = parent_1->curvature_sum /
+          ((integral_value)parent_1->length);
+      parent_1->dir_b = parent_2->dir_b;
+      total_curvature = angle_minus_angle(parent_1->dir_a, parent_1->dir_b);
+      if (fabs(total_curvature) > 0.15) {
+        parent_1->category = fc_CURVED;
       }
       else {
-        input_boundary_1->category = fc_STRAIGHT;
+        parent_1->category = fc_STRAIGHT;
       }
     }
   }

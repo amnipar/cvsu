@@ -1752,7 +1752,7 @@ result quad_forest_parse
               boundary_init(bpar_towards, elinks_towards);
             }
             if (bpar_towards != bpar_tree) {
-              if (fabs(bpar_towards->curvature_mean - bpar_tree->curvature_mean) < 0.1) {
+              if (fabs(bpar_towards->curvature_mean - bpar_tree->curvature_mean) < 0.15) {
                 boundary_union(bpar_tree, bpar_towards);
               }
             }
@@ -1763,7 +1763,7 @@ result quad_forest_parse
               boundary_init(bpar_against, elinks_against);
             }
             if (bpar_against != bpar_tree) {
-              if (fabs(bpar_against->curvature_mean - bpar_tree->curvature_mean) < 0.1) {
+              if (fabs(bpar_against->curvature_mean - bpar_tree->curvature_mean) < 0.15) {
                 boundary_union(bpar_against, bpar_tree);
               }
             }
@@ -1781,7 +1781,7 @@ result quad_forest_parse
           if (IS_PERPENDICULAR(measure_link1->category) && IS_N4(head1->link->category)) {
             tree2 = head1->other->tree;
             bfrag_link1 = has_boundary(&tree2->annotation, forest->token);
-            boundary_link1 = has_boundary(&tree2->annotation, forest->token);
+            boundary_link1 = has_boundary_potential(&tree2->annotation, forest->token);
             if (bfrag_link1 == NULL && boundary_link1 == NULL) {
               CHECK(ensure_segment_message(&head1->annotation, &smsg_link1,
                   forest->token, measure_link1->strength_score));
@@ -1915,16 +1915,17 @@ result quad_forest_visualize_parse_result
 )
 {
   TRY();
-  list links;
+  list links, frags;
   list_item *trees, *end;
   quad_tree *tree;
   neighborhood_stat *nstat;
   edge_response *eresp;
   ridge_potential *ridge1;
   boundary_potential *boundary1;
-  boundary *fragment1;
+  boundary *fragment1, *bparent;
   segment *segment1, *segment_parent;
-  uint32 x, y, width, height, stride, row_step;
+  colored_rect crect;
+  uint32 x, y, width, height, stride, row_step, frag_count;
   byte *target_data, *target_pos, color0, color1, color2;
   integral_value max_edge_mag, max_ridge_score, extent, max_extent;
 
@@ -1944,6 +1945,7 @@ result quad_forest_visualize_parse_result
 
   /*CHECK(pixel_image_clear(target));*/
   CHECK(list_create(&links, 1000, sizeof(weighted_line), 1));
+  CHECK(list_create(&frags, 1000, sizeof(colored_rect), 1));
 
   if (IS_TRUE(quad_forest_has_parse(forest))) {
     max_edge_mag = 0;
@@ -1982,6 +1984,35 @@ result quad_forest_visualize_parse_result
       }
       trees = trees->next;
     }
+
+    frag_count = 0;
+    srand(1234);
+    trees = forest->trees.first.next;
+    end = &forest->trees.last;
+    while (trees != end) {
+      tree = (quad_tree*)trees->data;
+      fragment1 = has_boundary(&tree->annotation, forest->token);
+      if (fragment1 != NULL) {
+        bparent = boundary_find(fragment1);
+        if (fragment1 == bparent) {
+          bparent->color[0] = (byte)(rand() % 256);
+          bparent->color[1] = (byte)(rand() % 256);
+          bparent->color[2] = (byte)(rand() % 256);
+          frag_count += 1;
+          if (bparent->length > 1) {
+            crect.left = bparent->x1;
+            crect.top = bparent->y1;
+            crect.right = bparent->x2;
+            crect.bottom = bparent->y2;
+            crect.color[0] = bparent->color[0];
+            crect.color[1] = bparent->color[1];
+            crect.color[2] = bparent->color[2];
+            CHECK(list_append(&frags, &crect));
+          }
+        }
+      }
+      trees = trees->next;
+    }
     /*PRINT1("max ridge score %.3f\n", max_ridge_score);*/
 
     trees = forest->trees.first.next;
@@ -2007,20 +2038,21 @@ result quad_forest_visualize_parse_result
         }
         else
         if (fragment1 != NULL) {
+          bparent = boundary_find(fragment1);
           color0 = (byte)(255 * 0);
-          if (fragment1->category == fc_STRAIGHT) {
+          if (bparent->category == fc_STRAIGHT) {
             color1 = (byte)(255 * 1);
           }
           else
-          if (fragment1->category == fc_CURVED) {
-            color1 = (byte)(255 * 0.75);
-          }
-          else
-          if (fragment1->category == fc_CORNER){
+          if (bparent->category == fc_CURVED) {
             color1 = (byte)(255 * 0.5);
           }
+          else
+          if (bparent->category == fc_CORNER) {
+            color1 = (byte)(255 * 0.0);
+          }
           else {
-            color1 = (byte)(255 * 0.25);
+            color1 = (byte)(255 * 0.0);
           }
           color2 = (byte)(255 * 0);
         }
@@ -2085,7 +2117,9 @@ result quad_forest_visualize_parse_result
       */
       /*CHECK(quad_tree_gradient_to_line(tree, &links));*/
       CHECK(pixel_image_draw_weighted_lines(target, &links, segment_color));
-
+      PRINT1("fragments found: %lu, ", frag_count);
+      PRINT1("frags in list: %lu\n", frags.count);
+      CHECK(pixel_image_draw_colored_rects(target, &frags));
       /*
       CHECK(list_clear(&links));
       CHECK(quad_forest_get_links(forest, &links, v_LINK_STRENGTH));
@@ -2096,6 +2130,7 @@ result quad_forest_visualize_parse_result
 
   FINALLY(quad_forest_visualize_parse_result);
   list_destroy(&links);
+  list_destroy(&frags);
   RETURN();
 }
 
