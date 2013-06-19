@@ -158,14 +158,22 @@ typedef struct rect_t {
   coord bottom;
 } rect;
 
+typedef struct colored_rect_t {
+  coord left;
+  coord right;
+  coord top;
+  coord bottom;
+  byte color[4];
+} colored_rect;
+
 typedef struct uncertain_rect_t {
   coord left;
-  coord left_uncertainty;
   coord right;
-  coord right_uncertainty;
   coord top;
-  coord top_uncertainty;
   coord bottom;
+  coord left_uncertainty;
+  coord right_uncertainty;
+  coord top_uncertainty;
   coord bottom_uncertainty;
 } uncertain_rect;
 

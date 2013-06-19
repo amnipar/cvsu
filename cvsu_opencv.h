@@ -111,6 +111,15 @@ result pixel_image_draw_rects
   uint32 count
 );
 
+/**
+ * Draw a list of colored rects over an image using OpenCV cvRectangle function.
+ */
+result pixel_image_draw_colored_rects
+(
+  pixel_image *source,
+  list *rects
+);
+
 #ifdef __cplusplus
 }
 #endif

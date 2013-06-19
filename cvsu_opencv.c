@@ -46,6 +46,7 @@ string pixel_image_write_to_file_name = "pixel_image_write_to_file";
 string pixel_image_draw_lines_name = "pixel_image_draw_lines";
 string pixel_image_draw_weighted_lines_name = "pixel_image_draw_weighted_lines";
 string pixel_image_draw_rects_name = "pixel_image_draw_rects";
+string pixel_image_draw_colored_rects_name = "pixel_image_draw_colored_rects";
 
 /******************************************************************************/
 
@@ -397,6 +398,46 @@ result pixel_image_draw_rects
   */
 
   FINALLY(pixel_image_draw_rects);
+  cvReleaseImageHeader(&dst);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result pixel_image_draw_colored_rects
+(
+  pixel_image *source,
+  list *rects
+)
+{
+  TRY();
+  IplImage *dst;
+  CvSize size;
+  list_item *items, *end;
+  colored_rect *this_rect;
+
+  CHECK_POINTER(source);
+  CHECK_POINTER(rects);
+  CHECK_PARAM(source->type == p_U8);
+  CHECK_PARAM(source->format == RGB);
+
+  size.width = (signed)source->width;
+  size.height = (signed)source->height;
+  dst = cvCreateImageHeader(size, IPL_DEPTH_8U, 3);
+  cvSetData(dst, source->data, (signed)source->stride);
+
+  items = rects->first.next;
+  end = &rects->last;
+  while (items != end) {
+    this_rect = (colored_rect*)items->data;
+    cvRectangle(dst,
+        cvPoint(this_rect->left, this_rect->top),
+        cvPoint(this_rect->right, this_rect->bottom),
+        cvScalar(this_rect->color[0],this_rect->color[1],this_rect->color[2],0), 2, 8, 0);
+    items = items->next;
+  }
+
+  FINALLY(pixel_image_draw_colored_rects);
   cvReleaseImageHeader(&dst);
   RETURN();
 }
