@@ -940,7 +940,7 @@ void boundary_union
       ((integral_value)parent_2->length);
       parent_2->dir_a = parent_1->dir_a;
       total_curvature = angle_minus_angle(parent_2->dir_a, parent_2->dir_b);
-      if (fabs(total_curvature) > 0.15) {
+      if (fabs(parent_2->curvature_mean) > 0.15) {
         parent_2->category = fc_CURVED;
       }
       else {
@@ -970,8 +970,8 @@ void boundary_union
       parent_1->curvature_mean = parent_1->curvature_sum /
           ((integral_value)parent_1->length);
       parent_1->dir_b = parent_2->dir_b;
-      total_curvature = angle_minus_angle(parent_1->dir_a, parent_1->dir_b);
-      if (fabs(total_curvature) > 0.15) {
+      /*total_curvature = angle_minus_angle(parent_1->dir_a, parent_1->dir_b);*/
+      if (fabs(parent_1->curvature_mean) > 0.15) {
         parent_1->category = fc_CURVED;
       }
       else {

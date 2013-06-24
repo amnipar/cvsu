@@ -1412,11 +1412,11 @@ result quad_forest_parse
   CHECK(list_create(&link_send, 1000, sizeof(quad_tree_link_head*), 1));
   CHECK(list_create(&link_recv, 1000, sizeof(quad_tree_link_head*), 1));
 
-  PRINT0("get neighborhood stats\n");
+  /*PRINT0("get neighborhood stats\n");*/
   CHECK(quad_forest_calculate_neighborhood_stats(forest));
 
   /* first find ridge candidate trees and get the edge links */
-  PRINT0("find ridge candidates\n");
+  /*PRINT0("find ridge candidates\n");*/
   trees = forest->trees.first.next;
   endtrees = &forest->trees.last;
   while (trees != endtrees) {
@@ -1511,7 +1511,7 @@ result quad_forest_parse
   /* in the next phase, include all neighbors of initial ridge nodes, that    */
   /* are on the same strength level or higher                                 */
   /* also add boundaries to a new list (?) */
-  PRINT0("get initial boundary fragments\n");
+  /*PRINT0("get initial boundary fragments\n");*/
   trees = ridgelist.first.next;
   endtrees = &ridgelist.last;
   while (trees != endtrees) {
@@ -1575,7 +1575,7 @@ result quad_forest_parse
     }
     trees = trees->next;
   }
-  PRINT0("starting main parse loop\n");
+  /*PRINT0("starting main parse loop\n");*/
   {
     uint32 max_extent, length;
     integral_value curvature_own, curvature_towards, curvature_against;
@@ -1589,10 +1589,10 @@ result quad_forest_parse
     /* it is important to avoid _loops_ in message passing */
     /* thus, nodes should not use information received from a node in the reply */
     for (i = 1; i <= rounds; i++) {
-      PRINT1("round %d\n", i);
+      /*PRINT1("round %d\n", i);*/
       /* boundary message loop */
       /* segment nodes are added to the link_send list here */
-      PRINT0("boundary message loop\n");
+      /*PRINT0("boundary message loop\n");*/
       trees = boundarylist.first.next;
       endtrees = &boundarylist.last;
       while (trees != endtrees) {
@@ -1614,20 +1614,21 @@ result quad_forest_parse
 
           bfrag_towards = has_boundary(&tree2->annotation, forest->token);
           /* if best link has boundary, check curvature */
-          if (bfrag_towards != NULL) {
+          /*if (bfrag_towards != NULL) {*/
             /* if tree doesn't have boundary, and best link isn't the parent, connect */
-            if (bfrag_tree == NULL) {
+            /*if (bfrag_tree == NULL) {*/
               /* if fragment isn't there, potential should be; otherwise error */
-              CHECK_POINTER(bpot_tree);
+              /*CHECK_POINTER(bpot_tree);*/
               /* encountered fragment from another chain, collapse to fragments */
-              if (bpot_tree->parent != bfrag_towards) {
-                CHECK(quad_tree_ensure_boundary(tree1, &bfrag_tree));
-              }
-            }
-          }
-          else {
+              /*if (bpot_tree->parent != bfrag_towards) {*/
+                /*CHECK(quad_tree_ensure_boundary(tree1, &bfrag_tree));*/
+              /*}*/
+            /*}*
+          /*}*/
+          /*else {*/
+          if (bfrag_towards == NULL) {
             bpot_towards = has_boundary_potential(&tree2->annotation, forest->token);
-            /* if best link doesn't have boundary, create boundary and add to list */
+            /* if best link doesn't have potential, create it and add to list */
             if (bpot_towards == NULL) {
               /* if even tree doesn't have a fragment, add to chain */
               if (bfrag_tree == NULL) {
@@ -1680,22 +1681,25 @@ result quad_forest_parse
 
         bfrag_against = NULL;
         bpar_against = NULL;
+        
         if (elinks_tree->against != NULL) {
           tree2 = elinks_tree->against->other->tree;
           CHECK(quad_tree_ensure_edge_links(forest, tree2, &elinks_against, TRUE));
 
           bfrag_against = has_boundary(&tree2->annotation, forest->token);
           /* if best link has boundary but tree doesn't, check if could add it */
+          /*
           if (bfrag_against != NULL) {
-            if (bfrag_tree == NULL) {
+            if (bfrag_tree == NULL) {*/
               /* if fragment isn't there, potential should be; otherwise error */
-              CHECK_POINTER(bpot_tree);
-              if (bpot_tree->parent != bfrag_against) {
-                CHECK(quad_tree_ensure_boundary(tree1, &bfrag_tree));
-              }
+              /*CHECK_POINTER(bpot_tree);
+              if (bpot_tree->parent != bfrag_against) {*/
+                /*CHECK(quad_tree_ensure_boundary(tree1, &bfrag_tree));*/
+              /*}
             }
           }
-          else {
+          else {*/
+          if (bfrag_against == NULL) {
             bpot_against = has_boundary_potential(&tree2->annotation, forest->token);
             /* add boundary to tree if best link has potential with different parent */
             /* if best link doesn't have boundary, create boundary and add to list */
@@ -1752,7 +1756,7 @@ result quad_forest_parse
               boundary_init(bpar_towards, elinks_towards);
             }
             if (bpar_towards != bpar_tree) {
-              if (fabs(bpar_towards->curvature_mean - bpar_tree->curvature_mean) < 0.15) {
+              if (fabs(bpar_towards->curvature_mean - bpar_tree->curvature_mean) < 0.2) {
                 boundary_union(bpar_tree, bpar_towards);
               }
             }
@@ -1763,7 +1767,7 @@ result quad_forest_parse
               boundary_init(bpar_against, elinks_against);
             }
             if (bpar_against != bpar_tree) {
-              if (fabs(bpar_against->curvature_mean - bpar_tree->curvature_mean) < 0.15) {
+              if (fabs(bpar_against->curvature_mean - bpar_tree->curvature_mean) < 0.2) {
                 boundary_union(bpar_against, bpar_tree);
               }
             }
@@ -1794,7 +1798,7 @@ result quad_forest_parse
       }
     }
     /* segment send loop */
-    PRINT0("segment send loop\n");
+    /*PRINT0("segment send loop\n");*/
     trees = link_send.first.next;
     endtrees = &link_send.last;
     while (trees != endtrees) {
@@ -1805,29 +1809,31 @@ result quad_forest_parse
       bfrag_link1 = has_boundary(&tree1->annotation, forest->token);
       boundary_link1 = has_boundary_potential(&tree1->annotation, forest->token);
 
-      if (IS_FALSE(smsg_link1->echo) && head2 != NULL) {
-        smsg_link2 = has_segment_message(&head2->other->annotation, forest->token);
-        /* encountered message from other direction, may echo back */
-        if (smsg_link2 != NULL) {
-          smsg_link1->extent = smsg_link1->extent + smsg_link2->extent;
-          smsg_link1->echo = TRUE;
-          smsg_link2->extent = smsg_link1->extent;
-          smsg_link2->echo = TRUE;
-          CHECK(list_prepend(&link_recv, &head2->other));
-          CHECK(list_prepend(&link_recv, &head1));
-        }
-        else {
-          /* if boundary not encountered, continue to propagate */
-          if (bfrag_link1 == NULL && boundary_link1 == NULL) {
-            CHECK(ensure_segment_message(&head2->annotation, &smsg_link2, forest->token, 0));
-            smsg_link2->extent = smsg_link1->extent + 1;
-            CHECK(list_append(&link_send, &head2));
-            CHECK(list_prepend(&link_recv, &head2));
-          }
-          /* encountered boundary and may echo back */
-          else {
+      if (head2 != NULL) {
+        if (IS_FALSE(smsg_link1->echo)) {
+          smsg_link2 = has_segment_message(&head2->other->annotation, forest->token);
+          /* encountered message from other direction, may echo back */
+          if (smsg_link2 != NULL) {
+            smsg_link1->extent = smsg_link1->extent + smsg_link2->extent;
             smsg_link1->echo = TRUE;
-            /*CHECK(list_prepend(&link_recv, &head1));*/
+            smsg_link2->extent = smsg_link1->extent;
+            smsg_link2->echo = TRUE;
+            CHECK(list_prepend(&link_recv, &head2->other));
+            CHECK(list_prepend(&link_recv, &head1));
+          }
+          else {
+            /* if boundary not encountered, continue to propagate */
+            if (bfrag_link1 == NULL && boundary_link1 == NULL) {
+              CHECK(ensure_segment_message(&head2->annotation, &smsg_link2, forest->token, 0));
+              smsg_link2->extent = smsg_link1->extent + 1;
+              CHECK(list_append(&link_send, &head2));
+              CHECK(list_prepend(&link_recv, &head2));
+            }
+            /* encountered boundary and may echo back */
+            else {
+              smsg_link1->echo = TRUE;
+              /*CHECK(list_prepend(&link_recv, &head1));*/
+            }
           }
         }
       }
@@ -1842,7 +1848,7 @@ result quad_forest_parse
       trees = trees->next;
     }
 
-    PRINT0("segment recv loop\n");
+    /*PRINT0("segment recv loop\n");*/
     trees = link_recv.first.next;
     endtrees = &link_recv.last;
     while (trees != endtrees) {
@@ -1863,7 +1869,7 @@ result quad_forest_parse
   } /* propagation loop frame */
 
   /* final belief accumulation loop */
-  PRINT0("belief accumulation loop\n");
+  /*PRINT0("belief accumulation loop\n");*/
   /* maybe loop through all nodes? or add all neighbors not considered yet? */
   /*
   trees = forest->trees.first.next;
@@ -2024,7 +2030,7 @@ result quad_forest_visualize_parse_result
         fragment1 = has_boundary(&tree->annotation, forest->token);
         boundary1 = has_boundary_potential(&tree->annotation, forest->token);
         segment1 = has_segment(&tree->annotation, forest->token);
-
+        /*
         if (segment1 != NULL) {
           segment_parent = segment_find(segment1);
           if (segment_parent->category == sc_CLUTTER) {
@@ -2037,6 +2043,7 @@ result quad_forest_visualize_parse_result
           color2 = (byte)(255 * 0);
         }
         else
+        */
         if (fragment1 != NULL) {
           bparent = boundary_find(fragment1);
           color0 = (byte)(255 * 0);
@@ -2055,6 +2062,11 @@ result quad_forest_visualize_parse_result
             color1 = (byte)(255 * 0.0);
           }
           color2 = (byte)(255 * 0);
+          /*
+          color0 = bparent->color[0];
+          color1 = bparent->color[1];
+          color2 = bparent->color[2];
+          */
         }
         else
         if (boundary1 != NULL) {
@@ -2068,7 +2080,7 @@ result quad_forest_visualize_parse_result
           color2 = (byte)(255 * 0);
         }
 
-        if (fragment1 != NULL) {
+        if (fragment1 != NULL /*&& bparent->length > 2*/) {
           width = tree->size;
           height = width;
           row_step = stride - 3 * width;
@@ -2116,10 +2128,12 @@ result quad_forest_visualize_parse_result
       }
       */
       /*CHECK(quad_tree_gradient_to_line(tree, &links));*/
+      /*
       CHECK(pixel_image_draw_weighted_lines(target, &links, segment_color));
       PRINT1("fragments found: %lu, ", frag_count);
       PRINT1("frags in list: %lu\n", frags.count);
       CHECK(pixel_image_draw_colored_rects(target, &frags));
+      */
       /*
       CHECK(list_clear(&links));
       CHECK(quad_forest_get_links(forest, &links, v_LINK_STRENGTH));
