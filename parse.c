@@ -194,19 +194,19 @@ int main(int argc, char *argv[])
       break;
     case m_NSTAT:
       PRINT0("parsing nstat...\n");
-      CHECK(quad_forest_calculate_neighborhood_stats(&forest));
+      CHECK(quad_forest_calculate_neighborhood_stats(&forest, FALSE));
       PRINT0("drawing image...\n");
       CHECK(quad_forest_visualize_neighborhood_stats(&forest, &dst_image, v_NSTAT));
       break;
     case m_OVERLAP:
       PRINT0("parsing overlap...\n");
-      CHECK(quad_forest_calculate_neighborhood_stats(&forest));
+      CHECK(quad_forest_calculate_neighborhood_stats(&forest, TRUE));
       PRINT0("drawing image...\n");
       CHECK(quad_forest_visualize_neighborhood_stats(&forest, &dst_image, v_OVERLAP));
       break;
     case m_STRENGTH:
       PRINT0("parsing strength...\n");
-      CHECK(quad_forest_calculate_neighborhood_stats(&forest));
+      CHECK(quad_forest_calculate_neighborhood_stats(&forest, FALSE));
       PRINT0("drawing image...\n");
       CHECK(quad_forest_visualize_neighborhood_stats(&forest, &dst_image, v_STRENGTH));
       break;

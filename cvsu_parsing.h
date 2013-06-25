@@ -74,7 +74,8 @@ result quad_forest_visualize_accumulated_stats
 
 result quad_forest_calculate_neighborhood_stats
 (
-  quad_forest *forest
+  quad_forest *forest,
+  truth_value with_overlap
 );
 
 typedef enum stat_visualization_mode_t {
