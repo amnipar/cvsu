@@ -87,7 +87,8 @@ result pixel_image_write_to_file
 result pixel_image_draw_lines
 (
   pixel_image *source,
-  list *lines
+  list *lines,
+  byte color[4]
 );
 
 /**
