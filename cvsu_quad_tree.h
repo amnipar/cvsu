@@ -257,7 +257,8 @@ result quad_tree_ensure_edge_response
 (
   struct quad_forest_t *forest,
   quad_tree *tree,
-  edge_response **eresp
+  edge_response **eresp,
+  truth_value use_max
 );
 
 /**

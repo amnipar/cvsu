@@ -155,6 +155,9 @@ typedef struct edge_response_t
   integral_value mag;
   integral_value ang;
   integral_value confidence;
+  uint32 hpeaks;
+  uint32 vpeaks;
+  integral_value peak_score;
 } edge_response;
 
 /******************************************************************************/
@@ -178,6 +181,14 @@ edge_response *has_edge_response
 (
   typed_pointer *tptr,
   uint32 token
+);
+
+/******************************************************************************/
+
+result expect_edge_response
+(
+  edge_response **eresp,
+  typed_pointer *tptr
 );
 
 /******************************************************************************/

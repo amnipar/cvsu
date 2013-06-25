@@ -750,25 +750,25 @@ result quad_tree_ensure_edge_response
 (
   quad_forest *forest,
   quad_tree *tree,
-  edge_response **eresp
+  edge_response **eresp,
+  truth_value use_max
 )
 {
   TRY();
-  uint32 box_width, box_length, row, col, endrow, endcol;
+  uint32 box_width, box_length, row, col, endrow, endcol, hpeaks, vpeaks;
   sint32 srow, scol;
-  integral_value hsum, vsum, ang;
+  integral_value hmax, hsum, vmax, vsum, ang, g_1, g_2, hold, vold;
   edge_response *resp;
   typed_pointer *tptr;
   INTEGRAL_IMAGE_2BOX_VARIABLES();
 
   CHECK_POINTER(forest);
   CHECK_POINTER(tree);
-  CHECK_POINTER(eresp);
 
-  *eresp = NULL;
   CHECK(ensure_has(&tree->annotation, t_edge_response, &tptr));
   resp = (edge_response*)tptr->value;
-  if (tptr->token != forest->token) {
+  if (tptr->token != tree->annotation.token) {
+    tptr->token = tree->annotation.token;
     box_width = tree->size;
     /* box length should be at least 4 to get proper result */
     box_length = (uint32)(getmax(((integral_value)box_width) / 2.0, 4.0));
@@ -779,25 +779,90 @@ result quad_tree_ensure_edge_response
       scol = ((signed)tree->x) - ((signed)box_length);
       endcol = ((unsigned)(scol + ((signed)box_width)));
       hsum = 0;
+      hpeaks = 0;
       /*printf("col %lu endcol %lu ", col, endcol);*/
       if (scol >= 0 && endcol + box_width + 1 <= forest->integral.width) {
-        col = ((unsigned)scol);
-        iA1 = I_1_data + tree->y * stride + col;
-        i2A1 = I_2_data + tree->y * stride + col;
-        while (col < endcol) {
-          sum1 = INTEGRAL_IMAGE_SUM_1();
-          sum2 = INTEGRAL_IMAGE_SUM_2();
-          sumsqr1 = INTEGRAL_IMAGE_SUMSQR_1();
-          sumsqr2 = INTEGRAL_IMAGE_SUMSQR_2();
-          g = edgel_fisher_signed(N, sum1, sum2, sumsqr1, sumsqr2);
-          hsum += g;
-          col++;
-          iA1++;
-          i2A1++;
+        if (IS_FALSE(use_max)) {
+          col = ((unsigned)scol);
+          iA1 = I_1_data + tree->y * stride + col;
+          i2A1 = I_2_data + tree->y * stride + col;
+          while (col < endcol) {
+            sum1 = INTEGRAL_IMAGE_SUM_1();
+            sum2 = INTEGRAL_IMAGE_SUM_2();
+            sumsqr1 = INTEGRAL_IMAGE_SUMSQR_1();
+            sumsqr2 = INTEGRAL_IMAGE_SUMSQR_2();
+            g = edgel_fisher_signed(N, sum1, sum2, sumsqr1, sumsqr2);
+            hsum += g;
+            col++;
+            iA1++;
+            i2A1++;
+          }
         }
+        else {
+          hold = 0;
+          hmax = 0;
+          g_2 = g_1 = 0;
+          col = ((unsigned)scol);
+          if (col > 1) {
+            col -= 1;
+          }
+          if (endcol + box_width + 2 < forest->integral.width) {
+            endcol += 1;
+          }
+
+          iA1 = I_1_data + tree->y * stride + col;
+          i2A1 = I_2_data + tree->y * stride + col;
+          while (col < endcol) {
+            sum1 = INTEGRAL_IMAGE_SUM_1();
+            sum2 = INTEGRAL_IMAGE_SUM_2();
+            sumsqr1 = INTEGRAL_IMAGE_SUMSQR_1();
+            sumsqr2 = INTEGRAL_IMAGE_SUMSQR_2();
+            g = edgel_fisher_signed(N, sum1, sum2, sumsqr1, sumsqr2);
+            hsum += g;
+            if (g < -0.000001) {
+              if (g_2 < 0 && g_1 < (g_2 - 0.1) && g_1 < (g - 0.1)) {
+                if (fabs(g_1) > fabs(hmax)) {
+                  if (fabs(hmax) > fabs(hold)) {
+                    hold = hmax;
+                  }
+                  hmax = g_1;
+                }
+                else {
+                  if (fabs(g_1) > fabs(hold)) {
+                    hold = g_1;
+                  }
+                }
+                hpeaks += 1;
+              }
+              g_2 = g_1;
+              g_1 = g;
+            }
+            else
+            if (g > 0.000001) {
+              if (g_2 > 0 && g_1 > (g_2 + 0.1) && g_1 > (g + 0.1)) {
+                if (fabs(g_1) > fabs(hmax)) {
+                  if (fabs(hmax) > fabs(hold)) {
+                    hold = hmax;
+                  }
+                  hmax = g_1;
+                }
+                else {
+                  if (fabs(g_1) > fabs(hold)) {
+                    hold = g_1;
+                  }
+                }
+                hpeaks += 1;
+              }
+              g_2 = g_1;
+              g_1 = g;
+            }
+            col++;
+            iA1++;
+            i2A1++;
+          }
+        }
+        hsum /= ((integral_value)box_width);
       }
-      hsum /= ((integral_value)box_width);
-      resp->dx = hsum;
     }
     /* calculate vertical cumulative gradient */
     {
@@ -805,36 +870,134 @@ result quad_tree_ensure_edge_response
       srow = ((signed)tree->y) - ((signed)box_length);
       endrow = ((unsigned)(srow + ((signed)box_width)));
       vsum = 0;
+      vpeaks = 0;
       /*printf("row %lu endrow %lu ", row, endrow);*/
       if (srow >= 0 && endrow + box_width + 1 <= forest->integral.height) {
-        row = ((unsigned)srow);
-        iA1 = I_1_data + row * stride + tree->x;
-        i2A1 = I_2_data + row * stride + tree->x;
-        while (row < endrow) {
-          sum1 = INTEGRAL_IMAGE_SUM_1();
-          sum2 = INTEGRAL_IMAGE_SUM_2();
-          sumsqr1 = INTEGRAL_IMAGE_SUMSQR_1();
-          sumsqr2 = INTEGRAL_IMAGE_SUMSQR_2();
-          g = edgel_fisher_signed(N, sum1, sum2, sumsqr1, sumsqr2);
-          vsum += g;
-          row++;
-          iA1 += stride;
-          i2A1 += stride;
+        if (IS_FALSE(use_max)) {
+          row = ((unsigned)srow);
+          iA1 = I_1_data + row * stride + tree->x;
+          i2A1 = I_2_data + row * stride + tree->x;
+          while (row < endrow) {
+            sum1 = INTEGRAL_IMAGE_SUM_1();
+            sum2 = INTEGRAL_IMAGE_SUM_2();
+            sumsqr1 = INTEGRAL_IMAGE_SUMSQR_1();
+            sumsqr2 = INTEGRAL_IMAGE_SUMSQR_2();
+            g = edgel_fisher_signed(N, sum1, sum2, sumsqr1, sumsqr2);
+            vsum += g;
+            row++;
+            iA1 += stride;
+            i2A1 += stride;
+          }
         }
+        else {
+          vold = 0;
+          vmax = 0;
+          g_2 = g_1 = 0;
+          row = ((unsigned)srow);
+          if (row > 1) {
+            row -= 1;
+          }
+          if (endrow + box_width + 2 < forest->integral.height) {
+            endrow += 1;
+          }
+
+          iA1 = I_1_data + row * stride + tree->x;
+          i2A1 = I_2_data + row * stride + tree->x;
+          while (row < endrow) {
+            sum1 = INTEGRAL_IMAGE_SUM_1();
+            sum2 = INTEGRAL_IMAGE_SUM_2();
+            sumsqr1 = INTEGRAL_IMAGE_SUMSQR_1();
+            sumsqr2 = INTEGRAL_IMAGE_SUMSQR_2();
+            g = edgel_fisher_signed(N, sum1, sum2, sumsqr1, sumsqr2);
+            vsum += g;
+            if (g < -0.000001) {
+              if (g_2 < 0 && g_1 < (g_2 - 0.1) && g_1 < (g - 0.1)) {
+                if (fabs(g_1) > fabs(vmax)) {
+                  if (fabs(vmax) > fabs(vold)) {
+                    vold = vmax;
+                  }
+                  vmax = g_1;
+                }
+                else {
+                  if (fabs(g_1) > fabs(vold)) {
+                    vold = g_1;
+                  }
+                }
+                vpeaks += 1;
+              }
+              g_2 = g_1;
+              g_1 = g;
+            }
+            else
+            if (g > 0.000001) {
+              if (g_2 > 0 && g_1 > (g_2 + 0.1) && g_1 > (g + 0.1)) {
+                if (fabs(g_1) > fabs(vmax)) {
+                  if (fabs(vmax) > fabs(vold)) {
+                    vold = vmax;
+                  }
+                  vmax = g_1;
+                }
+                else {
+                  if (fabs(g_1) > fabs(vold)) {
+                    vold = g_1;
+                  }
+                }
+                vpeaks += 1;
+              }
+              g_2 = g_1;
+              g_1 = g;
+            }
+            row++;
+            iA1 += stride;
+            i2A1 += stride;
+          }
+        }
+        vsum /= ((integral_value)box_width);
       }
-      vsum /= ((integral_value)box_width);
-      resp->dy = vsum;
     }
 
-    resp->mag = sqrt(hsum*hsum + vsum*vsum);
-    ang = atan2(-vsum, hsum);
-    if (ang < 0) ang = ang + 2 * M_PI;
-    resp->ang = ang;
+    if (IS_FALSE(use_max)) {
+      resp->dx = hsum;
+      resp->dy = vsum;
+      resp->mag = sqrt(hsum*hsum + vsum*vsum);
+      ang = atan2(-vsum, hsum);
+      if (ang < 0) ang = ang + 2 * M_PI;
+      resp->ang = ang;
+      resp->hpeaks = 0;
+      resp->vpeaks = 0;
+      resp->peak_score = 0;
+    }
+    else {
+      if ((hpeaks > 0) && (vpeaks > 0)) {
+        resp->dx = hmax;
+        resp->dy = vmax;
+        resp->mag = sqrt(hsum*hsum + vsum*vsum);
+        ang = atan2(-vsum, hsum);
+        if (ang < 0) ang = ang + 2 * M_PI;
+        resp->ang = ang;
+        resp->hpeaks = hpeaks;
+        resp->vpeaks = vpeaks;
+        resp->peak_score = (fabs((hmax - hold) / hmax) + fabs((vmax - vold) / vmax)) / 2;
 
-    tptr->token = forest->token;
+        /*PRINT1("peak score %.3f\n", resp->peak_score);*/
+      }
+      else {
+        resp->dx = hsum;
+        resp->dy = vsum;
+        resp->mag = sqrt(hsum*hsum + vsum*vsum);
+        ang = atan2(-vsum, hsum);
+        if (ang < 0) ang = ang + 2 * M_PI;
+        resp->ang = ang;
+        resp->hpeaks = 0;
+        resp->vpeaks = 0;
+        resp->peak_score = 0;
+      }
+    }
   }
 
-  *eresp = resp;
+  if (eresp != NULL) {
+    *eresp = resp;
+  }
 
   FINALLY(quad_tree_ensure_edge_response);
   RETURN();
@@ -952,7 +1115,7 @@ result quad_tree_edge_response_to_line
   CHECK_POINTER(lines);
 
   eresp = has_edge_response(&tree->annotation, forest->token);
-  if (eresp != NULL && eresp->mag > 0.001) {
+  if (eresp != NULL && eresp->mag > 1 && (eresp->hpeaks <= 2 && eresp->vpeaks <= 2)) {
     x = tree->x;
     y = tree->y;
     radius = ((integral_value)tree->size) / 2.0;

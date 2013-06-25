@@ -49,6 +49,7 @@ string ensure_link_measure_name = "ensure_link_measure";
 string expect_link_measure_name = "expect_link_measure";
 string ensure_edge_links_name = "ensure_edge_links";
 string expect_edge_links_name = "expect_edge_links";
+string expect_edge_response_name = "expect_edge_response";
 string ensure_boundary_potential_name = "ensure_boundary_potential";
 string ensure_boundary_message_name = "ensure_boundary_message";
 string ensure_segment_message_name = "ensure_segment_message";
@@ -590,6 +591,25 @@ edge_response *has_edge_response
     }
   }
   return NULL;
+}
+
+result expect_edge_response
+(
+  edge_response **eresp,
+  typed_pointer *tptr
+)
+{
+  TRY();
+
+  CHECK_POINTER(eresp);
+
+  *eresp = has_edge_response(tptr, tptr->token);
+  if (*eresp == NULL) {
+    ERROR(NOT_FOUND);
+  }
+
+  FINALLY(expect_edge_response);
+  RETURN();
 }
 
 /******************************************************************************/
