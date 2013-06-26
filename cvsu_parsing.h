@@ -92,6 +92,11 @@ result quad_forest_visualize_neighborhood_stats
   stat_visualization_mode smode
 );
 
+result quad_forest_calculate_edge_stats
+(
+  quad_forest *forest
+);
+
 /**
  * Uses deviation propagation to find potential segment boundaries.
  */
