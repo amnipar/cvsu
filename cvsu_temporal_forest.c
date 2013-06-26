@@ -407,13 +407,15 @@ result temporal_forest_visualize
   CHECK(convert_grey8_to_grey24(forest->source, &target->visual));
   */
 
-  /*CHECK(quad_forest_visualize_neighborhood_stats(forest, &target->visual, v_OVERLAP));*/
+
   /*CHECK(quad_forest_visualize_accumulated_regs(forest, &target->visual));*/
   if (image != NULL) {
     CHECK(quad_forest_visualize_parse_result(forest, image));
+    /*CHECK(quad_forest_visualize_neighborhood_stats(forest, image, v_STRENGTH));*/
   }
   else {
     CHECK(quad_forest_visualize_parse_result(forest, &target->visual));
+    /*CHECK(quad_forest_visualize_neighborhood_stats(forest, &target->visual, v_STRENGTH));*/
   }
   /*
   CHECK(list_create(&lines, 1000, sizeof(line), 1));
