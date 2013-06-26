@@ -109,9 +109,9 @@ typedef struct neighborhood_stat_t {
   integral_value dev_mean;
   integral_value dev_dev;
   integral_value strength;
-  integral_value strength_score;
-  integral_value ridge_score;
   integral_value overlap;
+  integral_value ridge_score;
+  integral_value ledge_score;
 } neighborhood_stat;
 
 /******************************************************************************/
@@ -232,13 +232,13 @@ smoothed_gradient *has_smoothed_gradient
  * IS_PARALLEL, IS_PERPENDICULAR
  */
 typedef enum link_category_t {
-  bl_UNDEF         = 0b00000000,
-  bl_TOWARDS       = 0b00010001, /* parallel */
-  bl_AGAINST       = 0b00010010, /* parallel */
-  bl_LEFT          = 0b00100100, /* perpendicular */
-  bl_RIGHT         = 0b00101000, /* perpendicular */
-  bl_PARALLEL      = 0b00010000,
-  bl_PERPENDICULAR = 0b00100000
+  bl_UNDEF         = 0x00, /* 00000000 */
+  bl_TOWARDS       = 0x11, /* 00010001, parallel */
+  bl_AGAINST       = 0x12, /* 00010010, parallel */
+  bl_LEFT          = 0x24, /* 00100100, perpendicular */
+  bl_RIGHT         = 0x28, /* 00101000, perpendicular */
+  bl_PARALLEL      = 0x10, /* 00010000 */
+  bl_PERPENDICULAR = 0x20, /* 00100000 */
 } link_category;
 
 #define IS_PARALLEL(expr) (((expr) & bl_PARALLEL) != 0)
@@ -248,11 +248,12 @@ typedef enum link_category_t {
 
 typedef struct link_measure_t {
   link_category category;
+  integral_value magnitude_score;
   integral_value strength_score;
-  /*integral_value magnitude_score;*/
   integral_value angle_score;
   integral_value straightness_score;
-  /*integral_value profile_score;*/
+  integral_value ridge_score;
+  integral_value ledge_score;
 } link_measure;
 
 /******************************************************************************/
