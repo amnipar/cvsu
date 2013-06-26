@@ -89,35 +89,35 @@ typedef enum direction_t {
   /** Unspecified direction */
   d_UNDEF = 0,
   /** Direction north / up */
-  d_N  = 0b0011001000000001, /* N8 + N4 + V + N */
+  d_N  = 0x3201, /* 0011001000000001, N8 + N4 + V + N */
   /** Direction northeast / up&right */
-  d_NE = 0b0010010000000010, /* N8 + R + NE */
+  d_NE = 0x2402, /* 0010010000000010, N8 + R + NE */
   /** Direction east / right */
-  d_E  = 0b0011000100000100, /* N8 + N4 + H + E */
+  d_E  = 0x3104, /* 0011000100000100, N8 + N4 + H + E */
   /** Direction southeast / down&right */
-  d_SE = 0b0010100000001000, /* N8 + F + SE */
+  d_SE = 0x2808, /* 0010100000001000, N8 + F + SE */
   /** Direction south / down */
-  d_S  = 0b0011001000010000, /* N8 + N4 + V + S */
+  d_S  = 0x3210, /* 0011001000010000, N8 + N4 + V + S */
   /** Direction southwest / down&left */
-  d_SW = 0b0010010000100000, /* N8 + R + SW */
+  d_SW = 0x2420, /* 0010010000100000, N8 + R + SW */
   /** Direction west / left */
-  d_W  = 0b0011000101000000, /* N8 + N4 + H + W */
+  d_W  = 0x3140, /* 0011000101000000, N8 + N4 + H + W */
   /** Direction northwest / up&left */
-  d_NW = 0b0010100010000000, /* N8 + F + NW */
+  d_NW = 0x2880, /* 0010100010000000, N8 + F + NW */
   /** Combined horizontal directions (E+W) */
-  d_H  = 0b0000000100000000,
+  d_H  = 0x0100, /* 0000000100000000 */
   /** Combined vertical directions (N+S) */
-  d_V  = 0b0000001000000000,
+  d_V  = 0x0200, /* 0000001000000000 */
   /** Combined 'rising' directions (SW+NE) */
-  d_R  = 0b0000010000000000,
+  d_R  = 0x0400, /* 0000010000000000 */
   /** Combined 'falling' directions (NW+SE) */
-  d_F  = 0b0000100000000000,
+  d_F  = 0x0800, /* 0000100000000000 */
   /** Combined 4-neighborhood directions (N+E+S+W) */
-  d_N4 = 0b0001000000000000,
+  d_N4 = 0x1000, /* 0001000000000000 */
   /** Combined 8-neighborhood directions */
-  d_N8 = 0b0010000000000000,
+  d_N8 = 0x2000, /* 0010000000000000 */
   /** Mid-range 6-neighborhood directions */
-  d_N6 = 0b0100000000000000
+  d_N6 = 0x4000  /* 0100000000000000 */
 } direction;
 
 #define IS_H(expr) (((expr) & d_H) != 0)
