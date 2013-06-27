@@ -916,36 +916,62 @@ result quad_forest_calculate_edge_stats
         /* calculate link measure using edge angle */
         angle1 = eresp->ang - M_PI_2;
         if (angle1 < 0) angle1 += M_2PI;
+        /* angle will be positive for left side, negative for right side */
         angle2 = head1->angle - angle1;
-        if (angle2 < 0) angle2 += M_2PI;
-        if (angle2 < M_PI_4) {
-          measure->category = bl_TOWARDS;
-          measure->angle_score = 1 - (angle2 / M_PI_2);
+        if (angle2 < -M_PI_2) {
+          angle2 = -M_PI - angle2;
+          if (angle2 < -M_PI_4) {
+            lmeasure1->category = bl_RIGHT;
+          }
+          else {
+            lmeasure1->category = bl_AGAINST;
+          }
         }
         else
-        if (angle2 < 3 * M_PI_4) {
-          measure->category = bl_LEFT;
-          measure->angle_score = 1 - (fabs(angle2 - M_PI_2) / M_PI_2);
-        }
-        else
-        if (angle2 < 5 * M_PI_4) {
-          measure->category = bl_AGAINST;
-          measure->angle_score = 1 - (fabs(angle2 - M_PI) / M_PI_2);
-        }
-        else
-        if (angle2 < 7 * M_PI_4) {
-          measure->category = bl_RIGHT;
-          measure->angle_score = 1 - (fabs(angle2 - 3 * M_PI_2) / M_PI_2);
+        if (angle2 > M_PI_2) {
+          angle2 = M_PI - angle2;
+          if (angle2 > M_PI_4) {
+            lmeasure1->category = bl_LEFT;
+          }
+          else {
+            lmeasure1->category = bl_AGAINST;
+          }
         }
         else {
-          measure->category = bl_TOWARDS;
-          measure->angle_score = 1 - (fabs(angle2 - 2 * M_PI) / M_PI_2);
+          if (angle2 > M_PI_4) {
+            lmeasure1->categoty = bl_LEFT;
+          }
+          else
+          if (angle2 < -M_PI_4) {
+            lmeasure1->category = bl_RIGHT;
+          }
+          else {
+            lmeasure1->category = bl_TOWARDS;
+          }
         }
+        /* angle score will be from -1 to 1; negative for right, positive for left */
+        lmeasure1->angle_score = angle2 / M_PI_2;
+
+
 
         head2 = head1->other;
         /* check if the other head of the link already has the measure */
         lmeasure2 = has_link_measure(&head2->annotation, forest->token);
         if (lmeasure2 != NULL) {
+          /* smaller angle score will decide the link category */
+          /* would need to consider also strength difference? */
+          if (lmeasure2->angle_score < lmeasure1->angle_score) {
+            if (lmeasure2->category == bl_AGAINST) {
+              lmeasure1->category = bl_TOWARDS;
+            }
+            else
+            if (lmeasure2->category == bl_TOWARDS) {
+              lmeasure1->category = bl_AGAINST;
+            }
+          }
+          else {
+
+          }
           link = head2->link;
           /* if it does, aggregate the stats into the link itself */
           CHECK(ensure_has(&link->annotation, t_link_measure, &tptr));

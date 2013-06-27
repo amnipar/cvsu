@@ -110,8 +110,10 @@ typedef struct neighborhood_stat_t {
   integral_value dev_dev;
   integral_value strength;
   integral_value overlap;
-  integral_value ridge_score;
-  integral_value ledge_score;
+  integral_value mean_ridge_score;
+  integral_value mean_ledge_score;
+  integral_value dev_ridge_score;
+  integral_value dev_ledge_score;
 } neighborhood_stat;
 
 /******************************************************************************/
@@ -251,9 +253,7 @@ typedef struct link_measure_t {
   integral_value magnitude_score;
   integral_value strength_score;
   integral_value angle_score;
-  integral_value straightness_score;
-  integral_value ridge_score;
-  integral_value ledge_score;
+  integral_value profile_score;
 } link_measure;
 
 /******************************************************************************/
