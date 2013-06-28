@@ -357,19 +357,23 @@ result ensure_link_measure
   typed_pointer *tptr;
   link_measure *measure;
 
-  CHECK_POINTER(lmeasure);
-  *lmeasure = NULL;
-
   CHECK(ensure_has(annotation, t_link_measure, &tptr));
   measure = (link_measure*)tptr->value;
   if (tptr->token != token) {
     tptr->token = token;
     measure->category = bl_UNDEF;
+    measure->magnitude_score = 0;
     measure->strength_score = 0;
     measure->angle_score = 0;
-    measure->straightness_score = 0;
+    measure->against_score = 0;
+    measure->profile_score = 0;
+    measure->parallel_score = 0;
+    measure->perpendicular_score = 0;
   }
-  *lmeasure = measure;
+
+  if (lmeasure != NULL) {
+    *lmeasure = measure;
+  }
 
   FINALLY(ensure_link_measure);
   RETURN();

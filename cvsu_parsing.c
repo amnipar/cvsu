@@ -389,7 +389,7 @@ result quad_forest_calculate_neighborhood_stats
   quad_tree *tree, *neighbor;
   integral_value weight, count, wcount, strength;
   integral_value mean, mean_sum1, mean_sum2, mean_wsum1;
-  integral_value dev, dev_sum1, dev_sum2, dev_wsum1, dev_max;
+  integral_value dev, dev_sum1, dev_sum2, dev_wsum1, dev_min, dev_max;
   integral_value mean_mean, mean_dev, max_mean_dev, dev_mean, dev_dev, max_dev_dev;
   integral_value overlap, min_overlap, max_overlap, scale;
 
@@ -415,7 +415,8 @@ result quad_forest_calculate_neighborhood_stats
         dev_sum2 = dev * dev;
 
         count = 1;
-        dev_max = 0;
+        dev_min = dev;
+        dev_max = dev;
         links = tree->links.first.next;
         endlinks = &tree->links.last;
         while (links != endlinks) {
@@ -425,13 +426,16 @@ result quad_forest_calculate_neighborhood_stats
 
             mean = neighbor->stat.mean;
             mean_sum1 += mean;
-            mean_sum2 += mean * mean;
+            mean_sum2 += (mean * mean);
 
             dev = neighbor->stat.deviation;
             dev_sum1 += dev;
-            dev_sum2 += dev * dev;
+            dev_sum2 += (dev * dev);
             if (dev > dev_max) {
               dev_max = dev;
+            }
+            if (dev < dev_min) {
+              dev_min = dev;
             }
 
             count += 1;
@@ -456,20 +460,24 @@ result quad_forest_calculate_neighborhood_stats
         if (dev_dev > max_dev_dev) {
           max_dev_dev = dev_dev;
         }
-        strength = (dev_max - dev) / dev_dev;
+        strength = (tree->stat.deviation - dev_min) / getmax(1,(dev_max - dev_min));
+        /*
         if (strength > 1) {
           strength = 1;
         }
+        */
         nstat->strength = strength;
-        nstat->strength_score = 0;
-        nstat->ridge_score = 0;
         nstat->overlap = 0;
+        nstat->mean_ridge_score = 0;
+        nstat->mean_ledge_score = 0;
+        nstat->dev_ridge_score = 0;
+        nstat->dev_ledge_score = 0;
       }
       trees = trees->next;
     }
     /* calculate strength */
     /*weight = 0.5;*/
-
+    /*
     trees = forest->trees.first.next;
     endtrees = &forest->trees.last;
     while (trees != endtrees) {
@@ -477,13 +485,13 @@ result quad_forest_calculate_neighborhood_stats
       nstat = has_neighborhood_stat(&tree->annotation);
       if (nstat != NULL) {
         mean_dev = nstat->mean_dev / max_mean_dev;
-        /*dev_dev = nstat->dev_dev / max_dev_dev;*/
+        dev_dev = nstat->dev_dev / max_dev_dev;
         nstat->strength *= mean_dev;
-        /*nstat->strength = getmax(mean_dev, dev_dev);*/
+        nstat->strength = getmax(mean_dev, dev_dev);
       }
       trees = trees->next;
     }
-
+    */
     /*nstat->strength = (weight * mean_dev) + (weight * dev_dev);*/
   }
   else {
@@ -509,6 +517,10 @@ result quad_forest_calculate_neighborhood_stats
         dev_sum1 = dev;
         dev_sum2 = dev * dev;
         dev_wsum1 = weight * dev;
+
+        if (dev > dev_max) {
+          dev_max = dev;
+        }
 
         count = 1;
         wcount = weight;
@@ -590,9 +602,15 @@ result quad_forest_calculate_neighborhood_stats
           max_dev_dev = dev_dev;
         }
 
-        nstat->strength = 0;
-        nstat->strength_score = 0;
-        nstat->ridge_score = 0;
+        strength = (dev_max - dev) / dev_dev;
+        if (strength > 1) {
+          strength = 1;
+        }
+        nstat->strength = 1 - strength;
+        nstat->mean_ridge_score = 0;
+        nstat->mean_ledge_score = 0;
+        nstat->dev_ridge_score = 0;
+        nstat->dev_ledge_score = 0;
 
         tptr->token = forest->token;
       }
@@ -611,14 +629,13 @@ result quad_forest_calculate_neighborhood_stats
         mean_dev = nstat->mean_dev / max_mean_dev;
         dev_dev = nstat->dev_dev / max_dev_dev;
         nstat->overlap = overlap;
-        nstat->strength = getmax(getmax(mean_dev, dev_dev), overlap);
+        nstat->strength *= overlap;
         /*nstat->strength =
             (weight * mean_dev) + (weight * dev_dev) + (weight * overlap);*/
       }
       trees = trees->next;
     }
   }
-
 
   /* */
   /*
@@ -634,8 +651,6 @@ result quad_forest_calculate_neighborhood_stats
     trees = trees->next;
   }
   */
-
-
 
   FINALLY(quad_forest_calculate_neighborhood_stats);
   RETURN();
@@ -893,16 +908,22 @@ result quad_forest_calculate_edge_stats
   list_item *trees, *endtrees, *links, *endlinks;
   quad_tree *tree1, *tree2;
   quad_tree_link *link;
-  quad_tree_link_head *head1, *head2
-  edge_response *eresp;
+  quad_tree_link_head *head1, *head2;
+  neighborhood_stat *nstat1, *nstat2;
+  edge_response *eresp1, *eresp2;
   link_measure *lmeasure, *lmeasure1, *lmeasure2;
   typed_pointer *tptr;
+  integral_value angle1, angle2, dir_cost, st_cost, left_sum, center_sum, right_sum;
+  integral_value parallel_1, parallel_2, perpendicular_1, perpendicular_2;
+
+  CHECK(quad_forest_calculate_neighborhood_stats(forest, FALSE));
 
   trees = forest->trees.first.next;
   endtrees = &forest->trees.last;
   while (trees != endtrees) {
     tree1 = (quad_tree*)trees->data;
-    CHECK(quad_tree_ensure_edge_response(forest, tree, &eresp, TRUE));
+    CHECK(expect_neighborhood_stat(&nstat1, &tree1->annotation));
+    CHECK(quad_tree_ensure_edge_response(forest, tree1, &eresp1, TRUE));
     links = tree1->links.first.next;
     endlinks = &tree1->links.last;
     while (links != endlinks) {
@@ -914,10 +935,11 @@ result quad_forest_calculate_edge_stats
         tptr->token = forest->token;
 
         /* calculate link measure using edge angle */
-        angle1 = eresp->ang - M_PI_2;
+        angle1 = eresp1->ang - M_PI_2;
         if (angle1 < 0) angle1 += M_2PI;
         /* angle will be positive for left side, negative for right side */
-        angle2 = head1->angle - angle1;
+        angle2 = angle_minus_angle(head1->angle, angle1);
+        lmeasure1->against_score = fabs(angle2 / M_PI);
         if (angle2 < -M_PI_2) {
           angle2 = -M_PI - angle2;
           if (angle2 < -M_PI_4) {
@@ -939,7 +961,7 @@ result quad_forest_calculate_edge_stats
         }
         else {
           if (angle2 > M_PI_4) {
-            lmeasure1->categoty = bl_LEFT;
+            lmeasure1->category = bl_LEFT;
           }
           else
           if (angle2 < -M_PI_4) {
@@ -950,39 +972,245 @@ result quad_forest_calculate_edge_stats
           }
         }
         /* angle score will be from -1 to 1; negative for right, positive for left */
-        lmeasure1->angle_score = angle2 / M_PI_2;
-
-
+        angle2 /= M_PI_2;
+        lmeasure1->angle_score = angle2;
+        dir_cost = fabs(angle2);
 
         head2 = head1->other;
+        tree2 = head2->tree;
+        CHECK(expect_neighborhood_stat(&nstat2, &tree2->annotation));
+        CHECK(quad_tree_ensure_edge_response(forest, tree2, &eresp2, TRUE));
+        st_cost = fabs(nstat2->strength - nstat1->strength);
+        lmeasure1->strength_score = st_cost;
+        parallel_1 = (1 - st_cost) * (1 - dir_cost);
+        lmeasure1->parallel_score = parallel_1;
+        perpendicular_1 = st_cost * dir_cost;
+        lmeasure1->perpendicular_score = perpendicular_1;
         /* check if the other head of the link already has the measure */
         lmeasure2 = has_link_measure(&head2->annotation, forest->token);
         if (lmeasure2 != NULL) {
-          /* smaller angle score will decide the link category */
-          /* would need to consider also strength difference? */
-          if (lmeasure2->angle_score < lmeasure1->angle_score) {
-            if (lmeasure2->category == bl_AGAINST) {
-              lmeasure1->category = bl_TOWARDS;
-            }
-            else
-            if (lmeasure2->category == bl_TOWARDS) {
-              lmeasure1->category = bl_AGAINST;
-            }
-          }
-          else {
-
-          }
-          link = head2->link;
+          link = head1->link;
           /* if it does, aggregate the stats into the link itself */
           CHECK(ensure_has(&link->annotation, t_link_measure, &tptr));
           lmeasure = (link_measure*)tptr->value;
           if (tptr->token != forest->token) {
             tptr->token = forest->token;
-
+            parallel_2 = lmeasure2->parallel_score;
+            perpendicular_2 = lmeasure2->perpendicular_score;
+            /* this node thinks this is a parallel link */
+            if (parallel_1 > perpendicular_1) {
+              /* also the opposing node thinks this is a parallel link */
+              if (parallel_2 > perpendicular_2) {
+                lmeasure->category = bl_PARALLEL;
+                lmeasure->parallel_score = getmax(parallel_1, parallel_2);
+                lmeasure->perpendicular_score = getmin(perpendicular_1, perpendicular_2);
+                if (lmeasure1->category == bl_TOWARDS) {
+                  lmeasure2->category = bl_AGAINST;
+                }
+                else
+                if (lmeasure1->category == bl_AGAINST){
+                  lmeasure2->category = bl_TOWARDS;
+                }
+                else {
+                  if (lmeasure1->against_score < 0.5) {
+                    lmeasure1->category = bl_TOWARDS;
+                    lmeasure2->category = bl_AGAINST;
+                  }
+                  else {
+                    lmeasure1->category = bl_AGAINST;
+                    lmeasure2->category = bl_TOWARDS;
+                  }
+                }
+              }
+              /* the opposing node things this is a perpendicular link */
+              else {
+                /* which belief is stronger? */
+                if (parallel_1 > perpendicular_2 && eresp1->mag > eresp2->mag) {
+                  lmeasure->category = bl_PARALLEL;
+                  lmeasure->parallel_score = getmax(parallel_1, parallel_2);
+                  lmeasure->perpendicular_score = getmin(perpendicular_1, perpendicular_2);
+                  if (lmeasure1->category == bl_TOWARDS) {
+                    lmeasure2->category = bl_AGAINST;
+                  }
+                  else
+                  if (lmeasure1->category == bl_AGAINST){
+                    lmeasure2->category = bl_TOWARDS;
+                  }
+                  else {
+                    if (lmeasure1->against_score < 0.5) {
+                      lmeasure1->category = bl_TOWARDS;
+                      lmeasure2->category = bl_AGAINST;
+                    }
+                    else {
+                      lmeasure1->category = bl_AGAINST;
+                      lmeasure2->category = bl_TOWARDS;
+                    }
+                  }
+                }
+                else {
+                  lmeasure->category = bl_PERPENDICULAR;
+                  lmeasure->parallel_score = getmin(parallel_1, parallel_2);
+                  lmeasure->perpendicular_score = getmax(perpendicular_1, perpendicular_2);
+                  if (eresp1->mag > eresp2->mag) {
+                    if (lmeasure1->angle_score < 0) {
+                      lmeasure1->category = bl_RIGHT;
+                      lmeasure2->category = bl_LEFT;
+                    }
+                    else {
+                      lmeasure1->category = bl_LEFT;
+                      lmeasure2->category = bl_RIGHT;
+                    }
+                  }
+                  else {
+                    if (lmeasure2->angle_score < 0) {
+                      lmeasure2->category = bl_RIGHT;
+                      lmeasure1->category = bl_LEFT;
+                    }
+                    else {
+                      lmeasure2->category = bl_LEFT;
+                      lmeasure1->category = bl_RIGHT;
+                    }
+                  }
+                  /*
+                  if (lmeasure2->category == bl_LEFT) {
+                    lmeasure1->category = bl_RIGHT;
+                  }
+                  else
+                  if (lmeasure2->category == bl_RIGHT) {
+                    lmeasure1->category = bl_LEFT;
+                  }
+                  else {
+                    if (lmeasure2->angle_score < 0) {
+                      lmeasure1->category = bl_LEFT;
+                      lmeasure2->category = bl_RIGHT;
+                    }
+                    else {
+                      lmeasure1->category = bl_RIGHT;
+                      lmeasure2->category = bl_LEFT;
+                    }
+                  }*/
+                }
+              }
+            }
+            /* this node thinks this is a perpendicular link */
+            else {
+              /* the opposing node things this is a parallel link */
+              if (parallel_2 > perpendicular_2) {
+                /* which belief is stronger? */
+                if (parallel_2 > perpendicular_1 && eresp2->mag > eresp1->mag) {
+                  lmeasure->category = bl_PARALLEL;
+                  lmeasure->parallel_score = getmax(parallel_1, parallel_2);
+                  lmeasure->perpendicular_score = getmin(perpendicular_1, perpendicular_2);
+                  if (lmeasure2->category == bl_TOWARDS) {
+                    lmeasure1->category = bl_AGAINST;
+                  }
+                  else
+                  if (lmeasure2->category == bl_AGAINST){
+                    lmeasure1->category = bl_TOWARDS;
+                  }
+                  else {
+                    if (lmeasure2->against_score < 0.5) {
+                      lmeasure2->category = bl_TOWARDS;
+                      lmeasure1->category = bl_AGAINST;
+                    }
+                    else {
+                      lmeasure2->category = bl_AGAINST;
+                      lmeasure1->category = bl_TOWARDS;
+                    }
+                  }
+                }
+                else {
+                  lmeasure->category = bl_PERPENDICULAR;
+                  lmeasure->parallel_score = getmin(parallel_1, parallel_2);
+                  lmeasure->perpendicular_score = getmax(perpendicular_1, perpendicular_2);
+                  if (eresp1->mag > eresp2->mag) {
+                    if (lmeasure1->angle_score < 0) {
+                      lmeasure1->category = bl_RIGHT;
+                      lmeasure2->category = bl_LEFT;
+                    }
+                    else {
+                      lmeasure1->category = bl_LEFT;
+                      lmeasure2->category = bl_RIGHT;
+                    }
+                  }
+                  else {
+                    if (lmeasure2->angle_score < 0) {
+                      lmeasure2->category = bl_RIGHT;
+                      lmeasure1->category = bl_LEFT;
+                    }
+                    else {
+                      lmeasure2->category = bl_LEFT;
+                      lmeasure1->category = bl_RIGHT;
+                    }
+                  }
+                  /*
+                  if (lmeasure1->category == bl_LEFT) {
+                    lmeasure2->category = bl_RIGHT;
+                  }
+                  else
+                  if (lmeasure1->category == bl_RIGHT) {
+                    lmeasure2->category = bl_LEFT;
+                  }
+                  else {
+                    if (lmeasure1->angle_score < 0) {
+                      lmeasure1->category = bl_RIGHT;
+                      lmeasure2->category = bl_LEFT;
+                    }
+                    else {
+                      lmeasure1->category = bl_LEFT;
+                      lmeasure2->category = bl_RIGHT;
+                    }
+                  }*/
+                }
+              }
+              /* also the opposing node thinks this is a perpendicular link */
+              else {
+                lmeasure->category = bl_PERPENDICULAR;
+                lmeasure->parallel_score = getmin(parallel_1, parallel_2);
+                lmeasure->perpendicular_score = getmax(perpendicular_1, perpendicular_2);
+                if (eresp1->mag > eresp2->mag) {
+                  if (lmeasure1->angle_score < 0) {
+                    lmeasure1->category = bl_RIGHT;
+                    lmeasure2->category = bl_LEFT;
+                  }
+                  else {
+                    lmeasure1->category = bl_LEFT;
+                    lmeasure2->category = bl_RIGHT;
+                  }
+                }
+                else {
+                  if (lmeasure2->angle_score < 0) {
+                    lmeasure2->category = bl_RIGHT;
+                    lmeasure1->category = bl_LEFT;
+                  }
+                  else {
+                    lmeasure2->category = bl_LEFT;
+                    lmeasure1->category = bl_RIGHT;
+                  }
+                }
+                /*
+                if (lmeasure1->category == bl_LEFT) {
+                  lmeasure2->category = bl_RIGHT;
+                }
+                else
+                if (lmeasure1->category == bl_RIGHT) {
+                  lmeasure2->category = bl_LEFT;
+                }
+                else {
+                  if (lmeasure1->angle_score < 0) {
+                    lmeasure1->category = bl_RIGHT;
+                    lmeasure2->category = bl_LEFT;
+                  }
+                  else {
+                    lmeasure1->category = bl_LEFT;
+                    lmeasure2->category = bl_RIGHT;
+                  }
+                }*/
+              }
+            }
           }
         }
       }
-
       links = links->next;
     }
     trees = trees->next;
@@ -1102,7 +1330,7 @@ result quad_tree_link_head_ensure_measure
     links2 = has_edge_links(&tree2->annotation, forest->token);
     if (links1 != NULL && links2 != NULL && IS_TRUE(use_edge_links)) {
       anglediff = fabs(angle_minus_angle(links1->own_angle, links2->own_angle));
-      measure->straightness_score = 1 - (anglediff / M_PI);
+      /*measure->straightness_score = 1 - (anglediff / M_PI);*/
     }
     else {
       CHECK(quad_tree_ensure_edge_response(forest, tree2, &eresp2, TRUE));
@@ -1111,7 +1339,7 @@ result quad_tree_link_head_ensure_measure
       angle2 = (eresp2->ang - M_PI_2);
       if (angle2 < 0) angle2 += 2 * M_PI;
       anglediff = fabs(angle_minus_angle(angle1, angle2));
-      measure->straightness_score = 1 - (anglediff / M_PI);
+      /*measure->straightness_score = 1 - (anglediff / M_PI);*/
     }
   }
   *lmeasure = measure;
@@ -1468,8 +1696,8 @@ result quad_tree_ensure_edge_links
         CHECK(expect_edge_links(&tree2->annotation, &links2, forest->token));
 
         anglediff = fabs(angle_minus_angle(links1->own_angle, links2->own_angle));
-        measure_link1->straightness_score = 1 - (anglediff / M_PI);
-        link_score = measure_link1->strength_score + 2 * measure_link1->straightness_score;
+        /*measure_link1->straightness_score = 1 - (anglediff / M_PI);*/
+        link_score = measure_link1->strength_score + 2 * fabs(measure_link1->angle_score);
         if (boundary_tree != NULL || potential_tree != NULL) {
           if (boundary_link != NULL) {
             link_score += 5;
@@ -1630,7 +1858,10 @@ result quad_forest_parse
   CHECK(list_create(&link_recv, 1000, sizeof(quad_tree_link_head*), 1));
 
   /*PRINT0( "get neighborhood stats\n" );*/
-  CHECK(quad_forest_calculate_neighborhood_stats(forest, FALSE));
+  /*CHECK(quad_forest_calculate_neighborhood_stats(forest, FALSE));*/
+
+  CHECK(quad_forest_calculate_edge_stats(forest));
+  TERMINATE(SUCCESS);
 
   /*PRINT0( "get edge responses for all trees\n" );*/
   trees = forest->trees.first.next;
@@ -2190,7 +2421,7 @@ result quad_forest_visualize_parse_result
 )
 {
   TRY();
-  list links, frags;
+  list links, frags, lines;
   list_item *trees, *end;
   quad_tree *tree;
   neighborhood_stat *nstat;
@@ -2219,8 +2450,25 @@ result quad_forest_visualize_parse_result
   target_data = (byte*)target->data;
 
   /*CHECK(pixel_image_clear(target));*/
-  CHECK(list_create(&links, 1000, sizeof(weighted_line), 1));
+  CHECK(list_create(&links, 1000, sizeof(colored_line), 1));
+  CHECK(list_create(&lines, 1000, sizeof(colored_line), 1));
   CHECK(list_create(&frags, 1000, sizeof(colored_rect), 1));
+
+  CHECK(quad_forest_visualize_neighborhood_stats(forest, target, v_STRENGTH));
+  CHECK(quad_forest_get_links(forest, &links, v_LINK_MEASURE));
+  CHECK(pixel_image_draw_colored_lines(target, &links));
+  /*
+  trees = forest->trees.first.next;
+  end = &forest->trees.last;
+  while (trees != end) {
+    tree = (quad_tree*)trees->data;
+    CHECK(quad_tree_edge_response_to_line(forest, tree, &lines));
+    trees = trees->next;
+  }
+  byte segment_color[4] = {0,0,0,0};
+  CHECK(pixel_image_draw_lines(target, &lines, segment_color));
+  */
+  TERMINATE(SUCCESS);
 
   if (IS_TRUE(quad_forest_has_parse(forest))) {
     max_edge_mag = 0;
@@ -2415,6 +2663,7 @@ result quad_forest_visualize_parse_result
   FINALLY(quad_forest_visualize_parse_result);
   list_destroy(&links);
   list_destroy(&frags);
+  list_destroy(&lines);
   RETURN();
 }
 
