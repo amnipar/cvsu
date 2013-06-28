@@ -1574,6 +1574,7 @@ result quad_forest_get_links
   uint32 size;
   /*integral_value d;*/
   weighted_line new_line;
+  colored_line color_line;
 
   CHECK_POINTER(forest);
 
@@ -1654,8 +1655,9 @@ result quad_forest_get_links
     quad_tree_link_head *head;
     link_measure *lmeasure;
     integral_value radius, str, max_str;
+    uint32 score;
     sint32 x, y, dx, dy;
-
+    /*
     max_str = 0;
     items = forest->links.first.next;
     end = &forest->links.last;
@@ -1663,7 +1665,6 @@ result quad_forest_get_links
       link = (quad_tree_link*)items->data;
       head = &link->a;
       lmeasure = has_link_measure(&head->annotation, forest->token);
-      /* bl_AGAINST bl_TOWARDS bl_PERPENDICULAR bl_RIGHT bl_LEFT */
       if (lmeasure != NULL &&
           (lmeasure->category == bl_TOWARDS || lmeasure->category == bl_AGAINST)) {
         str = lmeasure->angle_score * lmeasure->straightness_score;
@@ -1671,15 +1672,14 @@ result quad_forest_get_links
       }
       items = items->next;
     }
-
+    */
     items = forest->links.first.next;
     end = &forest->links.last;
     while (items != end) {
       link = (quad_tree_link*)items->data;
       head = &link->a;
       lmeasure = has_link_measure(&head->annotation, forest->token);
-      /* bl_AGAINST bl_TOWARDS bl_PERPENDICULAR bl_RIGHT bl_LEFT */
-      if (lmeasure != NULL && (lmeasure->category == bl_TOWARDS || lmeasure->category == bl_AGAINST)) {
+      if (lmeasure != NULL) {
         tree = head->tree;
         radius = ((integral_value)tree->size) / 2.0;
         x = getlround((integral_value)tree->x + radius);
@@ -1687,19 +1687,33 @@ result quad_forest_get_links
         dx = getlround(cos(head->angle) * radius);
         dy = getlround(sin(head->angle) * radius);
 
-        new_line.start.x = x;
-        new_line.start.y = y;
-        new_line.end.x = x + dx;
-        new_line.end.y = y - dy;
-
-        str = lmeasure->angle_score * lmeasure->straightness_score;
-        new_line.weight = str / max_str;
-
-        CHECK(list_append(links, (pointer)&new_line));
+        color_line.start.x = x;
+        color_line.start.y = y;
+        color_line.end.x = x + dx;
+        color_line.end.y = y - dy;
+        if (IS_PARALLEL(lmeasure->category)) {
+          /*score = (uint32)(lmeasure->parallel_score * 255.0);*/
+          /*score = (uint32)((1 - lmeasure->strength_score) * 255.0);*/
+          score = (uint32)((1 - lmeasure->angle_score) * 255.0);
+          if (score > 255) score = 255;
+          color_line.color[0] = 0;
+          color_line.color[1] = (byte)score;
+          color_line.color[2] = (byte)score;
+          CHECK(list_append(links, (pointer)&color_line));
+        }
+        else {
+          /*score = (uint32)(lmeasure->perpendicular_score * 255.0);*/
+          score = (uint32)(lmeasure->strength_score * 255.0);
+          if (score > 255) score = 255;
+          color_line.color[0] = (byte)score;
+          color_line.color[1] = (byte)score;
+          color_line.color[2] = 0;
+          /*CHECK(list_append(links, (pointer)&color_line));*/
+        }
       }
       head = &link->b;
       lmeasure = has_link_measure(&head->annotation, forest->token);
-      if (lmeasure != NULL && (lmeasure->category == bl_TOWARDS || lmeasure->category == bl_AGAINST)) {
+      if (lmeasure != NULL) {
         tree = head->tree;
         radius = ((integral_value)tree->size) / 2.0;
         x = getlround((integral_value)tree->x + radius);
@@ -1707,15 +1721,29 @@ result quad_forest_get_links
         dx = getlround(cos(head->angle) * radius);
         dy = getlround(sin(head->angle) * radius);
 
-        new_line.start.x = x;
-        new_line.start.y = y;
-        new_line.end.x = x + dx;
-        new_line.end.y = y - dy;
-
-        str = lmeasure->angle_score * lmeasure->straightness_score;
-        new_line.weight = str / max_str;
-
-        CHECK(list_append(links, (pointer)&new_line));
+        color_line.start.x = x;
+        color_line.start.y = y;
+        color_line.end.x = x + dx;
+        color_line.end.y = y - dy;
+        if (IS_PARALLEL(lmeasure->category)) {
+          /*score = (uint32)(lmeasure->parallel_score * 255.0);*/
+          /*score = (uint32)((1 - lmeasure->strength_score) * 255.0);*/
+          score = (uint32)((1 - lmeasure->angle_score) * 255.0);
+          if (score > 255) score = 255;
+          color_line.color[0] = 0;
+          color_line.color[1] = (byte)score;
+          color_line.color[2] = (byte)score;
+          CHECK(list_append(links, (pointer)&color_line));
+        }
+        else {
+          /*score = (uint32)((lmeasure->perpendicular_score) * 255.0);*/
+          score = (uint32)((lmeasure->strength_score) * 255.0);
+          if (score > 255) score = 255;
+          color_line.color[0] = (byte)score;
+          color_line.color[1] = (byte)score;
+          color_line.color[2] = 0;
+          /*CHECK(list_append(links, (pointer)&color_line));*/
+        }
       }
       items = items->next;
     }
@@ -1797,7 +1825,7 @@ result quad_forest_get_links
       }
       items = items->next;
     }
-   */ 
+   */
   }
   else
   if (mode == v_LINK_EDGE) {

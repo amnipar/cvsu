@@ -1115,7 +1115,7 @@ result quad_tree_edge_response_to_line
   CHECK_POINTER(lines);
 
   eresp = has_edge_response(&tree->annotation, forest->token);
-  if (eresp != NULL && eresp->mag > 1 && (eresp->hpeaks <= 2 && eresp->vpeaks <= 2)) {
+  if (eresp != NULL && eresp->mag > 0 && (eresp->hpeaks <= 2 && eresp->vpeaks <= 2)) {
     x = tree->x;
     y = tree->y;
     radius = ((integral_value)tree->size) / 2.0;

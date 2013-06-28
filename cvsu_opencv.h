@@ -103,6 +103,16 @@ result pixel_image_draw_weighted_lines
 );
 
 /**
+ * Draws a list of colored lines using the line color values.
+ * Uses OpenCV cvLine function for drawing.
+ */
+result pixel_image_draw_colored_lines
+(
+  pixel_image *source,
+  list *lines
+);
+
+/**
  * Draw a list of rects over an image using OpenCV cvRectangle function.
  */
 result pixel_image_draw_rects
