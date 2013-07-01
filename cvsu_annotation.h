@@ -100,6 +100,17 @@ result expect_accumulated_stat
 );
 
 /******************************************************************************/
+/* node hypothesis structures and functions                                 */
+/******************************************************************************/
+
+typedef struct node_hypothesis_t {
+  node_category category;
+  struct quad_tree_t *prev;
+  struct quad_tree_t *next;
+  integral_value likelihood_score;
+} node_hypothesis;
+
+/******************************************************************************/
 /* neighborhood stat structures and functions                                 */
 /******************************************************************************/
 
@@ -116,6 +127,8 @@ typedef struct neighborhood_stat_t {
   integral_value dev_ledge_score;
   integral_value boundary_score;
   integral_value segment_score;
+  uint32 hypothesis_count;
+  node_hypothesis hypotheses[5];
 } neighborhood_stat;
 
 /******************************************************************************/
