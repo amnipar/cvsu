@@ -2454,10 +2454,10 @@ result quad_forest_visualize_parse_result
   CHECK(list_create(&lines, 1000, sizeof(colored_line), 1));
   CHECK(list_create(&frags, 1000, sizeof(colored_rect), 1));
 
-  CHECK(quad_forest_visualize_neighborhood_stats(forest, target, v_STRENGTH));
+  /*CHECK(quad_forest_visualize_neighborhood_stats(forest, target, v_STRENGTH));*/
   CHECK(quad_forest_get_links(forest, &links, v_LINK_MEASURE));
   CHECK(pixel_image_draw_colored_lines(target, &links));
-  /*
+
   trees = forest->trees.first.next;
   end = &forest->trees.last;
   while (trees != end) {
@@ -2465,9 +2465,10 @@ result quad_forest_visualize_parse_result
     CHECK(quad_tree_edge_response_to_line(forest, tree, &lines));
     trees = trees->next;
   }
+  {
   byte segment_color[4] = {0,0,0,0};
-  CHECK(pixel_image_draw_lines(target, &lines, segment_color));
-  */
+  CHECK(pixel_image_draw_lines(target, &lines, segment_color, 2));
+  }
   TERMINATE(SUCCESS);
 
   if (IS_TRUE(quad_forest_has_parse(forest))) {
@@ -2645,7 +2646,7 @@ result quad_forest_visualize_parse_result
       }
       PRINT1("edges found: %d\n", links.count);
       /*CHECK(quad_tree_gradient_to_line(tree, &links));*/
-      CHECK(pixel_image_draw_lines(target, &links, segment_color));
+      CHECK(pixel_image_draw_lines(target, &links, segment_color, 1));
       /*CHECK(pixel_image_draw_weighted_lines(target, &links, segment_color));*/
       /*
       PRINT1("fragments found: %lu, ", frag_count);
