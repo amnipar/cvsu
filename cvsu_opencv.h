@@ -88,7 +88,8 @@ result pixel_image_draw_lines
 (
   pixel_image *source,
   list *lines,
-  byte color[4]
+  byte color[4],
+  uint32 width
 );
 
 /**

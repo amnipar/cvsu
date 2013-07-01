@@ -266,7 +266,8 @@ result pixel_image_draw_lines
 (
   pixel_image *source,
   list *lines,
-  byte color[4]
+  byte color[4],
+  uint32 width
 )
 {
   TRY();
@@ -292,7 +293,7 @@ result pixel_image_draw_lines
     cvLine(dst,
            cvPoint(this_line->start.x, this_line->start.y),
            cvPoint(this_line->end.x, this_line->end.y),
-           cvScalar(color[0], color[1], color[2],0), 1, 8, 0);
+           cvScalar(color[0], color[1], color[2],0), width, 8, 0);
     items = items->next;
   }
 
