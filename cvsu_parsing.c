@@ -889,6 +889,79 @@ result quad_forest_visualize_neighborhood_stats
         }
       }
       break;
+    case v_SCORE:
+      {
+        integral_value score, min_segment, max_segment, min_boundary, max_boundary;
+
+        min_segment = 1000000;
+        max_segment = -1000000;
+        min_boundary = 1000000;
+        max_boundary = -1000000;
+        trees = forest->trees.first.next;
+        end = &forest->trees.last;
+        while (trees != end) {
+          tree = (quad_tree*)trees->data;
+          if (tree->nw == NULL) {
+            nstat = has_neighborhood_stat(&tree->annotation);
+            if (nstat != NULL) {
+              score = nstat->segment_score;
+              if (score > max_segment) max_segment = score;
+              if (score < min_segment) min_segment = score;
+              score = nstat->boundary_score;
+              if (score > max_boundary) max_boundary = score;
+              if (score < min_boundary) min_boundary = score;
+            }
+          }
+          trees = trees->next;
+        }
+        PRINT2("segment min %.3f max %.3f\n", min_segment, max_segment);
+        PRINT2("boundary min %.3f max %.3f\n", min_boundary, max_boundary);
+        trees = forest->trees.first.next;
+        end = &forest->trees.last;
+        while (trees != end) {
+          tree = (quad_tree*)trees->data;
+          if (tree->nw == NULL) {
+            nstat = has_neighborhood_stat(&tree->annotation);
+            if (nstat != NULL) {
+              score = nstat->segment_score;
+              /*nstat->strength;*/
+              /*color0 = (byte)(255 * ((score - min_segment) / (max_segment - min_segment)));*/
+              if (nstat->segment_score > nstat->boundary_score) {
+                color0 = 255;
+                color2 = 0;
+              }
+              else {
+                color0 = 0;
+                color2 = 255;
+              }
+              color1 = 0;
+              score = nstat->boundary_score;
+              /*color2 = (byte)(255 * ((score - min_boundary) / (max_boundary - min_boundary)));*/
+            }
+            else {
+              color0 = 0;
+              color1 = 0;
+              color2 = 0;
+            }
+            width = tree->size;
+            height = width;
+            row_step = stride - 3 * width;
+            target_pos = target_data + tree->y * stride + 3 * tree->x;
+            for (y = 0; y < height; y++, target_pos += row_step) {
+              for (x = 0; x < width; x++) {
+                *target_pos = color0;
+                target_pos++;
+                *target_pos = color1;
+                target_pos++;
+                *target_pos = color2;
+                target_pos++;
+              }
+            }
+          }
+          trees = trees->next;
+        }
+      }
+      break;
     default:
       ERROR(BAD_PARAM);
   }
@@ -974,14 +1047,15 @@ result quad_forest_calculate_edge_stats
         /* angle score will be from -1 to 1; negative for right, positive for left */
         angle2 /= M_PI_2;
         lmeasure1->angle_score = angle2;
-        dir_cost = fabs(angle2);
+        dir_cost = getmin(fabs(angle2), 0.999);
 
         head2 = head1->other;
         tree2 = head2->tree;
         CHECK(expect_neighborhood_stat(&nstat2, &tree2->annotation));
         CHECK(quad_tree_ensure_edge_response(forest, tree2, &eresp2, TRUE));
-        st_cost = fabs(nstat2->strength - nstat1->strength);
+        st_cost = nstat2->strength - nstat1->strength;
         lmeasure1->strength_score = st_cost;
+        st_cost = getmin(fabs(st_cost), 0.999);
         parallel_1 = (1 - st_cost) * (1 - dir_cost);
         lmeasure1->parallel_score = parallel_1;
         perpendicular_1 = st_cost * dir_cost;
@@ -1216,6 +1290,128 @@ result quad_forest_calculate_edge_stats
     trees = trees->next;
   }
 
+  {
+    link_measure *best_towards, *best_against;
+    integral_value parallel_score, perpendicular_score, towards_score;
+    integral_value against_score, segment_score, boundary_score;
+
+    trees = forest->trees.first.next;
+    endtrees = &forest->trees.last;
+    while (trees != endtrees) {
+      tree1 = (quad_tree*)trees->data;
+      CHECK(expect_neighborhood_stat(&nstat1, &tree1->annotation));
+      segment_score = log(0.000001);
+      boundary_score = log(0.000001);
+      best_towards = NULL;
+      best_against = NULL;
+      links = tree1->links.first.next;
+      endlinks = &tree1->links.last;
+      while (links != endlinks) {
+        head1 = *((quad_tree_link_head**)links->data);
+        CHECK(expect_link_measure(&head1->annotation, &lmeasure1, forest->token));
+
+        st_cost = lmeasure1->strength_score;
+        dir_cost = getmin(getmax(fabs(lmeasure1->angle_score), 0.001), 0.999);
+
+        if (lmeasure1->category == bl_TOWARDS) {
+          if (st_cost > 0) {
+            st_cost = getmin(getmax(st_cost, 0.001),0.999);
+            segment_score += log(st_cost);
+            perpendicular_score = 1 - st_cost;
+          }
+          else {
+            st_cost = getmin(getmax(-st_cost, 0.001),0.999);
+            segment_score += log(1 - st_cost);
+            perpendicular_score = st_cost;
+          }
+          parallel_score = (1 - st_cost)*(1 - dir_cost);
+          if (best_towards == NULL) {
+            best_towards = lmeasure1;
+            towards_score = parallel_score;
+          }
+          else {
+            if (parallel_score > towards_score) {
+              st_cost = best_towards->strength_score;
+              if (st_cost > 0) {
+                st_cost = getmin(getmax(st_cost, 0.001),0.999);
+                boundary_score += log(1 - st_cost);
+              }
+              else {
+                st_cost = getmin(getmax(-st_cost, 0.001),0.999);
+                boundary_score += log(st_cost);
+              }
+              best_towards = lmeasure1;
+              towards_score = parallel_score;
+            }
+            else {
+              boundary_score += log(perpendicular_score);
+            }
+          }
+        }
+        else
+        if (lmeasure1->category == bl_AGAINST) {
+          if (st_cost > 0) {
+            st_cost = getmin(getmax(st_cost, 0.001),0.999);
+            segment_score += log(st_cost);
+            perpendicular_score = 1 - st_cost;
+          }
+          else {
+            st_cost = getmin(getmax(-st_cost, 0.001),0.999);
+            segment_score += log(1 - st_cost);
+            perpendicular_score = st_cost;
+          }
+          parallel_score = (1 - st_cost)*(1 - dir_cost);
+          if (best_against == NULL) {
+            best_against = lmeasure1;
+            against_score = parallel_score;
+          }
+          else {
+            if (parallel_score > against_score) {
+              st_cost = best_against->strength_score;
+              if (st_cost > 0) {
+                st_cost = getmin(getmax(st_cost, 0.001),0.999);
+                boundary_score += log(1 - st_cost);
+              }
+              else {
+                st_cost = getmin(getmax(-st_cost, 0.001),0.999);
+                boundary_score += log(st_cost);
+              }
+              best_against = lmeasure1;
+              against_score = parallel_score;
+            }
+            else {
+              boundary_score += log(perpendicular_score);
+            }
+          }
+        }
+        else {
+          /* neighbor is 'uphill' */
+          if (st_cost > 0) {
+            st_cost = getmin(getmax(st_cost, 0.001),0.999);
+            segment_score += log(st_cost);
+            boundary_score += log(1 - st_cost);
+          }
+          /* neighbor is 'downhill' */
+          else {
+            st_cost = getmin(getmax(-st_cost, 0.001),0.999);
+            segment_score += log(1 - st_cost);
+            boundary_score += log(st_cost);
+          }
+        }
+
+        links = links->next;
+      }
+      if (best_towards != NULL) {
+        boundary_score += log(towards_score);
+      }
+      if (best_against != NULL) {
+        boundary_score += log(against_score);
+      }
+      nstat1->segment_score = segment_score;
+      nstat1->boundary_score = boundary_score;
+      trees = trees->next;
+    }
+  }
   FINALLY(quad_forest_calculate_edge_stats);
   RETURN();
 }
@@ -2454,10 +2650,10 @@ result quad_forest_visualize_parse_result
   CHECK(list_create(&lines, 1000, sizeof(colored_line), 1));
   CHECK(list_create(&frags, 1000, sizeof(colored_rect), 1));
 
-  /*CHECK(quad_forest_visualize_neighborhood_stats(forest, target, v_STRENGTH));*/
+  CHECK(quad_forest_visualize_neighborhood_stats(forest, target, v_SCORE));
   CHECK(quad_forest_get_links(forest, &links, v_LINK_MEASURE));
-  CHECK(pixel_image_draw_colored_lines(target, &links));
-
+  /*CHECK(pixel_image_draw_colored_lines(target, &links));*/
+  /*
   trees = forest->trees.first.next;
   end = &forest->trees.last;
   while (trees != end) {
@@ -2469,6 +2665,7 @@ result quad_forest_visualize_parse_result
   byte segment_color[4] = {0,0,0,0};
   CHECK(pixel_image_draw_lines(target, &lines, segment_color, 2));
   }
+  */
   TERMINATE(SUCCESS);
 
   if (IS_TRUE(quad_forest_has_parse(forest))) {

@@ -82,7 +82,8 @@ typedef enum stat_visualization_mode_t {
   v_STAT = 0,
   v_NSTAT,
   v_OVERLAP,
-  v_STRENGTH
+  v_STRENGTH,
+  v_SCORE
 } stat_visualization_mode;
 
 result quad_forest_visualize_neighborhood_stats
