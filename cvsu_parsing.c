@@ -891,12 +891,10 @@ result quad_forest_visualize_neighborhood_stats
       break;
     case v_SCORE:
       {
-        integral_value score, min_segment, max_segment, min_boundary, max_boundary;
+        integral_value score, min_score, max_score;
 
-        min_segment = 1000000;
-        max_segment = -1000000;
-        min_boundary = 1000000;
-        max_boundary = -1000000;
+        min_score = 100;
+        max_score = -100;
         trees = forest->trees.first.next;
         end = &forest->trees.last;
         while (trees != end) {
@@ -904,18 +902,25 @@ result quad_forest_visualize_neighborhood_stats
           if (tree->nw == NULL) {
             nstat = has_neighborhood_stat(&tree->annotation);
             if (nstat != NULL) {
-              score = nstat->segment_score;
-              if (score > max_segment) max_segment = score;
-              if (score < min_segment) min_segment = score;
-              score = nstat->boundary_score;
-              if (score > max_boundary) max_boundary = score;
-              if (score < min_boundary) min_boundary = score;
+              score = nstat->profile_score;
+              /*
+              score = nstat->mean_ledge_score;
+              score = nstat->mean_ridge_score;
+              score = nstat->dev_ledge_score;
+              score = nstat->dev_ridge_score;
+              if (score < 0) score = 0;
+              score = 0;
+              score = fabs(nstat->mean_ledge_score);
+              score += fabs(nstat->mean_ridge_score);
+              score += fabs(nstat->dev_ridge_score);
+              */
+              if (score > max_score) max_score = score;
+              if (score < min_score) min_score = score;
             }
           }
           trees = trees->next;
         }
-        PRINT2("segment min %.3f max %.3f\n", min_segment, max_segment);
-        PRINT2("boundary min %.3f max %.3f\n", min_boundary, max_boundary);
+        PRINT2("score min %.3f max %.3f\n", min_score, max_score);
         trees = forest->trees.first.next;
         end = &forest->trees.last;
         while (trees != end) {
@@ -923,20 +928,18 @@ result quad_forest_visualize_neighborhood_stats
           if (tree->nw == NULL) {
             nstat = has_neighborhood_stat(&tree->annotation);
             if (nstat != NULL) {
-              score = nstat->segment_score;
+              score = nstat->profile_score;
+              /*
+              score = 0;
+              score = fabs(nstat->mean_ledge_score);
+              score += fabs(nstat->mean_ridge_score);
+              score += fabs(nstat->dev_ridge_score);
+              */
               /*nstat->strength;*/
-              /*color0 = (byte)(255 * ((score - min_segment) / (max_segment - min_segment)));*/
-              if (nstat->segment_score > nstat->boundary_score) {
-                color0 = 255;
-                color2 = 0;
-              }
-              else {
-                color0 = 0;
-                color2 = 255;
-              }
-              color1 = 0;
-              score = nstat->boundary_score;
-              /*color2 = (byte)(255 * ((score - min_boundary) / (max_boundary - min_boundary)));*/
+              color0 = (byte)(255 * ((score - min_score) / (max_score - min_score)));
+              /*color0 = 255 - color0;*/
+              color1 = color0;
+              color2 = color0;
             }
             else {
               color0 = 0;
@@ -1078,22 +1081,13 @@ result quad_forest_calculate_edge_stats
                 lmeasure->category = bl_PARALLEL;
                 lmeasure->parallel_score = getmax(parallel_1, parallel_2);
                 lmeasure->perpendicular_score = getmin(perpendicular_1, perpendicular_2);
-                if (lmeasure1->category == bl_TOWARDS) {
+                if (lmeasure1->against_score < 0.5) {
+                  lmeasure1->category = bl_TOWARDS;
                   lmeasure2->category = bl_AGAINST;
                 }
-                else
-                if (lmeasure1->category == bl_AGAINST){
-                  lmeasure2->category = bl_TOWARDS;
-                }
                 else {
-                  if (lmeasure1->against_score < 0.5) {
-                    lmeasure1->category = bl_TOWARDS;
-                    lmeasure2->category = bl_AGAINST;
-                  }
-                  else {
-                    lmeasure1->category = bl_AGAINST;
-                    lmeasure2->category = bl_TOWARDS;
-                  }
+                  lmeasure1->category = bl_AGAINST;
+                  lmeasure2->category = bl_TOWARDS;
                 }
               }
               /* the opposing node things this is a perpendicular link */
@@ -1103,22 +1097,13 @@ result quad_forest_calculate_edge_stats
                   lmeasure->category = bl_PARALLEL;
                   lmeasure->parallel_score = getmax(parallel_1, parallel_2);
                   lmeasure->perpendicular_score = getmin(perpendicular_1, perpendicular_2);
-                  if (lmeasure1->category == bl_TOWARDS) {
+                  if (lmeasure1->against_score < 0.5) {
+                    lmeasure1->category = bl_TOWARDS;
                     lmeasure2->category = bl_AGAINST;
                   }
-                  else
-                  if (lmeasure1->category == bl_AGAINST){
-                    lmeasure2->category = bl_TOWARDS;
-                  }
                   else {
-                    if (lmeasure1->against_score < 0.5) {
-                      lmeasure1->category = bl_TOWARDS;
-                      lmeasure2->category = bl_AGAINST;
-                    }
-                    else {
-                      lmeasure1->category = bl_AGAINST;
-                      lmeasure2->category = bl_TOWARDS;
-                    }
+                    lmeasure1->category = bl_AGAINST;
+                    lmeasure2->category = bl_TOWARDS;
                   }
                 }
                 else {
@@ -1145,24 +1130,6 @@ result quad_forest_calculate_edge_stats
                       lmeasure1->category = bl_RIGHT;
                     }
                   }
-                  /*
-                  if (lmeasure2->category == bl_LEFT) {
-                    lmeasure1->category = bl_RIGHT;
-                  }
-                  else
-                  if (lmeasure2->category == bl_RIGHT) {
-                    lmeasure1->category = bl_LEFT;
-                  }
-                  else {
-                    if (lmeasure2->angle_score < 0) {
-                      lmeasure1->category = bl_LEFT;
-                      lmeasure2->category = bl_RIGHT;
-                    }
-                    else {
-                      lmeasure1->category = bl_RIGHT;
-                      lmeasure2->category = bl_LEFT;
-                    }
-                  }*/
                 }
               }
             }
@@ -1175,22 +1142,13 @@ result quad_forest_calculate_edge_stats
                   lmeasure->category = bl_PARALLEL;
                   lmeasure->parallel_score = getmax(parallel_1, parallel_2);
                   lmeasure->perpendicular_score = getmin(perpendicular_1, perpendicular_2);
-                  if (lmeasure2->category == bl_TOWARDS) {
+                  if (lmeasure2->against_score < 0.5) {
+                    lmeasure2->category = bl_TOWARDS;
                     lmeasure1->category = bl_AGAINST;
                   }
-                  else
-                  if (lmeasure2->category == bl_AGAINST){
-                    lmeasure1->category = bl_TOWARDS;
-                  }
                   else {
-                    if (lmeasure2->against_score < 0.5) {
-                      lmeasure2->category = bl_TOWARDS;
-                      lmeasure1->category = bl_AGAINST;
-                    }
-                    else {
-                      lmeasure2->category = bl_AGAINST;
-                      lmeasure1->category = bl_TOWARDS;
-                    }
+                    lmeasure2->category = bl_AGAINST;
+                    lmeasure1->category = bl_TOWARDS;
                   }
                 }
                 else {
@@ -1217,24 +1175,6 @@ result quad_forest_calculate_edge_stats
                       lmeasure1->category = bl_RIGHT;
                     }
                   }
-                  /*
-                  if (lmeasure1->category == bl_LEFT) {
-                    lmeasure2->category = bl_RIGHT;
-                  }
-                  else
-                  if (lmeasure1->category == bl_RIGHT) {
-                    lmeasure2->category = bl_LEFT;
-                  }
-                  else {
-                    if (lmeasure1->angle_score < 0) {
-                      lmeasure1->category = bl_RIGHT;
-                      lmeasure2->category = bl_LEFT;
-                    }
-                    else {
-                      lmeasure1->category = bl_LEFT;
-                      lmeasure2->category = bl_RIGHT;
-                    }
-                  }*/
                 }
               }
               /* also the opposing node thinks this is a perpendicular link */
@@ -1262,24 +1202,6 @@ result quad_forest_calculate_edge_stats
                     lmeasure1->category = bl_RIGHT;
                   }
                 }
-                /*
-                if (lmeasure1->category == bl_LEFT) {
-                  lmeasure2->category = bl_RIGHT;
-                }
-                else
-                if (lmeasure1->category == bl_RIGHT) {
-                  lmeasure2->category = bl_LEFT;
-                }
-                else {
-                  if (lmeasure1->angle_score < 0) {
-                    lmeasure1->category = bl_RIGHT;
-                    lmeasure2->category = bl_LEFT;
-                  }
-                  else {
-                    lmeasure1->category = bl_LEFT;
-                    lmeasure2->category = bl_RIGHT;
-                  }
-                }*/
               }
             }
           }
@@ -1292,126 +1214,262 @@ result quad_forest_calculate_edge_stats
 
   {
     link_measure *best_towards, *best_against;
-    integral_value parallel_score, perpendicular_score, towards_score;
-    integral_value against_score, segment_score, boundary_score;
-
+    uint32 towards_count, against_count;
+    integral_value mean, dev, left_count, right_count, center_count;
+    integral_value left_mean_sum, right_mean_sum, center_mean_sum;
+    integral_value left_dev_sum, right_dev_sum, center_dev_sum, weight;
+    integral_value count, score, profile_score, segment_score, boundary_score;
+    
     trees = forest->trees.first.next;
     endtrees = &forest->trees.last;
     while (trees != endtrees) {
       tree1 = (quad_tree*)trees->data;
       CHECK(expect_neighborhood_stat(&nstat1, &tree1->annotation));
-      segment_score = log(0.000001);
-      boundary_score = log(0.000001);
-      best_towards = NULL;
-      best_against = NULL;
+      /*CHECK(expect_edge_response(&eresp1, &tree1->annotation));*/
+      towards_count = 0;
+      against_count = 0;
+      left_count = 0;
+      right_count = 0;
+      center_count = 1;
+      left_mean_sum = 0;
+      right_mean_sum = 0;
+      center_mean_sum = tree1->stat.mean;
+      left_dev_sum = 0;
+      right_dev_sum = 0;
+      center_dev_sum = tree1->stat.deviation;
       links = tree1->links.first.next;
       endlinks = &tree1->links.last;
       while (links != endlinks) {
         head1 = *((quad_tree_link_head**)links->data);
+        tree2 = head1->other->tree;
         CHECK(expect_link_measure(&head1->annotation, &lmeasure1, forest->token));
-
-        st_cost = lmeasure1->strength_score;
-        dir_cost = getmin(getmax(fabs(lmeasure1->angle_score), 0.001), 0.999);
-
-        if (lmeasure1->category == bl_TOWARDS) {
-          if (st_cost > 0) {
-            st_cost = getmin(getmax(st_cost, 0.001),0.999);
-            segment_score += log(st_cost);
-            perpendicular_score = 1 - st_cost;
-          }
-          else {
-            st_cost = getmin(getmax(-st_cost, 0.001),0.999);
-            segment_score += log(1 - st_cost);
-            perpendicular_score = st_cost;
-          }
-          parallel_score = (1 - st_cost)*(1 - dir_cost);
-          if (best_towards == NULL) {
-            best_towards = lmeasure1;
-            towards_score = parallel_score;
-          }
-          else {
-            if (parallel_score > towards_score) {
-              st_cost = best_towards->strength_score;
-              if (st_cost > 0) {
-                st_cost = getmin(getmax(st_cost, 0.001),0.999);
-                boundary_score += log(1 - st_cost);
-              }
-              else {
-                st_cost = getmin(getmax(-st_cost, 0.001),0.999);
-                boundary_score += log(st_cost);
-              }
-              best_towards = lmeasure1;
-              towards_score = parallel_score;
-            }
-            else {
-              boundary_score += log(perpendicular_score);
-            }
-          }
-        }
-        else
-        if (lmeasure1->category == bl_AGAINST) {
-          if (st_cost > 0) {
-            st_cost = getmin(getmax(st_cost, 0.001),0.999);
-            segment_score += log(st_cost);
-            perpendicular_score = 1 - st_cost;
-          }
-          else {
-            st_cost = getmin(getmax(-st_cost, 0.001),0.999);
-            segment_score += log(1 - st_cost);
-            perpendicular_score = st_cost;
-          }
-          parallel_score = (1 - st_cost)*(1 - dir_cost);
-          if (best_against == NULL) {
-            best_against = lmeasure1;
-            against_score = parallel_score;
-          }
-          else {
-            if (parallel_score > against_score) {
-              st_cost = best_against->strength_score;
-              if (st_cost > 0) {
-                st_cost = getmin(getmax(st_cost, 0.001),0.999);
-                boundary_score += log(1 - st_cost);
-              }
-              else {
-                st_cost = getmin(getmax(-st_cost, 0.001),0.999);
-                boundary_score += log(st_cost);
-              }
-              best_against = lmeasure1;
-              against_score = parallel_score;
-            }
-            else {
-              boundary_score += log(perpendicular_score);
-            }
+        
+        mean = tree2->stat.mean;
+        dev = tree2->stat.deviation;
+        if (lmeasure1->angle_score > 0) {
+          weight = fabs(lmeasure1->angle_score);
+          if (weight > 0.5) {
+            left_count += weight;
+            left_mean_sum += (weight * mean);
+            left_dev_sum += (weight * dev);
           }
         }
         else {
-          /* neighbor is 'uphill' */
-          if (st_cost > 0) {
-            st_cost = getmin(getmax(st_cost, 0.001),0.999);
-            segment_score += log(st_cost);
-            boundary_score += log(1 - st_cost);
-          }
-          /* neighbor is 'downhill' */
-          else {
-            st_cost = getmin(getmax(-st_cost, 0.001),0.999);
-            segment_score += log(1 - st_cost);
-            boundary_score += log(st_cost);
+          weight = fabs(lmeasure1->angle_score);
+          if (weight > 0.5) {
+            right_count += weight;
+            right_mean_sum += (weight * mean);
+            right_dev_sum += (weight * dev);
           }
         }
-
+        
+        switch (lmeasure1->category) {
+          case bl_TOWARDS:
+            towards_count += 1;
+            break;
+          case bl_AGAINST:
+            against_count += 1;
+            break;
+          case bl_LEFT:
+            
+            break;
+          case bl_RIGHT:
+            
+            break;
+          default:
+            ERROR(NOT_FOUND);
+        }
         links = links->next;
       }
-      if (best_towards != NULL) {
-        boundary_score += log(towards_score);
+      
+      left_mean_sum /= left_count;
+      left_dev_sum /= left_count;
+      right_mean_sum /= right_count;
+      right_dev_sum /= right_count;
+      
+      profile_score = 0;
+      
+      dev = nstat1->mean_dev;
+      if (dev < 1) dev = 1;
+              
+      score = (left_mean_sum - right_mean_sum) / dev;
+      if (score < 0) {
+        /*
+        if (score > -1) score = 0;
+        score += 1;
+        */
+        /*if (score < -2) score = -2;*/
       }
-      if (best_against != NULL) {
-        boundary_score += log(against_score);
+      else {
+        /*
+        if (score < 1) score = 0;
+        score -= 1;
+        */
+        /*if (score > 2) score = 2;*/
       }
-      nstat1->segment_score = segment_score;
-      nstat1->boundary_score = boundary_score;
+      /*score /= 2;*/
+      nstat1->mean_ledge_score = score;
+      /*
+      score = fabs(score);
+      profile_score += score;
+      */
+      if (score > profile_score) profile_score = score;
+      
+      score = ((2 * center_mean_sum) - (left_mean_sum + right_mean_sum)) / dev;
+      if (score < 0) {
+        /*
+        if (score > -1) score = 0;
+        score += 1;
+        */
+        /*if (score < -2) score = -2;*/
+        score += fabs(nstat1->mean_ledge_score);
+        if (score > 0) score = 0;
+      }
+      else {
+        /*
+        if (score < 1) score = 0;
+        score -= 1;
+        */
+        /*if (score > 2) score = 2;*/
+        score -= fabs(nstat1->mean_ledge_score);
+        if (score < 0) score = 0;
+      }
+      /*score /= 2;*/
+      nstat1->mean_ridge_score = score;
+      /*
+      score = fabs(score);
+      profile_score += score;
+      */
+      if (score > profile_score) profile_score = score;
+      
+      dev = nstat1->dev_dev;
+      if (dev < 1) dev = 1;
+      
+      score = (left_dev_sum - right_dev_sum) / dev;
+      if (score < 0) {
+        /*
+        if (score > -1) score = 0;
+        score += 1;
+        */
+        /*if (score < -2) score = -2;*/
+      }
+      else {
+        /*
+        if (score < 1) score = 0;
+        score -= 1;
+        */
+        /*if (score > 2) score = 2;*/
+      }
+      /*score /= 2;*/
+      nstat1->dev_ledge_score = score;
+      /*
+      score = fabs(score);
+      profile_score += score;
+      */
+      if (score > profile_score) profile_score = score;
+      
+      score = ((2 * center_dev_sum) - (left_dev_sum + right_dev_sum)) / dev;
+      if (score < 0) {
+        /*
+        if (score > -1) score = 0;
+        score += 1;
+        */
+        /*if (score < -2) score = -2;*/
+        score += fabs(nstat1->dev_ledge_score);
+        if (score > 0) score = 0;
+      }
+      else {
+        /*
+        if (score < 1) score = 0;
+        score -= 1;
+        */
+        /*if (score > 2) score = 2;*/
+        score -= fabs(nstat1->dev_ledge_score);
+        if (score < 0) score = 0;
+      }
+      /*score /= 2;*/
+      nstat1->dev_ridge_score = score;
+      /*
+      score = fabs(score);
+      profile_score += score;
+      */
+      if (score > profile_score) profile_score = score;
+      
+      /*profile_score /= 4;*/
+      nstat1->dir_confusion = ((integral_value)towards_count + against_count) / 2.0;
+      
+      if (nstat1->dir_confusion > 1) {
+        profile_score /= nstat1->dir_confusion;
+      }
+      else {
+        nstat1->dir_confusion = 1;
+      }
+      nstat1->profile_score = profile_score; /* nstat1->strength * */
       trees = trees->next;
     }
   }
+  
+  {
+    link_measure *best_towards, *best_against;
+    integral_value mean_ridge_dist, mean_ledge_dist, profile_dist, link_dist;
+    integral_value dev_ridge_dist, dev_ledge_dist, towards_dist, against_dist;
+    integral_value count, score, profile_score, segment_score, boundary_score;
+    
+    trees = forest->trees.first.next;
+    endtrees = &forest->trees.last;
+    while (trees != endtrees) {
+      tree1 = (quad_tree*)trees->data;
+      CHECK(expect_neighborhood_stat(&nstat1, &tree1->annotation));
+      
+      best_towards = NULL;
+      best_against = NULL;
+      towards_dist = 100;
+      against_dist = 100;
+      
+      links = tree1->links.first.next;
+      endlinks = &tree1->links.last;
+      while (links != endlinks) {
+        head1 = *((quad_tree_link_head**)links->data);
+        tree2 = head1->other->tree;
+        CHECK(expect_neighborhood_stat(&nstat2, &tree2->annotation));
+        CHECK(expect_link_measure(&head1->annotation, &lmeasure1, forest->token));
+        mean_ridge_dist = fabs(nstat1->mean_ridge_score - nstat2->mean_ridge_score);
+        mean_ledge_dist = fabs(nstat1->mean_ledge_score - nstat2->mean_ledge_score);
+        dev_ridge_dist = fabs(nstat1->dev_ridge_score - nstat2->dev_ridge_score);
+        dev_ledge_dist = fabs(nstat1->dev_ledge_score - nstat2->dev_ledge_score);
+        profile_dist = (mean_ridge_dist + mean_ledge_dist + dev_ridge_dist + dev_ledge_dist) / 4;
+        
+        if (lmeasure1->category == bl_TOWARDS) {
+          link_dist = lmeasure1->parallel_score * profile_dist;
+          if (link_dist < towards_dist) {
+            towards_dist = link_dist;
+            best_towards = lmeasure1;
+          }
+          lmeasure1->parallel_score /= nstat1->dir_confusion;
+        }
+        else
+        if (lmeasure1->category == bl_AGAINST) {
+          link_dist = lmeasure1->parallel_score * profile_dist;
+          if (link_dist < against_dist) {
+            against_dist = link_dist;
+            best_against = lmeasure1;
+          }
+          lmeasure1->parallel_score /= nstat1->dir_confusion;
+        }
+        links = links->next;
+      }
+      if (best_towards != NULL) {
+        best_towards->parallel_score = 1 / nstat1->dir_confusion;
+        nstat1->profile_score += (towards_dist / 2);
+      }
+      if (best_against != NULL) {
+        best_against->parallel_score = 1 / nstat1->dir_confusion;
+        nstat1->profile_score += (against_dist / 2);
+      }
+      trees = trees->next;
+    }
+  }
+  
   FINALLY(quad_forest_calculate_edge_stats);
   RETURN();
 }
@@ -2652,7 +2710,7 @@ result quad_forest_visualize_parse_result
 
   CHECK(quad_forest_visualize_neighborhood_stats(forest, target, v_SCORE));
   CHECK(quad_forest_get_links(forest, &links, v_LINK_MEASURE));
-  /*CHECK(pixel_image_draw_colored_lines(target, &links));*/
+  CHECK(pixel_image_draw_colored_lines(target, &links, 1));
   /*
   trees = forest->trees.first.next;
   end = &forest->trees.last;
