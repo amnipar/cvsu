@@ -414,13 +414,13 @@ result temporal_forest_visualize
     /*CHECK(quad_forest_visualize_parse_result(forest, image));*/
     CHECK(quad_forest_visualize_neighborhood_stats(forest, image, v_SCORE));
     CHECK(quad_forest_get_links(forest, &lines, v_LINK_MEASURE));
-    CHECK(pixel_image_draw_colored_lines(image, &lines));
+    CHECK(pixel_image_draw_colored_lines(image, &lines, 1));
   }
   else {
     /*CHECK(quad_forest_visualize_parse_result(forest, &target->visual));*/
     CHECK(quad_forest_visualize_neighborhood_stats(forest, &target->visual, v_SCORE));
     CHECK(quad_forest_get_links(forest, &lines, v_LINK_MEASURE));
-    CHECK(pixel_image_draw_colored_lines(&target->visual, &lines));
+    CHECK(pixel_image_draw_colored_lines(&target->visual, &lines, 1));
   }
   /*
   CHECK(list_create(&lines, 1000, sizeof(line), 1));

@@ -1692,11 +1692,19 @@ result quad_forest_get_links
         color_line.end.x = x + dx;
         color_line.end.y = y - dy;
         if (IS_PARALLEL(lmeasure->category)) {
-          /*score = (uint32)(lmeasure->parallel_score * 255.0);*/
+          score = (uint32)(lmeasure->parallel_score * 255.0);
           /*score = (uint32)((1 - lmeasure->strength_score) * 255.0);*/
-          score = (uint32)((1 - lmeasure->angle_score) * 255.0);
+          /*score = (uint32)((1 - lmeasure->angle_score) * 255.0);*/
           if (score > 255) score = 255;
-          color_line.color[0] = 0;
+          /*
+          if (lmeasure->category == bl_TOWARDS) {
+            score = 255;
+          }
+          else {
+            score = 127;
+          }
+          */
+          color_line.color[0] = (byte)score;
           color_line.color[1] = (byte)score;
           color_line.color[2] = (byte)score;
           CHECK(list_append(links, (pointer)&color_line));
@@ -1705,8 +1713,14 @@ result quad_forest_get_links
           /*score = (uint32)(lmeasure->perpendicular_score * 255.0);*/
           score = (uint32)(lmeasure->strength_score * 255.0);
           if (score > 255) score = 255;
+          if (lmeasure->category == bl_LEFT) {
+            score = 255;
+          }
+          else {
+            score = 127;
+          }
           color_line.color[0] = (byte)score;
-          color_line.color[1] = (byte)score;
+          color_line.color[1] = 0;/*(byte)score;*/
           color_line.color[2] = 0;
           /*CHECK(list_append(links, (pointer)&color_line));*/
         }
@@ -1726,11 +1740,19 @@ result quad_forest_get_links
         color_line.end.x = x + dx;
         color_line.end.y = y - dy;
         if (IS_PARALLEL(lmeasure->category)) {
-          /*score = (uint32)(lmeasure->parallel_score * 255.0);*/
+          score = (uint32)(lmeasure->parallel_score * 255.0);
           /*score = (uint32)((1 - lmeasure->strength_score) * 255.0);*/
-          score = (uint32)((1 - lmeasure->angle_score) * 255.0);
+          /*score = (uint32)((1 - lmeasure->angle_score) * 255.0);*/
           if (score > 255) score = 255;
-          color_line.color[0] = 0;
+          /*
+          if (lmeasure->category == bl_TOWARDS) {
+            score = 255;
+          }
+          else {
+            score = 127;
+          }
+          */
+          color_line.color[0] = (byte)score;
           color_line.color[1] = (byte)score;
           color_line.color[2] = (byte)score;
           CHECK(list_append(links, (pointer)&color_line));
@@ -1739,8 +1761,14 @@ result quad_forest_get_links
           /*score = (uint32)((lmeasure->perpendicular_score) * 255.0);*/
           score = (uint32)((lmeasure->strength_score) * 255.0);
           if (score > 255) score = 255;
+          if (lmeasure->category == bl_LEFT) {
+            score = 255;
+          }
+          else {
+            score = 127;
+          }
           color_line.color[0] = (byte)score;
-          color_line.color[1] = (byte)score;
+          color_line.color[1] = 0;/*(byte)score;*/
           color_line.color[2] = 0;
           /*CHECK(list_append(links, (pointer)&color_line));*/
         }

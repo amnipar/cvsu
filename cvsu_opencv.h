@@ -110,7 +110,8 @@ result pixel_image_draw_weighted_lines
 result pixel_image_draw_colored_lines
 (
   pixel_image *source,
-  list *lines
+  list *lines,
+  uint32 width
 );
 
 /**

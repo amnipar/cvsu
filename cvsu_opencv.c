@@ -350,7 +350,8 @@ result pixel_image_draw_weighted_lines
 result pixel_image_draw_colored_lines
 (
   pixel_image *source,
-  list *lines
+  list *lines,
+  uint32 width
 )
 {
   TRY();
@@ -377,7 +378,7 @@ result pixel_image_draw_colored_lines
     cvLine(dst,
            cvPoint(this_line->start.x, this_line->start.y),
            cvPoint(this_line->end.x, this_line->end.y),
-           cvScalar(this_line->color[0], this_line->color[1], this_line->color[2],0), 1, 8, 0);
+           cvScalar(this_line->color[0], this_line->color[1], this_line->color[2],0), width, 8, 0);
            items = items->next;
   }
 
