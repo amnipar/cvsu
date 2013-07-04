@@ -1232,7 +1232,7 @@ result quad_forest_calculate_edge_stats
   integral_value parallel_1, parallel_2, perpendicular_1, perpendicular_2;
   integral_value segment_score, boundary_score;
 
-  CHECK(quad_forest_calculate_neighborhood_stats(forest, FALSE));
+  /*CHECK(quad_forest_calculate_neighborhood_stats(forest, FALSE));*/
 
   trees = forest->trees.first.next;
   endtrees = &forest->trees.last;
@@ -1245,50 +1245,42 @@ result quad_forest_calculate_edge_stats
     while (links != endlinks) {
       head1 = *((quad_tree_link_head**)links->data);
       CHECK(expect_link_measure(&head1->annotation, &lmeasure1, forest->token));
+      
       head2 = head1->other;
       tree2 = head2->tree;
       CHECK(quad_tree_ensure_edge_stats(forest, tree2, &nstat2));
       CHECK(expect_link_measure(&head2->annotation, &lmeasure2, forest->token));
+      CHECK(expect_edge_response(&eresp2, &tree2->annotation));
       
-      mean_ledge_dist = fabs(nstat1->mean_ledge_score - nstat2->mean_ledge_score);
-      if (mean_ledge_dist > 1) mean_ledge_dist = 1;
-      mean_ridge_dist = fabs(nstat1->mean_ridge_score - nstat2->mean_ridge_score);
-      if (mean_ridge_dist > 1) mean_ridge_dist = 1;
-      dev_ridge_dist = fabs(nstat1->dev_ridge_score - nstat2->dev_ridge_score);
-      if (dev_ridge_dist > 1) dev_ridge_dist = 1;
+      link = head1->link;
+      CHECK(ensure_has(&link->annotation, t_link_measure, &tptr));
+      lmeasure = (link_measure*)tptr->value;
+      if (tptr->token != forest->token) {
+        tptr->token = forest->token;
       
-      prof_cost = (mean_ledge_dist + mean_ridge_dist + dev_ridge_dist) / 3;
-      dir_cost = fabs(lmeasure1->angle_score);
+        mean_ledge_dist = fabs(nstat1->mean_ledge_score - nstat2->mean_ledge_score);
+        if (mean_ledge_dist > 1) mean_ledge_dist = 1;
+        mean_ridge_dist = fabs(nstat1->mean_ridge_score - nstat2->mean_ridge_score);
+        if (mean_ridge_dist > 1) mean_ridge_dist = 1;
+        dev_ridge_dist = fabs(nstat1->dev_ridge_score - nstat2->dev_ridge_score);
+        if (dev_ridge_dist > 1) dev_ridge_dist = 1;
+        
+        prof_cost = (mean_ledge_dist + mean_ridge_dist + dev_ridge_dist) / 3;
+        dir_cost = fabs(lmeasure1->angle_score);
 
-      parallel_1 = (1 - prof_cost) * (1 - dir_cost);
-      lmeasure1->parallel_score = parallel_1;
-      perpendicular_1 = prof_cost * dir_cost;
-      lmeasure1->perpendicular_score = perpendicular_1;
-      
-      dir_cost = fabs(lmeasure2->angle_score);
-      parallel_2 = (1 - prof_cost) * (1 - dir_cost);
-      perpendicular_2 = prof_cost * dir_cost;
-      
-      /* this node thinks this is a parallel link */
-      if (parallel_1 > perpendicular_1) {
-        /* also the opposing node thinks this is a parallel link */
-        if (parallel_2 > perpendicular_2) {
-          lmeasure->category = bl_PARALLEL;
-          lmeasure->parallel_score = getmax(parallel_1, parallel_2);
-          lmeasure->perpendicular_score = getmin(perpendicular_1, perpendicular_2);
-          if (lmeasure1->against_score < 0.5) {
-            lmeasure1->category = bl_TOWARDS;
-            lmeasure2->category = bl_AGAINST;
-          }
-          else {
-            lmeasure1->category = bl_AGAINST;
-            lmeasure2->category = bl_TOWARDS;
-          }
-        }
-        /* the opposing node things this is a perpendicular link */
-        else {
-          /* which belief is stronger? */
-          if (parallel_1 > perpendicular_2 && eresp1->mag > eresp2->mag) {
+        parallel_1 = (1 - prof_cost) * (1 - dir_cost);
+        lmeasure1->parallel_score = parallel_1;
+        perpendicular_1 = prof_cost * dir_cost;
+        lmeasure1->perpendicular_score = perpendicular_1;
+        
+        dir_cost = fabs(lmeasure2->angle_score);
+        parallel_2 = (1 - prof_cost) * (1 - dir_cost);
+        perpendicular_2 = prof_cost * dir_cost;
+        
+        /* this node thinks this is a parallel link */
+        if (parallel_1 > perpendicular_1) {
+          /* also the opposing node thinks this is a parallel link */
+          if (parallel_2 > perpendicular_2) {
             lmeasure->category = bl_PARALLEL;
             lmeasure->parallel_score = getmax(parallel_1, parallel_2);
             lmeasure->perpendicular_score = getmin(perpendicular_1, perpendicular_2);
@@ -1301,100 +1293,117 @@ result quad_forest_calculate_edge_stats
               lmeasure2->category = bl_TOWARDS;
             }
           }
+          /* the opposing node things this is a perpendicular link */
           else {
-            lmeasure->category = bl_PERPENDICULAR;
-            lmeasure->parallel_score = getmin(parallel_1, parallel_2);
-            lmeasure->perpendicular_score = getmax(perpendicular_1, perpendicular_2);
-            if (eresp1->mag > eresp2->mag) {
-              if (lmeasure1->angle_score < 0) {
-                lmeasure1->category = bl_RIGHT;
-                lmeasure2->category = bl_LEFT;
+            /* which belief is stronger? */
+            if (parallel_1 > perpendicular_2 && eresp1->mag > eresp2->mag) {
+              lmeasure->category = bl_PARALLEL;
+              lmeasure->parallel_score = getmax(parallel_1, parallel_2);
+              lmeasure->perpendicular_score = getmin(perpendicular_1, perpendicular_2);
+              if (lmeasure1->against_score < 0.5) {
+                lmeasure1->category = bl_TOWARDS;
+                lmeasure2->category = bl_AGAINST;
               }
               else {
-                lmeasure1->category = bl_LEFT;
-                lmeasure2->category = bl_RIGHT;
+                lmeasure1->category = bl_AGAINST;
+                lmeasure2->category = bl_TOWARDS;
               }
             }
             else {
-              if (lmeasure2->angle_score < 0) {
-                lmeasure2->category = bl_RIGHT;
-                lmeasure1->category = bl_LEFT;
+              lmeasure->category = bl_PERPENDICULAR;
+              lmeasure->parallel_score = getmin(parallel_1, parallel_2);
+              lmeasure->perpendicular_score = getmax(perpendicular_1, perpendicular_2);
+              if (eresp1->mag > eresp2->mag) {
+                if (lmeasure1->angle_score < 0) {
+                  lmeasure1->category = bl_RIGHT;
+                  lmeasure2->category = bl_LEFT;
+                }
+                else {
+                  lmeasure1->category = bl_LEFT;
+                  lmeasure2->category = bl_RIGHT;
+                }
               }
               else {
-                lmeasure2->category = bl_LEFT;
-                lmeasure1->category = bl_RIGHT;
+                if (lmeasure2->angle_score < 0) {
+                  lmeasure2->category = bl_RIGHT;
+                  lmeasure1->category = bl_LEFT;
+                }
+                else {
+                  lmeasure2->category = bl_LEFT;
+                  lmeasure1->category = bl_RIGHT;
+                }
               }
             }
           }
         }
-      }
-      /* this node thinks this is a perpendicular link */
-      else {
-        /* the opposing node things this is a parallel link */
-        if (parallel_2 > perpendicular_2) {
-          /* which belief is stronger? */
-          if (parallel_2 > perpendicular_1 && eresp2->mag > eresp1->mag) {
-            lmeasure->category = bl_PARALLEL;
-            lmeasure->parallel_score = getmax(parallel_1, parallel_2);
-            lmeasure->perpendicular_score = getmin(perpendicular_1, perpendicular_2);
-            if (lmeasure2->against_score < 0.5) {
-              lmeasure2->category = bl_TOWARDS;
-              lmeasure1->category = bl_AGAINST;
-            }
-            else {
-              lmeasure2->category = bl_AGAINST;
-              lmeasure1->category = bl_TOWARDS;
-            }
-          }
-          else {
-            lmeasure->category = bl_PERPENDICULAR;
-            lmeasure->parallel_score = getmin(parallel_1, parallel_2);
-            lmeasure->perpendicular_score = getmax(perpendicular_1, perpendicular_2);
-            if (eresp1->mag > eresp2->mag) {
-              if (lmeasure1->angle_score < 0) {
-                lmeasure1->category = bl_RIGHT;
-                lmeasure2->category = bl_LEFT;
-              }
-              else {
-                lmeasure1->category = bl_LEFT;
-                lmeasure2->category = bl_RIGHT;
-              }
-            }
-            else {
-              if (lmeasure2->angle_score < 0) {
-                lmeasure2->category = bl_RIGHT;
-                lmeasure1->category = bl_LEFT;
-              }
-              else {
-                lmeasure2->category = bl_LEFT;
-                lmeasure1->category = bl_RIGHT;
-              }
-            }
-          }
-        }
-        /* also the opposing node thinks this is a perpendicular link */
+        /* this node thinks this is a perpendicular link */
         else {
-          lmeasure->category = bl_PERPENDICULAR;
-          lmeasure->parallel_score = getmin(parallel_1, parallel_2);
-          lmeasure->perpendicular_score = getmax(perpendicular_1, perpendicular_2);
-          if (eresp1->mag > eresp2->mag) {
-            if (lmeasure1->angle_score < 0) {
-              lmeasure1->category = bl_RIGHT;
-              lmeasure2->category = bl_LEFT;
+          /* the opposing node things this is a parallel link */
+          if (parallel_2 > perpendicular_2) {
+            /* which belief is stronger? */
+            if (parallel_2 > perpendicular_1 && eresp2->mag > eresp1->mag) {
+              lmeasure->category = bl_PARALLEL;
+              lmeasure->parallel_score = getmax(parallel_1, parallel_2);
+              lmeasure->perpendicular_score = getmin(perpendicular_1, perpendicular_2);
+              if (lmeasure2->against_score < 0.5) {
+                lmeasure2->category = bl_TOWARDS;
+                lmeasure1->category = bl_AGAINST;
+              }
+              else {
+                lmeasure2->category = bl_AGAINST;
+                lmeasure1->category = bl_TOWARDS;
+              }
             }
             else {
-              lmeasure1->category = bl_LEFT;
-              lmeasure2->category = bl_RIGHT;
+              lmeasure->category = bl_PERPENDICULAR;
+              lmeasure->parallel_score = getmin(parallel_1, parallel_2);
+              lmeasure->perpendicular_score = getmax(perpendicular_1, perpendicular_2);
+              if (eresp1->mag > eresp2->mag) {
+                if (lmeasure1->angle_score < 0) {
+                  lmeasure1->category = bl_RIGHT;
+                  lmeasure2->category = bl_LEFT;
+                }
+                else {
+                  lmeasure1->category = bl_LEFT;
+                  lmeasure2->category = bl_RIGHT;
+                }
+              }
+              else {
+                if (lmeasure2->angle_score < 0) {
+                  lmeasure2->category = bl_RIGHT;
+                  lmeasure1->category = bl_LEFT;
+                }
+                else {
+                  lmeasure2->category = bl_LEFT;
+                  lmeasure1->category = bl_RIGHT;
+                }
+              }
             }
           }
+          /* also the opposing node thinks this is a perpendicular link */
           else {
-            if (lmeasure2->angle_score < 0) {
-              lmeasure2->category = bl_RIGHT;
-              lmeasure1->category = bl_LEFT;
+            lmeasure->category = bl_PERPENDICULAR;
+            lmeasure->parallel_score = getmin(parallel_1, parallel_2);
+            lmeasure->perpendicular_score = getmax(perpendicular_1, perpendicular_2);
+            if (eresp1->mag > eresp2->mag) {
+              if (lmeasure1->angle_score < 0) {
+                lmeasure1->category = bl_RIGHT;
+                lmeasure2->category = bl_LEFT;
+              }
+              else {
+                lmeasure1->category = bl_LEFT;
+                lmeasure2->category = bl_RIGHT;
+              }
             }
             else {
-              lmeasure2->category = bl_LEFT;
-              lmeasure1->category = bl_RIGHT;
+              if (lmeasure2->angle_score < 0) {
+                lmeasure2->category = bl_RIGHT;
+                lmeasure1->category = bl_LEFT;
+              }
+              else {
+                lmeasure2->category = bl_LEFT;
+                lmeasure1->category = bl_RIGHT;
+              }
             }
           }
         }
