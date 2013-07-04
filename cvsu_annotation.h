@@ -264,7 +264,7 @@ typedef enum link_category_t {
   bl_LEFT          = 0x24, /* 00100100, perpendicular */
   bl_RIGHT         = 0x28, /* 00101000, perpendicular */
   bl_PARALLEL      = 0x10, /* 00010000 */
-  bl_PERPENDICULAR = 0x20, /* 00100000 */
+  bl_PERPENDICULAR = 0x20  /* 00100000 */
 } link_category;
 
 #define IS_PARALLEL(expr) (((expr) & bl_PARALLEL) != 0)
