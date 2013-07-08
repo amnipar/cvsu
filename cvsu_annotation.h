@@ -132,6 +132,7 @@ typedef struct neighborhood_stat_t {
   integral_value mean_ledge_score;
   integral_value dev_ridge_score;
   integral_value dev_ledge_score;
+  integral_value mag_ridge_score;
   integral_value profile_score;
   integral_value segment_score;
   integral_value boundary_score;

@@ -1706,7 +1706,7 @@ result quad_forest_get_links
           */
           color_line.color[0] = (byte)score;
           color_line.color[1] = (byte)score;
-          color_line.color[2] = (byte)score;
+          color_line.color[2] = 0;/*(byte)score;*/
           CHECK(list_append(links, (pointer)&color_line));
         }
         else {
@@ -1754,7 +1754,7 @@ result quad_forest_get_links
           */
           color_line.color[0] = (byte)score;
           color_line.color[1] = (byte)score;
-          color_line.color[2] = (byte)score;
+          color_line.color[2] = 0;/*(byte)score;*/
           CHECK(list_append(links, (pointer)&color_line));
         }
         else {
@@ -1876,12 +1876,15 @@ result quad_forest_get_links
           dx = getlround(cos(head->angle) * radius);
           dy = getlround(sin(head->angle) * radius);
 
-          new_line.start.x = x;
-          new_line.start.y = y;
-          new_line.end.x = x + dx;
-          new_line.end.y = y - dy;
-          new_line.weight = 1;
-          CHECK(list_append(links, (pointer)&new_line));
+          color_line.start.x = x;
+          color_line.start.y = y;
+          color_line.end.x = x + dx;
+          color_line.end.y = y - dy;
+          /*color_line.weight = 1;*/
+          color_line.color[0] = 255;
+          color_line.color[1] = 255;
+          color_line.color[2] = 0;
+          CHECK(list_append(links, (pointer)&color_line));
         }
         if (elinks->against != NULL) {
           head = elinks->against;
@@ -1891,12 +1894,15 @@ result quad_forest_get_links
           dx = getlround(cos(head->angle) * radius);
           dy = getlround(sin(head->angle) * radius);
 
-          new_line.start.x = x;
-          new_line.start.y = y;
-          new_line.end.x = x + dx;
-          new_line.end.y = y - dy;
-          new_line.weight = 0.75;
-          CHECK(list_append(links, (pointer)&new_line));
+          color_line.start.x = x;
+          color_line.start.y = y;
+          color_line.end.x = x + dx;
+          color_line.end.y = y - dy;
+          /*color_line.weight = 0.75;*/
+          color_line.color[0] = 255;
+          color_line.color[1] = 255;
+          color_line.color[2] = 0;
+          CHECK(list_append(links, (pointer)&color_line));
         }
         /*
         if (elinks->other != NULL) {
