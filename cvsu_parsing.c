@@ -53,6 +53,7 @@ string quad_tree_link_head_ensure_measure_name = "quad_tree_link_head_ensure_mea
 string quad_tree_ensure_edge_profiles_name = "quad_tree_ensure_edge_profiles";
 string quad_tree_ensure_edge_links_name = "quad_tree_ensure_edge_links";
 string quad_tree_ensure_ridge_potential_name = "quad_tree_ensure_ridge_potential";
+string consider_edge_links_name = "consider_edge_links";
 string quad_forest_parse_name = "quad_forest_parse";
 string quad_forest_visualize_parse_result_name = "quad_forest_visualize_parse_result";
 
@@ -2183,6 +2184,64 @@ result quad_tree_ensure_ridge_potential
   RETURN();
 }
 
+result consider_edge_links
+(
+  quad_forest *forest,
+  quad_tree *tree1,
+  edge_links **elinks
+)
+{
+  TRY();
+  typed_pointer *tptr;
+  quad_tree *tree2;
+  edge_links *elinks1, *elinks2;
+  edge_response *eresp1;
+  list_item *links, *endlinks;
+  quad_tree_link_head *head, *head_towards, *head_against;
+  integral_value tree_angle;
+  
+  CHECK_POINTER(tree1);
+  
+  head_towards = NULL;
+  head_against = NULL;
+  links = tree1->links.first.next;
+  endlinks = &tree1->links.last;
+  while (links != endlinks) {
+    head = *((quad_tree_link_head**)links->data);
+    tree2 = head->other->tree;
+    elinks2 = has_edge_links(&tree2->annotation, forest->token);
+    if (elinks2 != NULL) {
+      if (elinks2->towards == NULL || elinks2->towards->other == head) {
+        head_towards = head;
+      }
+      if (elinks2->against == NULL || elinks2->against->other == head) {
+        head_against = head;
+      }
+    }
+    links = links->next;
+  }
+  elinks1 = NULL;
+  if (head_towards != NULL && head_against != NULL) {
+    CHECK(ensure_has(&tree1->annotation, t_edge_links, &tptr));
+    elinks1 = (edge_links*)tptr->value;
+    if (tptr->token != forest->token) {
+      tptr->token = forest->token;
+      CHECK(expect_edge_response(&eresp1, &tree1->annotation));
+      tree_angle = eresp1->ang - M_PI_2;
+      if (tree_angle < 0) tree_angle += M_2PI;
+      elinks1->own_angle = tree_angle;
+      elinks1->towards = head_towards;
+      elinks1->against = head_against;
+    }
+  }
+  
+  if (elinks != NULL) {
+    *elinks = elinks1;
+  }
+  FINALLY(consider_edge_links);
+  RETURN();
+}
+
 /******************************************************************************/
 
 /* parameters needed. */
@@ -2209,6 +2268,7 @@ result quad_forest_parse
   list ridgelist, boundarylist, link_send, link_recv;
   list_item *trees, *endtrees, *links, *endlinks;
   integral_value score, towards_score, against_score, boundary_score;
+  integral_value own_angle, towards_angle, against_angle, curvature1, curvature2;
 
   CHECK_POINTER(forest);
   CHECK_PARAM(rounds > 0);
@@ -2274,20 +2334,115 @@ result quad_forest_parse
         elinks_tree = (edge_links*)tptr->value;
         if (tptr->token != forest->token) {
           tptr->token = forest->token;
-          if (best_ltowards != NULL) {
-            tree2 = best_ltowards->other->tree;
-            elinks_tree->towards = best_ltowards;
-          }
-          if (best_lagainst != NULL) {
-            tree2 = best_lagainst->other->tree;
-            elinks_tree->against = best_lagainst;
-          }
+          CHECK(expect_edge_response(&eresp1, &tree1->annotation));
+          own_angle = eresp1->ang - M_PI_2;
+          if (own_angle < 0) own_angle += M_2PI;
+          elinks_tree->own_angle = own_angle;
+          elinks_tree->towards = best_ltowards;
+          elinks_tree->against = best_lagainst;
         }
+        CHECK(list_append(&boundarylist, &tree1));
       }
     }
     trees = trees->next;
   }
   
+  trees = boundarylist.first.next;
+  endtrees = &boundarylist.last;
+  while (trees != endtrees) {
+    tree1 = *((quad_tree**)trees->data);
+    CHECK(expect_edge_links(&tree1->annotation, &elinks_tree, forest->token));
+    own_angle = elinks_tree->own_angle;
+    towards_angle = -10;
+    against_angle = -10;
+    if (elinks_tree->towards != NULL) {
+      tree2 = elinks_tree->towards->other->tree;
+      elinks_towards = has_edge_links(&tree2->annotation, forest->token);
+      /* if does not have edge links, check if it could have */
+      if (elinks_towards == NULL) {
+        CHECK(consider_edge_links(forest, tree2, &elinks_towards));
+        if (elinks_towards != NULL) {
+          CHECK(list_append(&boundarylist, &tree2));
+        }
+      }
+      /* now check if the linked neighbor has edge links */
+      if (elinks_towards != NULL) {
+        /* does it have a link back? */
+        if (elinks_towards->against != NULL) {
+          /* does it link back to this tree? */
+          if (elinks_towards->against->other == elinks_tree->towards) {
+            towards_angle = elinks_towards->own_angle;
+            towards_angle = angle_minus_angle(own_angle, towards_angle);
+          }
+          /* if not, need to check routing */
+          else {
+            
+          }
+        }
+        /* if not, it should be a safe bet to link back to this tree */
+        else {
+          elinks_towards->against = elinks_tree->towards->other;
+          towards_angle = elinks_towards->own_angle;
+          towards_angle = angle_minus_angle(own_angle, towards_angle);
+        }
+      }
+      /* if no edge links at this point, then the boundary ends */
+    }
+    if (elinks_tree->against != NULL) {
+      tree2 = elinks_tree->against->other->tree;
+      elinks_against = has_edge_links(&tree2->annotation, forest->token);
+      /* if does not have edge links, check if it could have */
+      if (elinks_against == NULL) {
+        CHECK(consider_edge_links(forest, tree2, &elinks_against));
+        if (elinks_against != NULL) {
+          CHECK(list_append(&boundarylist, &tree2));
+        }
+      }
+      /* now check if the linked neighbor has edge links */
+      if (elinks_against != NULL) {
+        /* does it have a link back? */
+        if (elinks_against->towards != NULL) {
+          /* does it link back to this tree? */
+          if (elinks_against->towards->other == elinks_tree->against) {
+            against_angle = elinks_against->own_angle;
+            against_angle = angle_minus_angle(against_angle, own_angle);
+          }
+          /* if not, need to check routing */
+          else {
+            
+          }
+        }
+        /* if not, it should be a safe bet to link back to this tree */
+        else {
+          elinks_against->towards = elinks_tree->against->other;
+          against_angle = elinks_against->own_angle;
+          against_angle = angle_minus_angle(against_angle, own_angle);
+        }
+      }
+      /* if no edge links at this point, then the boundary ends */
+    }
+    /* curvature requires two neighbors */
+    if (towards_angle > -5 && against_angle > -5) {
+      /* both neighbors need to curve in the same direction */
+      if (signum(towards_angle) == signum(against_angle)) {
+        curvature1 = (towards_angle + against_angle) / 2;
+        curvature2 = fabs(towards_angle - against_angle);
+      }
+      /* otherwise curvature is 0 (a saddle point) */
+      else {
+        curvature1 = 0;
+        curvature2 = 0;
+      }
+    }
+    /* otherwise curvature is 0 */
+    else {
+      curvature1 = 0;
+      curvature2 = 0;
+    }
+    elinks_tree->curvature = curvature1;
+    elinks_tree->straightness = curvature2;
+    trees = trees->next;
+  }
   /* set the state of forest */
   quad_forest_set_parse(forest);
 

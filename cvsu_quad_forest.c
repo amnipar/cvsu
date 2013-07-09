@@ -1859,8 +1859,29 @@ result quad_forest_get_links
   if (mode == v_LINK_EDGE) {
     quad_tree_link_head *head;
     edge_links *elinks;
-    integral_value radius;
+    integral_value radius, curvature, max_curvature, straightness, max_straightness;
     sint32 x, y, dx, dy;
+    
+    max_curvature = 0;
+    max_straightness = 0;
+    items = forest->trees.first.next;
+    end = &forest->trees.last;
+    while (items != end) {
+      tree = (quad_tree*)items->data;
+      elinks = has_edge_links(&tree->annotation, forest->token);
+      if (elinks != NULL) {
+        curvature = fabs(elinks->curvature);
+        if (curvature > max_curvature) {
+          max_curvature = curvature;
+        }
+        straightness = elinks->straightness;
+        if (straightness > max_straightness) {
+          max_straightness = straightness;
+        }
+      }
+      items = items->next;
+    }
+    PRINT2("max curvature: %.3f, straightness: %.3f\n", max_curvature, max_straightness);
 
     items = forest->trees.first.next;
     end = &forest->trees.last;
@@ -1868,6 +1889,10 @@ result quad_forest_get_links
       tree = (quad_tree*)items->data;
       elinks = has_edge_links(&tree->annotation, forest->token);
       if (elinks != NULL) {
+        curvature = fabs(elinks->curvature);
+        curvature /= max_curvature;
+        straightness = elinks->straightness;
+        straightness /= max_straightness;
         if (elinks->towards != NULL) {
           head = elinks->towards;
           radius = ((integral_value)tree->size) / 2.0;
@@ -1881,9 +1906,9 @@ result quad_forest_get_links
           color_line.end.x = x + dx;
           color_line.end.y = y - dy;
           /*color_line.weight = 1;*/
-          color_line.color[0] = 255;
-          color_line.color[1] = 255;
-          color_line.color[2] = 0;
+          color_line.color[0] = (byte)((1 - curvature) * 255);
+          color_line.color[1] = (byte)((1 - curvature) * 255);
+          color_line.color[2] = (byte)((1 - straightness) * 255);
           CHECK(list_append(links, (pointer)&color_line));
         }
         if (elinks->against != NULL) {
@@ -1899,9 +1924,9 @@ result quad_forest_get_links
           color_line.end.x = x + dx;
           color_line.end.y = y - dy;
           /*color_line.weight = 0.75;*/
-          color_line.color[0] = 255;
-          color_line.color[1] = 255;
-          color_line.color[2] = 0;
+          color_line.color[0] = (byte)((1 - curvature) * 255);
+          color_line.color[1] = (byte)((1 - curvature) * 255);
+          color_line.color[2] = (byte)((1 - straightness) * 255);
           CHECK(list_append(links, (pointer)&color_line));
         }
         /*
