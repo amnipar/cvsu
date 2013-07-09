@@ -1881,7 +1881,7 @@ result quad_forest_get_links
       }
       items = items->next;
     }
-    PRINT2("max curvature: %.3f, straightness: %.3f\n", max_curvature, max_straightness);
+    /*PRINT2("max curvature: %.3f, straightness: %.3f\n", max_curvature, max_straightness);*/
 
     items = forest->trees.first.next;
     end = &forest->trees.last;
