@@ -1906,9 +1906,14 @@ result quad_forest_get_links
           color_line.end.x = x + dx;
           color_line.end.y = y - dy;
           /*color_line.weight = 1;*/
-          color_line.color[0] = (byte)((1 - curvature) * 255);
-          color_line.color[1] = (byte)((1 - curvature) * 255);
-          color_line.color[2] = (byte)((1 - straightness) * 255);
+          color_line.color[0] = 255;/*(byte)((1 - curvature) * 255);*/
+          color_line.color[1] = 255;/*(byte)((1 - curvature) * 255);*/
+          color_line.color[2] = 0;/*(byte)((1 - straightness) * 255);*/
+          
+          color_line.color[0] = 0;
+          color_line.color[1] = 255;
+          color_line.color[2] = 255;
+          
           CHECK(list_append(links, (pointer)&color_line));
         }
         if (elinks->against != NULL) {
@@ -1924,9 +1929,14 @@ result quad_forest_get_links
           color_line.end.x = x + dx;
           color_line.end.y = y - dy;
           /*color_line.weight = 0.75;*/
-          color_line.color[0] = (byte)((1 - curvature) * 255);
-          color_line.color[1] = (byte)((1 - curvature) * 255);
-          color_line.color[2] = (byte)((1 - straightness) * 255);
+          color_line.color[0] = 255;/*(byte)((1 - curvature) * 255);*/
+          color_line.color[1] = 255;/*(byte)((1 - curvature) * 255);*/
+          color_line.color[2] = 0;/*(byte)((1 - straightness) * 255);*/
+          
+          color_line.color[0] = 0;
+          color_line.color[1] = 255;
+          color_line.color[2] = 255;
+          
           CHECK(list_append(links, (pointer)&color_line));
         }
         /*

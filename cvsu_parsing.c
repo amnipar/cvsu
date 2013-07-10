@@ -894,7 +894,7 @@ result quad_forest_visualize_neighborhood_stats
       break;
     case v_SCORE:
       {
-        integral_value score;
+        integral_value score, total_score;
         
         trees = forest->trees.first.next;
         end = &forest->trees.last;
@@ -907,21 +907,23 @@ result quad_forest_visualize_neighborhood_stats
               if (score < 1) score = 0;
               else score = (getmin(3.0, score) - 1) / 2;
               color0 = (byte)(255 * score);
-              
+              total_score = score;
               score = fabs(nstat->mag_ridge_score);
               if (score < 0.5) score = 0;
               else score = (getmin(1.5, score) - 0.5);
               color1 = (byte)(255 * score);
-              
+              total_score += score;
               score = fabs(nstat->dev_ridge_score);
               if (score < 0.5) score = 0;
               else score = (getmin(1.5, score) - 0.5);
               color2 = (byte)(255 * score);
-              /*
-              color0 = 0;
-              color1 = 0;
-              color2 = 0;
-              */
+              total_score += (2 * score);
+              total_score /= 4;
+              
+              color0 = (byte)(255 * total_score);
+              color1 = color0;
+              color2 = color0;
+              
             }
             else {
               color0 = 0;
@@ -1121,7 +1123,7 @@ result quad_tree_ensure_edge_stats
     against_mag_sum /= against_weight;
     
     /* for mean scores, use mean_dev to scale */
-    if (mean_dev < 5) mean_dev = 5;
+    if (mean_dev < 4) mean_dev = 4;
             
     /* calculate mean ledge score */
     score = (left_mean_sum - right_mean_sum) / mean_dev;
@@ -1162,7 +1164,7 @@ result quad_tree_ensure_edge_stats
     nstat->mean_ridge_score = score;
     
     /* for dev scores, use dev_dev to scale */
-    if (dev_dev < 2) dev_dev = 2;
+    if (dev_dev < 1) dev_dev = 1;
     
     /* calculate dev ledge score */
     score = (left_dev_sum - right_dev_sum) / dev_dev;
@@ -1276,7 +1278,7 @@ result quad_forest_calculate_edge_stats
     else if (mscore1 < 0.5) mscore1 = 0;
     else mscore1 = (mscore1 - 0.5);
     
-    boundary_score = (lscore1 + dscore1 + mscore1) / 3;
+    boundary_score = (lscore1 + 2 * dscore1 + mscore1) / 4;
     segment_score = 1 - boundary_score;
     
     links = tree1->links.first.next;
@@ -1333,7 +1335,7 @@ result quad_forest_calculate_edge_stats
         }
         
         /* calculate the profile cost */
-        prof_cost = (mean_ledge_dist + mag_ridge_dist + dev_ridge_dist) / 3;
+        prof_cost = (mean_ledge_dist + mag_ridge_dist + 2 * dev_ridge_dist) / 4;
         lmeasure1->profile_score = prof_cost;
         lmeasure2->profile_score = prof_cost;
         
@@ -1603,13 +1605,13 @@ result extend_edge_links
   while (links != endlinks) {
     head1 = *((quad_tree_link_head**)links->data);
     CHECK(expect_link_measure(&head1->annotation, &lmeasure1, forest->token));
-    if ((category == bl_TOWARDS && lmeasure1->against_score < 0.5) ||
-        (category == bl_AGAINST && lmeasure1->against_score > 0.5))
+    if ((category == bl_TOWARDS && lmeasure1->against_score < 0.3) ||
+        (category == bl_AGAINST && lmeasure1->against_score > 0.8))
     {
       tree2 = head1->other->tree;
       CHECK(expect_neighborhood_stat(&nstat2, &tree2->annotation));
       score = nstat2->boundary_score;
-      profile = lmeasure1->profile_score;
+      profile = lmeasure1->profile_score * fabs(lmeasure1->angle_score);
       elinks2 = has_edge_links(&tree2->annotation, forest->token);
       if (elinks2 != NULL) {
         score *= 1.5;
@@ -1982,7 +1984,7 @@ result quad_forest_visualize_parse_result
   CHECK(list_create(&lines, 1000, sizeof(colored_line), 1));
   CHECK(list_create(&frags, 1000, sizeof(colored_rect), 1));
 
-  /*CHECK(quad_forest_visualize_neighborhood_stats(forest, target, v_SCORE));*/
+  CHECK(quad_forest_visualize_neighborhood_stats(forest, target, v_SCORE));
   /*CHECK(quad_forest_get_links(forest, &links, v_LINK_MEASURE));*/
   CHECK(quad_forest_get_links(forest, &links, v_LINK_EDGE));
   CHECK(pixel_image_draw_colored_lines(target, &links, 2));
