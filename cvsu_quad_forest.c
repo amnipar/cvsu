@@ -1861,7 +1861,7 @@ result quad_forest_get_links
     edge_links *elinks;
     integral_value radius, curvature, max_curvature, straightness, max_straightness;
     sint32 x, y, dx, dy;
-    
+
     max_curvature = 0;
     max_straightness = 0;
     items = forest->trees.first.next;
@@ -1909,11 +1909,11 @@ result quad_forest_get_links
           color_line.color[0] = 255;/*(byte)((1 - curvature) * 255);*/
           color_line.color[1] = 255;/*(byte)((1 - curvature) * 255);*/
           color_line.color[2] = 0;/*(byte)((1 - straightness) * 255);*/
-          
+          /*
           color_line.color[0] = 0;
           color_line.color[1] = 255;
           color_line.color[2] = 255;
-          
+          */
           CHECK(list_append(links, (pointer)&color_line));
         }
         if (elinks->against != NULL) {
@@ -1929,14 +1929,14 @@ result quad_forest_get_links
           color_line.end.x = x + dx;
           color_line.end.y = y - dy;
           /*color_line.weight = 0.75;*/
-          color_line.color[0] = 255;/*(byte)((1 - curvature) * 255);*/
-          color_line.color[1] = 255;/*(byte)((1 - curvature) * 255);*/
+          color_line.color[0] = 127;/*(byte)((1 - curvature) * 255);*/
+          color_line.color[1] = 127;/*(byte)((1 - curvature) * 255);*/
           color_line.color[2] = 0;/*(byte)((1 - straightness) * 255);*/
-          
+          /*
           color_line.color[0] = 0;
           color_line.color[1] = 255;
           color_line.color[2] = 255;
-          
+          */
           CHECK(list_append(links, (pointer)&color_line));
         }
         /*

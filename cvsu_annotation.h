@@ -350,6 +350,7 @@ edge_profile *has_edge_profile
 /******************************************************************************/
 
 typedef struct edge_links_t {
+  uint32 round;
   struct quad_tree_link_head_t *towards;
   struct quad_tree_link_head_t *against;
   /*struct quad_tree_link_head_t *other;*/
