@@ -45,6 +45,7 @@ extern "C" {
 typedef struct temporal_forest_t {
   background_forest *background;
   quad_forest *forests;
+  quad_forest *cforest;
   pixel_image visual;
   uint32 rows;
   uint32 cols;

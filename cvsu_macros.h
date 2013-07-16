@@ -85,6 +85,10 @@ long lround(double __x);
 #define M_PI_2    1.570796326794896619231321691640 /* pi/2 */
 #endif
 
+#ifndef M_PI_3
+#define M_PI_3    1.047197551196597746154214461093 /* pi/3 */
+#endif
+
 #ifndef M_PI_4
 #define M_PI_4    0.785398163397448309615660845820 /* pi/4 */
 #endif

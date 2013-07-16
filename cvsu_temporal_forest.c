@@ -107,7 +107,7 @@ result temporal_forest_create
     CHECK(quad_forest_create(&target->forests[i], source, max_size, min_size));
   }
   target->count = frame_count;
-  target->current = 0;
+  target->current = -1;
   target->frames = 0;
   CHECK(pixel_image_create(&target->visual, p_U8, RGB, source->width, source->height, 3, 3 * source->stride));
   target->tree_max_size = max_size;
@@ -159,6 +159,7 @@ result temporal_forest_nullify
   CHECK(pixel_image_nullify(&target->visual));
   target->background = NULL;
   target->forests = NULL;
+  target->cforest = NULL;
   target->rows = 0;
   target->cols = 0;
   target->tree_max_size = 0;
@@ -210,11 +211,8 @@ result temporal_forest_update
   if (target->current >= target->count) {
     target->current = 0;
   }
-  CHECK(pixel_image_copy(target->forests[target->current].source, source));
   target->frames++;
-  target->forests[target->current].token = target->frames;
-  CHECK(quad_forest_update(&target->forests[target->current]));
-  if (target->frames > 1) {
+  /*if (target->frames > 1) {*/
     if (target->current == 0) {
       forest1 = &target->forests[target->count - 1];
     }
@@ -222,11 +220,14 @@ result temporal_forest_update
       forest1 = &target->forests[target->current - 1];
     }
     forest2 = &target->forests[target->current];
+    forest2->token = target->frames;
+    CHECK(pixel_image_copy(forest2->source, source));
+    CHECK(quad_forest_update(forest2));
 
-    /*forest2->token = target->frames;*/
     /*CHECK(quad_forest_calculate_neighborhood_stats(forest2, TRUE, 2, TRUE, FALSE, TRUE));*/
     /*CHECK(quad_forest_calculate_accumulated_regs(forest2, 5));*/
     CHECK(quad_forest_parse(forest2, 1, FALSE));
+    target->cforest = forest2;
     /*
     size = target->rows * target->cols;
     for (i = 0; i < size; i++) {
@@ -358,8 +359,7 @@ result temporal_forest_update
     }
     CHECK(quad_forest_refresh_segments(forest2));
     */
-
-  }
+  /*}*/
 
   FINALLY(temporal_forest_update);
   RETURN();
@@ -384,100 +384,102 @@ result temporal_forest_visualize
 
   CHECK_POINTER(target);
 
-  forest = &target->forests[target->current];
-  width = target->visual.width;
-  height = target->visual.height;
+  forest = target->cforest; /*&target->forests[target->current];*/
+  if (forest != NULL) {
+    width = target->visual.width;
+    height = target->visual.height;
 
-  if (image != NULL) {
-    CHECK_PARAM(image->width == width);
-    CHECK_PARAM(image->height == height);
-    CHECK_PARAM(image->type == p_U8);
-    CHECK_PARAM(image->format == RGB);
+    if (image != NULL) {
+      CHECK_PARAM(image->width == width);
+      CHECK_PARAM(image->height == height);
+      CHECK_PARAM(image->type == p_U8);
+      CHECK_PARAM(image->format == RGB);
 
-    stride = image->stride;
-    target_data = (byte*)image->data;
-  }
-  else {
-    stride = target->visual.stride;
-    target_data = (byte*)target->visual.data;
-  }
-
-  /*
-  CHECK(pixel_image_clear(&target->visual));
-  CHECK(convert_grey8_to_grey24(forest->source, &target->visual));
-  */
-
-  CHECK(list_create(&lines, 1000, sizeof(colored_line), 1));
-
-  /*CHECK(quad_forest_visualize_accumulated_regs(forest, &target->visual));*/
-  if (image != NULL) {
-    CHECK(quad_forest_visualize_parse_result(forest, image));
-    /*CHECK(quad_forest_visualize_neighborhood_stats(forest, image, v_SCORE));*/
-    /*CHECK(quad_forest_get_links(forest, &lines, v_LINK_MEASURE));*/
-    /*
-    CHECK(quad_forest_get_links(forest, &lines, v_LINK_EDGE));
-    CHECK(pixel_image_draw_colored_lines(image, &lines, 1));
-    */
-  }
-  else {
-    CHECK(quad_forest_visualize_parse_result(forest, &target->visual));
-    /*CHECK(quad_forest_visualize_neighborhood_stats(forest, &target->visual, v_SCORE));*/
-    /*CHECK(quad_forest_get_links(forest, &lines, v_LINK_MEASURE));*/
-    /*
-    CHECK(quad_forest_get_links(forest, &lines, v_LINK_EDGE));
-    CHECK(pixel_image_draw_colored_lines(&target->visual, &lines, 2));
-    */
-  }
-  /*
-  CHECK(list_create(&lines, 1000, sizeof(line), 1));
-  trees = forest->trees.first.next;
-  end = &forest->trees.last;
-  while (trees != end) {
-    tree = (quad_tree *)trees->data;
-    if (tree->nw == NULL) {
-      CHECK(quad_tree_edge_response_to_line(tree, &lines));
+      stride = image->stride;
+      target_data = (byte*)image->data;
     }
-    trees = trees->next;
-  }
-  CHECK(pixel_image_draw_lines(&target->visual, &lines));
-  */
-  /*
-  CHECK(pixel_image_clear(&target->visual));
+    else {
+      stride = target->visual.stride;
+      target_data = (byte*)target->visual.data;
+    }
 
-  trees = forest->trees.first.next;
-  end = &forest->trees.last;
-  while (trees != end) {
-    tree = (quad_tree *)trees->data;
-    if (tree->nw == NULL) {
-      parent = quad_tree_segment_find(tree);
-      if (parent != NULL) {
-        color0 = parent->color[0];
-        color1 = parent->color[1];
-        color2 = parent->color[2];
+    /*
+    CHECK(pixel_image_clear(&target->visual));
+    CHECK(convert_grey8_to_grey24(forest->source, &target->visual));
+    */
+
+    CHECK(list_create(&lines, 1000, sizeof(colored_line), 1));
+
+    /*CHECK(quad_forest_visualize_accumulated_regs(forest, &target->visual));*/
+    if (image != NULL) {
+      CHECK(quad_forest_visualize_parse_result(forest, image));
+      /*CHECK(quad_forest_visualize_neighborhood_stats(forest, image, v_SCORE));*/
+      /*CHECK(quad_forest_get_links(forest, &lines, v_LINK_MEASURE));*/
+      /*
+      CHECK(quad_forest_get_links(forest, &lines, v_LINK_EDGE));
+      CHECK(pixel_image_draw_colored_lines(image, &lines, 1));
+      */
+    }
+    else {
+      CHECK(quad_forest_visualize_parse_result(forest, &target->visual));
+      /*CHECK(quad_forest_visualize_neighborhood_stats(forest, &target->visual, v_SCORE));*/
+      /*CHECK(quad_forest_get_links(forest, &lines, v_LINK_MEASURE));*/
+      /*
+      CHECK(quad_forest_get_links(forest, &lines, v_LINK_EDGE));
+      CHECK(pixel_image_draw_colored_lines(&target->visual, &lines, 2));
+      */
+    }
+    /*
+    CHECK(list_create(&lines, 1000, sizeof(line), 1));
+    trees = forest->trees.first.next;
+    end = &forest->trees.last;
+    while (trees != end) {
+      tree = (quad_tree *)trees->data;
+      if (tree->nw == NULL) {
+        CHECK(quad_tree_edge_response_to_line(tree, &lines));
       }
-      else {
-        color0 = (byte)tree->stat.mean;
-        color1 = color0;
-        color2 = color0;
-      }
-      width = tree->size;
-      height = width;
-      row_step = stride - 3 * width;
-      target_pos = target_data + tree->y * stride + tree->x * 3;
-      for (y = 0; y < height; y++, target_pos += row_step) {
-        for (x = 0; x < width; x++) {
-          *target_pos = color0;
-          target_pos++;
-          *target_pos = color1;
-          target_pos++;
-          *target_pos = color2;
-          target_pos++;
+      trees = trees->next;
+    }
+    CHECK(pixel_image_draw_lines(&target->visual, &lines));
+    */
+    /*
+    CHECK(pixel_image_clear(&target->visual));
+
+    trees = forest->trees.first.next;
+    end = &forest->trees.last;
+    while (trees != end) {
+      tree = (quad_tree *)trees->data;
+      if (tree->nw == NULL) {
+        parent = quad_tree_segment_find(tree);
+        if (parent != NULL) {
+          color0 = parent->color[0];
+          color1 = parent->color[1];
+          color2 = parent->color[2];
+        }
+        else {
+          color0 = (byte)tree->stat.mean;
+          color1 = color0;
+          color2 = color0;
+        }
+        width = tree->size;
+        height = width;
+        row_step = stride - 3 * width;
+        target_pos = target_data + tree->y * stride + tree->x * 3;
+        for (y = 0; y < height; y++, target_pos += row_step) {
+          for (x = 0; x < width; x++) {
+            *target_pos = color0;
+            target_pos++;
+            *target_pos = color1;
+            target_pos++;
+            *target_pos = color2;
+            target_pos++;
+          }
         }
       }
+      trees = trees->next;
     }
-    trees = trees->next;
+    */
   }
-  */
   FINALLY(temporal_forest_visualize);
   list_destroy(&lines);
   RETURN();
@@ -492,7 +494,7 @@ quad_forest *temporal_forest_get_current
 {
   if (target != NULL) {
     if (target->count > 0) {
-      return &target->forests[target->current];
+      return target->cforest; /*&target->forests[target->current];*/
     }
   }
   return NULL;

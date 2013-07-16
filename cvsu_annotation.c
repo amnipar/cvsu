@@ -482,14 +482,7 @@ result ensure_edge_links
     links->towards = NULL;
     links->against = NULL;
     links->own_angle = 0;
-    links->towards_angle = 0;
-    links->against_angle = 0;
-    links->straightness = 0;
-    links->curvature = 0;
-    links->own_consistency = 0;
-    links->towards_consistency = 0;
-    links->against_consistency = 0;
-    links->direction_consistency = 0;
+    links->own_curvature = 0;
   }
   *elinks = links;
 
@@ -851,31 +844,33 @@ result quad_tree_ensure_boundary
 
   CHECK_POINTER(input_tree);
 
-  if (output_boundary != NULL) {
-    *output_boundary = NULL;
-  }
-
   annotation = &input_tree->annotation;
   CHECK(ensure_has(annotation, t_boundary, &new_pointer));
   tree_boundary = (boundary*)new_pointer->value;
   /* proceed only if the boundary hasn't been initialized yet in this frame */
   if (new_pointer->token != annotation->token) {
-    /* still need to check also the parent? */
-    /*if (tree_boundary->parent == NULL)*/
     new_pointer->token = annotation->token;
     /* one-tree segment is it's own parent, and has the rank of 0 */
     tree_boundary->parent = tree_boundary;
+    tree_boundary->prev = NULL;
+    tree_boundary->next = NULL;
+    tree_boundary->tree = input_tree;
     tree_boundary->category = fc_UNDEF;
     tree_boundary->rank = 0;
     tree_boundary->x1 = input_tree->x;
     tree_boundary->y1 = input_tree->y;
     tree_boundary->x2 = input_tree->x + input_tree->size - 1;
     tree_boundary->y2 = input_tree->y + input_tree->size - 1;
-    tree_boundary->length = 1;
+    tree_boundary->length = 0;
+    tree_boundary->angle = 0;
+    tree_boundary->curvature = 0;
+    tree_boundary->angle_mean = 0;
+    tree_boundary->angle_sum = 0;
     tree_boundary->curvature_mean = 0;
     tree_boundary->curvature_sum = 0;
-    tree_boundary->dir_a = 0;
-    tree_boundary->dir_b = 0;
+    tree_boundary->angle_1 = 0;
+    tree_boundary->angle_2 = 0;
+    tree_boundary->links = NULL;
     tree_boundary->hypotheses = NULL;
   }
 
@@ -895,19 +890,22 @@ void boundary_init
   edge_links *elinks
 )
 {
-  integral_value curvature;
+  integral_value angle;
   if (input_boundary != NULL && elinks != NULL) {
     boundary *parent;
     parent = boundary_find(input_boundary);
-    if (parent == input_boundary && parent->length <= 1) {
-      curvature = elinks->curvature;
+    if (parent == input_boundary && parent->length < 1) {
+      angle = elinks->own_angle;
       /* for a fragment of one node, the category is still unknown. */
       input_boundary->category = fc_UNKNOWN;
       input_boundary->length = 1;
-      input_boundary->curvature_mean = curvature;
-      input_boundary->curvature_sum = curvature;
-      input_boundary->dir_a = elinks->against_angle;
-      input_boundary->dir_b = elinks->towards_angle;
+      input_boundary->angle = angle;
+      input_boundary->angle_mean = angle;
+      input_boundary->angle_sum = angle;
+      input_boundary->curvature_mean = 0;
+      input_boundary->curvature_sum = 0;
+      input_boundary->angle_1 = angle;
+      input_boundary->angle_2 = angle;
     }
   }
 }
@@ -940,7 +938,7 @@ void boundary_union
 
   parent_1 = boundary_find(input_boundary_1);
   parent_2 = boundary_find(input_boundary_2);
-  integral_value total_curvature;
+
   if (parent_1 != NULL && parent_2 != NULL && parent_1 != parent_2) {
     if (parent_1->rank < parent_2->rank) {
       parent_1->parent = parent_2;
@@ -959,17 +957,23 @@ void boundary_union
           parent_1->y2 : parent_2->y2;
 
       parent_2->length += parent_1->length;
+      parent_2->angle_sum += parent_1->angle_sum;
+      parent_2->angle_mean =
+          parent_2->angle_sum /
+          ((integral_value)parent_2->length);
       parent_2->curvature_sum += parent_1->curvature_sum;
-      parent_2->curvature_mean = parent_2->curvature_sum /
-      ((integral_value)parent_2->length);
-      parent_2->dir_a = parent_1->dir_a;
-      total_curvature = angle_minus_angle(parent_2->dir_a, parent_2->dir_b);
+      parent_2->curvature_mean =
+          parent_2->curvature_sum /
+          ((integral_value)parent_2->length);
+      parent_2->angle_1 = parent_1->angle_1;
+      /*
       if (fabs(parent_2->curvature_mean) > 0.15) {
         parent_2->category = fc_CURVED;
       }
       else {
         parent_2->category = fc_STRAIGHT;
       }
+      */
     }
     else {
       parent_2->parent = parent_1;
@@ -990,17 +994,23 @@ void boundary_union
           parent_1->y2 : parent_2->y2;
 
       parent_1->length += parent_2->length;
-      parent_1->curvature_sum += parent_2->curvature_sum;
-      parent_1->curvature_mean = parent_1->curvature_sum /
+      parent_1->angle_sum += parent_2->angle_sum;
+      parent_1->angle_mean =
+          parent_1->angle_sum /
           ((integral_value)parent_1->length);
-      parent_1->dir_b = parent_2->dir_b;
-      /*total_curvature = angle_minus_angle(parent_1->dir_a, parent_1->dir_b);*/
+      parent_1->curvature_sum += parent_2->curvature_sum;
+      parent_1->curvature_mean =
+          parent_1->curvature_sum /
+          ((integral_value)parent_1->length);
+      parent_1->angle_2 = parent_2->angle_2;
+      /*
       if (fabs(parent_1->curvature_mean) > 0.15) {
         parent_1->category = fc_CURVED;
       }
       else {
         parent_1->category = fc_STRAIGHT;
       }
+      */
     }
   }
 }

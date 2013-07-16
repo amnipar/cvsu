@@ -350,19 +350,10 @@ edge_profile *has_edge_profile
 /******************************************************************************/
 
 typedef struct edge_links_t {
-  uint32 round;
   struct quad_tree_link_head_t *towards;
   struct quad_tree_link_head_t *against;
-  /*struct quad_tree_link_head_t *other;*/
   integral_value own_angle;
-  integral_value towards_angle;
-  integral_value against_angle;
-  integral_value straightness;
-  integral_value curvature;
-  integral_value own_consistency;
-  integral_value towards_consistency;
-  integral_value against_consistency;
-  integral_value direction_consistency;
+  integral_value own_curvature;
 } edge_links;
 
 /******************************************************************************/
@@ -572,6 +563,12 @@ typedef enum boundary_category_t {
 typedef struct boundary_t {
   /** Parent boundary, that determines the segment id (may be self) */
   struct boundary_t *parent;
+  /** Previous boundary node in this chain (NULL for first node) */
+  struct boundary_t *prev;
+  /** Next boundary node in this chain (NULL for last node) */
+  struct boundary_t *next;
+  /** Tree node corresponding to this boundary node */
+  struct quad_tree_t *tree;
   /** Boundary category */
   boundary_category category;
   /** Rank value used for optimizing union-find process */
@@ -586,16 +583,26 @@ typedef struct boundary_t {
   uint32 y2;
   /** Length of the boundary fragment in nodes */
   uint32 length;
+  /** Actual angle at this node */
+  integral_value angle;
+  /** Actual curvature at this node */
+  integral_value curvature;
+  /** Average angle (boundary direction) of nodes */
+  integral_value angle_mean;
+  /** Sum of angles for calculating the mean */
+  integral_value angle_sum;
   /** Average curvature (change in direction) between nodes */
   integral_value curvature_mean;
   /** Sum of curvatures for calculating the mean */
   integral_value curvature_sum;
   /** Direction in the beginning of the boundary fragment */
-  integral_value dir_a;
+  integral_value angle_1;
   /** Direction in the end of the fragment */
-  integral_value dir_b;
+  integral_value angle_2;
   /** Color assigned for this segment for visualizing purposes */
   byte color[4];
+  /** Parent nodes will collect links to nearby fragments */
+  list *links;
   /** Parent nodes will collect all hypotheses that this fragment affects */
   list *hypotheses;
 } boundary;

@@ -109,7 +109,6 @@ result quad_forest_init
 {
   TRY();
   uint32 row, col, rows, cols, pos, size, width, height;
-  integral_value angle;
   quad_tree new_tree, *tree;
   quad_tree_link new_link, *link;
   quad_tree_link_head *head, *n, *ne, *e, *se, *s, *sw, *w, *nw;
@@ -1654,7 +1653,7 @@ result quad_forest_get_links
   if (mode == v_LINK_MEASURE) {
     quad_tree_link_head *head;
     link_measure *lmeasure;
-    integral_value radius, str, max_str;
+    integral_value radius; /* , str, max_str; */
     uint32 score;
     sint32 x, y, dx, dy;
     /*
@@ -1859,29 +1858,24 @@ result quad_forest_get_links
   if (mode == v_LINK_EDGE) {
     quad_tree_link_head *head;
     edge_links *elinks;
-    integral_value radius, curvature, max_curvature, straightness, max_straightness;
+    integral_value radius, curvature, max_curvature;
     sint32 x, y, dx, dy;
 
     max_curvature = 0;
-    max_straightness = 0;
     items = forest->trees.first.next;
     end = &forest->trees.last;
     while (items != end) {
       tree = (quad_tree*)items->data;
       elinks = has_edge_links(&tree->annotation, forest->token);
       if (elinks != NULL) {
-        curvature = fabs(elinks->curvature);
+        curvature = fabs(elinks->own_curvature);
         if (curvature > max_curvature) {
           max_curvature = curvature;
-        }
-        straightness = elinks->straightness;
-        if (straightness > max_straightness) {
-          max_straightness = straightness;
         }
       }
       items = items->next;
     }
-    /*PRINT2("max curvature: %.3f, straightness: %.3f\n", max_curvature, max_straightness);*/
+    /*PRINT1("max curvature: %.3f\n", max_curvature);*/
 
     items = forest->trees.first.next;
     end = &forest->trees.last;
@@ -1889,10 +1883,8 @@ result quad_forest_get_links
       tree = (quad_tree*)items->data;
       elinks = has_edge_links(&tree->annotation, forest->token);
       if (elinks != NULL) {
-        curvature = fabs(elinks->curvature);
+        curvature = fabs(elinks->own_curvature);
         curvature /= max_curvature;
-        straightness = elinks->straightness;
-        straightness /= max_straightness;
         if (elinks->towards != NULL) {
           head = elinks->towards;
           radius = ((integral_value)tree->size) / 2.0;
@@ -1929,8 +1921,8 @@ result quad_forest_get_links
           color_line.end.x = x + dx;
           color_line.end.y = y - dy;
           /*color_line.weight = 0.75;*/
-          color_line.color[0] = 127;/*(byte)((1 - curvature) * 255);*/
-          color_line.color[1] = 127;/*(byte)((1 - curvature) * 255);*/
+          color_line.color[0] = 255;/*(byte)((1 - curvature) * 255);*/
+          color_line.color[1] = 255;/*(byte)((1 - curvature) * 255);*/
           color_line.color[2] = 0;/*(byte)((1 - straightness) * 255);*/
           /*
           color_line.color[0] = 0;
@@ -1962,8 +1954,8 @@ result quad_forest_get_links
   }
   else
   if (mode == v_LINK_STRAIGHT) {
-    quad_tree_link_head *head;
-    edge_links *elinks;
+    quad_tree *tree2;
+    edge_links *elinks, *elinks2;
     edge_response *eresp;
     integral_value angle, radius;
     sint32 x, y, dx, dy;
@@ -2004,7 +1996,7 @@ result quad_forest_get_links
         dy = getlround(sin(angle) * radius);
         new_line.end.x = x + dx;
         new_line.end.y = y - dy;
-        new_line.weight = elinks->straightness;
+        new_line.weight = 1;
         /*CHECK(list_append(links, (pointer)&new_line));*/
         angle -= M_PI;
         if (angle < 0) angle += 2 * M_PI;
@@ -2012,26 +2004,113 @@ result quad_forest_get_links
         dy = getlround(sin(angle) * radius);
         new_line.end.x = x + dx;
         new_line.end.y = y - dy;
-        new_line.weight = elinks->straightness;
+        new_line.weight = 1;
         /*CHECK(list_append(links, (pointer)&new_line));*/
 
-        angle = elinks->towards_angle;
+        angle = elinks->own_angle;
+        if (elinks->towards != NULL) {
+          tree2 = elinks->towards->other->tree;
+          elinks2 = has_edge_links(&tree2->annotation, forest->token);
+          if (elinks2 != NULL) {
+            angle = elinks2->own_angle;
+          }
+        }
         dx = getlround(cos(angle) * radius);
         dy = getlround(sin(angle) * radius);
         new_line.end.x = x + dx;
         new_line.end.y = y - dy;
-        new_line.weight = elinks->towards_consistency;
+        new_line.weight = 0.5;
         CHECK(list_append(links, (pointer)&new_line));
 
-        angle = elinks->against_angle;
+        angle = elinks->own_angle;
+        if (elinks->against != NULL) {
+          tree2 = elinks->against->other->tree;
+          elinks2 = has_edge_links(&tree2->annotation, forest->token);
+          if (elinks2 != NULL) {
+            angle = elinks2->own_angle;
+          }
+        }
         angle -= M_PI;
         if (angle < 0) angle += 2 * M_PI;
         dx = getlround(cos(angle) * radius);
         dy = getlround(sin(angle) * radius);
         new_line.end.x = x + dx;
         new_line.end.y = y - dy;
-        new_line.weight = elinks->against_consistency;
+        new_line.weight = 0.5;
         CHECK(list_append(links, (pointer)&new_line));
+      }
+      items = items->next;
+    }
+  }
+  else
+  if (mode == v_LINK_BOUNDARY) {
+    boundary *boundary1;
+    integral_value radius, angle, strength, max_strength, curvature;
+    sint32 x, y, dx, dy;
+
+    max_strength = 0;
+    items = forest->trees.first.next;
+    end = &forest->trees.last;
+    while (items != end) {
+      tree = (quad_tree*)items->data;
+      boundary1 = has_boundary(&tree->annotation, forest->token);
+      if (boundary1 != NULL) {
+        strength = fabs(boundary1->curvature);
+        if (strength > max_strength) {
+          max_strength = strength;
+        }
+      }
+      items = items->next;
+    }
+    PRINT1("max strength: %.3f\n", max_strength);
+
+    items = forest->trees.first.next;
+    end = &forest->trees.last;
+    while (items != end) {
+      tree = (quad_tree*)items->data;
+      boundary1 = has_boundary(&tree->annotation, forest->token);
+      if (boundary1 != NULL) {
+        angle = boundary1->angle; /* smoothed_angle */
+        curvature = boundary1->curvature;
+        strength = fabs(boundary1->curvature);
+        strength /= max_strength;
+
+        radius = ((integral_value)tree->size) / 2.0;
+        x = getlround((integral_value)tree->x + radius);
+        y = getlround((integral_value)tree->y + radius);
+        dx = getlround(cos(angle - curvature) * radius);
+        dy = getlround(sin(angle - curvature) * radius);
+
+        color_line.start.x = x;
+        color_line.start.y = y;
+        color_line.end.x = x + dx;
+        color_line.end.y = y - dy;
+
+        color_line.color[0] = (byte)((1 - strength) * 0);
+        color_line.color[1] = (byte)((1 - strength) * 255);
+        color_line.color[2] = (byte)((1 - strength) * 255);
+
+        CHECK(list_append(links, (pointer)&color_line));
+
+        radius = ((integral_value)tree->size) / 2.0;
+        x = getlround((integral_value)tree->x + radius);
+        y = getlround((integral_value)tree->y + radius);
+        angle += curvature;
+        angle -= M_PI;
+        dx = getlround(cos(angle) * radius);
+        dy = getlround(sin(angle) * radius);
+
+        color_line.start.x = x;
+        color_line.start.y = y;
+        color_line.end.x = x + dx;
+        color_line.end.y = y - dy;
+
+        color_line.color[0] = (byte)((1 - strength) * 0);
+        color_line.color[1] = (byte)((1 - strength) * 255);
+        color_line.color[2] = (byte)((1 - strength) * 255);
+
+        CHECK(list_append(links, (pointer)&color_line));
+
       }
       items = items->next;
     }
