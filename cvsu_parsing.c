@@ -1857,7 +1857,7 @@ result quad_forest_parse
         CHECK(quad_tree_ensure_boundary(tree3, &boundary3));
         boundary3->next = boundary1;
         boundary1->prev = boundary3;
-        if (boundary2->length < 1) {
+        if (boundary3->length < 1) {
           CHECK(expect_edge_links(&tree3->annotation, &elinks_against, forest->token));
           boundary_init(boundary3, elinks_against);
           CHECK(list_append(&boundarylist, &boundary3));
@@ -1920,7 +1920,7 @@ result quad_forest_parse
                 CHECK(quad_tree_ensure_boundary(tree2, &boundary2));
                 boundary_init(boundary2, elinks_against);
                 boundary2->next = boundary1;
-                boundary2->prev = boundary2;
+                boundary1->prev = boundary2;
                 CHECK(list_append(&boundarylist, &boundary2));
 
                 tree3 = best_against->other->tree;
@@ -1935,21 +1935,22 @@ result quad_forest_parse
               }
             }
           }
-          /* if did not succeed in extending, end the chain */
-          if (IS_FALSE(has_against)) {
-            CHECK(quad_tree_ensure_boundary(tree1, &boundary1));
+          
+          /* extended or not, link the found towards node */
+          CHECK(quad_tree_ensure_boundary(tree1, &boundary1));
+          if (boundary1->length < 1) {
             boundary_init(boundary1, elinks_tree);
             CHECK(list_append(&boundarylist, &boundary1));
+          }
 
-            tree2 = elinks_tree->towards->other->tree;
-            CHECK(quad_tree_ensure_boundary(tree2, &boundary2));
-            boundary1->next = boundary2;
-            boundary2->prev = boundary1;
-            if (boundary2->length < 1) {
-              CHECK(expect_edge_links(&tree2->annotation, &elinks2, forest->token));
-              boundary_init(boundary2, elinks2);
-              CHECK(list_append(&boundarylist, &boundary2));
-            }
+          tree2 = elinks_tree->towards->other->tree;
+          CHECK(quad_tree_ensure_boundary(tree2, &boundary2));
+          boundary1->next = boundary2;
+          boundary2->prev = boundary1;
+          if (boundary2->length < 1) {
+            CHECK(expect_edge_links(&tree2->annotation, &elinks2, forest->token));
+            boundary_init(boundary2, elinks2);
+            CHECK(list_append(&boundarylist, &boundary2));
           }
         }
         if (IS_TRUE(has_against)) {
@@ -2022,21 +2023,21 @@ result quad_forest_parse
               }
             }
           }
-          /* if did not succeed in extending, end the chain */
-          if (IS_FALSE(has_towards)) {
-            CHECK(quad_tree_ensure_boundary(tree1, &boundary1));
+          /* extended or not, link the found against node */
+          CHECK(quad_tree_ensure_boundary(tree1, &boundary1));
+          if (boundary1->length < 1) {
             boundary_init(boundary1, elinks_tree);
             CHECK(list_append(&boundarylist, &boundary1));
+          }
 
-            tree2 = elinks_tree->against->other->tree;
-            CHECK(quad_tree_ensure_boundary(tree2, &boundary2));
-            boundary2->next = boundary1;
-            boundary1->prev = boundary2;
-            if (boundary2->length < 1) {
-              CHECK(expect_edge_links(&tree2->annotation, &elinks2, forest->token));
-              boundary_init(boundary2, elinks2);
-              CHECK(list_append(&boundarylist, &boundary2));
-            }
+          tree2 = elinks_tree->against->other->tree;
+          CHECK(quad_tree_ensure_boundary(tree2, &boundary2));
+          boundary2->next = boundary1;
+          boundary1->prev = boundary2;
+          if (boundary2->length < 1) {
+            CHECK(expect_edge_links(&tree2->annotation, &elinks2, forest->token));
+            boundary_init(boundary2, elinks2);
+            CHECK(list_append(&boundarylist, &boundary2));
           }
         }
       }
@@ -2047,10 +2048,12 @@ result quad_forest_parse
   /* in the third round, analyze and merge boundary fragments */
   {
     list_item *boundaries, *endboundaries;
-    boundary *boundary1, *boundary2, *parent1, *parent2;
-    integral_value angle1, angle2, angle3, curvature;
-    integral_value next_diff_1, next_diff_2, prev_diff_1, prev_diff_2;
+    boundary *boundary1, *boundary2, *boundary3, *parent1, *parent2;
+    integral_value angle, angle1, angle2, angle3, curvature;
+    integral_value angle2a, angle2b, angle3a, angle3b;
+    integral_value diffs[7], diff, diff_sum, diff_mean, diff_diff, diff_dev, diff_count;
     integral_value next_d1, next_d2, prev_d1, prev_d2, d1, d2;
+    uint32 i, count;
 
     boundaries = boundarylist.first.next;
     endboundaries = &boundarylist.last;
@@ -2061,6 +2064,123 @@ result quad_forest_parse
       boundary2 = boundary1->next;
       if (boundary2 != NULL) {
         angle2 = boundary2->angle;
+        angle2 = angle_minus_angle(angle2, angle1);
+        angle2a = atan2(
+          (integral_value)((signed)boundary1->tree->y - (signed)boundary2->tree->y),
+          (integral_value)((signed)boundary2->tree->x - (signed)boundary1->tree->x));
+        if (angle2a < 0) angle2a += M_2PI;
+        angle2b = angle_minus_angle(angle2a, angle1);
+      }
+      else {
+        angle2 = 0;
+        angle2a = -10;
+        angle2b = 0;
+      }
+      boundary3 = boundary1->prev;
+      if (boundary3 != NULL) {
+        angle3 = boundary3->angle;
+        angle3 = angle_minus_angle(angle3, angle1);
+        angle3a = atan2(
+          (integral_value)((signed)boundary3->tree->y - (signed)boundary1->tree->y),
+          (integral_value)((signed)boundary1->tree->x - (signed)boundary3->tree->x));
+        if (angle3a < 0) angle3a += M_2PI;
+        angle3b = angle_minus_angle(angle3a, angle1);
+      }
+      else {
+        angle3 = 0;
+        angle3a = -10;
+        angle2b = 0;
+      }
+      if (angle2a < -4) {
+        angle2a = angle3a;
+      }
+      if (angle3a < -4) {
+        angle3a = angle2a;
+      }
+      angle = (angle2b + angle2 + angle3b + angle3) / 4;
+      angle1 = angle1 + angle;
+      angle2 = angle2a + (angle_minus_angle(angle3a, angle2a) / 2);
+      angle3 = fabs(angle_minus_angle(angle2, angle1));
+      if (angle3 > 0.2) {
+        boundary1->smoothed_angle = angle2;
+      }
+      else {
+        boundary1->smoothed_angle = angle1;
+      }
+      
+      boundaries = boundaries->next;
+    }
+    
+    boundaries = boundarylist.first.next;
+    endboundaries = &boundarylist.last;
+    while (boundaries != endboundaries) {
+      boundary1 = *((boundary**)boundaries->data);
+      
+      angle1 = boundary1->smoothed_angle;
+      count = 0;
+      boundary2 = boundary1->next;
+      if (boundary2 != NULL) {
+        angle2 = boundary2->smoothed_angle;
+        diffs[count++] = angle_minus_angle(angle2, angle1);
+        angle1 = angle2;
+        boundary2 = boundary2->next;
+        if (boundary2 != NULL) {
+          angle2 = boundary2->smoothed_angle;
+          diffs[count++] = angle_minus_angle(angle2, angle1);
+          angle1 = angle2;
+          boundary2 = boundary2->next;
+          if (boundary2 != NULL) {
+            angle2 = boundary2->smoothed_angle;
+            diffs[count++] = angle_minus_angle(angle2, angle1);
+          }
+        }
+      }
+      angle1 = boundary1->smoothed_angle;
+      boundary2 = boundary1->prev;
+      if (boundary2 != NULL) {
+        angle2 = boundary2->smoothed_angle;
+        diffs[count++] = angle_minus_angle(angle1, angle2);
+        angle1 = angle2;
+        boundary2 = boundary2->prev;
+        if (boundary2 != NULL) {
+          angle2 = boundary2->smoothed_angle;
+          diffs[count++] = angle_minus_angle(angle1, angle2);
+          angle1 = angle2;
+          boundary2 = boundary2->prev;
+          if (boundary2 != NULL) {
+            angle2 = boundary2->smoothed_angle;
+            diffs[count++] = angle_minus_angle(angle1, angle2);
+          }
+        }
+      }
+      
+      diff_count = (integral_value)count;
+      diff_sum = 0;
+      for (i = 0; i < count; i++) {
+        diff_sum += diffs[i];
+      }
+      diff_mean = diff_sum / diff_count;
+      diff_sum = 0;
+      for (i = 0; i < count; i++) {
+        diff = diffs[i] - diff_mean;
+        diff_sum += (diff*diff);
+      }
+      diff_dev = diff_sum / diff_count;
+      diff_dev = diff_dev < 1 ? diff_dev : sqrt(diff_dev);
+      
+      if ((fabs(diff_mean) + diff_dev) < 0.06) {
+        boundary1->category = fc_STRAIGHT;
+        boundary1->curvature = diff_mean + diff_dev;
+      }
+      else
+      if (fabs(diff_mean) > 0.06) {
+        boundary1->category = fc_CURVED;
+        boundary1->curvature = diff_mean;
+      }
+      
+      boundaries = boundaries->next;
+    }
+      /*
         next_diff_1 = angle_minus_angle(angle1, angle2);
         boundary2 = boundary2->next;
         if (boundary2 != NULL) {
@@ -2135,8 +2255,7 @@ result quad_forest_parse
           }
         }
       }
-      boundaries = boundaries->next;
-    }
+      */
   }
 
   /* set the state of forest */
@@ -2398,7 +2517,7 @@ result quad_forest_visualize_parse_result
       /*CHECK(quad_forest_get_links(forest, &links, v_LINK_EDGE));*/
       /*PRINT1("links: %d\n", links.count);*/
 
-      CHECK(quad_forest_get_links(forest, &links, v_LINK_EDGE));
+      CHECK(quad_forest_get_links(forest, &links, v_LINK_BOUNDARY));
       CHECK(pixel_image_draw_colored_lines(target, &links, 1));
       /*
       trees = forest->trees.first.next;

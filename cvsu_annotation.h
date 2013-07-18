@@ -585,6 +585,7 @@ typedef struct boundary_t {
   uint32 length;
   /** Actual angle at this node */
   integral_value angle;
+  integral_value smoothed_angle;
   /** Actual curvature at this node */
   integral_value curvature;
   /** Average angle (boundary direction) of nodes */

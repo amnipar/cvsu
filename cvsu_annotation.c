@@ -863,6 +863,7 @@ result quad_tree_ensure_boundary
     tree_boundary->y2 = input_tree->y + input_tree->size - 1;
     tree_boundary->length = 0;
     tree_boundary->angle = 0;
+    tree_boundary->smoothed_angle = 0;
     tree_boundary->curvature = 0;
     tree_boundary->angle_mean = 0;
     tree_boundary->angle_sum = 0;

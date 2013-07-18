@@ -2044,7 +2044,7 @@ result quad_forest_get_links
   }
   else
   if (mode == v_LINK_BOUNDARY) {
-    boundary *boundary1;
+    boundary *boundary1, *boundary2;
     integral_value radius, angle, strength, max_strength, curvature;
     sint32 x, y, dx, dy;
 
@@ -2070,33 +2070,19 @@ result quad_forest_get_links
       tree = (quad_tree*)items->data;
       boundary1 = has_boundary(&tree->annotation, forest->token);
       if (boundary1 != NULL) {
-        angle = boundary1->angle; /* smoothed_angle */
+        angle = boundary1->smoothed_angle;
         curvature = boundary1->curvature;
-        strength = fabs(boundary1->curvature);
-        strength /= max_strength;
+        strength = fabs(curvature);
+        if (strength > 0.06) {
+          strength = 1;
+        }
+        else {
+          strength /= 0.06;
+        }
 
         radius = ((integral_value)tree->size) / 2.0;
         x = getlround((integral_value)tree->x + radius);
         y = getlround((integral_value)tree->y + radius);
-        dx = getlround(cos(angle - curvature) * radius);
-        dy = getlround(sin(angle - curvature) * radius);
-
-        color_line.start.x = x;
-        color_line.start.y = y;
-        color_line.end.x = x + dx;
-        color_line.end.y = y - dy;
-
-        color_line.color[0] = (byte)((1 - strength) * 0);
-        color_line.color[1] = (byte)((1 - strength) * 255);
-        color_line.color[2] = (byte)((1 - strength) * 255);
-
-        CHECK(list_append(links, (pointer)&color_line));
-
-        radius = ((integral_value)tree->size) / 2.0;
-        x = getlround((integral_value)tree->x + radius);
-        y = getlround((integral_value)tree->y + radius);
-        angle += curvature;
-        angle -= M_PI;
         dx = getlround(cos(angle) * radius);
         dy = getlround(sin(angle) * radius);
 
@@ -2111,6 +2097,24 @@ result quad_forest_get_links
 
         CHECK(list_append(links, (pointer)&color_line));
 
+        radius = ((integral_value)tree->size) / 2.0;
+        x = getlround((integral_value)tree->x + radius);
+        y = getlround((integral_value)tree->y + radius);
+        angle -= M_PI;
+        dx = getlround(cos(angle) * radius);
+        dy = getlround(sin(angle) * radius);
+
+        color_line.start.x = x;
+        color_line.start.y = y;
+        color_line.end.x = x + dx;
+        color_line.end.y = y - dy;
+
+        color_line.color[0] = (byte)((1 - strength) * 0);
+        color_line.color[1] = (byte)((1 - strength) * 255);
+        color_line.color[2] = (byte)((1 - strength) * 255);
+
+        CHECK(list_append(links, (pointer)&color_line));
+        
       }
       items = items->next;
     }
