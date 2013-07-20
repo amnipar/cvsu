@@ -425,12 +425,14 @@ result pixel_image_draw_rects
   for (i = 0; i < count; i++) {
     /*this_line = (line*)items->data;*/
     tree_segment = segments[i];
+    /*
     if (tree_segment->x2 - tree_segment->x1 > 30 && tree_segment->y2 - tree_segment->y1 > 20) {
       cvRectangle(dst,
           cvPoint(tree_segment->x1, tree_segment->y1),
           cvPoint(tree_segment->x2, tree_segment->y2),
           cvScalar(0,255,255,0), 2, 8, 0);
     }
+    */
   }
   /*
     items = items->next;

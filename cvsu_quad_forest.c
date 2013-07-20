@@ -702,6 +702,7 @@ result quad_forest_get_segment_trees
   CHECK(list_create(target, 100, sizeof(quad_tree*), 1));
 
   /* find bounding box of the collection */
+  /*
   x1 = segments[0]->x1;
   y1 = segments[0]->y1;
   x2 = segments[0]->x2;
@@ -712,7 +713,7 @@ result quad_forest_get_segment_trees
     if (segments[i]->x2 > x2) x2 = segments[i]->x2;
     if (segments[i]->y2 > y2) y2 = segments[i]->y2;
   }
-
+  */
   /* determine which root trees are within the bounding box */
   firstcol = (uint32)((x1 - forest->dx) / forest->tree_max_size);
   lastcol = (uint32)((x2 - forest->dx) / forest->tree_max_size);
@@ -908,9 +909,11 @@ result quad_forest_draw_trees
       else {
         segment *tree_segment = quad_tree_segment_find(tree);
         if (tree_segment != NULL) {
+          /*
           value0 = tree_segment->color[0];
           value1 = tree_segment->color[1];
           value2 = tree_segment->color[2];
+          */
         }
         else {
           value0 = value1 = value2 = 0;
@@ -1037,6 +1040,7 @@ result quad_forest_get_segment_mask
   if parent is one of the segments, draw pixels to image
   */
   /* find bounding box of the collection */
+  /*
   x1 = segments[0]->x1;
   y1 = segments[0]->y1;
   x2 = segments[0]->x2;
@@ -1047,7 +1051,7 @@ result quad_forest_get_segment_mask
     if (segments[i]->x2 > x2) x2 = segments[i]->x2;
     if (segments[i]->y2 > y2) y2 = segments[i]->y2;
   }
-
+  */
   /* create the image */
   width = x2 - x1;
   height = y2 - y1;
@@ -1360,9 +1364,10 @@ result quad_forest_get_segment_boundary
   CHECK_POINTER(segment_boundary);
 
   CHECK(list_create(segment_boundary, 100, sizeof(line), 1));
-
-  if (input_segment->x2 - input_segment->x1 > 33 && input_segment->y2 - input_segment->y1 > 32) {
+  
+  if (1/*input_segment->x2 - input_segment->x1 > 33 && input_segment->y2 - input_segment->y1 > 32*/) {
     /* find the tree in center left of bounding box */
+    /*
     col = (uint32)((input_segment->x1 - forest->dx) / forest->tree_max_size);
     row = (uint32)((((uint32)((input_segment->y1 + input_segment->y2) / 2)) - forest->dy) / forest->tree_max_size);
     pos = row * forest->cols + col;
@@ -1375,11 +1380,12 @@ result quad_forest_get_segment_boundary
         tree_segment = quad_tree_segment_find(tree);
       }
       else {
+        */
         /*printf("%lu %lu %lu %lu %lu %lu\n", segment->x1, segment->y1, segment->x2, segment->y2, row, col);*/
-        TERMINATE(SUCCESS); /*NOT_FOUND*/
+        /*TERMINATE(SUCCESS);
       }
     }
-
+    */
     point_a.x = (signed)tree->x;
     point_a.y = (signed)tree->y + ((sint32)(tree->size / 2));
     start_point = point_a;
@@ -2189,6 +2195,7 @@ result quad_forest_highlight_segments
   }
 
   /* find bounding box of the collection */
+  /*
   x1 = segments[0]->x1;
   y1 = segments[0]->y1;
   x2 = segments[0]->x2;
@@ -2199,7 +2206,7 @@ result quad_forest_highlight_segments
     if (segments[i]->x2 > x2) x2 = segments[i]->x2;
     if (segments[i]->y2 > y2) y2 = segments[i]->y2;
   }
-
+  */
   {
     uint32 pos, col, firstcol, lastcol, row, firstrow, lastrow;
 
@@ -2321,9 +2328,11 @@ result quad_forest_draw_image
         if (tree->nw == NULL) {
           parent = quad_tree_segment_find(tree);
           if (parent != NULL) {
+            /*
             color0 = parent->color[0];
             color1 = parent->color[1];
             color2 = parent->color[2];
+            */
             width = tree->size;
             height = width;
             row_step = stride - 3 * width;

@@ -857,22 +857,14 @@ result quad_tree_ensure_boundary
     tree_boundary->tree = input_tree;
     tree_boundary->category = fc_UNDEF;
     tree_boundary->rank = 0;
-    tree_boundary->x1 = input_tree->x;
-    tree_boundary->y1 = input_tree->y;
-    tree_boundary->x2 = input_tree->x + input_tree->size - 1;
-    tree_boundary->y2 = input_tree->y + input_tree->size - 1;
     tree_boundary->length = 0;
     tree_boundary->angle = 0;
     tree_boundary->smoothed_angle = 0;
     tree_boundary->curvature = 0;
-    tree_boundary->angle_mean = 0;
-    tree_boundary->angle_sum = 0;
     tree_boundary->curvature_mean = 0;
-    tree_boundary->curvature_sum = 0;
-    tree_boundary->angle_1 = 0;
-    tree_boundary->angle_2 = 0;
-    tree_boundary->links = NULL;
-    tree_boundary->hypotheses = NULL;
+    tree_boundary->curvature_sum1 = 0;
+    tree_boundary->curvature_dev = 0;
+    tree_boundary->curvature_sum2 = 0;
   }
 
   if (output_boundary != NULL) {
@@ -901,12 +893,10 @@ void boundary_init
       input_boundary->category = fc_UNKNOWN;
       input_boundary->length = 1;
       input_boundary->angle = angle;
-      input_boundary->angle_mean = angle;
-      input_boundary->angle_sum = angle;
       input_boundary->curvature_mean = 0;
-      input_boundary->curvature_sum = 0;
-      input_boundary->angle_1 = angle;
-      input_boundary->angle_2 = angle;
+      input_boundary->curvature_sum1 = 0;
+      input_boundary->curvature_dev = 0;
+      input_boundary->curvature_sum2 = 0;
     }
   }
 }
@@ -943,75 +933,32 @@ void boundary_union
   if (parent_1 != NULL && parent_2 != NULL && parent_1 != parent_2) {
     if (parent_1->rank < parent_2->rank) {
       parent_1->parent = parent_2;
-
-      /* choose smaller of x1 (left) coordinates */
-      parent_2->x1 = (parent_1->x1 < parent_2->x1) ?
-          parent_1->x1 : parent_2->x1;
-      /* choose smaller of y1 (top) coordinates */
-      parent_2->y1 = (parent_1->y1 < parent_2->y1) ?
-          parent_1->y1 : parent_2->y1;
-      /* choose larger of x2 (right) coordinates */
-      parent_2->x2 = (parent_1->x2 > parent_2->x2) ?
-          parent_1->x2 : parent_2->x2;
-      /* choose larger of y2 (bottom) coordinates */
-      parent_2->y2 = (parent_1->y2 > parent_2->y2) ?
-          parent_1->y2 : parent_2->y2;
-
       parent_2->length += parent_1->length;
-      parent_2->angle_sum += parent_1->angle_sum;
-      parent_2->angle_mean =
-          parent_2->angle_sum /
-          ((integral_value)parent_2->length);
-      parent_2->curvature_sum += parent_1->curvature_sum;
+      parent_2->curvature_sum1 += parent_1->curvature_sum1;
       parent_2->curvature_mean =
-          parent_2->curvature_sum /
+          parent_2->curvature_sum1 /
           ((integral_value)parent_2->length);
-      parent_2->angle_1 = parent_1->angle_1;
-      /*
-      if (fabs(parent_2->curvature_mean) > 0.15) {
-        parent_2->category = fc_CURVED;
-      }
-      else {
-        parent_2->category = fc_STRAIGHT;
-      }
-      */
+      parent_2->curvature_sum2 += parent_1->curvature_sum2;
+      parent_2->curvature_dev =
+          parent_2->curvature_sum2 /
+          ((integral_value)parent_2->length) -
+          pow(parent_2->curvature_mean, 2.0);
     }
     else {
       parent_2->parent = parent_1;
       if (parent_1->rank == parent_2->rank) {
         parent_1->rank += 1;
       }
-      /* choose smaller of x1 (left) coordinates */
-      parent_1->x1 = (parent_1->x1 < parent_2->x1) ?
-          parent_1->x1 : parent_2->x1;
-      /* choose smaller of y1 (top) coordinates */
-      parent_1->y1 = (parent_1->y1 < parent_2->y1) ?
-          parent_1->y1 : parent_2->y1;
-      /* choose larger of x2 (right) coordinates */
-      parent_1->x2 = (parent_1->x2 > parent_2->x2) ?
-          parent_1->x2 : parent_2->x2;
-      /* choose larger of y2 (bottom) coordinates */
-      parent_1->y2 = (parent_1->y2 > parent_2->y2) ?
-          parent_1->y2 : parent_2->y2;
-
       parent_1->length += parent_2->length;
-      parent_1->angle_sum += parent_2->angle_sum;
-      parent_1->angle_mean =
-          parent_1->angle_sum /
-          ((integral_value)parent_1->length);
-      parent_1->curvature_sum += parent_2->curvature_sum;
+      parent_1->curvature_sum1 += parent_2->curvature_sum1;
       parent_1->curvature_mean =
-          parent_1->curvature_sum /
+          parent_1->curvature_sum1 /
           ((integral_value)parent_1->length);
-      parent_1->angle_2 = parent_2->angle_2;
-      /*
-      if (fabs(parent_1->curvature_mean) > 0.15) {
-        parent_1->category = fc_CURVED;
-      }
-      else {
-        parent_1->category = fc_STRAIGHT;
-      }
-      */
+      parent_1->curvature_sum2 += parent_2->curvature_sum2;
+      parent_1->curvature_dev =
+          parent_1->curvature_sum2 /
+          ((integral_value)parent_1->length) -
+          pow(parent_1->curvature_mean, 2.0);
     }
   }
 }
@@ -1177,11 +1124,9 @@ result quad_tree_ensure_segment
 
     /* one-tree segment is its own parent, and has the rank of 0 */
     tree_segment->parent = tree_segment;
+    tree_segment->category = sc_UNDEF;
     tree_segment->rank = 0;
-    tree_segment->x1 = input_tree->x;
-    tree_segment->y1 = input_tree->y;
-    tree_segment->x2 = input_tree->x + input_tree->size - 1;
-    tree_segment->y2 = input_tree->y + input_tree->size - 1;
+    tree_segment->extent = 0;
     memory_copy((data_pointer)&tree_segment->stat,
                 (data_pointer)&input_tree->stat, 1, sizeof(statistics));
   }
@@ -1221,20 +1166,6 @@ void segment_union
     integral_value N, mean, variance;
     if (input_segment_1->rank < input_segment_2->rank) {
       input_segment_1->parent = input_segment_2;
-
-      /* choose smaller of x1 (left) coordinates */
-      input_segment_2->x1 = (input_segment_1->x1 < input_segment_2->x1) ?
-          input_segment_1->x1 : input_segment_2->x1;
-      /* choose smaller of y1 (top) coordinates */
-      input_segment_2->y1 = (input_segment_1->y1 < input_segment_2->y1) ?
-          input_segment_1->y1 : input_segment_2->y1;
-      /* choose larger of x2 (right) coordinates */
-      input_segment_2->x2 = (input_segment_1->x2 > input_segment_2->x2) ?
-          input_segment_1->x2 : input_segment_2->x2;
-      /* choose larger of y2 (bottom) coordinates */
-      input_segment_2->y2 = (input_segment_1->y2 > input_segment_2->y2) ?
-          input_segment_1->y2 : input_segment_2->y2;
-
       stat = &input_segment_2->stat;
       N = (stat->N += input_segment_1->stat.N);
       stat->sum += input_segment_1->stat.sum;
@@ -1261,20 +1192,6 @@ void segment_union
       if (input_segment_1->rank == input_segment_2->rank) {
         input_segment_1->rank += 1;
       }
-
-      /* choose smaller of x1 (left) coordinates */
-      input_segment_1->x1 = (input_segment_1->x1 < input_segment_2->x1) ?
-          input_segment_1->x1 : input_segment_2->x1;
-      /* choose smaller of y1 (top) coordinates */
-      input_segment_1->y1 = (input_segment_1->y1 < input_segment_2->y1) ?
-          input_segment_1->y1 : input_segment_2->y1;
-      /* choose larger of x2 (right) coordinates */
-      input_segment_1->x2 = (input_segment_1->x2 > input_segment_2->x2) ?
-          input_segment_1->x2 : input_segment_2->x2;
-      /* choose larger of y2 (bottom) coordinates */
-      input_segment_1->y2 = (input_segment_1->y2 > input_segment_2->y2) ?
-          input_segment_1->y2 : input_segment_2->y2;
-
       stat = &input_segment_1->stat;
       N = (stat->N += input_segment_2->stat.N);
       stat->sum += input_segment_2->stat.sum;

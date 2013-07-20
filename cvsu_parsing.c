@@ -2052,8 +2052,9 @@ result quad_forest_parse
     integral_value angle, angle1, angle2, angle3, curvature;
     integral_value angle2a, angle2b, angle3a, angle3b;
     integral_value diffs[7], diff, diff_sum, diff_mean, diff_diff, diff_dev, diff_count;
-    integral_value next_d1, next_d2, prev_d1, prev_d2, d1, d2;
+    integral_value next_diff, prev_diff;
     uint32 i, count;
+    boundary_category category;
 
     boundaries = boundarylist.first.next;
     endboundaries = &boundarylist.last;
@@ -2168,6 +2169,8 @@ result quad_forest_parse
       diff_dev = diff_sum / diff_count;
       diff_dev = diff_dev < 1 ? diff_dev : sqrt(diff_dev);
       
+      boundary1->curvature_mean = diff_mean;
+      boundary1->curvature_dev = diff_dev;
       if ((fabs(diff_mean) + diff_dev) < 0.06) {
         boundary1->category = fc_STRAIGHT;
         boundary1->curvature = diff_mean + diff_dev;
@@ -2180,6 +2183,100 @@ result quad_forest_parse
       
       boundaries = boundaries->next;
     }
+    
+    /* now take the initial hypotheses and merge */
+    {
+      uint32 jump_count, max_jumps;
+      integral_value prev_angle_1, prev_angle_2, next_angle_1, next_angle_2;
+      integral_value prev_diff_sum, next_diff_sum, curvature_mean, curvature_dev;
+      integral_value prev_count, next_count, predicted_diff;
+      
+      max_jumps = 10;
+      boundaries = boundarylist.first.next;
+      endboundaries = &boundarylist.last;
+      while (boundaries != endboundaries) {
+        boundary1 = *((boundary**)boundaries->data);
+        category = boundary1->category;
+        /* take a straight or curved node and start extending it */
+        if (category == fc_STRAIGHT || category == fc_CURVED) {
+          /* first, find the local minimum of curvature deviation */
+          for (jump_count = 0; jump_count < max_jumps; jump_count++) {
+            boundary2 = boundary1->prev;
+            prev_diff = 0;
+            if (boundary2 != NULL && boundary2->category == category) {
+              prev_diff = boundary1->curvature_dev - boundary2->curvature_dev;
+            }
+            boundary3 = boundary1->next;
+            next_diff = 0;
+            if (boundary3 != NULL && boundary3->category == category) {
+              next_diff = boundary1->curvature_dev - boundary3->curvature_dev;
+            }
+            
+            if (prev_diff > next_diff) {
+              if (prev_diff > 0.001) {
+                boundary1 = boundary2;
+              }
+              else {
+                break;
+              }
+            }
+            else {
+              if (next_diff > 0.001) {
+                boundary1 = boundary3;
+              }
+              else {
+                break;
+              }
+            }
+          }
+          /* next, start merging neighboring nodes that fit the model */
+          boundary2 = boundary1->prev;
+          prev_angle_1 = boundary1->smoothed_angle;
+          prev_diff_sum = 0;
+          prev_count = 0;
+          boundary3 = boundary1->next;
+          next_angle_1 = prev_angle_1;
+          next_diff_sum = 0;
+          next_count = 0;
+          curvature_mean = boundary1->curvature_mean;
+          curvature_dev = boundary1->curvature_dev;
+          while (boundary2 != NULL || boundary3 != NULL) {
+            if (boundary2 != NULL) {
+              prev_angle_2 = boundary2->smoothed_angle;
+              diff = angle_minus_angle(prev_angle_1, prev_angle_2);
+              prev_diff_sum += diff;
+              prev_count += 1;
+              predicted_diff = prev_count * curvature_mean;
+              /* merge node if it fits the model */
+              if (predicted_diff - curvature_dev < prev_diff_sum &&
+                  prev_diff_sum < predicted_diff + curvature_dev)
+              {
+                
+              }
+              prev_angle_1 = prev_angle_2;
+              boundary2 = boundary2->prev;
+            }
+            if (boundary3 != NULL) {
+              next_angle_2 = boundary3->smoothed_angle;
+              diff = angle_minus_angle(next_angle_2, next_angle_1);
+              next_diff_sum += diff;
+              next_count += 1;
+              predicted_diff = next_count * curvature_mean;
+              /* merge node if it fits the model */
+              if (predicted_diff - curvature_dev < next_diff_sum &&
+                  next_diff_sum < predicted_diff + curvature_dev)
+              {
+                
+              }
+              next_angle_1 = next_angle_2;
+              boundary3 = boundary3->next;
+            }
+          }
+        }
+        boundaries = boundaries->next;
+      }
+    }
+    
       /*
         next_diff_1 = angle_minus_angle(angle1, angle2);
         boundary2 = boundary2->next;
@@ -2378,7 +2475,7 @@ result quad_forest_visualize_parse_result
       trees = trees->next;
     }
     */
-
+    /*
     frag_count = 0;
     srand(1234);
     trees = forest->trees.first.next;
@@ -2407,7 +2504,7 @@ result quad_forest_visualize_parse_result
       }
       trees = trees->next;
     }
-
+    */
     /*PRINT1("max ridge score %.3f\n", max_ridge_score);*/
 
     trees = forest->trees.first.next;

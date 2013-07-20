@@ -573,6 +573,34 @@ typedef struct boundary_t {
   boundary_category category;
   /** Rank value used for optimizing union-find process */
   uint32 rank;
+  /** Length of the boundary fragment in nodes */
+  uint32 length;
+  /** Actual angle at this node */
+  integral_value angle;
+  /** Angle smoothed based on neighboring nodes */
+  integral_value smoothed_angle;
+  /** Actual curvature at this node */
+  integral_value curvature;
+  /** Average curvature (change in direction) between nodes */
+  integral_value curvature_mean;
+  /** Sum of curvatures for calculating the mean */
+  integral_value curvature_sum1;
+  /** Standard deviation of curvature */
+  integral_value curvature_dev;
+  /** Sum of squared curvatures for calculating the deviation */
+  integral_value curvature_sum2;
+} boundary;
+
+/**
+ * Stores information for a whole boundary fragment, usually consisting of a
+ * collection of multiple fragment nodes. Used for visualization purposes, and
+ * for managing fragment collections and object hypotheses.
+ */
+typedef struct boundary_info_t {
+  struct boundary_t *parent;
+  struct boundary_t *first;
+  struct boundary_t *last;
+  boundary_category category;
   /** X-coordinate of the bounding box top left corner */
   uint32 x1;
   /** Y-coordinate of the bounding box top left corner */
@@ -581,32 +609,13 @@ typedef struct boundary_t {
   uint32 x2;
   /** Y-coordinate of the bounding box bottom right corner */
   uint32 y2;
-  /** Length of the boundary fragment in nodes */
-  uint32 length;
-  /** Actual angle at this node */
-  integral_value angle;
-  integral_value smoothed_angle;
-  /** Actual curvature at this node */
-  integral_value curvature;
-  /** Average angle (boundary direction) of nodes */
-  integral_value angle_mean;
-  /** Sum of angles for calculating the mean */
-  integral_value angle_sum;
-  /** Average curvature (change in direction) between nodes */
-  integral_value curvature_mean;
-  /** Sum of curvatures for calculating the mean */
-  integral_value curvature_sum;
-  /** Direction in the beginning of the boundary fragment */
-  integral_value angle_1;
-  /** Direction in the end of the fragment */
-  integral_value angle_2;
   /** Color assigned for this segment for visualizing purposes */
   byte color[4];
   /** Parent nodes will collect links to nearby fragments */
   list *links;
   /** Parent nodes will collect all hypotheses that this fragment affects */
   list *hypotheses;
-} boundary;
+} boundary_info;
 
 /******************************************************************************/
 
@@ -770,6 +779,13 @@ typedef struct segment_t
   uint32 rank;
   /** Maximum extent of the segment */
   uint32 extent;
+  /** Statistics of the image region covered by this segment */
+  statistics stat;
+} segment;
+
+typedef struct segment_info_t
+{
+  struct segment_t *center;
   /** X-coordinate of the bounding box top left corner */
   uint32 x1;
   /** Y-coordinate of the bounding box top left corner */
@@ -778,13 +794,11 @@ typedef struct segment_t
   uint32 x2;
   /** Y-coordinate of the bounding box bottom right corner */
   uint32 y2;
-  /** Statistics of the image region covered by this segment */
-  statistics stat;
   /** Color assigned for this segment for visualizing purposes */
   byte color[4];
   /** Parent nodes will collect all hypotheses that this segment affects */
   list *hypotheses;
-} segment;
+} segment_info;
 
 /******************************************************************************/
 

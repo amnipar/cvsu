@@ -71,9 +71,11 @@ result quad_forest_refresh_segments
       if (tree_segment != NULL) {
         parent = quad_tree_segment_find(tree);
         if (parent == tree_segment) {
+          /*
           tree_segment->color[0] = (byte)(rand() % 256);
           tree_segment->color[1] = (byte)(rand() % 256);
           tree_segment->color[2] = (byte)(rand() % 256);
+          */
           count++;
         }
       }
