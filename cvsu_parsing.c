@@ -2180,6 +2180,9 @@ result quad_forest_parse
         boundary1->category = fc_CURVED;
         boundary1->curvature = diff_mean;
       }
+      else {
+        boundary1->category = fc_UNKNOWN;
+      }
       
       boundaries = boundaries->next;
     }
@@ -2191,25 +2194,32 @@ result quad_forest_parse
       integral_value prev_diff_sum, next_diff_sum, curvature_mean, curvature_dev;
       integral_value prev_count, next_count, predicted_diff;
       
+      PRINT0("starting merge loop\n");
       max_jumps = 10;
       boundaries = boundarylist.first.next;
       endboundaries = &boundarylist.last;
       while (boundaries != endboundaries) {
         boundary1 = *((boundary**)boundaries->data);
+        boundary1 = boundary_find(boundary1);
+        if (boundary1->length > 1) {
+          boundaries = boundaries->next;
+          continue;
+        }
         category = boundary1->category;
         /* take a straight or curved node and start extending it */
         if (category == fc_STRAIGHT || category == fc_CURVED) {
           /* first, find the local minimum of curvature deviation */
+          /*
           for (jump_count = 0; jump_count < max_jumps; jump_count++) {
             boundary2 = boundary1->prev;
             prev_diff = 0;
             if (boundary2 != NULL && boundary2->category == category) {
-              prev_diff = boundary1->curvature_dev - boundary2->curvature_dev;
+              prev_diff = boundary2->curvature_dev - boundary1->curvature_dev;
             }
             boundary3 = boundary1->next;
             next_diff = 0;
             if (boundary3 != NULL && boundary3->category == category) {
-              next_diff = boundary1->curvature_dev - boundary3->curvature_dev;
+              next_diff = boundary3->curvature_dev - boundary1->curvature_dev;
             }
             
             if (prev_diff > next_diff) {
@@ -2229,6 +2239,7 @@ result quad_forest_parse
               }
             }
           }
+          */
           /* next, start merging neighboring nodes that fit the model */
           boundary2 = boundary1->prev;
           prev_angle_1 = boundary1->smoothed_angle;
@@ -2239,7 +2250,7 @@ result quad_forest_parse
           next_diff_sum = 0;
           next_count = 0;
           curvature_mean = boundary1->curvature_mean;
-          curvature_dev = boundary1->curvature_dev;
+          curvature_dev = 2 * boundary1->curvature_dev;
           while (boundary2 != NULL || boundary3 != NULL) {
             if (boundary2 != NULL) {
               prev_angle_2 = boundary2->smoothed_angle;
@@ -2251,10 +2262,21 @@ result quad_forest_parse
               if (predicted_diff - curvature_dev < prev_diff_sum &&
                   prev_diff_sum < predicted_diff + curvature_dev)
               {
-                
+                boundary2->category = category;
+                boundary_union(boundary1, boundary2);
+                prev_angle_1 = prev_angle_2;
+                boundary2 = boundary_find(boundary2->prev);
+                if (boundary2 != NULL &&
+                    (boundary2->length > 1 ||
+                    (boundary2->category != category && 
+                      boundary2->category != fc_UNKNOWN)))
+                {
+                  boundary2 = NULL;
+                }
               }
-              prev_angle_1 = prev_angle_2;
-              boundary2 = boundary2->prev;
+              else {
+                boundary2 = NULL;
+              }
             }
             if (boundary3 != NULL) {
               next_angle_2 = boundary3->smoothed_angle;
@@ -2266,93 +2288,33 @@ result quad_forest_parse
               if (predicted_diff - curvature_dev < next_diff_sum &&
                   next_diff_sum < predicted_diff + curvature_dev)
               {
-                
+                boundary3->category = category;
+                boundary_union(boundary1, boundary3);
+                next_angle_1 = next_angle_2;
+                boundary3 = boundary_find(boundary3->next);
+                if (boundary3 != NULL &&
+                    (boundary3->length > 1 ||
+                    (boundary3->category != category && 
+                      boundary3->category != fc_UNKNOWN)))
+                {
+                  boundary3 = NULL;
+                }
               }
-              next_angle_1 = next_angle_2;
-              boundary3 = boundary3->next;
+              else {
+                boundary3 = NULL;
+              }
+            }
+            boundary1 = boundary_find(boundary1);
+            if (boundary1->length > 5) {
+              curvature_mean = boundary1->curvature_mean;
+              curvature_dev = 2 * boundary1->curvature_dev;
             }
           }
         }
         boundaries = boundaries->next;
       }
+      PRINT0("merge finished\n");
     }
-    
-      /*
-        next_diff_1 = angle_minus_angle(angle1, angle2);
-        boundary2 = boundary2->next;
-        if (boundary2 != NULL) {
-          angle3 = boundary2->angle;
-          next_diff_2 = angle_minus_angle(angle2, angle3);
-        }
-        else {
-          next_diff_2 = next_diff_1;
-        }
-      }
-      else {
-        next_diff_1 = 0;
-        next_diff_2 = 0;
-      }
-      next_d1 = (next_diff_1 + next_diff_2) / 2;
-      next_d2 = fabs(next_diff_2 - next_diff_1);
-
-      boundary2 = boundary1->prev;
-      if (boundary2 != NULL) {
-        angle2 = boundary2->angle;
-        prev_diff_1 = angle_minus_angle(angle2, angle1);
-        boundary2 = boundary2->prev;
-        if (boundary2 != NULL) {
-          angle3 = boundary2->angle;
-          prev_diff_2 = angle_minus_angle(angle3, angle2);
-        }
-        else {
-          prev_diff_2 = prev_diff_1;
-        }
-      }
-      else {
-        prev_diff_1 = 0;
-        prev_diff_2 = 0;
-      }
-      prev_d1 = (prev_diff_1 + prev_diff_2) / 2;
-      prev_d2 = fabs(prev_diff_1 - prev_diff_2);
-
-      curvature = fabs((next_d1 + prev_d1) / 2);
-      boundary1->curvature = curvature;
-      boundary1->curvature_mean = (next_d2 + prev_d2) / 2;
-      if (boundary1->prev != NULL && boundary1->next != NULL) {
-        if (next_d2 < 0.2 && prev_d2 < 0.2) {
-          if (curvature > 0.1) {
-            parent1 = boundary_find(boundary1);
-            if (parent1->category != fc_STRAIGHT) {
-              parent2 = boundary_find(boundary1->prev);
-              if (parent2->category != fc_STRAIGHT) {
-                boundary_union(boundary1, boundary1->prev);
-              }
-              parent2 = boundary_find(boundary1->next);
-              if (parent2->category != fc_STRAIGHT) {
-                boundary_union(boundary1, boundary1->next);
-              }
-            }
-            parent1 = boundary_find(boundary1);
-            parent1->category = fc_CURVED;
-          }
-          else {
-            parent1 = boundary_find(boundary1);
-            if (parent1->category != fc_CURVED) {
-              parent2 = boundary_find(boundary1->prev);
-              if (parent2->category != fc_CURVED) {
-                boundary_union(boundary1, boundary1->prev);
-              }
-              parent2 = boundary_find(boundary1->next);
-              if (parent2->category != fc_CURVED) {
-                boundary_union(boundary1, boundary1->next);
-              }
-            }
-            parent1 = boundary_find(boundary1);
-            parent1->category = fc_STRAIGHT;
-          }
-        }
-      }
-      */
   }
 
   /* set the state of forest */
@@ -2534,22 +2496,23 @@ result quad_forest_visualize_parse_result
         */
         if (fragment1 != NULL) {
           bparent = boundary_find(fragment1);
-          if (bparent->category == fc_STRAIGHT) {
-            color0 = 255;
-            color1 = 0;
-            color2 = 0;
+          color0 = 0;
+          color1 = 255;
+          color2 = 0;
+          if (bparent->length > 1) {
+            if (bparent->category == fc_STRAIGHT) {
+              color0 = 255;
+              color1 = 0;
+              color2 = 0;
+            }
+            else
+            if (bparent->category == fc_CURVED) {
+              color0 = 0;
+              color1 = 0;
+              color2 = 255;
+            }
           }
-          else
-          if (bparent->category == fc_CURVED) {
-            color0 = 0;
-            color1 = 0;
-            color2 = 255;
-          }
-          else {
-            color0 = 0;
-            color1 = 255;
-            color2 = 0;
-          }
+          
           /*
           color0 = 255;
           color1 = 0;
