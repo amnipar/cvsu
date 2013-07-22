@@ -2191,10 +2191,9 @@ result quad_forest_parse
     {
       uint32 jump_count, max_jumps;
       integral_value prev_angle_1, prev_angle_2, next_angle_1, next_angle_2;
-      integral_value prev_diff_sum, next_diff_sum, curvature_mean, curvature_dev;
-      integral_value prev_count, next_count, predicted_diff;
+      integral_value count, diff_sum1, diff_sum2, curvature_mean, curvature_dev;
+      integral_value diff_min, diff_max, predicted_diff;
       
-      PRINT0("starting merge loop\n");
       max_jumps = 10;
       boundaries = boundarylist.first.next;
       endboundaries = &boundarylist.last;
@@ -2208,112 +2207,148 @@ result quad_forest_parse
         category = boundary1->category;
         /* take a straight or curved node and start extending it */
         if (category == fc_STRAIGHT || category == fc_CURVED) {
-          /* first, find the local minimum of curvature deviation */
-          /*
-          for (jump_count = 0; jump_count < max_jumps; jump_count++) {
+          /* first, find the start of the chain */
+          boundary2 = boundary1;
+          /* after this loop, boundary2 has the first node of chain */
+          PRINT0("loop 1\n");
+          while (1) {
+            boundary3 = boundary2->prev;
+            /* no previous node, end of chain */
+            if (boundary3 == NULL) {
+              break;
+            }
+            else
+            /* made full circle */
+            if (boundary3 == boundary1) {
+              break;
+            }
+            else
+            /* category changes, end of chain */
+            if (boundary3->category != category) {
+              break;
+            }
+            else
+            /* additional precaution for detecting loops (should be rare) */
+            if (boundary3->parent == boundary1) {
+              break;
+            }
+            boundary2 = boundary3;
+            boundary2->parent = boundary1;
+          }
+          boundary1 = boundary2;
+          
+          /* then, start following the chain, merge, and accumulate angle diff */
+          count = 0;
+          diff_sum1 = 0;
+          diff_sum2 = 0;
+          diff_min = 10;
+          diff_max = 0;
+          angle1 = boundary2->smoothed_angle;
+          /* after this loop, boundary2 has the last node of chain */
+          PRINT0("loop 2\n");
+          while (1) {
+            PRINT0("a\n");
+            boundary3 = boundary2->next;
+            PRINT0("b\n");
+            /* no next node, end of chain */
+            if (boundary3 == NULL) {
+              break;
+            }
+            else
+            /* made full circle */
+            if (boundary3 == boundary1) {
+              break;
+            }
+            else
+            /* additional precaution for detecting loops (should be rare) */
+            if (boundary3->parent == boundary1) {
+              break;
+            }
+            /* category changes, end of chain */
+            if (boundary3->category != category) {
+              break;
+            }
+            PRINT0("c\n");
+            angle2 = boundary3->smoothed_angle;
+            diff = angle_minus_angle(angle2, angle1);
+            count += 1;
+            diff_sum1 += diff;
+            diff_sum2 += (diff*diff);
+            PRINT0("d\n");
+            boundary_union(boundary2, boundary3);
+            PRINT0("e\n");
+            diff = fabs(diff);
+            if (diff < diff_min) diff_min = diff;
+            if (diff > diff_max) diff_max = diff;
+            PRINT0("f\n");
+            boundary3->parent = boundary1;
+            boundary2 = boundary3;
+            angle1 = angle2;
+            PRINT0("g\n");
+          }
+          /* at this stage, all nodes in the chain have been merged */
+          boundary3 = boundary2;
+          
+          /* next, start adding nodes at the beginning */
+          PRINT0("loop 3\n");
+          angle1 = boundary1->smoothed_angle;
+          while (1) {
             boundary2 = boundary1->prev;
-            prev_diff = 0;
-            if (boundary2 != NULL && boundary2->category == category) {
-              prev_diff = boundary2->curvature_dev - boundary1->curvature_dev;
+            if (boundary2 == NULL) {
+              break;
             }
-            boundary3 = boundary1->next;
-            next_diff = 0;
-            if (boundary3 != NULL && boundary3->category == category) {
-              next_diff = boundary3->curvature_dev - boundary1->curvature_dev;
+            else
+            if (boundary2 == boundary3) {
+              break;
             }
-            
-            if (prev_diff > next_diff) {
-              if (prev_diff > 0.001) {
-                boundary1 = boundary2;
-              }
-              else {
-                break;
-              }
+            else
+            if (boundary2->parent != boundary2) {
+              break;
+            }
+            angle2 = boundary2->smoothed_angle;
+            diff = angle_minus_angle(angle1, angle2);
+            if (diff_min < diff && diff < diff_max) {
+              boundary_union(boundary2, boundary1);
+              boundary2->category = category;
+              boundary1 = boundary2;
+              angle1 = angle2;
             }
             else {
-              if (next_diff > 0.001) {
-                boundary1 = boundary3;
-              }
-              else {
-                break;
-              }
+              break;
             }
           }
-          */
-          /* next, start merging neighboring nodes that fit the model */
-          boundary2 = boundary1->prev;
-          prev_angle_1 = boundary1->smoothed_angle;
-          prev_diff_sum = 0;
-          prev_count = 0;
-          boundary3 = boundary1->next;
-          next_angle_1 = prev_angle_1;
-          next_diff_sum = 0;
-          next_count = 0;
-          curvature_mean = boundary1->curvature_mean;
-          curvature_dev = 2 * boundary1->curvature_dev;
-          while (boundary2 != NULL || boundary3 != NULL) {
-            if (boundary2 != NULL) {
-              prev_angle_2 = boundary2->smoothed_angle;
-              diff = angle_minus_angle(prev_angle_1, prev_angle_2);
-              prev_diff_sum += diff;
-              prev_count += 1;
-              predicted_diff = prev_count * curvature_mean;
-              /* merge node if it fits the model */
-              if (predicted_diff - curvature_dev < prev_diff_sum &&
-                  prev_diff_sum < predicted_diff + curvature_dev)
-              {
-                boundary2->category = category;
-                boundary_union(boundary1, boundary2);
-                prev_angle_1 = prev_angle_2;
-                boundary2 = boundary_find(boundary2->prev);
-                if (boundary2 != NULL &&
-                    (boundary2->length > 1 ||
-                    (boundary2->category != category && 
-                      boundary2->category != fc_UNKNOWN)))
-                {
-                  boundary2 = NULL;
-                }
-              }
-              else {
-                boundary2 = NULL;
-              }
+          angle1 = boundary3->smoothed_angle;
+          /* finally, add nodes at the end */
+          PRINT0("loop 4\n");
+          while (1) {
+            boundary2 = boundary3->next;
+            if (boundary2 == NULL) {
+              break;
             }
-            if (boundary3 != NULL) {
-              next_angle_2 = boundary3->smoothed_angle;
-              diff = angle_minus_angle(next_angle_2, next_angle_1);
-              next_diff_sum += diff;
-              next_count += 1;
-              predicted_diff = next_count * curvature_mean;
-              /* merge node if it fits the model */
-              if (predicted_diff - curvature_dev < next_diff_sum &&
-                  next_diff_sum < predicted_diff + curvature_dev)
-              {
-                boundary3->category = category;
-                boundary_union(boundary1, boundary3);
-                next_angle_1 = next_angle_2;
-                boundary3 = boundary_find(boundary3->next);
-                if (boundary3 != NULL &&
-                    (boundary3->length > 1 ||
-                    (boundary3->category != category && 
-                      boundary3->category != fc_UNKNOWN)))
-                {
-                  boundary3 = NULL;
-                }
-              }
-              else {
-                boundary3 = NULL;
-              }
+            else
+            if (boundary2 == boundary1) {
+              break;
             }
-            boundary1 = boundary_find(boundary1);
-            if (boundary1->length > 5) {
-              curvature_mean = boundary1->curvature_mean;
-              curvature_dev = 2 * boundary1->curvature_dev;
+            else
+            if (boundary2->parent != boundary2) {
+              break;
+            }
+            angle2 = boundary2->smoothed_angle;
+            diff = angle_minus_angle(angle1, angle2);
+            if (diff_min < diff && diff < diff_max) {
+              boundary_union(boundary2, boundary3);
+              boundary2->category = category;
+              boundary3 = boundary2;
+              angle1 = angle2;
+            }
+            else {
+              break;
             }
           }
+          PRINT0("end\n");
         }
         boundaries = boundaries->next;
       }
-      PRINT0("merge finished\n");
     }
   }
 

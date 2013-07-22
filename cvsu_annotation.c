@@ -934,6 +934,7 @@ void boundary_union
     if (parent_1->rank < parent_2->rank) {
       parent_1->parent = parent_2;
       parent_2->length += parent_1->length;
+      /*
       parent_2->curvature_sum1 += parent_1->curvature_sum1;
       parent_2->curvature_mean =
           parent_2->curvature_sum1 /
@@ -943,6 +944,7 @@ void boundary_union
           parent_2->curvature_sum2 /
           ((integral_value)parent_2->length) -
           pow(parent_2->curvature_mean, 2.0);
+      */
     }
     else {
       parent_2->parent = parent_1;
@@ -950,6 +952,7 @@ void boundary_union
         parent_1->rank += 1;
       }
       parent_1->length += parent_2->length;
+      /*
       parent_1->curvature_sum1 += parent_2->curvature_sum1;
       parent_1->curvature_mean =
           parent_1->curvature_sum1 /
@@ -959,6 +962,7 @@ void boundary_union
           parent_1->curvature_sum2 /
           ((integral_value)parent_1->length) -
           pow(parent_1->curvature_mean, 2.0);
+      */
     }
   }
 }
