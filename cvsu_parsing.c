@@ -1935,7 +1935,7 @@ result quad_forest_parse
               }
             }
           }
-          
+
           /* extended or not, link the found towards node */
           CHECK(quad_tree_ensure_boundary(tree1, &boundary1));
           if (boundary1->length < 1) {
@@ -2053,6 +2053,7 @@ result quad_forest_parse
     integral_value angle2a, angle2b, angle3a, angle3b;
     integral_value diffs[7], diff, diff_sum, diff_mean, diff_diff, diff_dev, diff_count;
     integral_value next_diff, prev_diff;
+    integral_value x1, y1, x2, y2, dx, dy, px, py, mag, dist;
     uint32 i, count;
     boundary_category category;
 
@@ -2061,294 +2062,141 @@ result quad_forest_parse
     while (boundaries != endboundaries) {
       boundary1 = *((boundary**)boundaries->data);
       angle1 = boundary1->angle;
-
-      boundary2 = boundary1->next;
-      if (boundary2 != NULL) {
-        angle2 = boundary2->angle;
-        angle2 = angle_minus_angle(angle2, angle1);
-        angle2a = atan2(
-          (integral_value)((signed)boundary1->tree->y - (signed)boundary2->tree->y),
-          (integral_value)((signed)boundary2->tree->x - (signed)boundary1->tree->x));
-        if (angle2a < 0) angle2a += M_2PI;
-        angle2b = angle_minus_angle(angle2a, angle1);
-      }
-      else {
-        angle2 = 0;
-        angle2a = -10;
-        angle2b = 0;
-      }
-      boundary3 = boundary1->prev;
-      if (boundary3 != NULL) {
-        angle3 = boundary3->angle;
-        angle3 = angle_minus_angle(angle3, angle1);
-        angle3a = atan2(
-          (integral_value)((signed)boundary3->tree->y - (signed)boundary1->tree->y),
-          (integral_value)((signed)boundary1->tree->x - (signed)boundary3->tree->x));
-        if (angle3a < 0) angle3a += M_2PI;
-        angle3b = angle_minus_angle(angle3a, angle1);
-      }
-      else {
-        angle3 = 0;
-        angle3a = -10;
-        angle2b = 0;
-      }
-      if (angle2a < -4) {
-        angle2a = angle3a;
-      }
-      if (angle3a < -4) {
-        angle3a = angle2a;
-      }
-      angle = (angle2b + angle2 + angle3b + angle3) / 4;
-      angle1 = angle1 + angle;
-      angle2 = angle2a + (angle_minus_angle(angle3a, angle2a) / 2);
-      angle3 = fabs(angle_minus_angle(angle2, angle1));
-      if (angle3 > 0.2) {
-        boundary1->smoothed_angle = angle2;
-      }
-      else {
-        boundary1->smoothed_angle = angle1;
-      }
-      
-      boundaries = boundaries->next;
-    }
-    
-    boundaries = boundarylist.first.next;
-    endboundaries = &boundarylist.last;
-    while (boundaries != endboundaries) {
-      boundary1 = *((boundary**)boundaries->data);
-      
-      angle1 = boundary1->smoothed_angle;
+      x1 = (integral_value)boundary1->tree->x;
+      y1 = (integral_value)boundary1->tree->y;
+      dx = 0;
+      dy = 0;
       count = 0;
       boundary2 = boundary1->next;
       if (boundary2 != NULL) {
-        angle2 = boundary2->smoothed_angle;
-        diffs[count++] = angle_minus_angle(angle2, angle1);
-        angle1 = angle2;
+        x2 = (integral_value)boundary2->tree->x;
+        y2 = (integral_value)boundary2->tree->y;
+        dx += (x2 - x1);
+        dy += (y2 - y1);
+        count += 1;
         boundary2 = boundary2->next;
         if (boundary2 != NULL) {
-          angle2 = boundary2->smoothed_angle;
-          diffs[count++] = angle_minus_angle(angle2, angle1);
-          angle1 = angle2;
+          x2 = (integral_value)boundary2->tree->x;
+          y2 = (integral_value)boundary2->tree->y;
+          dx += (x2 - x1);
+          dy += (y2 - y1);
+          count += 1;
           boundary2 = boundary2->next;
           if (boundary2 != NULL) {
-            angle2 = boundary2->smoothed_angle;
-            diffs[count++] = angle_minus_angle(angle2, angle1);
+            x2 = (integral_value)boundary2->tree->x;
+            y2 = (integral_value)boundary2->tree->y;
+            dx += (x2 - x1);
+            dy += (y2 - y1);
+            count += 1;
           }
         }
       }
-      angle1 = boundary1->smoothed_angle;
-      boundary2 = boundary1->prev;
+      boundary3 = boundary1->prev;
+      if (boundary3 != NULL) {
+        x2 = (integral_value)boundary3->tree->x;
+        y2 = (integral_value)boundary3->tree->y;
+        dx += (x1 - x2);
+        dy += (y1 - y2);
+        count += 1;
+        boundary3 = boundary3->prev;
+        if (boundary3 != NULL) {
+          x2 = (integral_value)boundary3->tree->x;
+          y2 = (integral_value)boundary3->tree->y;
+          dx += (x1 - x2);
+          dy += (y1 - y2);
+          count += 1;
+          boundary3 = boundary3->prev;
+          if (boundary3 != NULL) {
+            x2 = (integral_value)boundary3->tree->x;
+            y2 = (integral_value)boundary3->tree->y;
+            dx += (x1 - x2);
+            dy += (y1 - y2);
+            count += 1;
+          }
+        }
+      }
+
+      dx = dx / ((integral_value)count);
+      dy = dy / ((integral_value)count);
+      angle2 = atan2(-dy, dx);
+      if (angle2 < 0) angle2 += M_2PI;
+      boundary1->smoothed_angle = angle2;
+
+      /* get a unit vector perpendicular to slope */
+      mag = sqrt(dx*dx + dy*dy);
+      px = dy / mag;
+      py = -dx / mag;
+      dist = 0;
+      count = 0;
+      boundary2 = boundary1->next;
       if (boundary2 != NULL) {
-        angle2 = boundary2->smoothed_angle;
-        diffs[count++] = angle_minus_angle(angle1, angle2);
-        angle1 = angle2;
-        boundary2 = boundary2->prev;
+        x2 = (integral_value)boundary2->tree->x;
+        y2 = (integral_value)boundary2->tree->y;
+        dx += (x2 - x1);
+        dy += (y2 - y1);
+        /* calculate distance by scalar product with perpendicular vector */
+        dist += (px*dx + py*dy);
+        count += 1;
+        boundary2 = boundary2->next;
         if (boundary2 != NULL) {
-          angle2 = boundary2->smoothed_angle;
-          diffs[count++] = angle_minus_angle(angle1, angle2);
-          angle1 = angle2;
-          boundary2 = boundary2->prev;
+          x2 = (integral_value)boundary2->tree->x;
+          y2 = (integral_value)boundary2->tree->y;
+          dx += (x2 - x1);
+          dy += (y2 - y1);
+          /* calculate distance by scalar product with perpendicular vector */
+          dist += (px*dx + py*dy);
+          count += 1;
+          boundary2 = boundary2->next;
           if (boundary2 != NULL) {
-            angle2 = boundary2->smoothed_angle;
-            diffs[count++] = angle_minus_angle(angle1, angle2);
+            x2 = (integral_value)boundary2->tree->x;
+            y2 = (integral_value)boundary2->tree->y;
+            dx += (x2 - x1);
+            dy += (y2 - y1);
+            /* calculate distance by scalar product with perpendicular vector */
+            dist += (px*dx + py*dy);
+            count += 1;
           }
         }
       }
-      
-      diff_count = (integral_value)count;
-      diff_sum = 0;
-      for (i = 0; i < count; i++) {
-        diff_sum += diffs[i];
+      boundary3 = boundary1->prev;
+      if (boundary3 != NULL) {
+        x2 = (integral_value)boundary3->tree->x;
+        y2 = (integral_value)boundary3->tree->y;
+        dx += (x1 - x2);
+        dy += (y1 - y2);
+        /* calculate distance by scalar product with perpendicular vector */
+        dist += (px*dx + py*dy);
+        count += 1;
+        boundary3 = boundary3->prev;
+        if (boundary3 != NULL) {
+          x2 = (integral_value)boundary3->tree->x;
+          y2 = (integral_value)boundary3->tree->y;
+          dx += (x1 - x2);
+          dy += (y1 - y2);
+          /* calculate distance by scalar product with perpendicular vector */
+          dist += (px*dx + py*dy);
+          count += 1;
+          boundary3 = boundary3->prev;
+          if (boundary3 != NULL) {
+            x2 = (integral_value)boundary3->tree->x;
+            y2 = (integral_value)boundary3->tree->y;
+            dx += (x1 - x2);
+            dy += (y1 - y2);
+            /* calculate distance by scalar product with perpendicular vector */
+            dist += (px*dx + py*dy);
+            count += 1;
+          }
+        }
       }
-      diff_mean = diff_sum / diff_count;
-      diff_sum = 0;
-      for (i = 0; i < count; i++) {
-        diff = diffs[i] - diff_mean;
-        diff_sum += (diff*diff);
-      }
-      diff_dev = diff_sum / diff_count;
-      diff_dev = diff_dev < 1 ? diff_dev : sqrt(diff_dev);
-      
-      boundary1->curvature_mean = diff_mean;
-      boundary1->curvature_dev = diff_dev;
-      if ((fabs(diff_mean) + diff_dev) < 0.06) {
+      dist = dist / ((integral_value)count);
+      boundary1->curvature = dist;
+      if (dist < 0.2) {
         boundary1->category = fc_STRAIGHT;
-        boundary1->curvature = diff_mean + diff_dev;
-      }
-      else
-      if (fabs(diff_mean) > 0.06) {
-        boundary1->category = fc_CURVED;
-        boundary1->curvature = diff_mean;
       }
       else {
-        boundary1->category = fc_UNKNOWN;
+        boundary1->category = fc_CURVED;
       }
-      
       boundaries = boundaries->next;
-    }
-    
-    /* now take the initial hypotheses and merge */
-    {
-      uint32 jump_count, max_jumps;
-      integral_value prev_angle_1, prev_angle_2, next_angle_1, next_angle_2;
-      integral_value count, diff_sum1, diff_sum2, curvature_mean, curvature_dev;
-      integral_value diff_min, diff_max, predicted_diff;
-      
-      max_jumps = 10;
-      boundaries = boundarylist.first.next;
-      endboundaries = &boundarylist.last;
-      while (boundaries != endboundaries) {
-        boundary1 = *((boundary**)boundaries->data);
-        boundary1 = boundary_find(boundary1);
-        if (boundary1->length > 1) {
-          boundaries = boundaries->next;
-          continue;
-        }
-        category = boundary1->category;
-        /* take a straight or curved node and start extending it */
-        if (category == fc_STRAIGHT || category == fc_CURVED) {
-          /* first, find the start of the chain */
-          boundary2 = boundary1;
-          /* after this loop, boundary2 has the first node of chain */
-          PRINT0("loop 1\n");
-          while (1) {
-            boundary3 = boundary2->prev;
-            /* no previous node, end of chain */
-            if (boundary3 == NULL) {
-              break;
-            }
-            else
-            /* made full circle */
-            if (boundary3 == boundary1) {
-              break;
-            }
-            else
-            /* category changes, end of chain */
-            if (boundary3->category != category) {
-              break;
-            }
-            else
-            /* additional precaution for detecting loops (should be rare) */
-            if (boundary3->parent == boundary1) {
-              break;
-            }
-            boundary2 = boundary3;
-            boundary2->parent = boundary1;
-          }
-          boundary1 = boundary2;
-          
-          /* then, start following the chain, merge, and accumulate angle diff */
-          count = 0;
-          diff_sum1 = 0;
-          diff_sum2 = 0;
-          diff_min = 10;
-          diff_max = 0;
-          angle1 = boundary2->smoothed_angle;
-          /* after this loop, boundary2 has the last node of chain */
-          PRINT0("loop 2\n");
-          while (1) {
-            PRINT0("a\n");
-            boundary3 = boundary2->next;
-            PRINT0("b\n");
-            /* no next node, end of chain */
-            if (boundary3 == NULL) {
-              break;
-            }
-            else
-            /* made full circle */
-            if (boundary3 == boundary1) {
-              break;
-            }
-            else
-            /* additional precaution for detecting loops (should be rare) */
-            if (boundary3->parent == boundary1) {
-              break;
-            }
-            /* category changes, end of chain */
-            if (boundary3->category != category) {
-              break;
-            }
-            PRINT0("c\n");
-            angle2 = boundary3->smoothed_angle;
-            diff = angle_minus_angle(angle2, angle1);
-            count += 1;
-            diff_sum1 += diff;
-            diff_sum2 += (diff*diff);
-            PRINT0("d\n");
-            boundary_union(boundary2, boundary3);
-            PRINT0("e\n");
-            diff = fabs(diff);
-            if (diff < diff_min) diff_min = diff;
-            if (diff > diff_max) diff_max = diff;
-            PRINT0("f\n");
-            boundary3->parent = boundary1;
-            boundary2 = boundary3;
-            angle1 = angle2;
-            PRINT0("g\n");
-          }
-          /* at this stage, all nodes in the chain have been merged */
-          boundary3 = boundary2;
-          
-          /* next, start adding nodes at the beginning */
-          PRINT0("loop 3\n");
-          angle1 = boundary1->smoothed_angle;
-          while (1) {
-            boundary2 = boundary1->prev;
-            if (boundary2 == NULL) {
-              break;
-            }
-            else
-            if (boundary2 == boundary3) {
-              break;
-            }
-            else
-            if (boundary2->parent != boundary2) {
-              break;
-            }
-            angle2 = boundary2->smoothed_angle;
-            diff = angle_minus_angle(angle1, angle2);
-            if (diff_min < diff && diff < diff_max) {
-              boundary_union(boundary2, boundary1);
-              boundary2->category = category;
-              boundary1 = boundary2;
-              angle1 = angle2;
-            }
-            else {
-              break;
-            }
-          }
-          angle1 = boundary3->smoothed_angle;
-          /* finally, add nodes at the end */
-          PRINT0("loop 4\n");
-          while (1) {
-            boundary2 = boundary3->next;
-            if (boundary2 == NULL) {
-              break;
-            }
-            else
-            if (boundary2 == boundary1) {
-              break;
-            }
-            else
-            if (boundary2->parent != boundary2) {
-              break;
-            }
-            angle2 = boundary2->smoothed_angle;
-            diff = angle_minus_angle(angle1, angle2);
-            if (diff_min < diff && diff < diff_max) {
-              boundary_union(boundary2, boundary3);
-              boundary2->category = category;
-              boundary3 = boundary2;
-              angle1 = angle2;
-            }
-            else {
-              break;
-            }
-          }
-          PRINT0("end\n");
-        }
-        boundaries = boundaries->next;
-      }
     }
   }
 
@@ -2534,7 +2382,7 @@ result quad_forest_visualize_parse_result
           color0 = 0;
           color1 = 255;
           color2 = 0;
-          if (bparent->length > 1) {
+          /*if (bparent->length > -1) {*/
             if (bparent->category == fc_STRAIGHT) {
               color0 = 255;
               color1 = 0;
@@ -2546,8 +2394,8 @@ result quad_forest_visualize_parse_result
               color1 = 0;
               color2 = 255;
             }
-          }
-          
+          /*}*/
+
           /*
           color0 = 255;
           color1 = 0;
@@ -2633,7 +2481,7 @@ result quad_forest_visualize_parse_result
       PRINT1("fragments found: %lu, ", frag_count);
       PRINT1("frags in list: %lu\n", frags.count);
       */
-      CHECK(pixel_image_draw_colored_rects(target, &frags));
+      /*CHECK(pixel_image_draw_colored_rects(target, &frags));*/
       /*
       CHECK(list_clear(&links));
       CHECK(quad_forest_get_links(forest, &links, v_LINK_STRENGTH));
