@@ -2049,11 +2049,9 @@ result quad_forest_parse
   {
     list_item *boundaries, *endboundaries;
     boundary *boundary1, *boundary2, *boundary3, *parent1, *parent2;
-    integral_value angle, angle1, angle2, angle3, curvature;
-    integral_value angle2a, angle2b, angle3a, angle3b;
-    integral_value diffs[7], diff, diff_sum, diff_mean, diff_diff, diff_dev, diff_count;
-    integral_value next_diff, prev_diff;
-    integral_value x1, y1, x2, y2, dx, dy, px, py, mag, dist;
+    integral_value angle1, angle2, curvature;
+    integral_value x1, y1, x2, y2, dx[6], dy[6], dxsum, dysum, dist;
+    integral_value weight, px, py, mag;
     uint32 i, count;
     boundary_category category;
 
@@ -2064,30 +2062,34 @@ result quad_forest_parse
       angle1 = boundary1->angle;
       x1 = (integral_value)boundary1->tree->x;
       y1 = (integral_value)boundary1->tree->y;
-      dx = 0;
-      dy = 0;
+      dxsum = 0.0;
+      dysum = 0.0;
       count = 0;
+      weight = 0.0;
       boundary2 = boundary1->next;
       if (boundary2 != NULL) {
         x2 = (integral_value)boundary2->tree->x;
         y2 = (integral_value)boundary2->tree->y;
-        dx += (x2 - x1);
-        dy += (y2 - y1);
-        count += 1;
+        dxsum += (dx[count] = (x2 - x1));
+        dysum += (dy[count] = (y2 - y1));
+        count++;
+        weight += 1.0;
         boundary2 = boundary2->next;
         if (boundary2 != NULL) {
           x2 = (integral_value)boundary2->tree->x;
           y2 = (integral_value)boundary2->tree->y;
-          dx += (x2 - x1);
-          dy += (y2 - y1);
-          count += 1;
+          dxsum += (2.0 * (dx[count] = (x2 - x1)));
+          dysum += (2.0 * (dy[count] = (y2 - y1)));
+          count++;
+          weight += 2.0;
           boundary2 = boundary2->next;
           if (boundary2 != NULL) {
             x2 = (integral_value)boundary2->tree->x;
             y2 = (integral_value)boundary2->tree->y;
-            dx += (x2 - x1);
-            dy += (y2 - y1);
-            count += 1;
+            dxsum += (3.0 * (dx[count] = (x2 - x1)));
+            dysum += (3.0 * (dy[count] = (y2 - y1)));
+            count++;
+            weight += 3.0;
           }
         }
       }
@@ -2095,102 +2097,55 @@ result quad_forest_parse
       if (boundary3 != NULL) {
         x2 = (integral_value)boundary3->tree->x;
         y2 = (integral_value)boundary3->tree->y;
-        dx += (x1 - x2);
-        dy += (y1 - y2);
-        count += 1;
+        dxsum += (dx[count] = (x1 - x2));
+        dysum += (dy[count] = (y1 - y2));
+        count++;
+        weight += 1.0;
         boundary3 = boundary3->prev;
         if (boundary3 != NULL) {
           x2 = (integral_value)boundary3->tree->x;
           y2 = (integral_value)boundary3->tree->y;
-          dx += (x1 - x2);
-          dy += (y1 - y2);
-          count += 1;
+          dxsum += (2.0 * (dx[count] = (x1 - x2)));
+          dysum += (2.0 * (dy[count] = (y1 - y2)));
+          count++;
+          weight += 2.0;
           boundary3 = boundary3->prev;
           if (boundary3 != NULL) {
             x2 = (integral_value)boundary3->tree->x;
             y2 = (integral_value)boundary3->tree->y;
-            dx += (x1 - x2);
-            dy += (y1 - y2);
-            count += 1;
+            dxsum += (3.0 * (dx[count] = (x1 - x2)));
+            dysum += (3.0 * (dy[count] = (y1 - y2)));
+            count++;
+            weight += 3.0;
           }
         }
       }
 
-      dx = dx / ((integral_value)count);
-      dy = dy / ((integral_value)count);
-      angle2 = atan2(-dy, dx);
+      dxsum = dxsum / weight;
+      dysum = dysum / weight;
+      angle2 = atan2(-dysum, dxsum);
       if (angle2 < 0) angle2 += M_2PI;
-      boundary1->smoothed_angle = angle2;
+      if (count > 2) {
+        boundary1->smoothed_angle = angle2;
+      }
+      else {
+        boundary1->smoothed_angle = angle1;
+      }
 
       /* get a unit vector perpendicular to slope */
-      mag = sqrt(dx*dx + dy*dy);
-      px = dy / mag;
-      py = -dx / mag;
-      dist = 0;
-      count = 0;
-      boundary2 = boundary1->next;
-      if (boundary2 != NULL) {
-        x2 = (integral_value)boundary2->tree->x;
-        y2 = (integral_value)boundary2->tree->y;
-        dx += (x2 - x1);
-        dy += (y2 - y1);
-        /* calculate distance by scalar product with perpendicular vector */
-        dist += (px*dx + py*dy);
-        count += 1;
-        boundary2 = boundary2->next;
-        if (boundary2 != NULL) {
-          x2 = (integral_value)boundary2->tree->x;
-          y2 = (integral_value)boundary2->tree->y;
-          dx += (x2 - x1);
-          dy += (y2 - y1);
-          /* calculate distance by scalar product with perpendicular vector */
-          dist += (px*dx + py*dy);
-          count += 1;
-          boundary2 = boundary2->next;
-          if (boundary2 != NULL) {
-            x2 = (integral_value)boundary2->tree->x;
-            y2 = (integral_value)boundary2->tree->y;
-            dx += (x2 - x1);
-            dy += (y2 - y1);
-            /* calculate distance by scalar product with perpendicular vector */
-            dist += (px*dx + py*dy);
-            count += 1;
-          }
-        }
+      mag = sqrt(dxsum*dxsum + dysum*dysum);
+      px = dysum / mag;
+      py = -dxsum / mag;
+      dist = 0.0;
+      /* calculate distance by scalar product with perpendicular vector */
+      for (i = 0; i < count; i++) {
+        dist += (px*dx[i] + py*dy[i]);
       }
-      boundary3 = boundary1->prev;
-      if (boundary3 != NULL) {
-        x2 = (integral_value)boundary3->tree->x;
-        y2 = (integral_value)boundary3->tree->y;
-        dx += (x1 - x2);
-        dy += (y1 - y2);
-        /* calculate distance by scalar product with perpendicular vector */
-        dist += (px*dx + py*dy);
-        count += 1;
-        boundary3 = boundary3->prev;
-        if (boundary3 != NULL) {
-          x2 = (integral_value)boundary3->tree->x;
-          y2 = (integral_value)boundary3->tree->y;
-          dx += (x1 - x2);
-          dy += (y1 - y2);
-          /* calculate distance by scalar product with perpendicular vector */
-          dist += (px*dx + py*dy);
-          count += 1;
-          boundary3 = boundary3->prev;
-          if (boundary3 != NULL) {
-            x2 = (integral_value)boundary3->tree->x;
-            y2 = (integral_value)boundary3->tree->y;
-            dx += (x1 - x2);
-            dy += (y1 - y2);
-            /* calculate distance by scalar product with perpendicular vector */
-            dist += (px*dx + py*dy);
-            count += 1;
-          }
-        }
-      }
-      dist = dist / ((integral_value)count);
+
+      /* include the central node with dist 0 into the equation */
+      dist = dist / ((integral_value)(count + 1));
       boundary1->curvature = dist;
-      if (dist < 0.2) {
+      if (dist < 0.15) {
         boundary1->category = fc_STRAIGHT;
       }
       else {
