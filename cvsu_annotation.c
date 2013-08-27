@@ -859,12 +859,12 @@ result quad_tree_ensure_boundary
     tree_boundary->rank = 0;
     tree_boundary->length = 0;
     tree_boundary->angle = 0;
+    tree_boundary->angle_prev = 0;
+    tree_boundary->angle_next = 0;
     tree_boundary->smoothed_angle = 0;
     tree_boundary->curvature = 0;
-    tree_boundary->curvature_mean = 0;
-    tree_boundary->curvature_sum1 = 0;
-    tree_boundary->curvature_dev = 0;
-    tree_boundary->curvature_sum2 = 0;
+    tree_boundary->curvature_prev = 0;
+    tree_boundary->curvature_next = 0;
   }
 
   if (output_boundary != NULL) {
@@ -893,10 +893,6 @@ void boundary_init
       input_boundary->category = fc_UNKNOWN;
       input_boundary->length = 1;
       input_boundary->angle = angle;
-      input_boundary->curvature_mean = 0;
-      input_boundary->curvature_sum1 = 0;
-      input_boundary->curvature_dev = 0;
-      input_boundary->curvature_sum2 = 0;
     }
   }
 }

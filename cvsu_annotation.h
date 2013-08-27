@@ -577,18 +577,14 @@ typedef struct boundary_t {
   uint32 length;
   /** Actual angle at this node */
   integral_value angle;
+  integral_value angle_prev;
+  integral_value angle_next;
   /** Angle smoothed based on neighboring nodes */
   integral_value smoothed_angle;
   /** Actual curvature at this node */
   integral_value curvature;
-  /** Average curvature (change in direction) between nodes */
-  integral_value curvature_mean;
-  /** Sum of curvatures for calculating the mean */
-  integral_value curvature_sum1;
-  /** Standard deviation of curvature */
-  integral_value curvature_dev;
-  /** Sum of squared curvatures for calculating the deviation */
-  integral_value curvature_sum2;
+  integral_value curvature_prev;
+  integral_value curvature_next;
 } boundary;
 
 /**
