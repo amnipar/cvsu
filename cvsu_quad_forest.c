@@ -1364,7 +1364,7 @@ result quad_forest_get_segment_boundary
   CHECK_POINTER(segment_boundary);
 
   CHECK(list_create(segment_boundary, 100, sizeof(line), 1));
-  
+
   if (1/*input_segment->x2 - input_segment->x1 > 33 && input_segment->y2 - input_segment->y1 > 32*/) {
     /* find the tree in center left of bounding box */
     /*
@@ -2068,7 +2068,7 @@ result quad_forest_get_links
       }
       items = items->next;
     }
-    PRINT1("max strength: %.3f\n", max_strength);
+    /*PRINT1("max strength: %.3f\n", max_strength);*/
 
     items = forest->trees.first.next;
     end = &forest->trees.last;
@@ -2120,7 +2120,7 @@ result quad_forest_get_links
         color_line.color[2] = (byte)((1 - strength) * 255);
 
         CHECK(list_append(links, (pointer)&color_line));
-        
+
       }
       items = items->next;
     }
