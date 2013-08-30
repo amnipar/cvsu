@@ -94,6 +94,7 @@ typedef enum link_visualization_mode_t {
   v_LINK_STRAIGHTNESS,
   v_LINK_EDGE,
   v_LINK_STRAIGHT,
+  v_LINK_EDGE_POS,
   v_LINK_BOUNDARY
 } link_visualization_mode;
 

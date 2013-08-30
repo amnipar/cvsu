@@ -2049,6 +2049,41 @@ result quad_forest_get_links
     }
   }
   else
+  if (mode == v_LINK_EDGE_POS) {
+    boundary *boundary1, *boundary2;
+    integral_value radius, angle, strength, max_strength, curvature;
+    sint32 x, y;
+
+    color_line.color[0] = 0;
+    color_line.color[1] = 255;
+    color_line.color[2] = 255;
+
+    items = forest->trees.first.next;
+    end = &forest->trees.last;
+    while (items != end) {
+      tree = (quad_tree*)items->data;
+      boundary1 = has_boundary(&tree->annotation, forest->token);
+      if (boundary1 != NULL) {
+        radius = ((integral_value)tree->size) / 2.0;
+        color_line.start.x = boundary1->x;
+        color_line.start.y = boundary1->y;
+        boundary2 = boundary1->next;
+        if (boundary2 != NULL) {
+          color_line.end.x = boundary2->x;
+          color_line.end.y = boundary2->y;
+          CHECK(list_append(links, (pointer)&color_line));
+        }
+        boundary2 = boundary1->prev;
+        if (boundary2 != NULL) {
+          color_line.end.x = boundary2->x;
+          color_line.end.y = boundary2->y;
+          CHECK(list_append(links, (pointer)&color_line));
+        }
+      }
+      items = items->next;
+    }
+  }
+  else
   if (mode == v_LINK_BOUNDARY) {
     boundary *boundary1, *boundary2;
     integral_value radius, angle, strength, max_strength, curvature;
@@ -2068,7 +2103,6 @@ result quad_forest_get_links
       }
       items = items->next;
     }
-    /*PRINT1("max strength: %.3f\n", max_strength);*/
 
     items = forest->trees.first.next;
     end = &forest->trees.last;

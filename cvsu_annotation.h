@@ -182,6 +182,8 @@ typedef struct edge_response_t
   integral_value mag;
   integral_value ang;
   integral_value confidence;
+  uint32 x;
+  uint32 y;
   uint32 hpeaks;
   uint32 vpeaks;
   integral_value peak_score;
@@ -575,6 +577,8 @@ typedef struct boundary_t {
   uint32 rank;
   /** Length of the boundary fragment in nodes */
   uint32 length;
+  uint32 x;
+  uint32 y;
   /** Actual angle at this node */
   integral_value angle;
   integral_value angle_prev;

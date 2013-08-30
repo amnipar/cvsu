@@ -755,7 +755,7 @@ result quad_tree_ensure_edge_response
 )
 {
   TRY();
-  uint32 box_width, box_length, row, col, endrow, endcol, hpeaks, vpeaks;
+  uint32 box_width, box_length, row, col, endrow, endcol, hpeaks, vpeaks, x, y;
   sint32 srow, scol;
   integral_value hmax, hsum, vmax, vsum, ang, g_1, g_2, hold, vold;
   edge_response *resp;
@@ -780,6 +780,7 @@ result quad_tree_ensure_edge_response
       endcol = ((unsigned)(scol + ((signed)box_width)));
       hsum = 0;
       hpeaks = 0;
+      x = 0;
       /*printf("col %lu endcol %lu ", col, endcol);*/
       if (scol >= 0 && endcol + box_width + 1 <= forest->integral.width) {
         if (IS_FALSE(use_max)) {
@@ -826,6 +827,7 @@ result quad_tree_ensure_edge_response
                     hold = hmax;
                   }
                   hmax = g_1;
+                  x = col;
                 }
                 else {
                   if (fabs(g_1) > fabs(hold)) {
@@ -845,6 +847,7 @@ result quad_tree_ensure_edge_response
                     hold = hmax;
                   }
                   hmax = g_1;
+                  x = col;
                 }
                 else {
                   if (fabs(g_1) > fabs(hold)) {
@@ -871,6 +874,7 @@ result quad_tree_ensure_edge_response
       endrow = ((unsigned)(srow + ((signed)box_width)));
       vsum = 0;
       vpeaks = 0;
+      y = 0;
       /*printf("row %lu endrow %lu ", row, endrow);*/
       if (srow >= 0 && endrow + box_width + 1 <= forest->integral.height) {
         if (IS_FALSE(use_max)) {
@@ -917,6 +921,7 @@ result quad_tree_ensure_edge_response
                     vold = vmax;
                   }
                   vmax = g_1;
+                  y = row;
                 }
                 else {
                   if (fabs(g_1) > fabs(vold)) {
@@ -936,6 +941,7 @@ result quad_tree_ensure_edge_response
                     vold = vmax;
                   }
                   vmax = g_1;
+                  y = row;
                 }
                 else {
                   if (fabs(g_1) > fabs(vold)) {
@@ -956,43 +962,42 @@ result quad_tree_ensure_edge_response
       }
     }
 
-    if (IS_FALSE(use_max)) {
-      resp->dx = hsum;
-      resp->dy = vsum;
-      resp->mag = sqrt(hsum*hsum + vsum*vsum);
-      ang = atan2(-vsum, hsum);
-      if (ang < 0) ang = ang + 2 * M_PI;
-      resp->ang = ang;
-      resp->hpeaks = 0;
-      resp->vpeaks = 0;
-      resp->peak_score = 0;
-    }
-    else {
-      if ((hpeaks > 0) && (vpeaks > 0)) {
-        resp->dx = hmax;
-        resp->dy = vmax;
-        resp->mag = sqrt(hsum*hsum + vsum*vsum);
-        ang = atan2(-vsum, hsum);
-        if (ang < 0) ang = ang + 2 * M_PI;
-        resp->ang = ang;
-        resp->hpeaks = hpeaks;
-        resp->vpeaks = vpeaks;
-        resp->peak_score = (fabs((hmax - hold) / hmax) + fabs((vmax - vold) / vmax)) / 2;
-
-        /*PRINT1("peak score %.3f\n", resp->peak_score);*/
+    if (hpeaks > 0) {
+      hsum = hmax;
+      if (fabs(hmax) > fabs(0.5 * vmax)) {
+        resp->x = x + box_length;
       }
       else {
-        resp->dx = hsum;
-        resp->dy = vsum;
-        resp->mag = sqrt(hsum*hsum + vsum*vsum);
-        ang = atan2(-vsum, hsum);
-        if (ang < 0) ang = ang + 2 * M_PI;
-        resp->ang = ang;
-        resp->hpeaks = 0;
-        resp->vpeaks = 0;
-        resp->peak_score = 0;
+        resp->x = tree->x + (tree->size / 2);
       }
     }
+    else {
+      resp->x = tree->x + (tree->size / 2);
+    }
+
+    if (vpeaks > 0) {
+      vsum = vmax;
+      if (fabs(vmax) > fabs(0.5 * hmax)) {
+        resp->y = y + box_length;
+      }
+      else {
+        resp->y = tree->y + (tree->size / 2);
+      }
+    }
+    else {
+      resp->y = tree->y + (tree->size / 2);
+    }
+
+    resp->dx = hsum;
+    resp->dy = vsum;
+    resp->mag = sqrt(hsum*hsum + vsum*vsum);
+    ang = atan2(-vsum, hsum);
+    if (ang < 0) ang = ang + 2 * M_PI;
+    resp->ang = ang;
+    resp->hpeaks = hpeaks;
+    resp->vpeaks = vpeaks;
+    resp->peak_score = 0;
+    /*resp->peak_score = (fabs((hmax - hold) / hmax) + fabs((vmax - vold) / vmax)) / 2;*/
   }
 
   if (eresp != NULL) {
