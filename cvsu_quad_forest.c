@@ -2132,8 +2132,8 @@ result quad_forest_get_links
         color_line.end.y = y - dy;
 
         color_line.color[0] = (byte)((1 - strength) * 0);
-        color_line.color[1] = (byte)((1 - strength) * 255);
-        color_line.color[2] = (byte)((1 - strength) * 255);
+        color_line.color[1] = (byte)((1 - strength) * 0);
+        color_line.color[2] = (byte)((1 - strength) * 0);
 
         CHECK(list_append(links, (pointer)&color_line));
 
@@ -2150,8 +2150,8 @@ result quad_forest_get_links
         color_line.end.y = y - dy;
 
         color_line.color[0] = (byte)((1 - strength) * 0);
-        color_line.color[1] = (byte)((1 - strength) * 255);
-        color_line.color[2] = (byte)((1 - strength) * 255);
+        color_line.color[1] = (byte)((1 - strength) * 0);
+        color_line.color[2] = (byte)((1 - strength) * 0);
 
         CHECK(list_append(links, (pointer)&color_line));
 

@@ -2047,10 +2047,12 @@ result quad_forest_parse
 
   /* in the third round, analyze and merge boundary fragments */
   {
+    quad_tree *tree;
+    edge_response *eresp;
     list_item *boundaries, *endboundaries;
     boundary *boundary1, *boundary2, *boundary3, *parent1, *parent2;
-    integral_value angle1, angle2, curvature, px, py, mag;
-    integral_value x1, y1, x2, y2, dx[6], dy[6], dist_prev, dist_next, dist_total;
+    integral_value angle1, angle2, curvature, px, py, rx, ry, mag;
+    integral_value x1, y1, x2, y2, dx[6], dy[6], dist[6], dist_prev, dist_next, dist_total;
     integral_value dx_temp, dx_total, dy_temp, dy_total, weight_temp, weight_total;
     uint32 i, count_prev, count_next;
     boundary_category category;
@@ -2059,43 +2061,95 @@ result quad_forest_parse
     endboundaries = &boundarylist.last;
     while (boundaries != endboundaries) {
       boundary1 = *((boundary**)boundaries->data);
+      tree = boundary1->tree;
+      CHECK(expect_edge_response(&eresp, &tree->annotation));
+      boundary1->x = eresp->x;
+      boundary1->y = eresp->y;
+      rx = -eresp->dy;
+      ry = eresp->dx;
+      mag = sqrt(rx*rx + ry*ry);
+      rx /= mag;
+      ry /= mag;
+      dx_total = rx; /*eresp->dy;*/
+      dy_total = ry; /*-eresp->dx;*/
+      weight_total = 1.0;
+
       angle1 = boundary1->angle;
-      x1 = (integral_value)boundary1->tree->x;
-      y1 = (integral_value)boundary1->tree->y;
+      x1 = (integral_value)boundary1->x;
+      y1 = (integral_value)boundary1->y;
       dx_temp = 0.0;
       dy_temp = 0.0;
       weight_temp = 0.0;
       count_next = 0;
       boundary2 = boundary1->next;
       if (boundary2 != NULL) {
-        x2 = (integral_value)boundary2->tree->x;
-        y2 = (integral_value)boundary2->tree->y;
-        dx_temp += (dx[count_next] = (x2 - x1));
-        dy_temp += (dy[count_next] = (y2 - y1));
-        weight_temp += 1.0;
+        tree = boundary2->tree;
+        CHECK(expect_edge_response(&eresp, &tree->annotation));
+        x2 = (integral_value)eresp->x;
+        y2 = (integral_value)eresp->y;
+        rx = (x2 - x1);
+        ry = (y2 - y1);
+        mag = sqrt(rx*rx + ry*ry);
+        dx[count_next] = rx;
+        dy[count_next] = ry;
+        dx_temp += (rx / mag);
+        dy_temp += (ry / mag);
+        dist[count_next] = mag;
+        rx = -eresp->dy;
+        ry = eresp->dx;
+        mag = sqrt(rx*rx + ry*ry);
+        dx_temp += (rx / mag);
+        dy_temp += (ry / mag);
+        weight_temp += 2.0;
         count_next++;
         boundary2 = boundary2->next;
         if (boundary2 != NULL) {
-          x2 = (integral_value)boundary2->tree->x;
-          y2 = (integral_value)boundary2->tree->y;
-          dx_temp += (2.0 * (dx[count_next] = (x2 - x1)));
-          dy_temp += (2.0 * (dy[count_next] = (y2 - y1)));
+          tree = boundary2->tree;
+          CHECK(expect_edge_response(&eresp, &tree->annotation));
+          x2 = (integral_value)eresp->x;
+          y2 = (integral_value)eresp->y;
+          rx = (x2 - x1);
+          ry = (y2 - y1);
+          mag = sqrt(rx*rx + ry*ry);
+          dx[count_next] = rx;
+          dy[count_next] = ry;
+          dx_temp += (rx / mag);
+          dy_temp += (ry / mag);
+          dist[count_next] = mag;
+          rx = -eresp->dy;
+          ry = eresp->dx;
+          mag = sqrt(rx*rx + ry*ry);
+          dx_temp += (rx / mag);
+          dy_temp += (ry / mag);
           weight_temp += 2.0;
           count_next++;
           boundary2 = boundary2->next;
           if (boundary2 != NULL) {
-            x2 = (integral_value)boundary2->tree->x;
-            y2 = (integral_value)boundary2->tree->y;
-            dx_temp += (3.0 * (dx[count_next] = (x2 - x1)));
-            dy_temp += (3.0 * (dy[count_next] = (y2 - y1)));
-            weight_temp += 3.0;
+            tree = boundary2->tree;
+            CHECK(expect_edge_response(&eresp, &tree->annotation));
+            x2 = (integral_value)eresp->x;
+            y2 = (integral_value)eresp->y;
+            rx = (x2 - x1);
+            ry = (y2 - y1);
+            mag = sqrt(rx*rx + ry*ry);
+            dx[count_next] = rx;
+            dy[count_next] = ry;
+            dx_temp += (rx / mag);
+            dy_temp += (ry / mag);
+            dist[count_next] = mag;
+            rx = -eresp->dy;
+            ry = eresp->dx;
+            mag = sqrt(rx*rx + ry*ry);
+            dx_temp += (rx / mag);
+            dy_temp += (ry / mag);
+            weight_temp += 2.0;
             count_next++;
           }
         }
       }
-      dx_total = dx_temp;
-      dy_total = dy_temp;
-      weight_total = weight_temp;
+      dx_total += dx_temp;
+      dy_total += dy_temp;
+      weight_total += weight_temp;
       dx_temp = dx_temp / weight_temp;
       dy_temp = dy_temp / weight_temp;
       angle2 = atan2(-dy_temp, dx_temp);
@@ -2112,27 +2166,66 @@ result quad_forest_parse
       count_prev = count_next;
       boundary3 = boundary1->prev;
       if (boundary3 != NULL) {
-        x2 = (integral_value)boundary3->tree->x;
-        y2 = (integral_value)boundary3->tree->y;
-        dx_temp += (dx[count_prev] = (x1 - x2));
-        dy_temp += (dy[count_prev] = (y1 - y2));
-        weight_temp += 1.0;
+        tree = boundary3->tree;
+        CHECK(expect_edge_response(&eresp, &tree->annotation));
+        x2 = (integral_value)eresp->x;
+        y2 = (integral_value)eresp->y;
+        rx = (x1 - x2);
+        ry = (y1 - y2);
+        mag = sqrt(rx*rx + ry*ry);
+        dx[count_prev] = rx;
+        dy[count_prev] = ry;
+        dx_temp += (rx / mag);
+        dy_temp += (ry / mag);
+        dist[count_prev] = mag;
+        rx = -eresp->dy;
+        ry = eresp->dx;
+        mag = sqrt(rx*rx + ry*ry);
+        dx_temp += (rx / mag);
+        dy_temp += (ry / mag);
+        weight_temp += 2.0;
         count_prev++;
         boundary3 = boundary3->prev;
         if (boundary3 != NULL) {
-          x2 = (integral_value)boundary3->tree->x;
-          y2 = (integral_value)boundary3->tree->y;
-          dx_temp += (2.0 * (dx[count_prev] = (x1 - x2)));
-          dy_temp += (2.0 * (dy[count_prev] = (y1 - y2)));
+          tree = boundary3->tree;
+          CHECK(expect_edge_response(&eresp, &tree->annotation));
+          x2 = (integral_value)eresp->x;
+          y2 = (integral_value)eresp->y;
+          rx = (x1 - x2);
+          ry = (y1 - y2);
+          mag = sqrt(rx*rx + ry*ry);
+          dx[count_prev] = rx;
+          dy[count_prev] = ry;
+          dx_temp += (rx / mag);
+          dy_temp += (ry / mag);
+          dist[count_prev] = mag;
+          rx = -eresp->dy;
+          ry = eresp->dx;
+          mag = sqrt(rx*rx + ry*ry);
+          dx_temp += (rx / mag);
+          dy_temp += (ry / mag);
           weight_temp += 2.0;
           count_prev++;
           boundary3 = boundary3->prev;
           if (boundary3 != NULL) {
-            x2 = (integral_value)boundary3->tree->x;
-            y2 = (integral_value)boundary3->tree->y;
-            dx_temp += (3.0 * (dx[count_prev] = (x1 - x2)));
-            dy_temp += (3.0 * (dy[count_prev] = (y1 - y2)));
-            weight_temp += 3.0;
+            tree = boundary3->tree;
+            CHECK(expect_edge_response(&eresp, &tree->annotation));
+            x2 = (integral_value)eresp->x;
+            y2 = (integral_value)eresp->y;
+            rx = (x1 - x2);
+            ry = (y1 - y2);
+            mag = sqrt(rx*rx + ry*ry);
+            dx[count_prev] = rx;
+            dy[count_prev] = ry;
+            dx_temp += (rx / mag);
+            dy_temp += (ry / mag);
+            dist[count_prev] = mag;
+            rx = -eresp->dy;
+            ry = eresp->dx;
+            mag = sqrt(rx*rx + ry*ry);
+            dx_temp += (rx / mag);
+            dy_temp += (ry / mag);
+            weight_temp += 2.0;
             count_prev++;
           }
         }
@@ -2171,7 +2264,7 @@ result quad_forest_parse
       /* calculate distance by scalar product with perpendicular vector */
       dist_next = 0.0;
       for (i = 0; i < count_next; i++) {
-        dist_next += (px*dx[i] + py*dy[i]);
+        dist_next += ((px*dx[i] + py*dy[i]) / dist[i]);
       }
       dist_total = dist_next;
       dist_next = dist_next / ((integral_value)(count_next + 1));
@@ -2179,7 +2272,7 @@ result quad_forest_parse
 
       dist_prev = 0.0;
       for (i = count_next; i < count_prev; i++) {
-        dist_prev += (px*dx[i] + py*dy[i]);
+        dist_prev += ((px*dx[i] + py*dy[i]) / dist[i]);
       }
       dist_total += dist_prev;
       dist_prev = dist_prev / ((integral_value)(count_prev - count_next + 1));
@@ -2188,11 +2281,11 @@ result quad_forest_parse
       /* include the central node with dist 0 into the equation */
       dist_total = dist_total / ((integral_value)(count_prev + 1));
       boundary1->curvature = dist_total;
-      if (dist_total < 0.2 && dist_prev < 0.1 && dist_next < 0.1) {
+      if (dist_total < 0.1 && dist_prev < 0.1 && dist_next < 0.1) {
         boundary1->category = fc_STRAIGHT;
       }
       else
-      if (dist_total >= 0.2 && dist_prev >= 0.1 && dist_next >= 0.1) {
+      if (dist_total >= 0.1) {
         boundary1->category = fc_CURVED;
       }
       boundaries = boundaries->next;
@@ -2458,7 +2551,8 @@ result quad_forest_visualize_parse_result
 
       /*CHECK(quad_forest_get_links(forest, &links, v_LINK_EDGE));*/
       /*PRINT1("links: %d\n", links.count);*/
-
+      CHECK(quad_forest_get_links(forest, &lines, v_LINK_EDGE_POS));
+      CHECK(pixel_image_draw_colored_lines(target, &lines, 2));
       CHECK(quad_forest_get_links(forest, &links, v_LINK_BOUNDARY));
       CHECK(pixel_image_draw_colored_lines(target, &links, 1));
       /*
