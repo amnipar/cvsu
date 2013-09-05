@@ -557,6 +557,20 @@ typedef enum boundary_category_t {
 /******************************************************************************/
 
 /**
+ * Stores boundary curve model information for quad forest parsing.
+ */
+typedef struct boundary_model_t {
+  struct boundary_model_t *parent;
+  uint32 x;
+  uint32 y;
+  uint32 length;
+  integral_value angle;
+  integral_value curvature;
+} boundary_model;
+
+/******************************************************************************/
+
+/**
  * Stores boundary fragment information for quad forest parsing. Each fragment
  * is a disjoint set of tree nodes, managed with union-find approach. Boundary
  * fragments are long and thin chains of nodes, that follow edges and boundaries
