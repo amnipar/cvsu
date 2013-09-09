@@ -858,13 +858,14 @@ result quad_tree_ensure_boundary
     tree_boundary->category = fc_UNDEF;
     tree_boundary->rank = 0;
     tree_boundary->length = 0;
+    tree_boundary->x = 0;
+    tree_boundary->y = 0;
+    tree_boundary->dx = 0;
+    tree_boundary->dy = 0;
     tree_boundary->angle = 0;
-    tree_boundary->angle_prev = 0;
-    tree_boundary->angle_next = 0;
     tree_boundary->smoothed_angle = 0;
     tree_boundary->curvature = 0;
-    tree_boundary->curvature_prev = 0;
-    tree_boundary->curvature_next = 0;
+    tree_boundary->fragment = NULL;
   }
 
   if (output_boundary != NULL) {

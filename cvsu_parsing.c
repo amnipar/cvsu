@@ -1601,13 +1601,14 @@ result quad_forest_parse
 )
 {
   TRY();
-  list edgelist, boundarylist;
+  list edgelist, boundarylist, fragmentlist;
 
   CHECK_POINTER(forest);
   CHECK_PARAM(rounds > 0);
 
   CHECK(list_create(&edgelist, 1000, sizeof(quad_tree*), 1));
   CHECK(list_create(&boundarylist, 1000, sizeof(boundary*), 1));
+  CHECK(list_create(&fragmentlist, 1000, sizeof(fragment_model*), 1));
 
   CHECK(quad_forest_calculate_edge_stats(forest));
 
@@ -2051,11 +2052,11 @@ result quad_forest_parse
     edge_response *eresp;
     list_item *boundaries, *endboundaries;
     boundary *boundary1, *boundary2, *boundary3, *parent1, *parent2;
-    integral_value angle1, angle2, curvature, px, py, rx, ry, mag;
-    integral_value x1, y1, x2, y2, dx[6], dy[6], dist[6], dist_prev, dist_next, dist_total;
-    integral_value dx_temp, dx_total, dy_temp, dy_total, weight_temp, weight_total;
-    uint32 i, count_prev, count_next;
+    integral_value angle1, angle2, angle3, curvature, px, py, rx, ry, mag;
+    integral_value x1, y1, x2, y2, dx, dy, adiff1, adiff2, adiff3;
+    uint32 i, count;
     boundary_category category;
+    fragment_model model;
 
     boundaries = boundarylist.first.next;
     endboundaries = &boundarylist.last;
@@ -2070,17 +2071,13 @@ result quad_forest_parse
       mag = sqrt(rx*rx + ry*ry);
       rx /= mag;
       ry /= mag;
-      dx_total = rx; /*eresp->dy;*/
-      dy_total = ry; /*-eresp->dx;*/
-      weight_total = 1.0;
+      dx = rx;
+      dy = ry;
 
       angle1 = boundary1->angle;
       x1 = (integral_value)boundary1->x;
       y1 = (integral_value)boundary1->y;
-      dx_temp = 0.0;
-      dy_temp = 0.0;
-      weight_temp = 0.0;
-      count_next = 0;
+      count = 0;
       boundary2 = boundary1->next;
       if (boundary2 != NULL) {
         tree = boundary2->tree;
@@ -2090,18 +2087,14 @@ result quad_forest_parse
         rx = (x2 - x1);
         ry = (y2 - y1);
         mag = sqrt(rx*rx + ry*ry);
-        dx[count_next] = rx;
-        dy[count_next] = ry;
-        dx_temp += (rx / mag);
-        dy_temp += (ry / mag);
-        dist[count_next] = mag;
+        dx += (rx / mag);
+        dy += (ry / mag);
         rx = -eresp->dy;
         ry = eresp->dx;
         mag = sqrt(rx*rx + ry*ry);
-        dx_temp += (rx / mag);
-        dy_temp += (ry / mag);
-        weight_temp += 2.0;
-        count_next++;
+        dx += (rx / mag);
+        dy += (ry / mag);
+        count++;
         boundary2 = boundary2->next;
         if (boundary2 != NULL) {
           tree = boundary2->tree;
@@ -2111,18 +2104,14 @@ result quad_forest_parse
           rx = (x2 - x1);
           ry = (y2 - y1);
           mag = sqrt(rx*rx + ry*ry);
-          dx[count_next] = rx;
-          dy[count_next] = ry;
-          dx_temp += (rx / mag);
-          dy_temp += (ry / mag);
-          dist[count_next] = mag;
+          dx += (rx / mag);
+          dy += (ry / mag);
           rx = -eresp->dy;
           ry = eresp->dx;
           mag = sqrt(rx*rx + ry*ry);
-          dx_temp += (rx / mag);
-          dy_temp += (ry / mag);
-          weight_temp += 2.0;
-          count_next++;
+          dx += (rx / mag);
+          dy += (ry / mag);
+          count++;
           boundary2 = boundary2->next;
           if (boundary2 != NULL) {
             tree = boundary2->tree;
@@ -2132,38 +2121,18 @@ result quad_forest_parse
             rx = (x2 - x1);
             ry = (y2 - y1);
             mag = sqrt(rx*rx + ry*ry);
-            dx[count_next] = rx;
-            dy[count_next] = ry;
-            dx_temp += (rx / mag);
-            dy_temp += (ry / mag);
-            dist[count_next] = mag;
+            dx += (rx / mag);
+            dy += (ry / mag);
             rx = -eresp->dy;
             ry = eresp->dx;
             mag = sqrt(rx*rx + ry*ry);
-            dx_temp += (rx / mag);
-            dy_temp += (ry / mag);
-            weight_temp += 2.0;
-            count_next++;
+            dx += (rx / mag);
+            dy += (ry / mag);
+            count++;
           }
         }
       }
-      dx_total += dx_temp;
-      dy_total += dy_temp;
-      weight_total += weight_temp;
-      dx_temp = dx_temp / weight_temp;
-      dy_temp = dy_temp / weight_temp;
-      angle2 = atan2(-dy_temp, dx_temp);
-      if (angle2 < 0) angle2 += M_2PI;
-      if (count_next > 1) {
-        boundary1->angle_next = angle2;
-      }
-      else {
-        boundary1->angle_next = angle1;
-      }
-      dx_temp = 0.0;
-      dy_temp = 0.0;
-      weight_temp = 0.0;
-      count_prev = count_next;
+
       boundary3 = boundary1->prev;
       if (boundary3 != NULL) {
         tree = boundary3->tree;
@@ -2173,18 +2142,14 @@ result quad_forest_parse
         rx = (x1 - x2);
         ry = (y1 - y2);
         mag = sqrt(rx*rx + ry*ry);
-        dx[count_prev] = rx;
-        dy[count_prev] = ry;
-        dx_temp += (rx / mag);
-        dy_temp += (ry / mag);
-        dist[count_prev] = mag;
+        dx += (rx / mag);
+        dy += (ry / mag);
         rx = -eresp->dy;
         ry = eresp->dx;
         mag = sqrt(rx*rx + ry*ry);
-        dx_temp += (rx / mag);
-        dy_temp += (ry / mag);
-        weight_temp += 2.0;
-        count_prev++;
+        dx += (rx / mag);
+        dy += (ry / mag);
+        count++;
         boundary3 = boundary3->prev;
         if (boundary3 != NULL) {
           tree = boundary3->tree;
@@ -2194,18 +2159,14 @@ result quad_forest_parse
           rx = (x1 - x2);
           ry = (y1 - y2);
           mag = sqrt(rx*rx + ry*ry);
-          dx[count_prev] = rx;
-          dy[count_prev] = ry;
-          dx_temp += (rx / mag);
-          dy_temp += (ry / mag);
-          dist[count_prev] = mag;
+          dx += (rx / mag);
+          dy += (ry / mag);
           rx = -eresp->dy;
           ry = eresp->dx;
           mag = sqrt(rx*rx + ry*ry);
-          dx_temp += (rx / mag);
-          dy_temp += (ry / mag);
-          weight_temp += 2.0;
-          count_prev++;
+          dx += (rx / mag);
+          dy += (ry / mag);
+          count++;
           boundary3 = boundary3->prev;
           if (boundary3 != NULL) {
             tree = boundary3->tree;
@@ -2215,78 +2176,62 @@ result quad_forest_parse
             rx = (x1 - x2);
             ry = (y1 - y2);
             mag = sqrt(rx*rx + ry*ry);
-            dx[count_prev] = rx;
-            dy[count_prev] = ry;
-            dx_temp += (rx / mag);
-            dy_temp += (ry / mag);
-            dist[count_prev] = mag;
+            dx += (rx / mag);
+            dy += (ry / mag);
             rx = -eresp->dy;
             ry = eresp->dx;
             mag = sqrt(rx*rx + ry*ry);
-            dx_temp += (rx / mag);
-            dy_temp += (ry / mag);
-            weight_temp += 2.0;
-            count_prev++;
+            dx += (rx / mag);
+            dy += (ry / mag);
+            count++;
           }
         }
       }
-      dx_total += dx_temp;
-      dy_total += dy_temp;
-      weight_total += weight_temp;
 
-      dx_temp = dx_temp / weight_temp;
-      dy_temp = dy_temp / weight_temp;
-      angle2 = atan2(-dy_temp, dx_temp);
+      /* calculate local slope and angle of the boundary */
+      mag = sqrt(dx*dx + dy*dy);
+      dx = dx / mag;
+      dy = dy / mag;
+      angle2 = atan2(-dy, dx);
       if (angle2 < 0) angle2 += M_2PI;
-      if (count_prev > count_next+1) {
-        boundary1->angle_prev = angle2;
-      }
-      else {
-        boundary1->angle_prev = angle1;
-      }
-
-      dx_total = dx_total / weight_total;
-      dy_total = dy_total / weight_total;
-      angle2 = atan2(-dy_total, dx_total);
-      if (angle2 < 0) angle2 += M_2PI;
-      if (count_prev > 2) {
+      if (count > 1) {
         boundary1->smoothed_angle = angle2;
       }
       else {
         boundary1->smoothed_angle = angle1;
       }
+      boundary1->dx = dx;
+      boundary1->dy = dy;
 
-      /* get a unit vector perpendicular to slope */
-      mag = sqrt(dx_total*dx_total + dy_total*dy_total);
-      px = dy_total / mag;
-      py = -dx_total / mag;
+      boundaries = boundaries->next;
+    }
 
-      /* calculate distance by scalar product with perpendicular vector */
-      dist_next = 0.0;
-      for (i = 0; i < count_next; i++) {
-        dist_next += ((px*dx[i] + py*dy[i]) / dist[i]);
-      }
-      dist_total = dist_next;
-      dist_next = dist_next / ((integral_value)(count_next + 1));
-      boundary1->curvature_next = dist_next;
+    /* next, categorize the fragment shape */
+    boundaries = boundarylist.first.next;
+    endboundaries = &boundarylist.last;
+    while (boundaries != endboundaries) {
+      boundary1 = *((boundary**)boundaries->data);
 
-      dist_prev = 0.0;
-      for (i = count_next; i < count_prev; i++) {
-        dist_prev += ((px*dx[i] + py*dy[i]) / dist[i]);
-      }
-      dist_total += dist_prev;
-      dist_prev = dist_prev / ((integral_value)(count_prev - count_next + 1));
-      boundary1->curvature_prev = dist_prev;
+      if (boundary1->next != NULL && boundary1->prev != NULL) {
+        boundary2 = boundary1->next;
+        boundary3 = boundary1->prev;
+        if (boundary2->next != NULL && boundary3->prev != NULL) {
+          boundary2 = boundary2->next;
+          boundary3 = boundary3->prev;
+          if (boundary2->next != NULL && boundary3->prev != NULL) {
+            boundary2 = boundary2->next;
+            boundary3 = boundary3->prev;
+          }
+        }
+        angle1 = boundary1->smoothed_angle;
+        angle2 = boundary2->smoothed_angle;
+        angle3 = boundary3->smoothed_angle;
+        adiff1 = angle_minus_angle(angle2, angle3);
+        adiff2 = angle_minus_angle(angle2, angle1);
+        adiff3 = angle_minus_angle(angle1, angle3);
+        if (fabs(adiff2 - adiff3) < 0.1) {
 
-      /* include the central node with dist 0 into the equation */
-      dist_total = dist_total / ((integral_value)(count_prev + 1));
-      boundary1->curvature = dist_total;
-      if (dist_total < 0.1 && dist_prev < 0.1 && dist_next < 0.1) {
-        boundary1->category = fc_STRAIGHT;
-      }
-      else
-      if (dist_total >= 0.1) {
-        boundary1->category = fc_CURVED;
+        }
       }
       boundaries = boundaries->next;
     }
@@ -2298,6 +2243,7 @@ result quad_forest_parse
   FINALLY(quad_forest_parse);
   list_destroy(&edgelist);
   list_destroy(&boundarylist);
+  list_destroy(&fragmentlist);
   RETURN();
 }
 

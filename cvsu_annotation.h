@@ -559,14 +559,16 @@ typedef enum boundary_category_t {
 /**
  * Stores boundary curve model information for quad forest parsing.
  */
-typedef struct boundary_model_t {
-  struct boundary_model_t *parent;
+typedef struct fragment_model_t {
   uint32 x;
   uint32 y;
   uint32 length;
   integral_value angle;
   integral_value curvature;
-} boundary_model;
+  struct boundary_t *center;
+  struct boundary_t *start;
+  struct boundary_t *end;
+} fragment_model;
 
 /******************************************************************************/
 
@@ -593,16 +595,16 @@ typedef struct boundary_t {
   uint32 length;
   uint32 x;
   uint32 y;
-  /** Actual angle at this node */
+  integral_value dx;
+  integral_value dy;
+  /** Actual gradient angle at this node */
   integral_value angle;
-  integral_value angle_prev;
-  integral_value angle_next;
   /** Angle smoothed based on neighboring nodes */
   integral_value smoothed_angle;
   /** Actual curvature at this node */
   integral_value curvature;
-  integral_value curvature_prev;
-  integral_value curvature_next;
+  /** Boundary fragment model matched by this node */
+  fragment_model *fragment;
 } boundary;
 
 /**
