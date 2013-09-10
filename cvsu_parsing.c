@@ -2053,7 +2053,7 @@ result quad_forest_parse
     list_item *boundaries, *endboundaries;
     boundary *boundary1, *boundary2, *boundary3, *parent1, *parent2;
     integral_value angle1, angle2, angle3, curvature, px, py, rx, ry, mag;
-    integral_value x1, y1, x2, y2, dx, dy, adiff1, adiff2, adiff3;
+    integral_value x1, y1, x2, y2, dx, dy, adiff1, adiff2, adiff3, dist, r;
     uint32 i, count;
     boundary_category category;
     fragment_model model;
@@ -2218,19 +2218,48 @@ result quad_forest_parse
         if (boundary2->next != NULL && boundary3->prev != NULL) {
           boundary2 = boundary2->next;
           boundary3 = boundary3->prev;
+          /*
           if (boundary2->next != NULL && boundary3->prev != NULL) {
             boundary2 = boundary2->next;
             boundary3 = boundary3->prev;
           }
+          */
         }
         angle1 = boundary1->smoothed_angle;
         angle2 = boundary2->smoothed_angle;
         angle3 = boundary3->smoothed_angle;
+        /* angle diff of approx. pi/16 (~0.20) is the threshold for curved */
         adiff1 = angle_minus_angle(angle2, angle3);
         adiff2 = angle_minus_angle(angle2, angle1);
         adiff3 = angle_minus_angle(angle1, angle3);
+        /* check that the difference on both sides is similar */
         if (fabs(adiff2 - adiff3) < 0.1) {
-
+          /* create straight line model if not curved enough */
+          if (fabs(adiff1) < 0.2) {
+            boundary1->category = fc_STRAIGHT;
+          }
+          /* otherwise create curved line model */
+          else {
+            boundary1->category = fc_CURVED;
+            x1 = (integral_value)boundary1->x;
+            y1 = (integral_value)boundary1->y;
+            x2 = (integral_value)boundary2->x;
+            y2 = (integral_value)boundary2->y;
+            dx = boundary1->dx;
+            dy = boundary1->dy;
+            dist = (x2-x1)*dx + (y2-y1)*dy;
+            r = fabs(dist / sin(fabs(adiff2)));
+            /* now curvature means the radius of a circle */
+            boundary1->curvature = r;
+            if (adiff2 < 0) {
+              boundary1->cx = x1 - r * dy;
+              boundary1->cy = y1 + r * dx;
+            }
+            else {
+              boundary1->cx = x1 + r * dy;
+              boundary1->cy = y1 - r * dx;
+            }
+          }
         }
       }
       boundaries = boundaries->next;
@@ -2256,7 +2285,7 @@ result quad_forest_visualize_parse_result
 )
 {
   TRY();
-  list links, frags, lines;
+  list links, frags, lines, circles;
   list_item *trees, *end;
   quad_tree *tree;
   neighborhood_stat *nstat;
@@ -2266,6 +2295,8 @@ result quad_forest_visualize_parse_result
   boundary *fragment1, *bparent;
   segment *segment1, *segment_parent;
   colored_rect crect;
+  colored_line bline;
+  circle bcirc;
   uint32 x, y, width, height, stride, row_step, frag_count;
   byte *target_data, *target_pos, color0, color1, color2;
   integral_value max_edge_mag, max_ridge_score, extent, max_extent;
@@ -2288,6 +2319,7 @@ result quad_forest_visualize_parse_result
   CHECK(list_create(&links, 1000, sizeof(colored_line), 1));
   CHECK(list_create(&lines, 1000, sizeof(colored_line), 1));
   CHECK(list_create(&frags, 1000, sizeof(colored_rect), 1));
+  CHECK(list_create(&circles, 1000, sizeof(circle), 1));
 
   /*CHECK(quad_forest_visualize_neighborhood_stats(forest, target, v_SCORE));*/
   /*
@@ -2332,7 +2364,7 @@ result quad_forest_visualize_parse_result
       if (eresp != NULL) {
         if (eresp->mag > max_edge_mag) {
           max_edge_mag = eresp->mag;
-        }
+  }cvScalar(color[0], color[1], color[2], 0)
       }
       segment1 = has_segment(&tree->annotation, forest->token);
       if (segment1 != NULL) {
@@ -2390,6 +2422,11 @@ result quad_forest_visualize_parse_result
     */
     /*PRINT1("max ridge score %.3f\n", max_ridge_score);*/
 
+    bline.color[0] = 255;
+    bline.color[1] = 0;
+    bline.color[2] = 0;
+    bline.color[3] = 0;
+
     trees = forest->trees.first.next;
     end = &forest->trees.last;
     while (trees != end) {
@@ -2425,12 +2462,22 @@ result quad_forest_visualize_parse_result
               color0 = 255;
               color1 = 0;
               color2 = 0;
+              bline.start.x = bparent->x - 25 * bparent->dx;
+              bline.start.y = bparent->y - 25 * bparent->dy;
+              bline.end.x = bparent->x + 25 * bparent->dx;
+              bline.end.y = bparent->y + 25 * bparent->dy;
+              CHECK(list_append(&lines, &bline));
             }
             else
             if (bparent->category == fc_CURVED) {
               color0 = 0;
               color1 = 0;
               color2 = 255;
+              bcirc.center.x = (uint32)bparent->cx;
+              bcirc.center.y = (uint32)bparent->cy;
+              bcirc.r = (uint32)bparent->curvature;
+              if (bcirc.r < 1) bcirc.r = 1;
+              CHECK(list_append(&circles, &bcirc));
             }
           /*}*/
 
@@ -2479,6 +2526,7 @@ result quad_forest_visualize_parse_result
     }
     /*CHECK(quad_forest_visualize_neighborhood_stats(forest, target, v_STRENGTH));*/
     {
+      byte circle_color[4] = {255,0,0,0};
       /*
       byte edge_color_1[4] = {0,255,0,0};
       byte edge_color_2[4] = {0,255,0,0};
@@ -2497,9 +2545,10 @@ result quad_forest_visualize_parse_result
 
       /*CHECK(quad_forest_get_links(forest, &links, v_LINK_EDGE));*/
       /*PRINT1("links: %d\n", links.count);*/
-      CHECK(quad_forest_get_links(forest, &lines, v_LINK_EDGE_POS));
+      /*CHECK(quad_forest_get_links(forest, &links, v_LINK_BOUNDARY));*/
       CHECK(pixel_image_draw_colored_lines(target, &lines, 2));
-      CHECK(quad_forest_get_links(forest, &links, v_LINK_BOUNDARY));
+      CHECK(pixel_image_draw_circles(target, &circles, 2, circle_color));
+      CHECK(quad_forest_get_links(forest, &links, v_LINK_EDGE_POS));
       CHECK(pixel_image_draw_colored_lines(target, &links, 1));
       /*
       trees = forest->trees.first.next;
@@ -2533,6 +2582,7 @@ result quad_forest_visualize_parse_result
   list_destroy(&links);
   list_destroy(&frags);
   list_destroy(&lines);
+  list_destroy(&circles);
   RETURN();
 }
 

@@ -602,6 +602,8 @@ typedef struct boundary_t {
   /** Angle smoothed based on neighboring nodes */
   integral_value smoothed_angle;
   /** Actual curvature at this node */
+  integral_value cx;
+  integral_value cy;
   integral_value curvature;
   /** Boundary fragment model matched by this node */
   fragment_model *fragment;
