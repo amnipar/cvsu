@@ -151,6 +151,11 @@ typedef struct colored_line_t {
   byte color[4];
 } colored_line;
 
+typedef struct circle_t {
+  point center;
+  uint32 r;
+} circle;
+
 typedef struct rect_t {
   coord left;
   coord right;

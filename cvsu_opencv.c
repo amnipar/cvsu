@@ -46,6 +46,7 @@ string pixel_image_write_to_file_name = "pixel_image_write_to_file";
 string pixel_image_draw_lines_name = "pixel_image_draw_lines";
 string pixel_image_draw_weighted_lines_name = "pixel_image_draw_weighted_lines";
 string pixel_image_draw_colored_lines_name = "pixel_image_draw_colored_lines";
+string pixel_image_draw_circles_name = "pixel_image_draw_circles";
 string pixel_image_draw_rects_name = "pixel_image_draw_rects";
 string pixel_image_draw_colored_rects_name = "pixel_image_draw_colored_rects";
 
@@ -383,6 +384,49 @@ result pixel_image_draw_colored_lines
   }
 
   FINALLY(pixel_image_draw_colored_lines);
+  cvReleaseImageHeader(&dst);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result pixel_image_draw_circles
+(
+  pixel_image *source,
+  list *circles,
+  uint32 width,
+  byte color[4]
+)
+{
+  TRY();
+  IplImage *dst;
+  CvSize size;
+  list_item *items, *end;
+  circle *this_circle;
+  float weight;
+
+  CHECK_POINTER(source);
+  CHECK_POINTER(circles);
+  CHECK_PARAM(source->type == p_U8);
+  CHECK_PARAM(source->format == RGB);
+
+  size.width = (signed)source->width;
+  size.height = (signed)source->height;
+  dst = cvCreateImageHeader(size, IPL_DEPTH_8U, 3);
+  cvSetData(dst, source->data, (signed)source->stride);
+
+  items = circles->first.next;
+  end = &circles->last;
+  while (items != end) {
+    this_circle = (circle*)items->data;
+    cvCircle(dst,
+           cvPoint(this_circle->center.x, this_circle->center.y),
+           this_circle->r,
+           cvScalar(color[0], color[1], color[2], 0), width, 8, 0);
+    items = items->next;
+  }
+
+  FINALLY(pixel_image_draw_circles);
   cvReleaseImageHeader(&dst);
   RETURN();
 }

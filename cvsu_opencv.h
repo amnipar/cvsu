@@ -114,6 +114,14 @@ result pixel_image_draw_colored_lines
   uint32 width
 );
 
+result pixel_image_draw_circles
+(
+  pixel_image *source,
+  list *circles,
+  uint32 width,
+  byte color[4]
+);
+
 /**
  * Draw a list of rects over an image using OpenCV cvRectangle function.
  */
