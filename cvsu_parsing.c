@@ -2054,6 +2054,7 @@ result quad_forest_parse
     boundary *boundary1, *boundary2, *boundary3, *parent1, *parent2;
     integral_value angle1, angle2, angle3, curvature, px, py, rx, ry, mag;
     integral_value x1, y1, x2, y2, dx, dy, adiff1, adiff2, adiff3, dist, r;
+    integral_value dist1, dist2;
     uint32 i, count;
     boundary_category category;
     fragment_model model;
@@ -2218,12 +2219,17 @@ result quad_forest_parse
         if (boundary2->next != NULL && boundary3->prev != NULL) {
           boundary2 = boundary2->next;
           boundary3 = boundary3->prev;
-          /*
           if (boundary2->next != NULL && boundary3->prev != NULL) {
             boundary2 = boundary2->next;
             boundary3 = boundary3->prev;
+            boundary1->quality = 3;
           }
-          */
+          else {
+            boundary1->quality = 2;
+          }
+        }
+        else {
+          boundary1->quality = 1;
         }
         angle1 = boundary1->smoothed_angle;
         angle2 = boundary2->smoothed_angle;
@@ -2261,6 +2267,95 @@ result quad_forest_parse
             }
           }
         }
+        else {
+          adiff2 = (adiff2 + adiff3) / 2;
+          boundary1->quality -= 0.5;
+          if (fabs(adiff2) < 0.1) {
+            boundary1->category = fc_STRAIGHT;
+          }
+          /* otherwise create curved line model */
+          else {
+            boundary1->category = fc_CURVED;
+            x1 = (integral_value)boundary1->x;
+            y1 = (integral_value)boundary1->y;
+            x2 = (integral_value)boundary2->x;
+            y2 = (integral_value)boundary2->y;
+            dx = boundary1->dx;
+            dy = boundary1->dy;
+            dist = (x2-x1)*dx + (y2-y1)*dy;
+            r = fabs(dist / sin(fabs(adiff2)));
+            /* now curvature means the radius of a circle */
+            boundary1->curvature = r;
+            if (adiff2 < 0) {
+              boundary1->cx = x1 - r * dy;
+              boundary1->cy = y1 + r * dx;
+            }
+            else {
+              boundary1->cx = x1 + r * dy;
+              boundary1->cy = y1 - r * dx;
+            }
+          }
+        }
+      }
+      else {
+        boundary1->quality = 0;
+      }
+      boundary1->first = boundary1;
+      boundary1->last = boundary1;
+      boundaries = boundaries->next;
+    }
+
+    /* then, find best models and merge nodes */
+    boundaries = boundarylist.first.next;
+    endboundaries = &boundarylist.last;
+    while (boundaries != endboundaries) {
+      boundary1 = *((boundary**)boundaries->data);
+      boundary1 = boundary_find(boundary1);
+      boundary2 = boundary_find(boundary1->last->next);
+      if (boundary2 != NULL) {
+        x1 = (integral_value)boundary1->last->x;
+        y1 = (integral_value)boundary1->last->y;
+        x2 = (integral_value)boundary2->first->x;
+        y2 = (integral_value)boundary2->first->y;
+        if (boundary1->category == fc_STRAIGHT) {
+
+        }
+        else
+        if (boundary1->category == fc_CURVED) {
+          rx = boundary1->cx - x2;
+          ry = boundary1->cy - y2;
+          dist1 = sqrt(rx*rx + ry*ry);
+        }
+        else {
+          dist1 = 1000;
+        }
+        if (boundary2->category == fc_STRAIGHT) {
+
+        }
+        else
+        if (boundary2->category == fc_CURVED) {
+          rx = boundary2->cx - x1;
+          ry = boundary2->cy - y1;
+          dist1 = sqrt(rx*rx + ry*ry);
+        }
+        else {
+          dist2 = 1000;
+        }
+        if (dist1 < dist2) {
+          boundary2->parent = boundary1;
+          boundary1->length += boundary2->length;
+        }
+        else {
+          boundary1->parent = boundary2;
+          boundary2->length += boundary1->length;
+        }
+      }
+      boundary3 = boundary_find(boundary1->first->prev);
+      if (boundary3 != NULL) {
+        x1 = (integral_value)boundary1->first->x;
+        y1 = (integral_value)boundary1->first->y;
+        x2 = (integral_value)boundary3->last->x;
+        y2 = (integral_value)boundary3->last->y;
       }
       boundaries = boundaries->next;
     }

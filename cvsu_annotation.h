@@ -565,6 +565,8 @@ typedef struct fragment_model_t {
   uint32 length;
   integral_value angle;
   integral_value curvature;
+  integral_value start_angle;
+  integral_value end_angle;
   struct boundary_t *center;
   struct boundary_t *start;
   struct boundary_t *end;
@@ -585,6 +587,8 @@ typedef struct boundary_t {
   struct boundary_t *prev;
   /** Next boundary node in this chain (NULL for last node) */
   struct boundary_t *next;
+  struct boundary_t *first;
+  struct boundary_t *last;
   /** Tree node corresponding to this boundary node */
   struct quad_tree_t *tree;
   /** Boundary category */
@@ -595,16 +599,17 @@ typedef struct boundary_t {
   uint32 length;
   uint32 x;
   uint32 y;
-  integral_value dx;
-  integral_value dy;
   /** Actual gradient angle at this node */
   integral_value angle;
   /** Angle smoothed based on neighboring nodes */
+  integral_value dx;
+  integral_value dy;
   integral_value smoothed_angle;
   /** Actual curvature at this node */
   integral_value cx;
   integral_value cy;
   integral_value curvature;
+  integral_value quality;
   /** Boundary fragment model matched by this node */
   fragment_model *fragment;
 } boundary;
