@@ -156,6 +156,13 @@ typedef struct circle_t {
   uint32 r;
 } circle;
 
+typedef struct arc_t {
+  point center;
+  uint32 r;
+  double start_angle;
+  double end_angle;
+} arc;
+
 typedef struct rect_t {
   coord left;
   coord right;
