@@ -122,6 +122,14 @@ result pixel_image_draw_circles
   byte color[4]
 );
 
+result pixel_image_draw_arcs
+(
+  pixel_image *source,
+  list *arcs,
+  uint32 width,
+  byte color[4]
+);
+
 /**
  * Draw a list of rects over an image using OpenCV cvRectangle function.
  */

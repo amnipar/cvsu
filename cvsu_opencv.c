@@ -47,6 +47,7 @@ string pixel_image_draw_lines_name = "pixel_image_draw_lines";
 string pixel_image_draw_weighted_lines_name = "pixel_image_draw_weighted_lines";
 string pixel_image_draw_colored_lines_name = "pixel_image_draw_colored_lines";
 string pixel_image_draw_circles_name = "pixel_image_draw_circles";
+string pixel_image_draw_arcs_name = "pixel_image_draw_arcs";
 string pixel_image_draw_rects_name = "pixel_image_draw_rects";
 string pixel_image_draw_colored_rects_name = "pixel_image_draw_colored_rects";
 
@@ -427,6 +428,52 @@ result pixel_image_draw_circles
   }
 
   FINALLY(pixel_image_draw_circles);
+  cvReleaseImageHeader(&dst);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result pixel_image_draw_arcs
+(
+  pixel_image *source,
+  list *arcs,
+  uint32 width,
+  byte color[4]
+)
+{
+  TRY();
+  IplImage *dst;
+  CvSize size, axes;
+  list_item *items, *end;
+  arc *this_arc;
+  float weight;
+
+  CHECK_POINTER(source);
+  CHECK_POINTER(arcs);
+  CHECK_PARAM(source->type == p_U8);
+  CHECK_PARAM(source->format == RGB);
+
+  size.width = (signed)source->width;
+  size.height = (signed)source->height;
+  dst = cvCreateImageHeader(size, IPL_DEPTH_8U, 3);
+  cvSetData(dst, source->data, (signed)source->stride);
+
+  items = arcs->first.next;
+  end = &arcs->last;
+  while (items != end) {
+    this_arc = (arc*)items->data;
+    axes.width = axes.height = this_arc->r;
+    cvEllipse(dst,
+           cvPoint(this_arc->center.x, this_arc->center.y),
+           axes, 0,
+           this_arc->start_angle,
+           this_arc->end_angle,
+           cvScalar(color[0], color[1], color[2], 0), width, 8, 0);
+    items = items->next;
+  }
+
+  FINALLY(pixel_image_draw_arcs);
   cvReleaseImageHeader(&dst);
   RETURN();
 }

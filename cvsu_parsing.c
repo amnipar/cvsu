@@ -2245,8 +2245,10 @@ result quad_forest_parse
           /* create straight line model if not curved enough */
           if (fabs(adiff1) < 0.2) {
             boundary1->category = fc_STRAIGHT;
+            /*
             boundary1->cx = x1;
             boundary1->cy = y1;
+            */
           }
           /* otherwise create curved line model */
           else {
@@ -2274,8 +2276,10 @@ result quad_forest_parse
           boundary1->quality -= 0.5;
           if (fabs(adiff2) < 0.1) {
             boundary1->category = fc_STRAIGHT;
+            /*
             boundary1->cx = x1;
             boundary1->cy = y1;
+            */
           }
           /* otherwise create curved line model */
           else {
@@ -2302,6 +2306,8 @@ result quad_forest_parse
       else {
         boundary1->quality = 0;
       }
+      boundary1->cx = x1;
+      boundary1->cy = y1;
       boundary1->first = boundary1;
       boundary1->last = boundary1;
       boundaries = boundaries->next;
@@ -2347,16 +2353,16 @@ result quad_forest_parse
         else {
           dist2 = 1000000;
         }
-        PRINT2("dist 2 %.3f %.3f\n", dist1, dist2);
+        /*PRINT2("dist 2 %.3f %.3f\n", dist1, dist2);*/
         if (dist1 < dist2) {
-          if (dist1 < 2) {
+          if (dist1 < 8) {
             boundary2->parent = boundary1;
             boundary1->length += boundary2->length;
             boundary1->last = boundary2;
           }
         }
         else {
-          if (dist2 < 2) {
+          if (dist2 < 8) {
             boundary1->parent = boundary2;
             boundary2->length += boundary1->length;
             boundary2->first = boundary1->first;
@@ -2398,16 +2404,16 @@ result quad_forest_parse
         else {
           dist2 = 1000000;
         }
-        PRINT2("dist 3 %.3f %.3f\n", dist1, dist2);
+        /*PRINT2("dist 3 %.3f %.3f\n", dist1, dist2);*/
         if (dist1 < dist2) {
-          if (dist1 < 2) {
+          if (dist1 < 8) {
             boundary3->parent = boundary1;
             boundary1->length += boundary3->length;
             boundary1->first = boundary3;
           }
         }
         else {
-          if (dist2 < 2) {
+          if (dist2 < 8) {
             boundary1->parent = boundary3;
             boundary3->length += boundary1->length;
             boundary3->first = boundary1;
@@ -2449,9 +2455,11 @@ result quad_forest_visualize_parse_result
   colored_rect crect;
   colored_line bline;
   circle bcirc;
+  arc barc;
   uint32 x, y, width, height, stride, row_step, frag_count;
   byte *target_data, *target_pos, color0, color1, color2;
   integral_value max_edge_mag, max_ridge_score, extent, max_extent;
+  integral_value rx, ry, dist, angle1, angle2;
 
   CHECK_POINTER(forest);
   CHECK_POINTER(target);
@@ -2471,7 +2479,7 @@ result quad_forest_visualize_parse_result
   CHECK(list_create(&links, 1000, sizeof(colored_line), 1));
   CHECK(list_create(&lines, 1000, sizeof(colored_line), 1));
   CHECK(list_create(&frags, 1000, sizeof(colored_rect), 1));
-  CHECK(list_create(&circles, 1000, sizeof(circle), 1));
+  CHECK(list_create(&circles, 1000, sizeof(arc), 1));
 
   /*CHECK(quad_forest_visualize_neighborhood_stats(forest, target, v_SCORE));*/
   /*
@@ -2614,10 +2622,15 @@ result quad_forest_visualize_parse_result
               color0 = 255;
               color1 = 0;
               color2 = 0;
-              bline.start.x = (sint32)(bparent->cx - 25 * bparent->dx);
-              bline.start.y = (sint32)(bparent->cy - 25 * bparent->dy);
-              bline.end.x = (sint32)(bparent->cx + 25 * bparent->dx);
-              bline.end.y = (sint32)(bparent->cy + 25 * bparent->dy);
+              /*
+              rx = bparent->first->cx - bparent->cx;
+              ry = bparent->first->cy - bparent->cy;
+              dist = fabs(bparent->dx * rx + bparent->dy * ry);
+              */
+              bline.start.x = (signed)(bparent->first->x);
+              bline.start.y = (signed)(bparent->first->y);
+              bline.end.x = (signed)(bparent->last->x);
+              bline.end.y = (signed)(bparent->last->y);
               CHECK(list_append(&lines, &bline));
             }
             else
@@ -2625,11 +2638,33 @@ result quad_forest_visualize_parse_result
               color0 = 0;
               color1 = 0;
               color2 = 255;
-              bcirc.center.x = (uint32)bparent->cx;
-              bcirc.center.y = (uint32)bparent->cy;
-              bcirc.r = (uint32)bparent->curvature;
-              if (bcirc.r < 1) bcirc.r = 1;
-              CHECK(list_append(&circles, &bcirc));
+              barc.center.x = (uint32)bparent->cx;
+              barc.center.y = (uint32)bparent->cy;
+              barc.r = (uint32)bparent->curvature;
+              if (barc.r < 1) barc.r = 1;
+              rx = ((integral_value)bparent->first->x) - bparent->cx;
+              ry = ((integral_value)bparent->first->y) - bparent->cy;
+              angle1 = atan2(-ry, rx);
+              angle1 *= 180;
+              rx = ((integral_value)bparent->last->x) - bparent->cx;
+              ry = ((integral_value)bparent->last->y) - bparent->cy;
+              angle2 = atan2(-ry, rx);
+              angle2 *= 180;
+              if (angle1 < (angle2 + 0.001)) {
+                if (fabs(angle2 - angle1) < 1) {
+                  angle2 += 1;
+                }
+                barc.start_angle = angle1;
+                barc.end_angle = angle2;
+              }
+              else {
+                if (fabs(angle1 - angle2) < 1) {
+                  angle1 += 1;
+                }
+                barc.start_angle = angle2;
+                barc.end_angle = angle1;
+              }
+              CHECK(list_append(&circles, &barc));
             }
           /*}*/
 
@@ -2678,7 +2713,8 @@ result quad_forest_visualize_parse_result
     }
     /*CHECK(quad_forest_visualize_neighborhood_stats(forest, target, v_STRENGTH));*/
     {
-      byte circle_color[4] = {255,0,0,0};
+      byte line_color[4] = {0,255,255,0};
+      byte circle_color[4] = {255,255,0,0};
       /*
       byte edge_color_1[4] = {0,255,0,0};
       byte edge_color_2[4] = {0,255,0,0};
@@ -2699,7 +2735,9 @@ result quad_forest_visualize_parse_result
       /*PRINT1("links: %d\n", links.count);*/
       /*CHECK(quad_forest_get_links(forest, &links, v_LINK_BOUNDARY));*/
       CHECK(pixel_image_draw_colored_lines(target, &lines, 2));
-      CHECK(pixel_image_draw_circles(target, &circles, 2, circle_color));
+      /*
+      CHECK(pixel_image_draw_arcs(target, &circles, 2, circle_color));
+      */
       CHECK(quad_forest_get_links(forest, &links, v_LINK_EDGE_POS));
       CHECK(pixel_image_draw_colored_lines(target, &links, 1));
       /*
