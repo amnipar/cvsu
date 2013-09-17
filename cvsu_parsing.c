@@ -2201,6 +2201,10 @@ result quad_forest_parse
       else {
         boundary1->smoothed_angle = angle1;
       }
+      boundary1->parent = boundary1;
+      boundary1->category = fc_UNDEF;
+      boundary1->cx = x1;
+      boundary1->cy = y1;
       boundary1->dx = dx;
       boundary1->dy = dy;
 
@@ -2212,16 +2216,47 @@ result quad_forest_parse
     endboundaries = &boundarylist.last;
     while (boundaries != endboundaries) {
       boundary1 = *((boundary**)boundaries->data);
-      boundary1->parent = boundary1;
       if (boundary1->next != NULL && boundary1->prev != NULL) {
         boundary2 = boundary1->next;
+        parent1 = boundary2->parent;
+        if (parent1 != boundary2) {
+          parent1 = boundary_find(parent1);
+        }
         boundary3 = boundary1->prev;
+        parent2 = boundary3->parent;
+        if (parent2 != boundary3) {
+          parent2 = boundary_find(parent2);
+        }
         if (boundary2->next != NULL && boundary3->prev != NULL) {
           boundary2 = boundary2->next;
+          if (parent1->category == fc_UNDEF) {
+            parent1 = boundary2->parent;
+            if (parent1 != boundary2) {
+              parent1 = boundary_find(parent1);
+            }
+          }
           boundary3 = boundary3->prev;
+          if (parent2->category == fc_UNDEF) {
+            parent2 = boundary3->parent;
+            if (parent2 != boundary3) {
+              parent2 = boundary_find(parent2);
+            }
+          }
           if (boundary2->next != NULL && boundary3->prev != NULL) {
             boundary2 = boundary2->next;
+            if (parent1->category == fc_UNDEF) {
+              parent1 = boundary2->parent;
+              if (parent1 != boundary2) {
+                parent1 = boundary_find(parent1);
+              }
+            }
             boundary3 = boundary3->prev;
+            if (parent2->category == fc_UNDEF) {
+              parent2 = boundary3->parent;
+              if (parent2 != boundary3) {
+                parent2 = boundary_find(parent2);
+              }
+            }
             boundary1->quality = 3;
           }
           else {
@@ -2245,10 +2280,6 @@ result quad_forest_parse
           /* create straight line model if not curved enough */
           if (fabs(adiff1) < 0.2) {
             boundary1->category = fc_STRAIGHT;
-            /*
-            boundary1->cx = x1;
-            boundary1->cy = y1;
-            */
           }
           /* otherwise create curved line model */
           else {
@@ -2276,10 +2307,6 @@ result quad_forest_parse
           boundary1->quality -= 0.5;
           if (fabs(adiff2) < 0.1) {
             boundary1->category = fc_STRAIGHT;
-            /*
-            boundary1->cx = x1;
-            boundary1->cy = y1;
-            */
           }
           /* otherwise create curved line model */
           else {
@@ -2302,12 +2329,30 @@ result quad_forest_parse
             }
           }
         }
+        if (parent1->category == fc_STRAIGHT) {
+          
+        }
+        else
+        if (parent1->category == fc_CURVED) {
+          
+        }
+        else { /* fc_UNDEF */
+          
+        }
+        if (parent2->category == fc_STRAIGHT) {
+          
+        }
+        else
+        if (parent2->category == fc_CURVED) {
+          
+        }
+        else { /* fc_UNDEF */
+          
+        }
       }
       else {
         boundary1->quality = 0;
       }
-      boundary1->cx = x1;
-      boundary1->cy = y1;
       boundary1->first = boundary1;
       boundary1->last = boundary1;
       boundaries = boundaries->next;
@@ -2735,9 +2780,9 @@ result quad_forest_visualize_parse_result
       /*PRINT1("links: %d\n", links.count);*/
       /*CHECK(quad_forest_get_links(forest, &links, v_LINK_BOUNDARY));*/
       CHECK(pixel_image_draw_colored_lines(target, &lines, 2));
-      /*
+      
       CHECK(pixel_image_draw_arcs(target, &circles, 2, circle_color));
-      */
+      
       CHECK(quad_forest_get_links(forest, &links, v_LINK_EDGE_POS));
       CHECK(pixel_image_draw_colored_lines(target, &links, 1));
       /*
