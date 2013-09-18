@@ -467,8 +467,8 @@ result pixel_image_draw_arcs
     cvEllipse(dst,
            cvPoint(this_arc->center.x, this_arc->center.y),
            axes, 0,
-           this_arc->start_angle,
-           this_arc->end_angle,
+           -this_arc->start_angle,
+           -this_arc->end_angle,
            cvScalar(color[0], color[1], color[2], 0), width, 8, 0);
     items = items->next;
   }

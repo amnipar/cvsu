@@ -2051,12 +2051,12 @@ result quad_forest_parse
     quad_tree *tree;
     edge_response *eresp;
     list_item *boundaries, *endboundaries;
-    boundary *boundary1, *boundary2, *boundary3, *parent1, *parent2;
+    boundary *boundary1, *boundary2, *boundary3, *parent, *parent2, *parent3;
     integral_value angle1, angle2, angle3, curvature, px, py, rx, ry, mag;
     integral_value x1, y1, x2, y2, dx, dy, adiff1, adiff2, adiff3, dist, r;
-    integral_value dist1, dist2;
+    integral_value dist1, dist2, sim1, sim2;
     uint32 i, count;
-    boundary_category category;
+    boundary_category category1, category2, category3;
     fragment_model model;
 
     boundaries = boundarylist.first.next;
@@ -2202,6 +2202,8 @@ result quad_forest_parse
         boundary1->smoothed_angle = angle1;
       }
       boundary1->parent = boundary1;
+      boundary1->first = boundary1;
+      boundary1->last = boundary1;
       boundary1->category = fc_UNDEF;
       boundary1->cx = x1;
       boundary1->cy = y1;
@@ -2216,45 +2218,50 @@ result quad_forest_parse
     endboundaries = &boundarylist.last;
     while (boundaries != endboundaries) {
       boundary1 = *((boundary**)boundaries->data);
+      /* if the node is already assigned to model, skip it */
+      if (boundary1->parent != boundary1) {
+        boundaries = boundaries->next;
+        continue;
+      }
       if (boundary1->next != NULL && boundary1->prev != NULL) {
         boundary2 = boundary1->next;
-        parent1 = boundary2->parent;
-        if (parent1 != boundary2) {
-          parent1 = boundary_find(parent1);
+        parent2 = boundary2->parent;
+        if (parent2 != boundary2) {
+          parent2 = boundary_find(parent2);
         }
         boundary3 = boundary1->prev;
-        parent2 = boundary3->parent;
-        if (parent2 != boundary3) {
-          parent2 = boundary_find(parent2);
+        parent3 = boundary3->parent;
+        if (parent3 != boundary3) {
+          parent3 = boundary_find(parent3);
         }
         if (boundary2->next != NULL && boundary3->prev != NULL) {
           boundary2 = boundary2->next;
-          if (parent1->category == fc_UNDEF) {
-            parent1 = boundary2->parent;
-            if (parent1 != boundary2) {
-              parent1 = boundary_find(parent1);
+          if (parent2->category == fc_UNDEF) {
+            parent2 = boundary2->parent;
+            if (parent2 != boundary2) {
+              parent2 = boundary_find(parent2);
             }
           }
           boundary3 = boundary3->prev;
-          if (parent2->category == fc_UNDEF) {
-            parent2 = boundary3->parent;
-            if (parent2 != boundary3) {
-              parent2 = boundary_find(parent2);
+          if (parent3->category == fc_UNDEF) {
+            parent3 = boundary3->parent;
+            if (parent3 != boundary3) {
+              parent3 = boundary_find(parent3);
             }
           }
           if (boundary2->next != NULL && boundary3->prev != NULL) {
             boundary2 = boundary2->next;
-            if (parent1->category == fc_UNDEF) {
-              parent1 = boundary2->parent;
-              if (parent1 != boundary2) {
-                parent1 = boundary_find(parent1);
+            if (parent2->category == fc_UNDEF) {
+              parent2 = boundary2->parent;
+              if (parent2 != boundary2) {
+                parent2 = boundary_find(parent2);
               }
             }
             boundary3 = boundary3->prev;
-            if (parent2->category == fc_UNDEF) {
-              parent2 = boundary3->parent;
-              if (parent2 != boundary3) {
-                parent2 = boundary_find(parent2);
+            if (parent3->category == fc_UNDEF) {
+              parent3 = boundary3->parent;
+              if (parent3 != boundary3) {
+                parent3 = boundary_find(parent3);
               }
             }
             boundary1->quality = 3;
@@ -2298,7 +2305,7 @@ result quad_forest_parse
             }
             else {
               boundary1->cx = x1 + r * dy;
-              boundary1->cy = y1 - r * dx;
+              boundary1->cy = y1 + r * dx;
             }
           }
         }
@@ -2325,40 +2332,221 @@ result quad_forest_parse
             }
             else {
               boundary1->cx = x1 + r * dy;
-              boundary1->cy = y1 - r * dx;
+              boundary1->cy = y1 + r * dx;
             }
           }
         }
-        if (parent1->category == fc_STRAIGHT) {
-          
+        /* first case: no neighboring models found */
+        if (parent2->category == fc_UNDEF && parent3->category == fc_UNDEF) {
+          /* merge with neighbors to create a seed model */
+          parent = boundary1;
+          while (parent != boundary3) {
+            parent = parent->prev;
+            parent->parent = boundary1;
+            boundary1->length += 1;
+          }
+          boundary1->first = boundary3;
+          parent = boundary1;
+          while (parent != boundary2) {
+            parent = parent->next;
+            parent->parent = boundary1;
+            boundary1->length += 1;
+          }
+          boundary1->last = boundary2;
         }
         else
-        if (parent1->category == fc_CURVED) {
-          
-        }
-        else { /* fc_UNDEF */
-          
-        }
-        if (parent2->category == fc_STRAIGHT) {
-          
+        /* second case: only next model found */
+        if (parent2->category != fc_UNDEF && parent3->category == fc_UNDEF) {
+          /* if category is the same, compare model similarity */
+          if (parent2->category == boundary1->category) {
+            /* for straight line models, compare angle */
+            if (parent2->category == fc_STRAIGHT) {
+              sim1 = fabs(angle_minus_angle(parent2->smoothed_angle, 
+                                            boundary1->smoothed_angle));
+              if (sim1 < 0.1) {
+                sim1 = 1;
+              }
+              else {
+                sim1 = 0;
+              }
+            }
+            else
+            /* for curved line models, compare curvature radius */
+            if (parent2->category == fc_CURVED) {
+              sim1 = fabs(parent2->curvature - boundary1->curvature);
+              if (sim1 < 8) {
+                sim1 = 1;
+              }
+              else {
+                sim1 = 0;
+              }
+            }
+            /* if similar with existing model, merge in full */
+            if (sim1 > 0.5) {
+              parent = parent2;
+              while (parent != boundary3) {
+                parent = parent->prev;
+                parent->parent = parent2;
+                parent2->length += 1;
+              }
+              parent2->first = boundary3;
+            }
+            /* if not similar, create a new model extending into the opposite dir */
+            else {
+              parent = boundary1;
+              while (parent != boundary3) {
+                parent = parent->prev;
+                parent->parent = boundary1;
+                boundary1->length += 1;
+              }
+              boundary1->first = boundary3;
+            }
+          }
+          /* if category is different, calculate distance to model */
+          else {
+            if (parent2->category == fc_STRAIGHT) {
+              px = -parent2->dy;
+              py = parent2->dx;
+              dist1 = fabs(px * (x1 - parent2->cx) + py * (y1 - parent2->cy));
+            }
+            else
+            if (parent2->category == fc_CURVED) {
+              rx = x1 - parent2->cx;
+              ry = y1 - parent2->cy;
+              dist1 = fabs(sqrt(rx*rx + ry*ry) - parent2->curvature);
+            }
+            /* if node is close enough, merge until this node */
+            if (dist1 < 8) {
+              parent = parent2;
+              while (parent != boundary1) {
+                parent = parent->prev;
+                parent->parent = parent2;
+                parent2->length += 1;
+              }
+              parent2->first = boundary1;
+            }
+            /* otherwise create a new model extending into the opposite dir */
+            else {
+              parent = boundary1;
+              while (parent != boundary3) {
+                parent = parent->prev;
+                parent->parent = boundary1;
+                boundary1->length += 1;
+              }
+              boundary1->first = boundary3;
+            }
+          }
         }
         else
-        if (parent2->category == fc_CURVED) {
-          
+        /* third case: only prev model found */
+        if (parent2->category == fc_UNDEF && parent3->category != fc_UNDEF) {
+          /* if category is the same, compare model similarity */
+          if (parent3->category == boundary1->category) {
+            /* for straight line models, compare angle */
+            if (parent3->category == fc_STRAIGHT) {
+              sim1 = fabs(angle_minus_angle(parent3->smoothed_angle, 
+                                            boundary1->smoothed_angle));
+              if (sim1 < 0.1) {
+                sim1 = 1;
+              }
+              else {
+                sim1 = 0;
+              }
+            }
+            else
+            /* for curved line models, compare curvature radius */
+            if (parent3->category == fc_CURVED) {
+              sim1 = fabs(parent3->curvature - boundary1->curvature);
+              if (sim1 < 8) {
+                sim1 = 1;
+              }
+              else {
+                sim1 = 0;
+              }
+            }
+            /* if similar with existing model, merge in full */
+            if (sim1 > 0.5) {
+              parent = parent3;
+              while (parent != boundary2) {
+                parent = parent->next;
+                parent->parent = parent3;
+                parent3->length += 1;
+              }
+              parent3->last = boundary2;
+            }
+            /* if not similar, create a new model extending into the opposite dir */
+            else {
+              parent = boundary1;
+              while (parent != boundary2) {
+                parent = parent->next;
+                parent->parent = boundary1;
+                boundary1->length += 1;
+              }
+              boundary1->last = boundary2;
+            }
+          }
+          /* if category is different, calculate distance to model */
+          else {
+            if (parent3->category == fc_STRAIGHT) {
+              px = -parent3->dy;
+              py = parent3->dx;
+              dist1 = fabs(px * (x1 - parent3->cx) + py * (y1 - parent3->cy));
+            }
+            else
+            if (parent3->category == fc_CURVED) {
+              rx = x1 - parent3->cx;
+              ry = y1 - parent3->cy;
+              dist1 = fabs(sqrt(rx*rx + ry*ry) - parent3->curvature);
+            }
+            /* if node is close enough, merge until this node */
+            if (dist1 < 8) {
+              parent = parent3;
+              while (parent != boundary1) {
+                parent = parent->next;
+                parent->parent = parent3;
+                parent3->length += 1;
+              }
+              parent3->last = boundary1;
+            }
+            /* otherwise create a new model extending into the opposite dir */
+            else {
+              parent = boundary1;
+              while (parent != boundary2) {
+                parent = parent->next;
+                parent->parent = boundary1;
+                boundary1->length += 1;
+              }
+              boundary1->last = boundary2;
+            }
+          }
         }
-        else { /* fc_UNDEF */
-          
+        else
+        /* fourth case: two neighboring models found */
+        if (parent2->category != fc_UNDEF && parent3->category != fc_UNDEF) {
+          /* if both models have the same category, try to merge all */
+          if (parent2->category == parent3->category) {
+            
+          }
+          else
+          /* if next model has the same category, try to merge with that */
+          if (parent2->category == boundary1->category) {
+            
+          }
+          else
+          /* if prev model has the same category, try to merge with that */
+          if (parent3->category == boundary1->category) {
+            
+          }
         }
       }
       else {
         boundary1->quality = 0;
       }
-      boundary1->first = boundary1;
-      boundary1->last = boundary1;
       boundaries = boundaries->next;
     }
 
     /* then, find best models and merge nodes */
+    /*
     boundaries = boundarylist.first.next;
     endboundaries = &boundarylist.last;
     while (boundaries != endboundaries) {
@@ -2398,7 +2586,6 @@ result quad_forest_parse
         else {
           dist2 = 1000000;
         }
-        /*PRINT2("dist 2 %.3f %.3f\n", dist1, dist2);*/
         if (dist1 < dist2) {
           if (dist1 < 8) {
             boundary2->parent = boundary1;
@@ -2449,7 +2636,6 @@ result quad_forest_parse
         else {
           dist2 = 1000000;
         }
-        /*PRINT2("dist 3 %.3f %.3f\n", dist1, dist2);*/
         if (dist1 < dist2) {
           if (dist1 < 8) {
             boundary3->parent = boundary1;
@@ -2467,6 +2653,7 @@ result quad_forest_parse
       }
       boundaries = boundaries->next;
     }
+    */
   }
 
   /* set the state of forest */
@@ -2688,19 +2875,22 @@ result quad_forest_visualize_parse_result
               barc.r = (uint32)bparent->curvature;
               if (barc.r < 1) barc.r = 1;
               rx = ((integral_value)bparent->first->x) - bparent->cx;
-              ry = ((integral_value)bparent->first->y) - bparent->cy;
-              angle1 = atan2(-ry, rx);
-              angle1 *= 180;
+              ry = bparent->cy - ((integral_value)bparent->first->y);
+              angle1 = atan2(ry, rx);
+              if (angle1 < 0) angle1 += M_2PI;
+              angle1 *= (180 / M_PI);
               rx = ((integral_value)bparent->last->x) - bparent->cx;
-              ry = ((integral_value)bparent->last->y) - bparent->cy;
-              angle2 = atan2(-ry, rx);
-              angle2 *= 180;
-              if (angle1 < (angle2 + 0.001)) {
-                if (fabs(angle2 - angle1) < 1) {
-                  angle2 += 1;
-                }
-                barc.start_angle = angle1;
-                barc.end_angle = angle2;
+              ry = bparent->cy - ((integral_value)bparent->last->y);
+              angle2 = atan2(ry, rx);
+              if (angle2 < 0) angle2 += M_2PI;
+              angle2 *= (180 / M_PI);
+              
+              if (fabs(angle2 - angle1) < 1) {
+                angle2 += 1;
+              }
+              barc.start_angle = angle1;
+              barc.end_angle = angle2;
+              /*
               }
               else {
                 if (fabs(angle1 - angle2) < 1) {
@@ -2709,6 +2899,7 @@ result quad_forest_visualize_parse_result
                 barc.start_angle = angle2;
                 barc.end_angle = angle1;
               }
+              */
               CHECK(list_append(&circles, &barc));
             }
           /*}*/
