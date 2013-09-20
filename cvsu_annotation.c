@@ -773,6 +773,7 @@ boundary_message *has_boundary_message
 int compare_boundaries(const void *a, const void *b)
 {
   const boundary *sa, *sb;
+  integral_value quality_diff;
 
   sa = *((const boundary* const *)a);
   if (sa == NULL) {
@@ -786,8 +787,9 @@ int compare_boundaries(const void *a, const void *b)
     return -1;
   }
 
-  if (sa > sb) return 1;
-  else if (sa < sb) return -1;
+  quality_diff = sa->quality - sb->quality;
+  if (quality_diff > 0.0001) return 1;
+  else if (quality_diff < -0.0001) return -1;
   else return 0;
 }
 

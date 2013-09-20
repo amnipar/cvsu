@@ -472,7 +472,14 @@ result pixel_image_draw_arcs
            cvScalar(color[0], color[1], color[2], 0), width, 8, 0);
     items = items->next;
   }
-
+  /*
+  cvEllipse(dst,
+           cvPoint(100,100),
+           cvSize(50,50), 0,
+           -45,
+           -315,
+           cvScalar(color[0], color[1], color[2], 0), width, 8, 0);
+  */
   FINALLY(pixel_image_draw_arcs);
   cvReleaseImageHeader(&dst);
   RETURN();

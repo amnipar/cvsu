@@ -589,10 +589,13 @@ typedef struct boundary_t {
   struct boundary_t *next;
   struct boundary_t *first;
   struct boundary_t *last;
+  struct boundary_t *first2;
+  struct boundary_t *last2;
   /** Tree node corresponding to this boundary node */
   struct quad_tree_t *tree;
   /** Boundary category */
   boundary_category category;
+  boundary_category category2;
   /** Rank value used for optimizing union-find process */
   uint32 rank;
   /** Length of the boundary fragment in nodes */
@@ -604,12 +607,20 @@ typedef struct boundary_t {
   /** Angle smoothed based on neighboring nodes */
   integral_value dx;
   integral_value dy;
+  integral_value dx1;
+  integral_value dy1;
+  integral_value dx2;
+  integral_value dy2;
   integral_value smoothed_angle;
   /** Actual curvature at this node */
   integral_value cx;
   integral_value cy;
   integral_value curvature;
   integral_value quality;
+  integral_value cx2;
+  integral_value cy2;
+  integral_value curvature2;
+  integral_value quality2;
   /** Boundary fragment model matched by this node */
   fragment_model *fragment;
 } boundary;
