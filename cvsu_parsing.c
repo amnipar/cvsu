@@ -2050,12 +2050,12 @@ result quad_forest_parse
   {
     quad_tree *tree;
     edge_response *eresp;
-    list_item *boundaries, *endboundaries;
+    list_item *boundaries, *endboundaries, *temp_item;
     boundary *boundary1, *boundary2, *boundary3, *parent, *parent2, *parent3;
-    integral_value angle1, angle2, angle3, curvature, px, py, rx, ry, mag;
+    integral_value angle1, angle2, angle3, curvature, px, py, rx, ry, cx, cy, mag;
     integral_value x1, y1, x2, y2, x3, y3, dx, dy, adiff1, adiff2, adiff3, dist, r;
     integral_value dist1, dist2, sim1, sim2;
-    uint32 i, count;
+    uint32 i, count, length1, length2;
     boundary_category category1, category2, category3;
     fragment_model model;
 
@@ -2202,6 +2202,7 @@ result quad_forest_parse
         boundary1->smoothed_angle = angle1;
       }
       boundary1->parent = boundary1;
+      boundary1->parent2 = boundary1;
       boundary1->first = boundary1;
       boundary1->last = boundary1;
       boundary1->category = fc_UNDEF;
@@ -2391,6 +2392,181 @@ result quad_forest_parse
       }
       boundaries = boundaries->next;
     }
+    
+    boundaries = boundarylist.first.next;
+    endboundaries = &boundarylist.last;
+    while (boundaries != endboundaries) {
+      boundary1 = *((boundary**)boundaries->data);
+      category1 = boundary1->category;
+      px = -boundary1->dy;
+      py = boundary1->dx;
+      cx = boundary1->cx;
+      cy = boundary1->cy;
+      curvature = boundary1->curvature;
+      length1 = 0;
+      length2 = 0;
+      
+      boundary2 = boundary1->prev;
+      while (boundary2 != NULL && boundary2->parent2 != boundary1) {
+        category2 = boundary2->category;
+        x2 = (integral_value)boundary2->x;
+        y2 = (integral_value)boundary2->y;
+        if (category1 == fc_STRAIGHT) {
+          if (category2 == fc_STRAIGHT || category2 == fc_UNDEF) {
+            dist1 = fabs(px * (x2 - cx) + py * (y2 - cy));
+            if (dist1 < 8) {
+              length1 += 1;
+              boundary1->first = boundary2;
+              boundary2->parent2 = boundary1;
+              boundary2 = boundary2->prev;
+            }
+            else {
+              boundary2 = NULL;
+            }
+          }
+          else {
+            boundary2 = NULL;
+          }
+        }
+        else
+        if (category1 == fc_CURVED) {
+          if (category2 == fc_CURVED || category2 == fc_UNDEF) {
+            rx = x2 - cx;
+            ry = y2 - cy;
+            dist1 = fabs(sqrt(rx*rx + ry*ry) - curvature);
+            if (dist1 < 8) {
+              length1 += 1;
+              boundary1->first = boundary2;
+              boundary2->parent2 = boundary1;
+              boundary2 = boundary2->prev;
+            }
+            else {
+              boundary2 = NULL;
+            }
+          }
+          else {
+            boundary2 = NULL;
+          }
+        }
+        else {
+          boundary2 = NULL;
+        }
+      }
+      
+      if (boundary1->category2 != boundary1->category) {
+        category1 = boundary1->category2;
+        px = -boundary1->dy2;
+        py = boundary1->dx2;
+        cx = boundary1->cx2;
+        cy = boundary1->cy2;
+        curvature = boundary1->curvature2;
+      }
+      
+      boundary2 = boundary1->next;
+      while (boundary2 != NULL && boundary2->parent2 != boundary1) {
+        category2 = boundary2->category;
+        x2 = (integral_value)boundary2->x;
+        y2 = (integral_value)boundary2->y;
+        if (category1 == fc_STRAIGHT) {
+          if (category2 == fc_STRAIGHT || category2 == fc_UNDEF) {
+            dist1 = fabs(px * (x2 - cx) + py * (y2 - cy));
+            if (dist1 < 8) {
+              length2 += 1;
+              boundary1->last = boundary2;
+              boundary2->parent2 = boundary1;
+              boundary2 = boundary2->next;
+            }
+            else {
+              boundary2 = NULL;
+            }
+          }
+          else {
+            boundary2 = NULL;
+          }
+        }
+        else
+        if (category1 == fc_CURVED) {
+          if (category2 == fc_CURVED || category2 == fc_UNDEF) {
+            rx = x2 - cx;
+            ry = y2 - cy;
+            dist1 = fabs(sqrt(rx*rx + ry*ry) - curvature);
+            if (dist1 < 8) {
+              length2 += 1;
+              boundary1->last = boundary2;
+              boundary2->parent2 = boundary1;
+              boundary2 = boundary2->next;
+            }
+            else {
+              boundary2 = NULL;
+            }
+          }
+          else {
+            boundary2 = NULL;
+          }
+        }
+        else {
+          boundary2 = NULL;
+        }
+      }
+      
+      if (boundary1->category2 != boundary1->category) {
+        if (length2 > length1) {
+          boundary1->length = length2 + 1;
+          boundary1->first = boundary1;
+          boundary1->category = boundary1->category2;
+          boundary1->category2 = fc_UNDEF;
+        }
+        else {
+          boundary1->length = length1 + 1;
+          boundary1->last = boundary1;
+          boundary1->category2 = fc_UNDEF;
+        }
+      }
+      else {
+        boundary1->length = length1 + length2 + 1;
+      }
+      
+      if (length1 < 2 && length2 < 2) {
+        CHECK(list_append(&fragmentlist, &boundary1));
+      }
+      else {
+        CHECK(list_insert_sorted(&fragmentlist, &boundary1, 
+                                 &compare_boundaries_by_length));
+      }
+      
+      boundaries = boundaries->next;
+    }
+    
+    /* finally merge nodes into their best parent (one with longest chain) */
+    boundaries = fragmentlist.first.next;
+    endboundaries = &fragmentlist.last;
+    while (boundaries != endboundaries) {
+      boundary1 = *((boundary**)boundaries->data);
+      /* if the node is already assigned to model, skip it */
+      if (boundary1->parent != boundary1) {
+        temp_item = boundaries;
+        boundaries = boundaries->next;
+        CHECK(list_remove_item(&fragmentlist, temp_item));
+        continue;
+      }
+      boundary2 = boundary1;
+      while (boundary2 != boundary1->first) {
+        boundary2 = boundary1->prev;
+        if (boundary2 == NULL || boundary2->parent != boundary2) {
+          break;
+        }
+        boundary2->parent = boundary1;
+      }
+      boundary2 = boundary1;
+      while (boundary2 != boundary1->last) {
+        boundary2 = boundary1->next;
+        if (boundary2 == NULL || boundary2->parent != boundary2) {
+          break;
+        }
+        boundary2->parent = boundary1;
+      }
+      boundaries = boundaries->next;
+    }
   }
 
   /* set the state of forest */
@@ -2444,113 +2620,12 @@ result quad_forest_visualize_parse_result
   stride = target->stride;
   target_data = (byte*)target->data;
 
-  /*CHECK(pixel_image_clear(target));*/
   CHECK(list_create(&links, 1000, sizeof(colored_line), 1));
   CHECK(list_create(&lines, 1000, sizeof(colored_line), 1));
   CHECK(list_create(&frags, 1000, sizeof(colored_rect), 1));
   CHECK(list_create(&circles, 1000, sizeof(arc), 1));
 
-  /*CHECK(quad_forest_visualize_neighborhood_stats(forest, target, v_SCORE));*/
-  /*
-  CHECK(quad_forest_get_links(forest, &links, v_LINK_MEASURE));
-  PRINT1("links: %lu\n", links.count);
-  */
-  /*
-  CHECK(quad_forest_get_links(forest, &links, v_LINK_BOUNDARY));
-  PRINT1("lines: %lu\n", links.count);
-  CHECK(pixel_image_draw_colored_lines(target, &links, 2));
-  TERMINATE(SUCCESS);
-  */
-  /*
-  CHECK(quad_forest_get_links(forest, &links, v_LINK_EDGE));
-  CHECK(pixel_image_draw_colored_lines(target, &links, 2));
-  */
-  /*
-  trees = forest->trees.first.next;
-  end = &forest->trees.last;
-  while (trees != end) {
-    tree = (quad_tree*)trees->data;
-    CHECK(quad_tree_edge_response_to_line(forest, tree, &lines));
-    trees = trees->next;
-  }
-  {
-  byte segment_color[4] = {0,0,0,0};
-  CHECK(pixel_image_draw_lines(target, &lines, segment_color, 2));
-  }
-  */
-  /*TERMINATE(SUCCESS);*/
-
   if (IS_TRUE(quad_forest_has_parse(forest))) {
-    /*
-    max_edge_mag = 0;
-    max_extent = 0;
-    trees = forest->trees.first.next;
-    end = &forest->trees.last;
-    while (trees != end) {
-      tree = (quad_tree*)trees->data;
-      CHECK(expect_neighborhood_stat(&nstat, &tree->annotation));
-      eresp = has_edge_response(&tree->annotation, forest->token);
-      if (eresp != NULL) {
-        if (eresp->mag > max_edge_mag) {
-          max_edge_mag = eresp->mag;
-  }cvScalar(color[0], color[1], color[2], 0)
-      }
-      segment1 = has_segment(&tree->annotation, forest->token);
-      if (segment1 != NULL) {
-        extent = (integral_value)segment1->extent;
-        if (extent > max_extent) {
-          max_extent = extent;
-        }
-      }
-      trees = trees->next;
-    }
-
-    max_ridge_score = 0;
-    trees = forest->trees.first.next;
-    end = &forest->trees.last;
-    while (trees != end) {
-      tree = (quad_tree*)trees->data;
-      ridge1 = has_ridge_potential(&tree->annotation, forest->token);
-      if (ridge1 != NULL) {
-        if (ridge1->ridge_score > max_ridge_score) {
-          max_ridge_score = ridge1->ridge_score;
-        }
-      }
-      trees = trees->next;
-    }
-    */
-    /*
-    frag_count = 0;
-    srand(1234);
-    trees = forest->trees.first.next;
-    end = &forest->trees.last;
-    while (trees != end) {
-      tree = (quad_tree*)trees->data;
-      fragment1 = has_boundary(&tree->annotation, forest->token);
-      if (fragment1 != NULL) {
-        bparent = boundary_find(fragment1);
-        if (fragment1 == bparent) {
-          bparent->color[0] = (byte)(rand() % 256);
-          bparent->color[1] = (byte)(rand() % 256);
-          bparent->color[2] = (byte)(rand() % 256);
-          frag_count += 1;
-          if (bparent->length > 1) {
-            crect.left = ((signed)bparent->x1)-3;
-            crect.top = ((signed)bparent->y1)-3;
-            crect.right = ((signed)bparent->x2)+3;
-            crect.bottom = ((signed)bparent->y2)+3;
-            crect.color[0] = bparent->color[0];
-            crect.color[1] = bparent->color[1];
-            crect.color[2] = bparent->color[2];
-            CHECK(list_append(&frags, &crect));
-          }
-        }
-      }
-      trees = trees->next;
-    }
-    */
-    /*PRINT1("max ridge score %.3f\n", max_ridge_score);*/
-
     bline.color[0] = 0;
     bline.color[1] = 255;
     bline.color[2] = 255;
@@ -2563,50 +2638,31 @@ result quad_forest_visualize_parse_result
       CHECK(expect_neighborhood_stat(&nstat, &tree->annotation));
       if (tree->nw == NULL) {
         fragment1 = has_boundary(&tree->annotation, forest->token);
-        /*
-        boundary1 = has_boundary_potential(&tree->annotation, forest->token);
-        segment1 = has_segment(&tree->annotation, forest->token);
-        */
-        /*
-        if (segment1 != NULL) {
-          segment_parent = segment_find(segment1);
-          if (segment_parent->category == sc_CLUTTER) {
-            color0 = (byte)(255 * 0);
-          }
-          else {
-            color0 = (byte)(255 * 0);
-          }
-          color1 = (byte)(255 * 0);
-          color2 = (byte)(255 * 0);
-        }
-        else
-        */
+        
         if (fragment1 != NULL) {
           bparent = boundary_find(fragment1);
           color0 = 0;
           color1 = 255;
           color2 = 0;
-          /*if (bparent->length > -1) {*/
-            if (bparent->category == fc_STRAIGHT) {
-              color0 = 255;
-              color1 = 0;
-              color2 = 0;
-              /*
-              rx = bparent->first->cx - bparent->cx;
-              ry = bparent->first->cy - bparent->cy;
-              dist = fabs(bparent->dx * rx + bparent->dy * ry);
-              */
+          
+          if (bparent->category == fc_STRAIGHT) {
+            color0 = 255;
+            color1 = 0;
+            color2 = 0;
+            if (bparent == fragment1) {
               bline.start.x = (signed)(bparent->first->x);
               bline.start.y = (signed)(bparent->first->y);
               bline.end.x = (signed)(bparent->last->x);
               bline.end.y = (signed)(bparent->last->y);
               CHECK(list_append(&lines, &bline));
             }
-            else
-            if (bparent->category == fc_CURVED) {
-              color0 = 0;
-              color1 = 0;
-              color2 = 255;
+          }
+          else
+          if (bparent->category == fc_CURVED) {
+            color0 = 0;
+            color1 = 0;
+            color2 = 255;
+            if (bparent == fragment1) {
               barc.center.x = (uint32)bparent->cx;
               barc.center.y = (uint32)bparent->cy;
               barc.r = (uint32)fabs(bparent->curvature);
@@ -2638,72 +2694,9 @@ result quad_forest_visualize_parse_result
               }
               CHECK(list_append(&circles, &barc));
             }
-            if (bparent->category2 == fc_STRAIGHT) {
-              bline.start.x = (signed)(bparent->first2->x);
-              bline.start.y = (signed)(bparent->first2->y);
-              bline.end.x = (signed)(bparent->last2->x);
-              bline.end.y = (signed)(bparent->last2->y);
-              CHECK(list_append(&lines, &bline));
-            }
-            else
-            if (bparent->category2 == fc_CURVED) {
-              barc.center.x = (uint32)bparent->cx2;
-              barc.center.y = (uint32)bparent->cy2;
-              barc.r = (uint32)fabs(bparent->curvature2);
-              if (barc.r < 1) barc.r = 1;
-              rx = ((integral_value)bparent->first2->x) - bparent->cx2;
-              ry = bparent->cy2 - ((integral_value)bparent->first2->y);
-              angle1 = atan2(ry, rx);
-              /*if (angle1 < 0) angle1 += M_2PI;*/
-              angle1 *= (180 / M_PI);
-              rx = ((integral_value)bparent->last2->x) - bparent->cx2;
-              ry = bparent->cy2 - ((integral_value)bparent->last2->y);
-              angle2 = atan2(ry, rx);
-              /*if (angle2 < 0) angle2 += M_2PI;*/
-              angle2 *= (180 / M_PI);
-              
-              if (bparent->curvature2 < 0) {
-                if (angle2 > 0 && angle1 < 0) {
-                  angle1 += 360;
-                }
-                barc.start_angle = angle2;
-                barc.end_angle = angle1;
-              }
-              else {
-                if (angle1 > 0 && angle2 < 0) {
-                  angle2 += 360;
-                }
-                barc.start_angle = angle1;
-                barc.end_angle = angle2;
-              }
-              CHECK(list_append(&circles, &barc));
-            }
-          /*}*/
-
-          /*
-          color0 = 255;
-          color1 = 0;
-          color2 = 0;
-          */
-          /*
-          color0 = bparent->color[0];
-          color1 = bparent->color[1];
-          color2 = bparent->color[2];
-          */
+          }
         }
-        /*
-        else
-        if (boundary1 != NULL) {
-          color0 = (byte)(255 * 0);
-          color1 = (byte)(255 * 0);
-          color2 = (byte)(255 * 1);
-        }
-        else {
-          color0 = (byte)(255 * 0);
-          color1 = (byte)(255 * 0);
-          color2 = (byte)(255 * 0);
-        }
-        */
+        
         if (fragment1 != NULL /*&& bparent->length > 2*/) {
           width = tree->size;
           height = width;

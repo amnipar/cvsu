@@ -583,6 +583,7 @@ typedef struct fragment_model_t {
 typedef struct boundary_t {
   /** Parent boundary, that determines the segment id (may be self) */
   struct boundary_t *parent;
+  struct boundary_t *parent2;
   /** Previous boundary node in this chain (NULL for first node) */
   struct boundary_t *prev;
   /** Next boundary node in this chain (NULL for last node) */
@@ -600,6 +601,7 @@ typedef struct boundary_t {
   uint32 rank;
   /** Length of the boundary fragment in nodes */
   uint32 length;
+  uint32 length2;
   uint32 x;
   uint32 y;
   /** Actual gradient angle at this node */
@@ -656,7 +658,8 @@ typedef struct boundary_info_t {
 /**
  * Compares boundaries numerically by pointer value.
  */
-int compare_boundaries(const void *a, const void *b);
+int compare_boundaries_by_quality(const void *a, const void *b);
+int compare_boundaries_by_length(const void *a, const void *b);
 
 /******************************************************************************/
 

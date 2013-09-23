@@ -770,7 +770,7 @@ boundary_message *has_boundary_message
 /* boundary structures and functions                                           */
 /******************************************************************************/
 
-int compare_boundaries(const void *a, const void *b)
+int compare_boundaries_by_quality(const void *a, const void *b)
 {
   const boundary *sa, *sb;
   integral_value quality_diff;
@@ -790,6 +790,29 @@ int compare_boundaries(const void *a, const void *b)
   quality_diff = sa->quality - sb->quality;
   if (quality_diff > 0.0001) return 1;
   else if (quality_diff < -0.0001) return -1;
+  else return 0;
+}
+
+int compare_boundaries_by_length(const void *a, const void *b)
+{
+  const boundary *sa, *sb;
+  uint32 quality_diff;
+
+  sa = *((const boundary* const *)a);
+  if (sa == NULL) {
+    PRINT0("warning: tree is null in compare_boundaries\n");
+    return -1;
+  }
+
+  sb = *((const boundary* const *)b);
+  if (sb == NULL) {
+    PRINT0("warning: tree is null in compare_boundaries\n");
+    return -1;
+  }
+
+  quality_diff = sa->length - sb->length;
+  if (quality_diff > 0) return 1;
+  else if (quality_diff < 0) return -1;
   else return 0;
 }
 
