@@ -601,7 +601,6 @@ typedef struct boundary_t {
   uint32 rank;
   /** Length of the boundary fragment in nodes */
   uint32 length;
-  uint32 length2;
   uint32 x;
   uint32 y;
   /** Actual gradient angle at this node */

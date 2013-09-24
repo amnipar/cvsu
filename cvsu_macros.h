@@ -318,14 +318,14 @@ finally:
 
 #define FOR_2_DISCONTINUOUS_IMAGE_ROWS()\
   for (source_pos = source_rows[0], target_pos = target_rows[0],x,\
-       y = 0; y < source->height; y++,\
-       source_pos = source_rows[y], target_pos = target_rows[y])
+       y = 0; y < source->height;\
+       source_pos = source_rows[y], target_pos = target_rows[y], y++)
 
 #define FOR_2_DISCONTINUOUS_IMAGE_COLS()\
   for (source_pos = source_rows[0], target_pos = target_rows[0],y,\
-       x = 0; x < source->width; x++,\
+       x = 0; x < source->width;\
        source_pos = source_rows[0] + x * source_step,\
-       target_pos = target_rows[0] + x * target_step)
+       target_pos = target_rows[0] + x * target_step,x++)
 
 #define FOR_IMAGE_WITH_STEP(image, row_step, col_step)\
   for (image##_step = image->step * col_step,\

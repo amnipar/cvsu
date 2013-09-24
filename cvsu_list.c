@@ -1020,21 +1020,21 @@ result list_insert_sorted
 )
 {
   TRY();
-  list_item *item;
-  list_item *i;
+  list_item *item, *i, *end;
 
   CHECK(list_create_item(target, &item, data));
 
   i = target->first.next;
-  while (i != &target->last) {
+  end = &target->last;
+  while (i != end) {
     if (i == NULL) {
       /* iteration finished without encountering the end item */
       ERROR(NOT_FOUND);
     }
-    if (comparator(data, i->data) <= 0) {
+    if (comparator(item->data, i->data) <= 0) {
       break;
     }
-    i = i -> next;
+    i = i->next;
   }
   CHECK(item_insert_before(i, item));
 

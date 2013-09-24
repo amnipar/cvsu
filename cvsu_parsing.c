@@ -1034,6 +1034,14 @@ result quad_tree_ensure_edge_stats
 
       CHECK(ensure_has(&head->annotation, t_link_measure, &tptr));
       lmeasure = (link_measure*)tptr->value;
+      lmeasure->category = bl_UNDEF;
+      lmeasure->magnitude_score = 0;
+      lmeasure->strength_score = 0;
+      lmeasure->angle_score = 0;
+      lmeasure->against_score = 0;
+      lmeasure->profile_score = 0;
+      lmeasure->parallel_score = 0;
+      lmeasure->perpendicular_score = 0;
       if (tptr->token != forest->token) {
         tptr->token = forest->token;
         angle1 = eresp1->ang - M_PI_2;
@@ -2053,9 +2061,9 @@ result quad_forest_parse
     list_item *boundaries, *endboundaries, *temp_item;
     boundary *boundary1, *boundary2, *boundary3, *parent, *parent2, *parent3;
     integral_value angle1, angle2, angle3, curvature, px, py, rx, ry, cx, cy, mag;
-    integral_value x1, y1, x2, y2, x3, y3, dx, dy, adiff1, adiff2, adiff3, dist, r;
-    integral_value dist1, dist2, sim1, sim2;
-    uint32 i, count, length1, length2;
+    integral_value x1, y1, x2, y2, x3, y3, dx, dy, adiff1, adiff2, adiff3, dist;
+    integral_value dist1, dist2, sim1, sim2, radius;
+    uint32 count;
     boundary_category category1, category2, category3;
     fragment_model model;
 
@@ -2308,17 +2316,17 @@ result quad_forest_parse
             dx = boundary3->dx;
             dy = boundary3->dy;
             dist = (x2-x3)*dx + (y2-y3)*dy;
-            r = fabs(dist / sin(fabs(adiff1)));
+            radius = fabs(dist / sin(fabs(adiff1)));
             /* now curvature means the radius of a circle */
             if (adiff1 < 0) {
-              boundary1->curvature = -r;
-              boundary1->cx = x3 - r * dy;
-              boundary1->cy = y3 + r * dx;
+              boundary1->curvature = -radius;
+              boundary1->cx = x3 - radius * dy;
+              boundary1->cy = y3 + radius * dx;
             }
             else {
               boundary1->curvature = r;
-              boundary1->cx = x3 + r * dy;
-              boundary1->cy = y3 - r * dx;
+              boundary1->cx = x3 + radius * dy;
+              boundary1->cy = y3 - radius * dx;
             }
           }
         }
@@ -2347,17 +2355,17 @@ result quad_forest_parse
             dx = boundary1->dx;
             dy = boundary1->dy;
             dist = (x1-x3)*dx + (y1-y3)*dy;
-            r = fabs(dist / sin(fabs(adiff3)));
+            radius = fabs(dist / sin(fabs(adiff3)));
             /* now curvature means the radius of a circle */
             if (adiff3 < 0) {
-              boundary1->curvature = -r;
-              boundary1->cx = x1 - r * dy;
-              boundary1->cy = y1 + r * dx;
+              boundary1->curvature = -radius;
+              boundary1->cx = x1 - radius * dy;
+              boundary1->cy = y1 + radius * dx;
             }
             else {
-              boundary1->curvature = r;
-              boundary1->cx = x1 + r * dy;
-              boundary1->cy = y1 - r * dx;
+              boundary1->curvature = radius;
+              boundary1->cx = x1 + radius * dy;
+              boundary1->cy = y1 - radius * dx;
             }
           }
           if (fabs(adiff2) < 0.1) {
@@ -2375,24 +2383,28 @@ result quad_forest_parse
             dx = boundary1->dx;
             dy = boundary1->dy;
             dist = (x2-x1)*dx + (y2-y1)*dy;
-            r = fabs(dist / sin(fabs(adiff2)));
+            radius = fabs(dist / sin(fabs(adiff2)));
             /* now curvature means the radius of a circle */
             if (adiff2 < 0) {
-              boundary1->curvature2 = -r;
-              boundary1->cx2 = x1 - r * dy;
-              boundary1->cy2 = y1 + r * dx;
+              boundary1->curvature2 = -radius;
+              boundary1->cx2 = x1 - radius * dy;
+              boundary1->cy2 = y1 + radius * dx;
             }
             else {
-              boundary1->curvature2 = r;
-              boundary1->cx2 = x1 + r * dy;
-              boundary1->cy2 = y1 - r * dx;
+              boundary1->curvature2 = radius;
+              boundary1->cx2 = x1 + radius * dy;
+              boundary1->cy2 = y1 - radius * dx;
             }
           }
         }
       }
       boundaries = boundaries->next;
     }
+    {
+    list_item *bstart, *bend;
+    uint32 i, length1, length2;
     
+    i = 0;
     boundaries = boundarylist.first.next;
     endboundaries = &boundarylist.last;
     while (boundaries != endboundaries) {
@@ -2508,47 +2520,108 @@ result quad_forest_parse
           boundary2 = NULL;
         }
       }
-      
+      /*
+      if (i > 0) {
+        boundaries = boundaries->prev;
+        boundary2 = *((boundary**)boundaries->data);
+        PRINT1("-%lu", boundary2->length);
+        boundaries = boundaries->next;
+      }
+      */
+      PRINT0("[");
+      bstart = fragmentlist.first.next;
+      bend = &fragmentlist.last;
+      while (bstart != bend) {
+        boundary2 = *((boundary**)bstart->data);
+        PRINT1("%lu,", boundary2->length);
+        bstart = bstart->next;
+      }
+      PRINT0("]");
+      /*
       if (boundary1->category2 != boundary1->category) {
         if (length2 > length1) {
           boundary1->length = length2 + 1;
-          boundary1->first = boundary1;
+          */
+          /*boundary1->first = boundary1;*/
+          /*
           boundary1->category = boundary1->category2;
           boundary1->category2 = fc_UNDEF;
+          */
+          /*
         }
-        else {
-          boundary1->length = length1 + 1;
-          boundary1->last = boundary1;
-          boundary1->category2 = fc_UNDEF;
-        }
+        else {*/
+          /*boundary1->length = length1 + 1;*/
+          /*boundary1->last = boundary1;*/
+          /*boundary1->category2 = fc_UNDEF;*/
+        /*}*/
+        /*
       }
-      else {
-        boundary1->length = length1 + length2 + 1;
-      }
+      else {*/
+        boundary1->length = (length1 + length2 + 1);
+      /*}*/
       
+      /*
       if (length1 < 2 && length2 < 2) {
         CHECK(list_append(&fragmentlist, &boundary1));
       }
       else {
-        CHECK(list_insert_sorted(&fragmentlist, &boundary1, 
-                                 &compare_boundaries_by_length));
+        */
+        /*
+        CHECK(list_insert_sorted(&fragmentlist, (pointer)&boundary1,
+                                 compare_boundaries_by_length));
+        */
+      /*}*/
+      /*
+      if (i > 0) {
+        boundaries = boundaries->prev;
+        boundary2 = *((boundary**)boundaries->data);
+        PRINT1("<-%lu ", boundary2->length);
+        boundaries = boundaries->next;
       }
-      
+      */
+      CHECK(list_append(&fragmentlist, &boundary1));
+      PRINT1("%lu[", boundary1->length);
+      bstart = fragmentlist.first.next;
+      bend = &fragmentlist.last;
+      while (bstart != bend) {
+        boundary2 = *((boundary**)bstart->data);
+        PRINT1("%lu,", boundary2->length);
+        bstart = bstart->next;
+      }
+      PRINT0("]");
+      /*
+      if (i > 0) {
+        boundaries = boundaries->prev;
+        boundary1 = *((boundary**)boundaries->data);
+        PRINT1("<-%lu ", boundary1->length);
+        boundaries = boundaries->next;
+      }
+      */
+      i++;
       boundaries = boundaries->next;
     }
-    
+    }
+    PRINT0("\n\n");
     /* finally merge nodes into their best parent (one with longest chain) */
     boundaries = fragmentlist.first.next;
     endboundaries = &fragmentlist.last;
     while (boundaries != endboundaries) {
       boundary1 = *((boundary**)boundaries->data);
-      /* if the node is already assigned to model, skip it */
-      if (boundary1->parent != boundary1) {
-        temp_item = boundaries;
-        boundaries = boundaries->next;
-        CHECK(list_remove_item(&fragmentlist, temp_item));
-        continue;
+      PRINT1("%lu ", boundary1->length);
+      /*
+      if (boundary1->length > 1) {
+        
       }
+      */
+      /* if the node is already assigned to model, skip it */
+      
+      if (boundary1->parent != boundary1) {
+        /*temp_item = boundaries;*/
+        /*boundaries = boundaries->next;*/
+        /*CHECK(list_remove_item(&fragmentlist, temp_item));*/
+        /*continue;*/
+      }
+      /*
       boundary2 = boundary1;
       while (boundary2 != boundary1->first) {
         boundary2 = boundary1->prev;
@@ -2565,6 +2638,7 @@ result quad_forest_parse
         }
         boundary2->parent = boundary1;
       }
+      */
       boundaries = boundaries->next;
     }
   }
@@ -2663,8 +2737,8 @@ result quad_forest_visualize_parse_result
             color1 = 0;
             color2 = 255;
             if (bparent == fragment1) {
-              barc.center.x = (uint32)bparent->cx;
-              barc.center.y = (uint32)bparent->cy;
+              barc.center.x = (sint32)bparent->cx;
+              barc.center.y = (sint32)bparent->cy;
               barc.r = (uint32)fabs(bparent->curvature);
               if (barc.r < 1) barc.r = 1;
               rx = ((integral_value)bparent->first->x) - bparent->cx;
