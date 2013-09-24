@@ -1849,8 +1849,10 @@ result quad_forest_parse
       /* if has links to both nodes, create a fragment */
       if (IS_TRUE(has_towards) && IS_TRUE(has_against)) {
         CHECK(quad_tree_ensure_boundary(tree1, &boundary1));
-        boundary_init(boundary1, elinks_tree);
-        CHECK(list_append(&boundarylist, &boundary1));
+        if (boundary1->length < 1) {
+          boundary_init(boundary1, elinks_tree);
+          CHECK(list_append(&boundarylist, &boundary1));
+        }
 
         tree2 = elinks_tree->towards->other->tree;
         CHECK(quad_tree_ensure_boundary(tree2, &boundary2));
@@ -1923,14 +1925,18 @@ result quad_forest_parse
                 elinks_against->against = best_against;
 
                 CHECK(quad_tree_ensure_boundary(tree1, &boundary1));
-                boundary_init(boundary1, elinks_tree);
-                CHECK(list_append(&boundarylist, &boundary1));
+                if (boundary1->length < 1) {
+                  boundary_init(boundary1, elinks_tree);
+                  CHECK(list_append(&boundarylist, &boundary1));
+                }
 
                 CHECK(quad_tree_ensure_boundary(tree2, &boundary2));
-                boundary_init(boundary2, elinks_against);
                 boundary2->next = boundary1;
                 boundary1->prev = boundary2;
-                CHECK(list_append(&boundarylist, &boundary2));
+                if (boundary2->length < 1) {
+                  boundary_init(boundary2, elinks_against);
+                  CHECK(list_append(&boundarylist, &boundary2));
+                }
 
                 tree3 = best_against->other->tree;
                 CHECK(quad_tree_ensure_boundary(tree3, &boundary3));
@@ -2011,14 +2017,18 @@ result quad_forest_parse
                 elinks_towards->towards = best_towards;
 
                 CHECK(quad_tree_ensure_boundary(tree1, &boundary1));
-                boundary_init(boundary1, elinks_tree);
-                CHECK(list_append(&boundarylist, &boundary1));
+                if (boundary1->length < 1) {
+                  boundary_init(boundary1, elinks_tree);
+                  CHECK(list_append(&boundarylist, &boundary1));
+                }
 
                 CHECK(quad_tree_ensure_boundary(tree2, &boundary2));
-                boundary_init(boundary2, elinks_towards);
                 boundary1->next = boundary2;
                 boundary2->prev = boundary1;
-                CHECK(list_append(&boundarylist, &boundary2));
+                if (boundary2->length < 1) {
+                  boundary_init(boundary2, elinks_towards);
+                  CHECK(list_append(&boundarylist, &boundary2));
+                }
 
                 tree3 = best_towards->other->tree;
                 CHECK(quad_tree_ensure_boundary(tree3, &boundary3));
@@ -2402,9 +2412,8 @@ result quad_forest_parse
     }
     {
     list_item *bstart, *bend;
-    uint32 i, length1, length2;
-    
-    i = 0;
+    uint32 length1, length2;
+
     boundaries = boundarylist.first.next;
     endboundaries = &boundarylist.last;
     while (boundaries != endboundaries) {
@@ -2417,7 +2426,7 @@ result quad_forest_parse
       curvature = boundary1->curvature;
       length1 = 0;
       length2 = 0;
-      
+
       boundary2 = boundary1->prev;
       while (boundary2 != NULL && boundary2->parent2 != boundary1) {
         category2 = boundary2->category;
@@ -2464,7 +2473,7 @@ result quad_forest_parse
           boundary2 = NULL;
         }
       }
-      
+
       if (boundary1->category2 != boundary1->category) {
         category1 = boundary1->category2;
         px = -boundary1->dy2;
@@ -2473,7 +2482,7 @@ result quad_forest_parse
         cy = boundary1->cy2;
         curvature = boundary1->curvature2;
       }
-      
+
       boundary2 = boundary1->next;
       while (boundary2 != NULL && boundary2->parent2 != boundary1) {
         category2 = boundary2->category;
@@ -2520,125 +2529,82 @@ result quad_forest_parse
           boundary2 = NULL;
         }
       }
-      /*
-      if (i > 0) {
-        boundaries = boundaries->prev;
-        boundary2 = *((boundary**)boundaries->data);
-        PRINT1("-%lu", boundary2->length);
-        boundaries = boundaries->next;
-      }
-      */
-      PRINT0("[");
-      bstart = fragmentlist.first.next;
-      bend = &fragmentlist.last;
-      while (bstart != bend) {
-        boundary2 = *((boundary**)bstart->data);
-        PRINT1("%lu,", boundary2->length);
-        bstart = bstart->next;
-      }
-      PRINT0("]");
-      /*
+
       if (boundary1->category2 != boundary1->category) {
         if (length2 > length1) {
           boundary1->length = length2 + 1;
-          */
-          /*boundary1->first = boundary1;*/
-          /*
+          boundary1->first = boundary1;
           boundary1->category = boundary1->category2;
           boundary1->category2 = fc_UNDEF;
-          */
-          /*
         }
-        else {*/
-          /*boundary1->length = length1 + 1;*/
-          /*boundary1->last = boundary1;*/
-          /*boundary1->category2 = fc_UNDEF;*/
-        /*}*/
-        /*
+        else {
+          boundary1->length = length1 + 1;
+          boundary1->last = boundary1;
+          boundary1->category2 = fc_UNDEF;
+        }
       }
-      else {*/
+      else {
         boundary1->length = (length1 + length2 + 1);
-      /*}*/
-      
-      /*
+      }
+
       if (length1 < 2 && length2 < 2) {
         CHECK(list_append(&fragmentlist, &boundary1));
       }
       else {
-        */
-        /*
         CHECK(list_insert_sorted(&fragmentlist, (pointer)&boundary1,
                                  compare_boundaries_by_length));
-        */
-      /*}*/
-      /*
-      if (i > 0) {
-        boundaries = boundaries->prev;
-        boundary2 = *((boundary**)boundaries->data);
-        PRINT1("<-%lu ", boundary2->length);
-        boundaries = boundaries->next;
       }
-      */
-      CHECK(list_append(&fragmentlist, &boundary1));
-      PRINT1("%lu[", boundary1->length);
-      bstart = fragmentlist.first.next;
-      bend = &fragmentlist.last;
-      while (bstart != bend) {
-        boundary2 = *((boundary**)bstart->data);
-        PRINT1("%lu,", boundary2->length);
-        bstart = bstart->next;
-      }
-      PRINT0("]");
-      /*
-      if (i > 0) {
-        boundaries = boundaries->prev;
-        boundary1 = *((boundary**)boundaries->data);
-        PRINT1("<-%lu ", boundary1->length);
-        boundaries = boundaries->next;
-      }
-      */
-      i++;
+
       boundaries = boundaries->next;
     }
     }
-    PRINT0("\n\n");
+
     /* finally merge nodes into their best parent (one with longest chain) */
     boundaries = fragmentlist.first.next;
     endboundaries = &fragmentlist.last;
     while (boundaries != endboundaries) {
       boundary1 = *((boundary**)boundaries->data);
-      PRINT1("%lu ", boundary1->length);
-      /*
-      if (boundary1->length > 1) {
-        
-      }
-      */
+
       /* if the node is already assigned to model, skip it */
-      
       if (boundary1->parent != boundary1) {
-        /*temp_item = boundaries;*/
-        /*boundaries = boundaries->next;*/
-        /*CHECK(list_remove_item(&fragmentlist, temp_item));*/
-        /*continue;*/
+        temp_item = boundaries;
+        boundaries = boundaries->next;
+        CHECK(list_remove_item(&fragmentlist, temp_item));
+        continue;
       }
-      /*
+
       boundary2 = boundary1;
       while (boundary2 != boundary1->first) {
-        boundary2 = boundary1->prev;
-        if (boundary2 == NULL || boundary2->parent != boundary2) {
+        if (boundary2->prev != NULL) {
+          boundary2 = boundary2->prev;
+          if (boundary2->parent != boundary2) {
+            boundary1->first = boundary2->next;
+            break;
+          }
+        }
+        else {
+          boundary1->first = boundary2;
           break;
         }
         boundary2->parent = boundary1;
       }
+
       boundary2 = boundary1;
       while (boundary2 != boundary1->last) {
-        boundary2 = boundary1->next;
-        if (boundary2 == NULL || boundary2->parent != boundary2) {
+        if (boundary2->next != NULL) {
+          boundary2 = boundary2->next;
+          if (boundary2->parent != boundary2) {
+            boundary1->last = boundary2->prev;
+            break;
+          }
+        }
+        else {
+          boundary1->first = boundary2;
           break;
         }
         boundary2->parent = boundary1;
       }
-      */
+
       boundaries = boundaries->next;
     }
   }
@@ -2712,13 +2678,13 @@ result quad_forest_visualize_parse_result
       CHECK(expect_neighborhood_stat(&nstat, &tree->annotation));
       if (tree->nw == NULL) {
         fragment1 = has_boundary(&tree->annotation, forest->token);
-        
+
         if (fragment1 != NULL) {
           bparent = boundary_find(fragment1);
           color0 = 0;
           color1 = 255;
           color2 = 0;
-          
+
           if (bparent->category == fc_STRAIGHT) {
             color0 = 255;
             color1 = 0;
@@ -2751,7 +2717,7 @@ result quad_forest_visualize_parse_result
               angle2 = atan2(ry, rx);
               /*if (angle2 < 0) angle2 += M_2PI;*/
               angle2 *= (180 / M_PI);
-              
+
               if (bparent->curvature < 0) {
                 if (angle2 > 0 && angle1 < 0) {
                   angle1 += 360;
@@ -2770,7 +2736,7 @@ result quad_forest_visualize_parse_result
             }
           }
         }
-        
+
         if (fragment1 != NULL /*&& bparent->length > 2*/) {
           width = tree->size;
           height = width;
@@ -2814,9 +2780,9 @@ result quad_forest_visualize_parse_result
       /*PRINT1("links: %d\n", links.count);*/
       /*CHECK(quad_forest_get_links(forest, &links, v_LINK_BOUNDARY));*/
       CHECK(pixel_image_draw_colored_lines(target, &lines, 2));
-      
+
       CHECK(pixel_image_draw_arcs(target, &circles, 2, circle_color));
-      
+
       CHECK(quad_forest_get_links(forest, &links, v_LINK_EDGE_POS));
       CHECK(pixel_image_draw_colored_lines(target, &links, 1));
       /*
