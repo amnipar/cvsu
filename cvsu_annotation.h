@@ -583,7 +583,6 @@ typedef struct fragment_model_t {
 typedef struct boundary_t {
   /** Parent boundary, that determines the segment id (may be self) */
   struct boundary_t *parent;
-  struct boundary_t *parent2;
   /** Previous boundary node in this chain (NULL for first node) */
   struct boundary_t *prev;
   /** Next boundary node in this chain (NULL for last node) */
@@ -597,6 +596,7 @@ typedef struct boundary_t {
   /** Boundary category */
   boundary_category category;
   boundary_category category2;
+  uint32 round;
   /** Rank value used for optimizing union-find process */
   uint32 rank;
   /** Length of the boundary fragment in nodes */

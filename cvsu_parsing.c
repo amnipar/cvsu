@@ -2069,7 +2069,7 @@ result quad_forest_parse
     quad_tree *tree;
     edge_response *eresp;
     list_item *boundaries, *endboundaries, *temp_item;
-    boundary *boundary1, *boundary2, *boundary3, *parent, *parent2, *parent3;
+    boundary *boundary1, *boundary2, *boundary3;
     integral_value angle1, angle2, angle3, curvature, px, py, rx, ry, cx, cy, mag;
     integral_value x1, y1, x2, y2, x3, y3, dx, dy, adiff1, adiff2, adiff3, dist;
     integral_value dist1, dist2, sim1, sim2, radius;
@@ -2220,7 +2220,6 @@ result quad_forest_parse
         boundary1->smoothed_angle = angle1;
       }
       boundary1->parent = boundary1;
-      boundary1->parent2 = boundary1;
       boundary1->first = boundary1;
       boundary1->last = boundary1;
       boundary1->category = fc_UNDEF;
@@ -2228,6 +2227,7 @@ result quad_forest_parse
       boundary1->cy = y1;
       boundary1->dx = dx;
       boundary1->dy = dy;
+      boundary1->round = 0;
 
       boundaries = boundaries->next;
     }
@@ -2238,51 +2238,21 @@ result quad_forest_parse
     while (boundaries != endboundaries) {
       boundary1 = *((boundary**)boundaries->data);
       /* if the node is already assigned to model, skip it */
+      /*
       if (boundary1->parent != boundary1) {
         boundaries = boundaries->next;
         continue;
       }
+      */
       if (boundary1->next != NULL && boundary1->prev != NULL) {
         boundary2 = boundary1->next;
-        parent2 = boundary2->parent;
-        if (parent2 != boundary2) {
-          parent2 = boundary_find(parent2);
-        }
         boundary3 = boundary1->prev;
-        parent3 = boundary3->parent;
-        if (parent3 != boundary3) {
-          parent3 = boundary_find(parent3);
-        }
         if (boundary2->next != NULL && boundary3->prev != NULL) {
           boundary2 = boundary2->next;
-          if (parent2->category == fc_UNDEF) {
-            parent2 = boundary2->parent;
-            if (parent2 != boundary2) {
-              parent2 = boundary_find(parent2);
-            }
-          }
           boundary3 = boundary3->prev;
-          if (parent3->category == fc_UNDEF) {
-            parent3 = boundary3->parent;
-            if (parent3 != boundary3) {
-              parent3 = boundary_find(parent3);
-            }
-          }
           if (boundary2->next != NULL && boundary3->prev != NULL) {
             boundary2 = boundary2->next;
-            if (parent2->category == fc_UNDEF) {
-              parent2 = boundary2->parent;
-              if (parent2 != boundary2) {
-                parent2 = boundary_find(parent2);
-              }
-            }
             boundary3 = boundary3->prev;
-            if (parent3->category == fc_UNDEF) {
-              parent3 = boundary3->parent;
-              if (parent3 != boundary3) {
-                parent3 = boundary_find(parent3);
-              }
-            }
             boundary1->quality = 3;
           }
           else {
@@ -2334,7 +2304,7 @@ result quad_forest_parse
               boundary1->cy = y3 + radius * dx;
             }
             else {
-              boundary1->curvature = r;
+              boundary1->curvature = radius;
               boundary1->cx = x3 + radius * dy;
               boundary1->cy = y3 - radius * dx;
             }
@@ -2411,173 +2381,221 @@ result quad_forest_parse
       boundaries = boundaries->next;
     }
     {
-    list_item *bstart, *bend;
-    uint32 length1, length2;
+    uint32 round, length1, length2;
+    integral_value dist_threshold;
 
+    dist_threshold = 5;
+    round = 0;
     boundaries = boundarylist.first.next;
     endboundaries = &boundarylist.last;
     while (boundaries != endboundaries) {
       boundary1 = *((boundary**)boundaries->data);
       category1 = boundary1->category;
-      px = -boundary1->dy;
-      py = boundary1->dx;
+      px = -boundary1->dy1;
+      py = boundary1->dx1;
       cx = boundary1->cx;
       cy = boundary1->cy;
-      curvature = boundary1->curvature;
+      curvature = fabs(boundary1->curvature);
       length1 = 0;
       length2 = 0;
 
-      boundary2 = boundary1->prev;
-      while (boundary2 != NULL && boundary2->parent2 != boundary1) {
-        category2 = boundary2->category;
-        x2 = (integral_value)boundary2->x;
-        y2 = (integral_value)boundary2->y;
-        if (category1 == fc_STRAIGHT) {
-          if (category2 == fc_STRAIGHT || category2 == fc_UNDEF) {
-            dist1 = fabs(px * (x2 - cx) + py * (y2 - cy));
-            if (dist1 < 8) {
-              length1 += 1;
-              boundary1->first = boundary2;
-              boundary2->parent2 = boundary1;
-              boundary2 = boundary2->prev;
-            }
-            else {
-              boundary2 = NULL;
-            }
+      round++;
+      boundary1->round = round;
+      boundary1->first = boundary1;
+      boundary1->last = boundary1;
+      if (category1 == fc_STRAIGHT) {
+        boundary2 = boundary1->prev;
+        while (boundary2 != NULL && boundary2->round != round) {
+          rx = ((integral_value)boundary2->x) - cx;
+          ry = ((integral_value)boundary2->y) - cy;
+          dist1 = fabs(px * rx + py * ry);
+          if (dist1 < dist_threshold) {
+            length1 += 1;
+            boundary1->first = boundary2;
+            boundary2->round = round;
+            boundary2 = boundary2->prev;
           }
           else {
             boundary2 = NULL;
           }
         }
-        else
-        if (category1 == fc_CURVED) {
-          if (category2 == fc_CURVED || category2 == fc_UNDEF) {
-            rx = x2 - cx;
-            ry = y2 - cy;
-            dist1 = fabs(sqrt(rx*rx + ry*ry) - curvature);
-            if (dist1 < 8) {
-              length1 += 1;
-              boundary1->first = boundary2;
-              boundary2->parent2 = boundary1;
-              boundary2 = boundary2->prev;
-            }
-            else {
-              boundary2 = NULL;
-            }
+        boundary2 = boundary1->next;
+        while (boundary2 != NULL && boundary2->round != round) {
+          rx = ((integral_value)boundary2->x) - cx;
+          ry = ((integral_value)boundary2->y) - cy;
+          dist1 = fabs(px * rx + py * ry);
+          if (dist1 < dist_threshold) {
+            length1 += 1;
+            boundary1->last = boundary2;
+            boundary2->round = round;
+            boundary2 = boundary2->next;
           }
           else {
             boundary2 = NULL;
           }
         }
-        else {
-          boundary2 = NULL;
+      }
+      else
+      if (category1 == fc_CURVED) {
+        boundary2 = boundary1->prev;
+        while (boundary2 != NULL && boundary2->round != round) {
+          rx = ((integral_value)boundary2->x) - cx;
+          ry = ((integral_value)boundary2->y) - cy;
+          dist1 = fabs(sqrt(rx*rx + ry*ry) - curvature);
+          if (dist1 < dist_threshold) {
+            length1 += 1;
+            boundary1->first = boundary2;
+            boundary2->round = round;
+            boundary2 = boundary2->prev;
+          }
+          else {
+            boundary2 = NULL;
+          }
+        }
+        boundary2 = boundary1->next;
+        while (boundary2 != NULL && boundary2->round != round) {
+          rx = ((integral_value)boundary2->x) - cx;
+          ry = ((integral_value)boundary2->y) - cy;
+          dist1 = fabs(sqrt(rx*rx + ry*ry) - curvature);
+          if (dist1 < dist_threshold) {
+            length1 += 1;
+            boundary1->last = boundary2;
+            boundary2->round = round;
+            boundary2 = boundary2->next;
+          }
+          else {
+            boundary2 = NULL;
+          }
         }
       }
 
-      if (boundary1->category2 != boundary1->category) {
+      if (boundary1->category2 != category1) {
         category1 = boundary1->category2;
         px = -boundary1->dy2;
         py = boundary1->dx2;
         cx = boundary1->cx2;
         cy = boundary1->cy2;
-        curvature = boundary1->curvature2;
-      }
-
-      boundary2 = boundary1->next;
-      while (boundary2 != NULL && boundary2->parent2 != boundary1) {
-        category2 = boundary2->category;
-        x2 = (integral_value)boundary2->x;
-        y2 = (integral_value)boundary2->y;
+        curvature = fabs(boundary1->curvature2);
+        round++;
+        boundary1->round = round;
+        boundary1->first2 = boundary1;
+        boundary1->last2 = boundary1;
         if (category1 == fc_STRAIGHT) {
-          if (category2 == fc_STRAIGHT || category2 == fc_UNDEF) {
-            dist1 = fabs(px * (x2 - cx) + py * (y2 - cy));
-            if (dist1 < 8) {
+          boundary2 = boundary1->prev;
+          while (boundary2 != NULL && boundary2->round != round) {
+            rx = ((integral_value)boundary2->x) - cx;
+            ry = ((integral_value)boundary2->y) - cy;
+            dist1 = fabs(px * rx + py * ry);
+            if (dist1 < dist_threshold) {
               length2 += 1;
-              boundary1->last = boundary2;
-              boundary2->parent2 = boundary1;
-              boundary2 = boundary2->next;
+              boundary1->first2 = boundary2;
+              boundary2->round = round;
+              boundary2 = boundary2->prev;
             }
             else {
               boundary2 = NULL;
             }
           }
-          else {
-            boundary2 = NULL;
+          boundary2 = boundary1->next;
+          while (boundary2 != NULL && boundary2->round != round) {
+            rx = ((integral_value)boundary2->x) - cx;
+            ry = ((integral_value)boundary2->y) - cy;
+            dist1 = fabs(px * rx + py * ry);
+            if (dist1 < dist_threshold) {
+              length2 += 1;
+              boundary1->last2 = boundary2;
+              boundary2->round = round;
+              boundary2 = boundary2->next;
+            }
+            else {
+              boundary2 = NULL;
+            }
           }
         }
         else
         if (category1 == fc_CURVED) {
-          if (category2 == fc_CURVED || category2 == fc_UNDEF) {
-            rx = x2 - cx;
-            ry = y2 - cy;
+          boundary2 = boundary1->prev;
+          while (boundary2 != NULL && boundary2->round != round) {
+            rx = ((integral_value)boundary2->x) - cx;
+            ry = ((integral_value)boundary2->y) - cy;
             dist1 = fabs(sqrt(rx*rx + ry*ry) - curvature);
-            if (dist1 < 8) {
+            if (dist1 < dist_threshold) {
               length2 += 1;
-              boundary1->last = boundary2;
-              boundary2->parent2 = boundary1;
+              boundary1->first2 = boundary2;
+              boundary2->round = round;
+              boundary2 = boundary2->prev;
+            }
+            else {
+              boundary2 = NULL;
+            }
+          }
+          boundary2 = boundary1->next;
+          while (boundary2 != NULL && boundary2->round != round) {
+            rx = ((integral_value)boundary2->x) - cx;
+            ry = ((integral_value)boundary2->y) - cy;
+            dist1 = fabs(sqrt(rx*rx + ry*ry) - curvature);
+            if (dist1 < dist_threshold) {
+              length2 += 1;
+              boundary1->last2 = boundary2;
+              boundary2->round = round;
               boundary2 = boundary2->next;
             }
             else {
               boundary2 = NULL;
             }
           }
-          else {
-            boundary2 = NULL;
-          }
-        }
-        else {
-          boundary2 = NULL;
         }
       }
 
-      if (boundary1->category2 != boundary1->category) {
-        if (length2 > length1) {
-          boundary1->length = length2 + 1;
-          boundary1->first = boundary1;
-          boundary1->category = boundary1->category2;
-          boundary1->category2 = fc_UNDEF;
-        }
-        else {
-          boundary1->length = length1 + 1;
-          boundary1->last = boundary1;
-          boundary1->category2 = fc_UNDEF;
-        }
+      if (length2 > length1) {
+        boundary1->length = length2 + 1;
+        boundary1->cx = boundary1->cx2;
+        boundary1->cy = boundary1->cy2;
+        boundary1->curvature = boundary1->curvature2;
+        boundary1->first = boundary1->first2;
+        boundary1->last = boundary1->last2;
+        boundary1->category = boundary1->category2;
+        boundary1->category2 = fc_UNDEF;
       }
       else {
-        boundary1->length = (length1 + length2 + 1);
+        boundary1->length = length1 + 1;
+        boundary1->category2 = fc_UNDEF;
       }
+      boundary1->parent = boundary1;
 
-      if (length1 < 2 && length2 < 2) {
+      if (boundary1->length < 3) {
         CHECK(list_append(&fragmentlist, &boundary1));
       }
       else {
-        CHECK(list_insert_sorted(&fragmentlist, (pointer)&boundary1,
+        CHECK(list_insert_sorted(&fragmentlist, &boundary1,
                                  compare_boundaries_by_length));
       }
 
       boundaries = boundaries->next;
     }
-    }
 
     /* finally merge nodes into their best parent (one with longest chain) */
+    round++;
     boundaries = fragmentlist.first.next;
     endboundaries = &fragmentlist.last;
     while (boundaries != endboundaries) {
       boundary1 = *((boundary**)boundaries->data);
-
+      
       /* if the node is already assigned to model, skip it */
-      if (boundary1->parent != boundary1) {
-        temp_item = boundaries;
+      if (boundary1->round == round) {
+        /*temp_item = boundaries;*/
         boundaries = boundaries->next;
-        CHECK(list_remove_item(&fragmentlist, temp_item));
+        /*CHECK(list_remove_item(&fragmentlist, temp_item));*/
         continue;
       }
-
+      
+      boundary1->round = round;
+      boundary1->length = 1;
       boundary2 = boundary1;
       while (boundary2 != boundary1->first) {
         if (boundary2->prev != NULL) {
           boundary2 = boundary2->prev;
-          if (boundary2->parent != boundary2) {
+          if (boundary2->round == round) {
             boundary1->first = boundary2->next;
             break;
           }
@@ -2587,25 +2605,30 @@ result quad_forest_parse
           break;
         }
         boundary2->parent = boundary1;
+        boundary2->round = round;
+        boundary1->length += 1;
       }
 
       boundary2 = boundary1;
       while (boundary2 != boundary1->last) {
         if (boundary2->next != NULL) {
           boundary2 = boundary2->next;
-          if (boundary2->parent != boundary2) {
+          if (boundary2->round == round) {
             boundary1->last = boundary2->prev;
             break;
           }
         }
         else {
-          boundary1->first = boundary2;
+          boundary1->last = boundary2;
           break;
         }
         boundary2->parent = boundary1;
+        boundary2->round = round;
+        boundary1->length += 1;
       }
 
       boundaries = boundaries->next;
+    }
     }
   }
 
@@ -2680,7 +2703,7 @@ result quad_forest_visualize_parse_result
         fragment1 = has_boundary(&tree->annotation, forest->token);
 
         if (fragment1 != NULL) {
-          bparent = boundary_find(fragment1);
+          bparent = fragment1->parent;
           color0 = 0;
           color1 = 255;
           color2 = 0;
@@ -2689,6 +2712,11 @@ result quad_forest_visualize_parse_result
             color0 = 255;
             color1 = 0;
             color2 = 0;
+            /*
+            if (fragment1->category2 != fc_UNDEF) {
+              color1 = 255;
+            }
+            */
             if (bparent == fragment1) {
               bline.start.x = (signed)(bparent->first->x);
               bline.start.y = (signed)(bparent->first->y);
@@ -2702,6 +2730,11 @@ result quad_forest_visualize_parse_result
             color0 = 0;
             color1 = 0;
             color2 = 255;
+            /*
+            if (fragment1->category2 != fc_UNDEF) {
+              color1 = 255;
+            }
+            */
             if (bparent == fragment1) {
               barc.center.x = (sint32)bparent->cx;
               barc.center.y = (sint32)bparent->cy;
@@ -2717,7 +2750,7 @@ result quad_forest_visualize_parse_result
               angle2 = atan2(ry, rx);
               /*if (angle2 < 0) angle2 += M_2PI;*/
               angle2 *= (180 / M_PI);
-
+              
               if (bparent->curvature < 0) {
                 if (angle2 > 0 && angle1 < 0) {
                   angle1 += 360;
