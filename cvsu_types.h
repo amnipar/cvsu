@@ -163,6 +163,14 @@ typedef struct arc_t {
   double end_angle;
 } arc;
 
+typedef struct colored_arc_t {
+  point center;
+  uint32 r;
+  double start_angle;
+  double end_angle;
+  byte color[4];
+} colored_arc;
+
 typedef struct rect_t {
   coord left;
   coord right;

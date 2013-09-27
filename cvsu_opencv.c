@@ -472,14 +472,54 @@ result pixel_image_draw_arcs
            cvScalar(color[0], color[1], color[2], 0), width, 8, 0);
     items = items->next;
   }
-  /*
-  cvEllipse(dst,
-           cvPoint(100,100),
-           cvSize(50,50), 0,
-           -45,
-           -315,
-           cvScalar(color[0], color[1], color[2], 0), width, 8, 0);
-  */
+  
+  FINALLY(pixel_image_draw_arcs);
+  cvReleaseImageHeader(&dst);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result pixel_image_draw_colored_arcs
+(
+  pixel_image *source,
+  list *arcs,
+  uint32 width
+)
+{
+  TRY();
+  IplImage *dst;
+  CvSize size, axes;
+  list_item *items, *end;
+  colored_arc *this_arc;
+  float weight;
+
+  CHECK_POINTER(source);
+  CHECK_POINTER(arcs);
+  CHECK_PARAM(source->type == p_U8);
+  CHECK_PARAM(source->format == RGB || source->format == RGBA);
+  CHECK_PARAM(source->step == 3 || source->step == 4);
+
+  size.width = (signed)source->width;
+  size.height = (signed)source->height;
+  dst = cvCreateImageHeader(size, IPL_DEPTH_8U, source->step);
+  cvSetData(dst, source->data, (signed)source->stride);
+
+  items = arcs->first.next;
+  end = &arcs->last;
+  while (items != end) {
+    this_arc = (colored_arc*)items->data;
+    axes.width = axes.height = this_arc->r;
+    cvEllipse(dst,
+           cvPoint(this_arc->center.x, this_arc->center.y),
+           axes, 0,
+           -this_arc->start_angle,
+           -this_arc->end_angle,
+           cvScalar(this_arc->color[0], this_arc->color[1], this_arc->color[2], 0),
+           width, 8, 0);
+    items = items->next;
+  }
+  
   FINALLY(pixel_image_draw_arcs);
   cvReleaseImageHeader(&dst);
   RETURN();
