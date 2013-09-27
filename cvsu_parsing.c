@@ -1131,7 +1131,7 @@ result quad_tree_ensure_edge_stats
     against_mag_sum /= against_weight;
 
     /* for mean scores, use mean_dev to scale */
-    if (mean_dev < 4) mean_dev = 4;
+    if (mean_dev < 3) mean_dev = 3;
 
     /* calculate mean ledge score */
     score = (left_mean_sum - right_mean_sum) / mean_dev;
@@ -1286,7 +1286,7 @@ result quad_forest_calculate_edge_stats
     else if (mscore1 < 0.5) mscore1 = 0;
     else mscore1 = (mscore1 - 0.5);
 
-    boundary_score = (lscore1 + 2 * dscore1 + mscore1) / 4;
+    boundary_score = (lscore1 + dscore1 + 2 * mscore1) / 4;
     segment_score = 1 - boundary_score;
 
     links = tree1->links.first.next;
@@ -1343,7 +1343,7 @@ result quad_forest_calculate_edge_stats
         }
 
         /* calculate the profile cost */
-        prof_cost = (mean_ledge_dist + mag_ridge_dist + 2 * dev_ridge_dist) / 4;
+        prof_cost = (mean_ledge_dist + 2 * mag_ridge_dist + dev_ridge_dist) / 4;
         lmeasure1->profile_score = prof_cost;
         lmeasure2->profile_score = prof_cost;
 
@@ -2237,13 +2237,6 @@ result quad_forest_parse
     endboundaries = &boundarylist.last;
     while (boundaries != endboundaries) {
       boundary1 = *((boundary**)boundaries->data);
-      /* if the node is already assigned to model, skip it */
-      /*
-      if (boundary1->parent != boundary1) {
-        boundaries = boundaries->next;
-        continue;
-      }
-      */
       if (boundary1->next != NULL && boundary1->prev != NULL) {
         boundary2 = boundary1->next;
         boundary3 = boundary1->prev;
@@ -2384,7 +2377,7 @@ result quad_forest_parse
     uint32 round, length1, length2;
     integral_value dist_threshold;
 
-    dist_threshold = 5;
+    dist_threshold = forest->tree_max_size;
     round = 0;
     boundaries = boundarylist.first.next;
     endboundaries = &boundarylist.last;
@@ -2663,8 +2656,8 @@ result quad_forest_visualize_parse_result
   colored_rect crect;
   colored_line bline;
   circle bcirc;
-  arc barc;
-  uint32 x, y, width, height, stride, row_step, frag_count;
+  colored_arc barc;
+  uint32 x, y, width, height, step, stride, row_step, col_step, frag_count;
   byte *target_data, *target_pos, color0, color1, color2;
   integral_value max_edge_mag, max_ridge_score, extent, max_extent;
   integral_value rx, ry, dist, angle1, angle2;
@@ -2673,24 +2666,26 @@ result quad_forest_visualize_parse_result
   CHECK_POINTER(target);
 
   CHECK_PARAM(target->type == p_U8);
-  CHECK_PARAM(target->format == RGB);
+  CHECK_PARAM(target->format == RGB || target->format == RGBA);
   CHECK_PARAM(target->width >= forest->source->width);
   CHECK_PARAM(target->height >= forest->source->height);
-  CHECK_PARAM(target->step == 3);
+  CHECK_PARAM(target->step == 3 || target->step == 4);
 
   width = target->width;
   height = target->height;
+  step = target->step;
   stride = target->stride;
   target_data = (byte*)target->data;
+  col_step = step - 2; /* 2 steps to next col if image is RGBA */
 
   CHECK(list_create(&links, 1000, sizeof(colored_line), 1));
   CHECK(list_create(&lines, 1000, sizeof(colored_line), 1));
   CHECK(list_create(&frags, 1000, sizeof(colored_rect), 1));
-  CHECK(list_create(&circles, 1000, sizeof(arc), 1));
+  CHECK(list_create(&circles, 1000, sizeof(colored_arc), 1));
 
   if (IS_TRUE(quad_forest_has_parse(forest))) {
     bline.color[0] = 0;
-    bline.color[1] = 255;
+    bline.color[1] = 0;
     bline.color[2] = 255;
     bline.color[3] = 0;
 
@@ -2712,12 +2707,8 @@ result quad_forest_visualize_parse_result
             color0 = 255;
             color1 = 0;
             color2 = 0;
-            /*
-            if (fragment1->category2 != fc_UNDEF) {
-              color1 = 255;
-            }
-            */
-            if (bparent == fragment1) {
+            
+            if (bparent == fragment1 && bparent->length > 2) {
               bline.start.x = (signed)(bparent->first->x);
               bline.start.y = (signed)(bparent->first->y);
               bline.end.x = (signed)(bparent->last->x);
@@ -2730,12 +2721,8 @@ result quad_forest_visualize_parse_result
             color0 = 0;
             color1 = 0;
             color2 = 255;
-            /*
-            if (fragment1->category2 != fc_UNDEF) {
-              color1 = 255;
-            }
-            */
-            if (bparent == fragment1) {
+            
+            if (bparent == fragment1 && bparent->length > 2) {
               barc.center.x = (sint32)bparent->cx;
               barc.center.y = (sint32)bparent->cy;
               barc.r = (uint32)fabs(bparent->curvature);
@@ -2743,23 +2730,35 @@ result quad_forest_visualize_parse_result
               rx = ((integral_value)bparent->first->x) - bparent->cx;
               ry = bparent->cy - ((integral_value)bparent->first->y);
               angle1 = atan2(ry, rx);
-              /*if (angle1 < 0) angle1 += M_2PI;*/
               angle1 *= (180 / M_PI);
               rx = ((integral_value)bparent->last->x) - bparent->cx;
               ry = bparent->cy - ((integral_value)bparent->last->y);
               angle2 = atan2(ry, rx);
-              /*if (angle2 < 0) angle2 += M_2PI;*/
               angle2 *= (180 / M_PI);
               
               if (bparent->curvature < 0) {
-                if (angle2 > 0 && angle1 < 0) {
+                barc.color[0] = 255;
+                barc.color[1] = 0;
+                barc.color[2] = 0;
+                barc.color[3] = 0;
+                if (angle2 > -0.0001 && angle1 < 0.0001) {
+                  angle1 += 360;
+                }
+                if (angle2 < 0.0001 && angle1 < angle2) {
                   angle1 += 360;
                 }
                 barc.start_angle = angle2;
                 barc.end_angle = angle1;
               }
               else {
-                if (angle1 > 0 && angle2 < 0) {
+                barc.color[0] = 0;
+                barc.color[1] = 255;
+                barc.color[2] = 0;
+                barc.color[3] = 0;
+                if (angle1 > -0.0001 && angle2 < 0.0001) {
+                  angle2 += 360;
+                }
+                if (angle1 < 0.0001 && angle2 < angle1) {
                   angle2 += 360;
                 }
                 barc.start_angle = angle1;
@@ -2768,81 +2767,37 @@ result quad_forest_visualize_parse_result
               CHECK(list_append(&circles, &barc));
             }
           }
-        }
-
-        if (fragment1 != NULL /*&& bparent->length > 2*/) {
-          width = tree->size;
-          height = width;
-          row_step = stride - 3 * width;
-          target_pos = target_data + tree->y * stride + 3 * tree->x;
-          for (y = 0; y < height; y++, target_pos += row_step) {
-            for (x = 0; x < width; x++) {
-              *target_pos = color0;
-              target_pos++;
-              *target_pos = color1;
-              target_pos++;
-              *target_pos = color2;
-              target_pos++;
+          /*
+          if (bparent->length > 2) {
+            width = tree->size;
+            height = width;
+            row_step = stride - step * width;
+            target_pos = target_data + tree->y * stride + step * tree->x;
+            for (y = 0; y < height; y++, target_pos += row_step) {
+              for (x = 0; x < width; x++) {
+                *target_pos = color0;
+                target_pos++;
+                *target_pos = color1;
+                target_pos++;
+                *target_pos = color2;
+                target_pos += col_step;
+              }
             }
           }
+          */
         }
       }
       trees = trees->next;
     }
-    /*CHECK(quad_forest_visualize_neighborhood_stats(forest, target, v_STRENGTH));*/
+    
     {
-      byte line_color[4] = {0,255,255,0};
-      byte circle_color[4] = {255,255,0,0};
-      /*
-      byte edge_color_1[4] = {0,255,0,0};
-      byte edge_color_2[4] = {0,255,0,0};
-      byte segment_color[4] = {255,255,255,0};
-      */
-      /*CHECK(quad_forest_get_links(forest, &links, v_LINK_NONE));*/
-      /*
-      CHECK(quad_forest_get_links(forest, &links, v_LINK_SIMILARITY));
-      CHECK(pixel_image_draw_weighted_lines(target, &links, segment_color));
-      CHECK(list_clear(&links));
-      CHECK(quad_forest_get_links(forest, &links, v_LINK_ANGLE_COST));
-      CHECK(pixel_image_draw_weighted_lines(target, &links, edge_color));
-      */
-      /*CHECK(quad_forest_get_links(forest, &links, v_LINK_MEASURE));*/
-      /*CHECK(quad_forest_get_links(forest, &links, v_LINK_EDGE));*/
-
-      /*CHECK(quad_forest_get_links(forest, &links, v_LINK_EDGE));*/
-      /*PRINT1("links: %d\n", links.count);*/
-      /*CHECK(quad_forest_get_links(forest, &links, v_LINK_BOUNDARY));*/
-      CHECK(pixel_image_draw_colored_lines(target, &lines, 2));
-
-      CHECK(pixel_image_draw_arcs(target, &circles, 2, circle_color));
-
+      byte line_color[4] = {0,0,255,0};
+      byte circle_color[4] = {0,255,0,0};
+      
+      CHECK(pixel_image_draw_colored_lines(target, &lines, 3));
+      CHECK(pixel_image_draw_colored_arcs(target, &circles, 3));
       CHECK(quad_forest_get_links(forest, &links, v_LINK_EDGE_POS));
-      CHECK(pixel_image_draw_colored_lines(target, &links, 1));
-      /*
-      trees = forest->trees.first.next;
-      end = &forest->trees.last;
-      while (trees != end) {
-        tree = (quad_tree*)trees->data;
-        CHECK(quad_tree_edge_response_to_line(forest, tree, &links));
-        trees = trees->next;
-      }
-      */
-      /*PRINT1("edges found: %d\n", links.count);*/
-      /*CHECK(quad_tree_gradient_to_line(tree, &links));*/
-      /*
-      CHECK(pixel_image_draw_lines(target, &links, segment_color, 1));
-      */
-      /*CHECK(pixel_image_draw_weighted_lines(target, &links, segment_color));*/
-      /*
-      PRINT1("fragments found: %lu, ", frag_count);
-      PRINT1("frags in list: %lu\n", frags.count);
-      */
-      /*CHECK(pixel_image_draw_colored_rects(target, &frags));*/
-      /*
-      CHECK(list_clear(&links));
-      CHECK(quad_forest_get_links(forest, &links, v_LINK_STRENGTH));
-      CHECK(pixel_image_draw_weighted_lines(target, &links, edge_color));
-      */
+      CHECK(pixel_image_draw_colored_lines(target, &links, 2));
     }
   }
 
