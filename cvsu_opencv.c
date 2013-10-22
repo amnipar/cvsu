@@ -47,7 +47,9 @@ string pixel_image_draw_lines_name = "pixel_image_draw_lines";
 string pixel_image_draw_weighted_lines_name = "pixel_image_draw_weighted_lines";
 string pixel_image_draw_colored_lines_name = "pixel_image_draw_colored_lines";
 string pixel_image_draw_circles_name = "pixel_image_draw_circles";
+string pixel_image_draw_colored_circles_name = "pixel_image_draw_colored_circles";
 string pixel_image_draw_arcs_name = "pixel_image_draw_arcs";
+string pixel_image_draw_colored_arcs_name = "pixel_image_draw_colored_arcs";
 string pixel_image_draw_rects_name = "pixel_image_draw_rects";
 string pixel_image_draw_colored_rects_name = "pixel_image_draw_colored_rects";
 
@@ -66,10 +68,14 @@ result pixel_image_create_from_ipl_image
 
   CHECK_POINTER(target);
   CHECK_POINTER(source);
-  CHECK_PARAM(format == RGB || format == GREY);
+  CHECK_PARAM(format == RGBA || format == RGB || format == GREY);
 
   channels = ((unsigned)source->nChannels);
 
+  if (format == RGBA) {
+    CHECK_PARAM(channels == 4);
+  }
+  else
   if (format == RGB) {
     CHECK_PARAM(channels == 3);
   }
@@ -125,10 +131,11 @@ result ipl_image_create_from_pixel_image
   TRY();
   IplImage *temp;
   CvSize size;
+  int depth, channels;
 
   CHECK_POINTER(source);
   CHECK_PARAM(source->type == p_U8);
-  CHECK_PARAM(source->format == RGB || source->format == GREY);
+  CHECK_PARAM(source->format == RGBA || source->format == RGB || source->format == GREY);
 
   size.width = (signed)source->width;
   size.height = (signed)source->height;
@@ -136,17 +143,44 @@ result ipl_image_create_from_pixel_image
   /* TODO: convert format (and type) based on parameters */
   /* this reflects the 'expected' type and format at the calling side */
   (void)format;
-  switch (source->format) {
-    case RGB:
-      temp = cvCreateImageHeader(size, IPL_DEPTH_8U, 3);
+  switch (source->type) {
+    case p_U8:
+      depth = (int)IPL_DEPTH_8U;
       break;
-    case GREY:
-      temp = cvCreateImageHeader(size, IPL_DEPTH_8U, 1);
+    case p_S8:
+      depth = (int)IPL_DEPTH_8S;
+      break;
+    case p_U16:
+      depth = (int)IPL_DEPTH_16U;
+      break;
+    case p_S16:
+      depth = (int)IPL_DEPTH_16S;
+      break;
+    case p_S32:
+      depth = (int)IPL_DEPTH_32S;
+      break;
+    case p_F32:
+      depth = (int)IPL_DEPTH_32F;
+      break;
+    case p_F64:
+      depth = (int)IPL_DEPTH_64F;
       break;
     default:
-      temp = NULL;
+      ERROR(BAD_TYPE);
   }
-
+  switch (source->format) {
+    case RGBA:
+      channels = 4;
+    case RGB:
+      channels = 3;
+      break;
+    case GREY:
+      channels = 1;
+      break;
+    default:
+      ERROR(BAD_TYPE);
+  }
+  temp = cvCreateImageHeader(size, depth, channels);
   cvSetData(temp, source->data, (signed)source->stride);
 
   *target = cvCloneImage(temp);
@@ -277,15 +311,25 @@ result pixel_image_draw_lines
   CvSize size;
   list_item *items, *end;
   line *this_line;
+  int channels;
 
   CHECK_POINTER(source);
   CHECK_POINTER(lines);
   CHECK_PARAM(source->type == p_U8);
-  CHECK_PARAM(source->format == RGB);
+  CHECK_PARAM(source->format == RGB || source->format == RGBA);
+  if (source->format == RGB) {
+    CHECK_PARAM(source->step == 3);
+    channels = 3;
+  }
+  else
+  if (source->format == RGBA) {
+    CHECK_PARAM(source->step == 4);
+    channels = 4;
+  }
 
   size.width = (signed)source->width;
   size.height = (signed)source->height;
-  dst = cvCreateImageHeader(size, IPL_DEPTH_8U, 3);
+  dst = cvCreateImageHeader(size, IPL_DEPTH_8U, channels);
   cvSetData(dst, source->data, (signed)source->stride);
 
   items = lines->first.next;
@@ -293,9 +337,9 @@ result pixel_image_draw_lines
   while (items != end) {
     this_line = (line*)items->data;
     cvLine(dst,
-           cvPoint(this_line->start.x, this_line->start.y),
-           cvPoint(this_line->end.x, this_line->end.y),
-           cvScalar(color[0], color[1], color[2],0), width, 8, 0);
+           cvPoint((int)this_line->start.x, (int)this_line->start.y),
+           cvPoint((int)this_line->end.x, (int)this_line->end.y),
+           cvScalar(color[0], color[1], color[2], 0),(int) width, 8, 0);
     items = items->next;
   }
 
@@ -310,12 +354,14 @@ result pixel_image_draw_weighted_lines
 (
   pixel_image *source,
   list *lines,
-  byte color[4]
+  byte color[4],
+  uint32 width
 )
 {
   TRY();
   IplImage *dst;
   CvSize size;
+  int channels;
   list_item *items, *end;
   weighted_line *this_line;
   float weight;
@@ -323,11 +369,20 @@ result pixel_image_draw_weighted_lines
   CHECK_POINTER(source);
   CHECK_POINTER(lines);
   CHECK_PARAM(source->type == p_U8);
-  CHECK_PARAM(source->format == RGB);
+  CHECK_PARAM(source->format == RGB || source->format == RGBA);
+  if (source->format == RGB) {
+    CHECK_PARAM(source->step == 3);
+    channels = 3;
+  }
+  else
+  if (source->format == RGBA) {
+    CHECK_PARAM(source->step == 4);
+    channels = 4;
+  }
 
   size.width = (signed)source->width;
   size.height = (signed)source->height;
-  dst = cvCreateImageHeader(size, IPL_DEPTH_8U, 3);
+  dst = cvCreateImageHeader(size, IPL_DEPTH_8U, channels);
   cvSetData(dst, source->data, (signed)source->stride);
 
   items = lines->first.next;
@@ -336,9 +391,10 @@ result pixel_image_draw_weighted_lines
     this_line = (weighted_line*)items->data;
     weight = (float)this_line->weight;
     cvLine(dst,
-           cvPoint(this_line->start.x, this_line->start.y),
-           cvPoint(this_line->end.x, this_line->end.y),
-           cvScalar(weight * color[0], weight * color[1], weight * color[2],0), 1, 8, 0);
+           cvPoint((int)this_line->start.x, (int)this_line->start.y),
+           cvPoint((int)this_line->end.x, (int)this_line->end.y),
+           cvScalar(weight * (float)color[0], weight * (float)color[1], weight * (float)color[2], 0),
+           (int)width, 8, 0);
     items = items->next;
   }
 
@@ -359,18 +415,27 @@ result pixel_image_draw_colored_lines
   TRY();
   IplImage *dst;
   CvSize size;
+  int channels;
   list_item *items, *end;
   colored_line *this_line;
-  float weight;
 
   CHECK_POINTER(source);
   CHECK_POINTER(lines);
   CHECK_PARAM(source->type == p_U8);
-  CHECK_PARAM(source->format == RGB);
+  CHECK_PARAM(source->format == RGB || source->format == RGBA);
+  if (source->format == RGB) {
+    CHECK_PARAM(source->step == 3);
+    channels = 3;
+  }
+  else
+  if (source->format == RGBA) {
+    CHECK_PARAM(source->step == 4);
+    channels = 4;
+  }
 
   size.width = (signed)source->width;
   size.height = (signed)source->height;
-  dst = cvCreateImageHeader(size, IPL_DEPTH_8U, 3);
+  dst = cvCreateImageHeader(size, IPL_DEPTH_8U, channels);
   cvSetData(dst, source->data, (signed)source->stride);
 
   items = lines->first.next;
@@ -378,10 +443,11 @@ result pixel_image_draw_colored_lines
   while (items != end) {
     this_line = (colored_line*)items->data;
     cvLine(dst,
-           cvPoint(this_line->start.x, this_line->start.y),
-           cvPoint(this_line->end.x, this_line->end.y),
-           cvScalar(this_line->color[0], this_line->color[1], this_line->color[2],0), width, 8, 0);
-           items = items->next;
+           cvPoint((int)this_line->start.x, (int)this_line->start.y),
+           cvPoint((int)this_line->end.x, (int)this_line->end.y),
+           cvScalar(this_line->color[0], this_line->color[1], this_line->color[2], 0),
+           (int)width, 8, 0);
+    items = items->next;
   }
 
   FINALLY(pixel_image_draw_colored_lines);
@@ -395,25 +461,34 @@ result pixel_image_draw_circles
 (
   pixel_image *source,
   list *circles,
-  uint32 width,
-  byte color[4]
+  byte color[4],
+  uint32 width
 )
 {
   TRY();
   IplImage *dst;
   CvSize size;
+  int channels;
   list_item *items, *end;
   circle *this_circle;
-  float weight;
 
   CHECK_POINTER(source);
   CHECK_POINTER(circles);
   CHECK_PARAM(source->type == p_U8);
-  CHECK_PARAM(source->format == RGB);
+  CHECK_PARAM(source->format == RGB || source->format == RGBA);
+  if (source->format == RGB) {
+    CHECK_PARAM(source->step == 3);
+    channels = 3;
+  }
+  else
+  if (source->format == RGBA) {
+    CHECK_PARAM(source->step == 4);
+    channels = 4;
+  }
 
   size.width = (signed)source->width;
   size.height = (signed)source->height;
-  dst = cvCreateImageHeader(size, IPL_DEPTH_8U, 3);
+  dst = cvCreateImageHeader(size, IPL_DEPTH_8U, channels);
   cvSetData(dst, source->data, (signed)source->stride);
 
   items = circles->first.next;
@@ -421,9 +496,9 @@ result pixel_image_draw_circles
   while (items != end) {
     this_circle = (circle*)items->data;
     cvCircle(dst,
-           cvPoint(this_circle->center.x, this_circle->center.y),
-           this_circle->r,
-           cvScalar(color[0], color[1], color[2], 0), width, 8, 0);
+             cvPoint((int)this_circle->center.x, (int)this_circle->center.y),
+             (int)this_circle->r,
+             cvScalar(color[0], color[1], color[2], 0), (int)width, 8, 0);
     items = items->next;
   }
 
@@ -438,41 +513,50 @@ result pixel_image_draw_arcs
 (
   pixel_image *source,
   list *arcs,
-  uint32 width,
-  byte color[4]
+  byte color[4],
+  uint32 width
 )
 {
   TRY();
   IplImage *dst;
   CvSize size, axes;
+  int channels;
   list_item *items, *end;
   arc *this_arc;
-  float weight;
 
   CHECK_POINTER(source);
   CHECK_POINTER(arcs);
   CHECK_PARAM(source->type == p_U8);
-  CHECK_PARAM(source->format == RGB);
+  CHECK_PARAM(source->format == RGB || source->format == RGBA);
+  if (source->format == RGB) {
+    CHECK_PARAM(source->step == 3);
+    channels = 3;
+  }
+  else
+  if (source->format == RGBA) {
+    CHECK_PARAM(source->step == 4);
+    channels = 4;
+  }
 
   size.width = (signed)source->width;
   size.height = (signed)source->height;
-  dst = cvCreateImageHeader(size, IPL_DEPTH_8U, 3);
+  dst = cvCreateImageHeader(size, IPL_DEPTH_8U, channels);
   cvSetData(dst, source->data, (signed)source->stride);
 
   items = arcs->first.next;
   end = &arcs->last;
   while (items != end) {
     this_arc = (arc*)items->data;
-    axes.width = axes.height = this_arc->r;
+    axes.width = axes.height = (int)this_arc->r;
     cvEllipse(dst,
-           cvPoint(this_arc->center.x, this_arc->center.y),
-           axes, 0,
-           -this_arc->start_angle,
-           -this_arc->end_angle,
-           cvScalar(color[0], color[1], color[2], 0), width, 8, 0);
+              cvPoint((int)this_arc->center.x, (int)this_arc->center.y),
+              axes, 0,
+              -this_arc->start_angle,
+              -this_arc->end_angle,
+              cvScalar(color[0], color[1], color[2], 0), (int)width, 8, 0);
     items = items->next;
   }
-  
+
   FINALLY(pixel_image_draw_arcs);
   cvReleaseImageHeader(&dst);
   RETURN();
@@ -490,98 +574,95 @@ result pixel_image_draw_colored_arcs
   TRY();
   IplImage *dst;
   CvSize size, axes;
+  int channels;
   list_item *items, *end;
   colored_arc *this_arc;
-  float weight;
 
   CHECK_POINTER(source);
   CHECK_POINTER(arcs);
   CHECK_PARAM(source->type == p_U8);
   CHECK_PARAM(source->format == RGB || source->format == RGBA);
-  CHECK_PARAM(source->step == 3 || source->step == 4);
+  if (source->format == RGB) {
+    CHECK_PARAM(source->step == 3);
+    channels = 3;
+  }
+  else
+  if (source->format == RGBA) {
+    CHECK_PARAM(source->step == 4);
+    channels = 4;
+  }
 
   size.width = (signed)source->width;
   size.height = (signed)source->height;
-  dst = cvCreateImageHeader(size, IPL_DEPTH_8U, source->step);
+  dst = cvCreateImageHeader(size, IPL_DEPTH_8U, channels);
   cvSetData(dst, source->data, (signed)source->stride);
 
   items = arcs->first.next;
   end = &arcs->last;
   while (items != end) {
     this_arc = (colored_arc*)items->data;
-    axes.width = axes.height = this_arc->r;
+    axes.width = axes.height = (int)this_arc->r;
     cvEllipse(dst,
-           cvPoint(this_arc->center.x, this_arc->center.y),
-           axes, 0,
-           -this_arc->start_angle,
-           -this_arc->end_angle,
-           cvScalar(this_arc->color[0], this_arc->color[1], this_arc->color[2], 0),
-           width, 8, 0);
+              cvPoint((int)this_arc->center.x, (int)this_arc->center.y),
+              axes, 0,
+              -this_arc->start_angle,
+              -this_arc->end_angle,
+              cvScalar(this_arc->color[0], this_arc->color[1], this_arc->color[2], 0),
+              (int)width, 8, 0);
     items = items->next;
   }
-  
-  FINALLY(pixel_image_draw_arcs);
+
+  FINALLY(pixel_image_draw_colored_arcs);
   cvReleaseImageHeader(&dst);
   RETURN();
 }
 
 /******************************************************************************/
-/* TODO: change parameters to list of rects */
 
 result pixel_image_draw_rects
 (
   pixel_image *source,
-  segment **segments,
-  uint32 count
+  list *rects,
+  byte color[4],
+  uint32 width
 )
 {
   TRY();
   IplImage *dst;
   CvSize size;
+  int channels;
   list_item *items, *end;
-  segment *tree_segment;
   rect *this_rect;
-  uint32 i;
-  struct timeval finish;
-  double timestamp;
-  char filename[50];
 
   CHECK_POINTER(source);
-  CHECK_POINTER(segments);
+  CHECK_POINTER(rects);
   CHECK_PARAM(source->type == p_U8);
-  CHECK_PARAM(source->format == RGB);
+  CHECK_PARAM(source->format == RGB || source->format == RGBA);
+  if (source->format == RGB) {
+    CHECK_PARAM(source->step == 3);
+    channels = 3;
+  }
+  else
+  if (source->format == RGBA) {
+    CHECK_PARAM(source->step == 4);
+    channels = 4;
+  }
 
   size.width = (signed)source->width;
   size.height = (signed)source->height;
-  dst = cvCreateImageHeader(size, IPL_DEPTH_8U, 3);
+  dst = cvCreateImageHeader(size, IPL_DEPTH_8U, channels);
   cvSetData(dst, source->data, (signed)source->stride);
-  /*
-  items = lines->first.next;
-  end = &lines->last;
+
+  items = rects->first.next;
+  end = &rects->last;
   while (items != end) {
-  */
-  for (i = 0; i < count; i++) {
-    /*this_line = (line*)items->data;*/
-    tree_segment = segments[i];
-    /*
-    if (tree_segment->x2 - tree_segment->x1 > 30 && tree_segment->y2 - tree_segment->y1 > 20) {
-      cvRectangle(dst,
-          cvPoint(tree_segment->x1, tree_segment->y1),
-          cvPoint(tree_segment->x2, tree_segment->y2),
-          cvScalar(0,255,255,0), 2, 8, 0);
-    }
-    */
+    this_rect = (rect*)items->data;
+    cvRectangle(dst,
+                cvPoint((int)this_rect->left, (int)this_rect->top),
+                cvPoint((int)this_rect->right, (int)this_rect->bottom),
+                cvScalar(color[0], color[1], color[2], 0), (int)width, 8, 0);
+                items = items->next;
   }
-  /*
-    items = items->next;
-  }
-  */
-  /*
-  gettimeofday(&finish, NULL);
-  timestamp = (((double)finish.tv_sec) + (((double)finish.tv_usec) / 1000000.0));
-  sprintf(filename, "capture/%.6f.png", timestamp);
-  cvSaveImage(filename, dst, 0);
-  */
 
   FINALLY(pixel_image_draw_rects);
   cvReleaseImageHeader(&dst);
@@ -593,23 +674,34 @@ result pixel_image_draw_rects
 result pixel_image_draw_colored_rects
 (
   pixel_image *source,
-  list *rects
+  list *rects,
+  uint32 width
 )
 {
   TRY();
   IplImage *dst;
   CvSize size;
+  int channels;
   list_item *items, *end;
   colored_rect *this_rect;
 
   CHECK_POINTER(source);
   CHECK_POINTER(rects);
   CHECK_PARAM(source->type == p_U8);
-  CHECK_PARAM(source->format == RGB);
+  CHECK_PARAM(source->format == RGB || source->format == RGBA);
+  if (source->format == RGB) {
+    CHECK_PARAM(source->step == 3);
+    channels = 3;
+  }
+  else
+  if (source->format == RGBA) {
+    CHECK_PARAM(source->step == 4);
+    channels = 4;
+  }
 
   size.width = (signed)source->width;
   size.height = (signed)source->height;
-  dst = cvCreateImageHeader(size, IPL_DEPTH_8U, 3);
+  dst = cvCreateImageHeader(size, IPL_DEPTH_8U, channels);
   cvSetData(dst, source->data, (signed)source->stride);
 
   items = rects->first.next;
@@ -617,9 +709,10 @@ result pixel_image_draw_colored_rects
   while (items != end) {
     this_rect = (colored_rect*)items->data;
     cvRectangle(dst,
-        cvPoint(this_rect->left, this_rect->top),
-        cvPoint(this_rect->right, this_rect->bottom),
-        cvScalar(this_rect->color[0],this_rect->color[1],this_rect->color[2],0), 2, 8, 0);
+                cvPoint((int)this_rect->left, (int)this_rect->top),
+                cvPoint((int)this_rect->right, (int)this_rect->bottom),
+                cvScalar(this_rect->color[0], this_rect->color[1], this_rect->color[2], 0),
+                (int)width, 8, 0);
     items = items->next;
   }
 

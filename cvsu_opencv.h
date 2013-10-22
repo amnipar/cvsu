@@ -100,7 +100,8 @@ result pixel_image_draw_weighted_lines
 (
   pixel_image *source,
   list *lines,
-  byte color[4]
+  byte color[4],
+  uint32 width
 );
 
 /**
@@ -118,16 +119,16 @@ result pixel_image_draw_circles
 (
   pixel_image *source,
   list *circles,
-  uint32 width,
-  byte color[4]
+  byte color[4],
+  uint32 width
 );
 
 result pixel_image_draw_arcs
 (
   pixel_image *source,
   list *arcs,
-  uint32 width,
-  byte color[4]
+  byte color[4],
+  uint32 width
 );
 
 result pixel_image_draw_colored_arcs
@@ -143,8 +144,9 @@ result pixel_image_draw_colored_arcs
 result pixel_image_draw_rects
 (
   pixel_image *source,
-  segment **segments,
-  uint32 count
+  list *rects,
+  byte color[4],
+  uint32 width
 );
 
 /**
@@ -153,7 +155,8 @@ result pixel_image_draw_rects
 result pixel_image_draw_colored_rects
 (
   pixel_image *source,
-  list *rects
+  list *rects,
+  uint32 width
 );
 
 #ifdef __cplusplus
