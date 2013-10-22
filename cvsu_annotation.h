@@ -299,14 +299,14 @@ result ensure_link_measure
 
 truth_value is_link_measure
 (
-  typed_pointer *tptr
+  const typed_pointer *tptr
 );
 
 /******************************************************************************/
 
 link_measure *has_link_measure
 (
-  typed_pointer *tptr,
+  const typed_pointer *tptr,
   uint32 token
 );
 
@@ -314,7 +314,7 @@ link_measure *has_link_measure
 
 result expect_link_measure
 (
-  typed_pointer *tptr,
+  const typed_pointer *tptr,
   link_measure **lmeasure,
   uint32 token
 );
@@ -352,8 +352,8 @@ edge_profile *has_edge_profile
 /******************************************************************************/
 
 typedef struct edge_links_t {
-  struct quad_tree_link_head_t *towards;
-  struct quad_tree_link_head_t *against;
+  const struct quad_tree_link_head_t *towards;
+  const struct quad_tree_link_head_t *against;
   integral_value own_angle;
   integral_value own_curvature;
 } edge_links;

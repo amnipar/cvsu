@@ -152,7 +152,7 @@ void typed_pointer_nullify
 
 truth_value typed_pointer_is_null
 (
-  typed_pointer *tptr
+  const typed_pointer *tptr
 )
 {
   if (tptr != NULL && tptr->value != NULL) {
@@ -168,7 +168,7 @@ truth_value typed_pointer_is_null
 
 truth_value is_typed_pointer
 (
-  typed_pointer *tptr
+  const typed_pointer *tptr
 )
 {
   if (tptr != NULL && tptr->type == t_typed_pointer) {
@@ -342,7 +342,7 @@ result tuple_ensure_has_unique
 
 typed_pointer *tuple_has_type
 (
-  typed_pointer *tuple,
+  const typed_pointer *tuple,
   type_label type
 )
 {
@@ -365,7 +365,7 @@ typed_pointer *tuple_has_type
 
 truth_value is_tuple
 (
-  typed_pointer *tptr
+  const typed_pointer *tptr
 )
 {
   if (tptr != NULL && tptr->type == t_tuple) {
@@ -387,7 +387,7 @@ result ensure_has
   typed_pointer *new_pointer;
 
   CHECK_POINTER(tptr);
-  
+
   new_pointer = NULL;
 
   if (tptr->type == type) {
@@ -424,7 +424,7 @@ result ensure_has
     CHECK(typed_pointer_create(&new_element, type, 1));
     CHECK(tuple_extend(tptr, &new_element, &new_pointer));
   }
-  
+
   if (res != NULL) {
     *res = new_pointer;
   }

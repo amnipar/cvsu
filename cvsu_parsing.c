@@ -354,19 +354,19 @@ result quad_forest_visualize_accumulated_stats
         color0 = (byte)(255 * astat->strength * astat->meandev);
         color1 = color;
         color2 = (byte)(255 * astat->strength * astat->devdev);
-      }
-      width = tree->size;
-      height = width;
-      row_step = stride - 3 * width;
-      target_pos = target_data + tree->y * stride + 3 * tree->x;
-      for (y = 0; y < height; y++, target_pos += row_step) {
-        for (x = 0; x < width; x++) {
-          *target_pos = color0;
-          target_pos++;
-          *target_pos = color1;
-          target_pos++;
-          *target_pos = color2;
-          target_pos++;
+        width = tree->size;
+        height = width;
+        row_step = stride - 3 * width;
+        target_pos = target_data + tree->y * stride + 3 * tree->x;
+        for (y = 0; y < height; y++, target_pos += row_step) {
+          for (x = 0; x < width; x++) {
+            *target_pos = color0;
+            target_pos++;
+            *target_pos = color1;
+            target_pos++;
+            *target_pos = color2;
+            target_pos++;
+          }
         }
       }
     }
@@ -1249,7 +1249,8 @@ result quad_forest_calculate_edge_stats
   list_item *trees, *endtrees, *links, *endlinks;
   quad_tree *tree1, *tree2;
   quad_tree_link *link;
-  quad_tree_link_head *head1, *head2;
+  quad_tree_link_head *head1;
+  const quad_tree_link_head *head2;
   neighborhood_stat *nstat1, *nstat2;
   edge_response *eresp1, *eresp2;
   link_measure *lmeasure, *lmeasure1, *lmeasure2;
@@ -1603,16 +1604,13 @@ result extend_edge_links
 
 result quad_forest_parse
 (
-  quad_forest *forest,
-  uint32 rounds,
-  truth_value use_dev
+  quad_forest *forest
 )
 {
   TRY();
   list edgelist, boundarylist, fragmentlist;
 
   CHECK_POINTER(forest);
-  CHECK_PARAM(rounds > 0);
 
   CHECK(list_create(&edgelist, 1000, sizeof(quad_tree*), 1));
   CHECK(list_create(&boundarylist, 1000, sizeof(boundary*), 1));
@@ -1726,7 +1724,8 @@ result quad_forest_parse
   {
     list_item *edges, *endedges, *links, *endlinks;
     quad_tree *tree1, *tree2, *tree3;
-    quad_tree_link_head *head1, *head2, *best_towards, *best_against;
+    quad_tree_link_head *head1, *best_towards, *best_against;
+    const quad_tree_link_head *head2;
     boundary *boundary1, *boundary2, *boundary3;
     edge_links *elinks_tree, *elinks_towards, *elinks_against, *elinks2, *elinks3;
     edge_response *eresp2;
@@ -2068,14 +2067,13 @@ result quad_forest_parse
   {
     quad_tree *tree;
     edge_response *eresp;
-    list_item *boundaries, *endboundaries, *temp_item;
+    list_item *boundaries, *endboundaries;
     boundary *boundary1, *boundary2, *boundary3;
     integral_value angle1, angle2, angle3, curvature, px, py, rx, ry, cx, cy, mag;
-    integral_value x1, y1, x2, y2, x3, y3, dx, dy, adiff1, adiff2, adiff3, dist;
-    integral_value dist1, dist2, sim1, sim2, radius;
+    integral_value x1, y1, x2, y2, x3, y3, dx, dy, adiff1, adiff2, adiff3;
+    integral_value dist, radius;
     uint32 count;
-    boundary_category category1, category2, category3;
-    fragment_model model;
+    boundary_category category1;
 
     boundaries = boundarylist.first.next;
     endboundaries = &boundarylist.last;
@@ -2374,11 +2372,11 @@ result quad_forest_parse
       boundaries = boundaries->next;
     }
     {
-    uint32 round, length1, length2;
+    uint32 counter, length1, length2;
     integral_value dist_threshold;
 
-    dist_threshold = forest->tree_max_size;
-    round = 0;
+    dist_threshold = ((integral_value)forest->tree_max_size) / 2;
+    counter = 0;
     boundaries = boundarylist.first.next;
     endboundaries = &boundarylist.last;
     while (boundaries != endboundaries) {
@@ -2392,20 +2390,20 @@ result quad_forest_parse
       length1 = 0;
       length2 = 0;
 
-      round++;
-      boundary1->round = round;
+      counter++;
+      boundary1->round = counter;
       boundary1->first = boundary1;
       boundary1->last = boundary1;
       if (category1 == fc_STRAIGHT) {
         boundary2 = boundary1->prev;
-        while (boundary2 != NULL && boundary2->round != round) {
+        while (boundary2 != NULL && boundary2->round != counter) {
           rx = ((integral_value)boundary2->x) - cx;
           ry = ((integral_value)boundary2->y) - cy;
-          dist1 = fabs(px * rx + py * ry);
-          if (dist1 < dist_threshold) {
+          dist = fabs(px * rx + py * ry);
+          if (dist < dist_threshold) {
             length1 += 1;
             boundary1->first = boundary2;
-            boundary2->round = round;
+            boundary2->round = counter;
             boundary2 = boundary2->prev;
           }
           else {
@@ -2413,14 +2411,14 @@ result quad_forest_parse
           }
         }
         boundary2 = boundary1->next;
-        while (boundary2 != NULL && boundary2->round != round) {
+        while (boundary2 != NULL && boundary2->round != counter) {
           rx = ((integral_value)boundary2->x) - cx;
           ry = ((integral_value)boundary2->y) - cy;
-          dist1 = fabs(px * rx + py * ry);
-          if (dist1 < dist_threshold) {
+          dist = fabs(px * rx + py * ry);
+          if (dist < dist_threshold) {
             length1 += 1;
             boundary1->last = boundary2;
-            boundary2->round = round;
+            boundary2->round = counter;
             boundary2 = boundary2->next;
           }
           else {
@@ -2431,14 +2429,14 @@ result quad_forest_parse
       else
       if (category1 == fc_CURVED) {
         boundary2 = boundary1->prev;
-        while (boundary2 != NULL && boundary2->round != round) {
+        while (boundary2 != NULL && boundary2->round != counter) {
           rx = ((integral_value)boundary2->x) - cx;
           ry = ((integral_value)boundary2->y) - cy;
-          dist1 = fabs(sqrt(rx*rx + ry*ry) - curvature);
-          if (dist1 < dist_threshold) {
+          dist = fabs(sqrt(rx*rx + ry*ry) - curvature);
+          if (dist < dist_threshold) {
             length1 += 1;
             boundary1->first = boundary2;
-            boundary2->round = round;
+            boundary2->round = counter;
             boundary2 = boundary2->prev;
           }
           else {
@@ -2446,14 +2444,14 @@ result quad_forest_parse
           }
         }
         boundary2 = boundary1->next;
-        while (boundary2 != NULL && boundary2->round != round) {
+        while (boundary2 != NULL && boundary2->round != counter) {
           rx = ((integral_value)boundary2->x) - cx;
           ry = ((integral_value)boundary2->y) - cy;
-          dist1 = fabs(sqrt(rx*rx + ry*ry) - curvature);
-          if (dist1 < dist_threshold) {
+          dist = fabs(sqrt(rx*rx + ry*ry) - curvature);
+          if (dist < dist_threshold) {
             length1 += 1;
             boundary1->last = boundary2;
-            boundary2->round = round;
+            boundary2->round = counter;
             boundary2 = boundary2->next;
           }
           else {
@@ -2469,20 +2467,20 @@ result quad_forest_parse
         cx = boundary1->cx2;
         cy = boundary1->cy2;
         curvature = fabs(boundary1->curvature2);
-        round++;
-        boundary1->round = round;
+        counter++;
+        boundary1->round = counter;
         boundary1->first2 = boundary1;
         boundary1->last2 = boundary1;
         if (category1 == fc_STRAIGHT) {
           boundary2 = boundary1->prev;
-          while (boundary2 != NULL && boundary2->round != round) {
+          while (boundary2 != NULL && boundary2->round != counter) {
             rx = ((integral_value)boundary2->x) - cx;
             ry = ((integral_value)boundary2->y) - cy;
-            dist1 = fabs(px * rx + py * ry);
-            if (dist1 < dist_threshold) {
+            dist = fabs(px * rx + py * ry);
+            if (dist < dist_threshold) {
               length2 += 1;
               boundary1->first2 = boundary2;
-              boundary2->round = round;
+              boundary2->round = counter;
               boundary2 = boundary2->prev;
             }
             else {
@@ -2490,14 +2488,14 @@ result quad_forest_parse
             }
           }
           boundary2 = boundary1->next;
-          while (boundary2 != NULL && boundary2->round != round) {
+          while (boundary2 != NULL && boundary2->round != counter) {
             rx = ((integral_value)boundary2->x) - cx;
             ry = ((integral_value)boundary2->y) - cy;
-            dist1 = fabs(px * rx + py * ry);
-            if (dist1 < dist_threshold) {
+            dist = fabs(px * rx + py * ry);
+            if (dist < dist_threshold) {
               length2 += 1;
               boundary1->last2 = boundary2;
-              boundary2->round = round;
+              boundary2->round = counter;
               boundary2 = boundary2->next;
             }
             else {
@@ -2508,14 +2506,14 @@ result quad_forest_parse
         else
         if (category1 == fc_CURVED) {
           boundary2 = boundary1->prev;
-          while (boundary2 != NULL && boundary2->round != round) {
+          while (boundary2 != NULL && boundary2->round != counter) {
             rx = ((integral_value)boundary2->x) - cx;
             ry = ((integral_value)boundary2->y) - cy;
-            dist1 = fabs(sqrt(rx*rx + ry*ry) - curvature);
-            if (dist1 < dist_threshold) {
+            dist = fabs(sqrt(rx*rx + ry*ry) - curvature);
+            if (dist < dist_threshold) {
               length2 += 1;
               boundary1->first2 = boundary2;
-              boundary2->round = round;
+              boundary2->round = counter;
               boundary2 = boundary2->prev;
             }
             else {
@@ -2523,14 +2521,14 @@ result quad_forest_parse
             }
           }
           boundary2 = boundary1->next;
-          while (boundary2 != NULL && boundary2->round != round) {
+          while (boundary2 != NULL && boundary2->round != counter) {
             rx = ((integral_value)boundary2->x) - cx;
             ry = ((integral_value)boundary2->y) - cy;
-            dist1 = fabs(sqrt(rx*rx + ry*ry) - curvature);
-            if (dist1 < dist_threshold) {
+            dist = fabs(sqrt(rx*rx + ry*ry) - curvature);
+            if (dist < dist_threshold) {
               length2 += 1;
               boundary1->last2 = boundary2;
-              boundary2->round = round;
+              boundary2->round = counter;
               boundary2 = boundary2->next;
             }
             else {
@@ -2544,6 +2542,8 @@ result quad_forest_parse
         boundary1->length = length2 + 1;
         boundary1->cx = boundary1->cx2;
         boundary1->cy = boundary1->cy2;
+        boundary1->dx = boundary1->dx2;
+        boundary1->dy = boundary1->dy2;
         boundary1->curvature = boundary1->curvature2;
         boundary1->first = boundary1->first2;
         boundary1->last = boundary1->last2;
@@ -2568,27 +2568,27 @@ result quad_forest_parse
     }
 
     /* finally merge nodes into their best parent (one with longest chain) */
-    round++;
+    counter++;
     boundaries = fragmentlist.first.next;
     endboundaries = &fragmentlist.last;
     while (boundaries != endboundaries) {
       boundary1 = *((boundary**)boundaries->data);
-      
+
       /* if the node is already assigned to model, skip it */
-      if (boundary1->round == round) {
+      if (boundary1->round == counter) {
         /*temp_item = boundaries;*/
         boundaries = boundaries->next;
         /*CHECK(list_remove_item(&fragmentlist, temp_item));*/
         continue;
       }
-      
-      boundary1->round = round;
+
+      boundary1->round = counter;
       boundary1->length = 1;
       boundary2 = boundary1;
       while (boundary2 != boundary1->first) {
         if (boundary2->prev != NULL) {
           boundary2 = boundary2->prev;
-          if (boundary2->round == round) {
+          if (boundary2->round == counter) {
             boundary1->first = boundary2->next;
             break;
           }
@@ -2598,7 +2598,7 @@ result quad_forest_parse
           break;
         }
         boundary2->parent = boundary1;
-        boundary2->round = round;
+        boundary2->round = counter;
         boundary1->length += 1;
       }
 
@@ -2606,7 +2606,7 @@ result quad_forest_parse
       while (boundary2 != boundary1->last) {
         if (boundary2->next != NULL) {
           boundary2 = boundary2->next;
-          if (boundary2->round == round) {
+          if (boundary2->round == counter) {
             boundary1->last = boundary2->prev;
             break;
           }
@@ -2616,7 +2616,7 @@ result quad_forest_parse
           break;
         }
         boundary2->parent = boundary1;
-        boundary2->round = round;
+        boundary2->round = counter;
         boundary1->length += 1;
       }
 
@@ -2648,19 +2648,17 @@ result quad_forest_visualize_parse_result
   list_item *trees, *end;
   quad_tree *tree;
   neighborhood_stat *nstat;
-  edge_response *eresp;
-  ridge_potential *ridge1;
-  boundary_potential *boundary1;
   boundary *fragment1, *bparent;
-  segment *segment1, *segment_parent;
-  colored_rect crect;
   colored_line bline;
-  circle bcirc;
   colored_arc barc;
-  uint32 x, y, width, height, step, stride, row_step, col_step, frag_count;
-  byte *target_data, *target_pos, color0, color1, color2;
-  integral_value max_edge_mag, max_ridge_score, extent, max_extent;
-  integral_value rx, ry, dist, angle1, angle2;
+  uint32 width, height, step, stride, col_step;
+  byte *target_data;
+  integral_value cx, cy, px, py, rx, ry, dist, angle1, angle2;
+  /* uncomment if need to draw tree colors */
+  /*
+  byte *target_pos, color0, color1, color2;
+  uint32 x, y, row_step;
+  */
 
   CHECK_POINTER(forest);
   CHECK_POINTER(target);
@@ -2689,6 +2687,11 @@ result quad_forest_visualize_parse_result
     bline.color[2] = 255;
     bline.color[3] = 0;
 
+    barc.color[0] = 255;
+    barc.color[1] = 0;
+    barc.color[2] = 0;
+    barc.color[3] = 0;
+
     trees = forest->trees.first.next;
     end = &forest->trees.last;
     while (trees != end) {
@@ -2699,29 +2702,48 @@ result quad_forest_visualize_parse_result
 
         if (fragment1 != NULL) {
           bparent = fragment1->parent;
+          /* uncomment if need to draw tree colors */
+          /*
           color0 = 0;
           color1 = 255;
           color2 = 0;
-
+          */
           if (bparent->category == fc_STRAIGHT) {
+            /* uncomment if need to draw tree colors */
+            /*
             color0 = 255;
             color1 = 0;
             color2 = 0;
-            
+            */
             if (bparent == fragment1 && bparent->length > 2) {
-              bline.start.x = (signed)(bparent->first->x);
-              bline.start.y = (signed)(bparent->first->y);
-              bline.end.x = (signed)(bparent->last->x);
-              bline.end.y = (signed)(bparent->last->y);
+              px = bparent->dx;
+              py = bparent->dy;
+              cx = bparent->cx;
+              cy = bparent->cy;
+
+              rx = ((integral_value)bparent->first->x) - cx;
+              ry = ((integral_value)bparent->first->y) - cy;
+              dist = px * rx + py * ry;
+              bline.start.x = (sint32)(cx + dist * px);
+              bline.start.y = (sint32)(cy + dist * py);
+
+              rx = ((integral_value)bparent->last->x) - cx;
+              ry = ((integral_value)bparent->last->y) - cy;
+              dist = px * rx + py * ry;
+              bline.end.x = (sint32)(cx + dist * px);
+              bline.end.y = (sint32)(cy + dist * py);
+
               CHECK(list_append(&lines, &bline));
             }
           }
           else
           if (bparent->category == fc_CURVED) {
+            /* uncomment if need to draw tree colors */
+            /*
             color0 = 0;
             color1 = 0;
             color2 = 255;
-            
+            */
             if (bparent == fragment1 && bparent->length > 2) {
               barc.center.x = (sint32)bparent->cx;
               barc.center.y = (sint32)bparent->cy;
@@ -2735,12 +2757,8 @@ result quad_forest_visualize_parse_result
               ry = bparent->cy - ((integral_value)bparent->last->y);
               angle2 = atan2(ry, rx);
               angle2 *= (180 / M_PI);
-              
+
               if (bparent->curvature < 0) {
-                barc.color[0] = 255;
-                barc.color[1] = 0;
-                barc.color[2] = 0;
-                barc.color[3] = 0;
                 if (angle2 > -0.0001 && angle1 < 0.0001) {
                   angle1 += 360;
                 }
@@ -2751,10 +2769,6 @@ result quad_forest_visualize_parse_result
                 barc.end_angle = angle1;
               }
               else {
-                barc.color[0] = 0;
-                barc.color[1] = 255;
-                barc.color[2] = 0;
-                barc.color[3] = 0;
                 if (angle1 > -0.0001 && angle2 < 0.0001) {
                   angle2 += 360;
                 }
@@ -2767,6 +2781,7 @@ result quad_forest_visualize_parse_result
               CHECK(list_append(&circles, &barc));
             }
           }
+          /* uncomment if need to draw tree colors */
           /*
           if (bparent->length > 2) {
             width = tree->size;
@@ -2789,16 +2804,11 @@ result quad_forest_visualize_parse_result
       }
       trees = trees->next;
     }
-    
-    {
-      byte line_color[4] = {0,0,255,0};
-      byte circle_color[4] = {0,255,0,0};
-      
-      CHECK(pixel_image_draw_colored_lines(target, &lines, 3));
-      CHECK(pixel_image_draw_colored_arcs(target, &circles, 3));
-      CHECK(quad_forest_get_links(forest, &links, v_LINK_EDGE_POS));
-      CHECK(pixel_image_draw_colored_lines(target, &links, 2));
-    }
+
+    CHECK(pixel_image_draw_colored_lines(target, &lines, 3));
+    CHECK(pixel_image_draw_colored_arcs(target, &circles, 3));
+    CHECK(quad_forest_get_links(forest, &links, v_LINK_EDGE_POS));
+    CHECK(pixel_image_draw_colored_lines(target, &links, 2));
   }
 
   FINALLY(quad_forest_visualize_parse_result);

@@ -688,7 +688,7 @@ result quad_forest_get_segment_trees
 )
 {
   TRY();
-  uint32 i, x1, y1, x2, y2;
+  uint32 /*i,*/ x1, y1, x2, y2;
   uint32 pos, col, firstcol, lastcol, row, firstrow, lastrow;
 
   CHECK_POINTER(forest);
@@ -1023,7 +1023,7 @@ result quad_forest_get_segment_mask
 )
 {
   TRY();
-  uint32 i, x1, y1, x2, y2, width, height;
+  uint32 /*i,*/ x1, y1, x2, y2, width, height;
   byte value[4];
 
   CHECK_POINTER(forest);
@@ -1351,9 +1351,9 @@ result quad_forest_get_segment_boundary
   list *segment_boundary
 )
 {
-  uint32 row, col, pos;
+  /*uint32 row, col, pos;*/
   quad_tree *tree, *next_tree, *end_tree;
-  segment *tree_segment;
+  /*segment *tree_segment;*/
   direction prev_dir, next_dir;
   point start_point, point_a, point_b;
   line new_line;
@@ -1862,7 +1862,7 @@ result quad_forest_get_links
   }
   else
   if (mode == v_LINK_EDGE) {
-    quad_tree_link_head *head;
+    const quad_tree_link_head *head;
     edge_links *elinks;
     integral_value radius, curvature, max_curvature;
     sint32 x, y, dx, dy;
@@ -2050,9 +2050,8 @@ result quad_forest_get_links
   }
   else
   if (mode == v_LINK_EDGE_POS) {
-    boundary *boundary1, *boundary2, *parent;
-    integral_value radius, angle, strength, max_strength, curvature;
-    sint32 x, y;
+    boundary *boundary1, *boundary2;
+    integral_value radius;
 
     color_line.color[0] = 0;
     color_line.color[1] = 255;
@@ -2066,18 +2065,18 @@ result quad_forest_get_links
       if (boundary1 != NULL) {
         if (boundary1->parent != NULL && boundary1->parent->length > 2) {
           radius = ((integral_value)tree->size) / 2.0;
-          color_line.start.x = boundary1->x;
-          color_line.start.y = boundary1->y;
+          color_line.start.x = (signed)boundary1->x;
+          color_line.start.y = (signed)boundary1->y;
           boundary2 = boundary1->next;
           if (boundary2 != NULL) {
-            color_line.end.x = boundary2->x;
-            color_line.end.y = boundary2->y;
+            color_line.end.x = (signed)boundary2->x;
+            color_line.end.y = (signed)boundary2->y;
             CHECK(list_append(links, (pointer)&color_line));
           }
           boundary2 = boundary1->prev;
           if (boundary2 != NULL) {
-            color_line.end.x = boundary2->x;
-            color_line.end.y = boundary2->y;
+            color_line.end.x = (signed)boundary2->x;
+            color_line.end.y = (signed)boundary2->y;
             CHECK(list_append(links, (pointer)&color_line));
           }
         }
@@ -2087,7 +2086,7 @@ result quad_forest_get_links
   }
   else
   if (mode == v_LINK_BOUNDARY) {
-    boundary *boundary1, *boundary2;
+    boundary *boundary1;
     integral_value radius, angle, strength, max_strength, curvature;
     sint32 x, y, dx, dy;
 
@@ -2220,7 +2219,7 @@ result quad_forest_highlight_segments
 )
 {
   TRY();
-  uint32 i, x1, y1, x2, y2;
+  uint32 /*i,*/ x1, y1, x2, y2;
 
   CHECK_POINTER(forest);
   CHECK_POINTER(target);

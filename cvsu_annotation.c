@@ -381,7 +381,7 @@ result ensure_link_measure
 
 truth_value is_link_measure
 (
-  typed_pointer *tptr
+  const typed_pointer *tptr
 )
 {
   if (tptr != NULL && tptr->type == t_link_measure) {
@@ -392,7 +392,7 @@ truth_value is_link_measure
 
 link_measure *has_link_measure
 (
-  typed_pointer *tptr,
+  const typed_pointer *tptr,
   uint32 token
 )
 {
@@ -410,7 +410,7 @@ link_measure *has_link_measure
 
 result expect_link_measure
 (
-  typed_pointer *tptr,
+  const typed_pointer *tptr,
   link_measure **lmeasure,
   uint32 token
 )
@@ -809,7 +809,7 @@ int compare_boundaries_by_length(const void *a, const void *b)
     PRINT0("warning: tree is null in compare_boundaries_by_length\n");
     return -1;
   }
-  
+
   quality_diff = ((signed)sa->length) - ((signed)sb->length);
   if (quality_diff > 0) return -1;
   else if (quality_diff < 0) return 1;
