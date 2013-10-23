@@ -137,8 +137,6 @@ typedef struct neighborhood_stat_t {
   integral_value segment_score;
   integral_value boundary_score;
   integral_value dir_confusion;
-  uint32 hypothesis_count;
-  node_hypothesis hypotheses[5];
 } neighborhood_stat;
 
 /******************************************************************************/
@@ -218,32 +216,6 @@ result expect_edge_response
 (
   edge_response **eresp,
   typed_pointer *tptr
-);
-
-/******************************************************************************/
-/* smoothed gradient structures and functions                                 */
-/******************************************************************************/
-
-typedef struct smoothed_gradient_t
-{
-  integral_value mag;
-  integral_value ang;
-  integral_value confidence;
-} smoothed_gradient;
-
-/******************************************************************************/
-
-truth_value is_smoothed_gradient
-(
-  typed_pointer *tptr
-);
-
-/******************************************************************************/
-
-smoothed_gradient *has_smoothed_gradient
-(
-  typed_pointer *tptr,
-  uint32 token
 );
 
 /******************************************************************************/
@@ -388,68 +360,6 @@ result expect_edge_links
 (
   typed_pointer *tptr,
   edge_links **elinks,
-  uint32 token
-);
-
-/******************************************************************************/
-/* ridge potential structures and functions                                   */
-/******************************************************************************/
-
-typedef struct ridge_potential_t {
-  uint32 round;
-  integral_value ridge_score;
-  struct quad_tree_t *better_ridge;
-} ridge_potential;
-
-/******************************************************************************/
-
-truth_value is_ridge_potential
-(
-  typed_pointer *tptr
-);
-
-/******************************************************************************/
-
-ridge_potential *has_ridge_potential
-(
-  typed_pointer *tptr,
-  uint32 token
-);
-
-/******************************************************************************/
-/* boundary potential structures and functions                                */
-/******************************************************************************/
-
-typedef struct boundary_potential_t {
-  uint32 length;
-  integral_value angle;
-  integral_value curvature;
-  integral_value acc_angle;
-  struct boundary_t *parent;
-  struct boundary_potential_t *prev;
-} boundary_potential;
-
-/******************************************************************************/
-
-result ensure_boundary_potential
-(
-  typed_pointer *annotation,
-  boundary_potential **bpot,
-  uint32 token
-);
-
-/******************************************************************************/
-
-truth_value is_boundary_potential
-(
-  typed_pointer *tptr
-);
-
-/******************************************************************************/
-
-boundary_potential *has_boundary_potential
-(
-  typed_pointer *tptr,
   uint32 token
 );
 
@@ -622,8 +532,6 @@ typedef struct boundary_t {
   integral_value cy2;
   integral_value curvature2;
   integral_value quality2;
-  /** Boundary fragment model matched by this node */
-  fragment_model *fragment;
 } boundary;
 
 /**

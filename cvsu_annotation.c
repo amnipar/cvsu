@@ -50,12 +50,9 @@ string expect_link_measure_name = "expect_link_measure";
 string ensure_edge_links_name = "ensure_edge_links";
 string expect_edge_links_name = "expect_edge_links";
 string expect_edge_response_name = "expect_edge_response";
-string ensure_boundary_potential_name = "ensure_boundary_potential";
 string ensure_boundary_message_name = "ensure_boundary_message";
 string ensure_segment_message_name = "ensure_segment_message";
 string expect_segment_message_name = "expect_segment_message";
-string ensure_segment_potential_name = "ensure_segment_potential";
-string expect_segment_potential_name = "expect_segment_potential";
 
 string quad_tree_ensure_boundary_name = "quad_tree_ensure_boundary";
 string quad_tree_boundary_init_name = "quad_tree_boundary_init";
@@ -230,37 +227,6 @@ result expect_neighborhood_stat
 
   FINALLY(expect_neighborhood_stat);
   RETURN();
-}
-
-/******************************************************************************/
-
-truth_value is_ridge_potential
-(
-  typed_pointer *tptr
-)
-{
-  if (tptr != NULL && tptr->type == t_ridge_potential) {
-    return TRUE;
-  }
-  return FALSE;
-}
-
-ridge_potential *has_ridge_potential
-(
-  typed_pointer *tptr,
-  uint32 token
-)
-{
-  if (IS_TRUE(is_ridge_potential(tptr)) && tptr->token == token) {
-    return (ridge_potential*)tptr->value;
-  }
-  else {
-    typed_pointer *element = tuple_has_type(tptr, t_ridge_potential);
-    if (element != NULL && element->token == token) {
-      return (ridge_potential*)element->value;
-    }
-  }
-  return NULL;
 }
 
 /******************************************************************************/
@@ -611,100 +577,6 @@ result expect_edge_response
 
 /******************************************************************************/
 
-truth_value is_smoothed_gradient
-(
-  typed_pointer *tptr
-)
-{
-  if (tptr != NULL && tptr->type == t_smoothed_gradient) {
-    return TRUE;
-  }
-  return FALSE;
-}
-
-smoothed_gradient *has_smoothed_gradient
-(
-  typed_pointer *tptr,
-  uint32 token
-)
-{
-  if (IS_TRUE(is_smoothed_gradient(tptr)) && tptr->token == token) {
-    return (smoothed_gradient*)tptr->value;
-  }
-  else {
-    typed_pointer *element = tuple_has_type(tptr, t_smoothed_gradient);
-    if (element != NULL && element->token == token) {
-      return (smoothed_gradient*)element->value;
-    }
-  }
-  return NULL;
-}
-
-/******************************************************************************/
-
-result ensure_boundary_potential
-(
-  typed_pointer *annotation,
-  boundary_potential **bpot,
-  uint32 token
-)
-{
-  TRY();
-  typed_pointer *tptr;
-  boundary_potential *potential;
-
-  CHECK_POINTER(bpot);
-  *bpot = NULL;
-
-  CHECK(ensure_has(annotation, t_boundary_potential, &tptr));
-  potential = (boundary_potential*)tptr->value;
-  if (tptr->token != token) {
-    tptr->token = token;
-    potential->length = 0;
-    potential->angle = 0;
-    potential->curvature = 0;
-    potential->acc_angle = 0;
-    potential->parent = NULL;
-    potential->prev = NULL;
-    /*bpot->profile_score = 0;*/
-  }
-  *bpot = potential;
-
-  FINALLY(ensure_boundary_potential);
-  RETURN();
-}
-
-truth_value is_boundary_potential
-(
-  typed_pointer *tptr
-)
-{
-  if (tptr != NULL && tptr->type == t_boundary_potential) {
-    return TRUE;
-  }
-  return FALSE;
-}
-
-boundary_potential *has_boundary_potential
-(
-  typed_pointer *tptr,
-  uint32 token
-)
-{
-  if (IS_TRUE(is_boundary_potential(tptr)) && tptr->token == token) {
-    return (boundary_potential*)tptr->value;
-  }
-  else {
-    typed_pointer *element = tuple_has_type(tptr, t_boundary_potential);
-    if (element != NULL && element->token == token) {
-      return (boundary_potential*)element->value;
-    }
-  }
-  return NULL;
-}
-
-/******************************************************************************/
-
 result ensure_boundary_message
 (
   typed_pointer *annotation,
@@ -890,7 +762,6 @@ result quad_tree_ensure_boundary
     tree_boundary->angle = 0;
     tree_boundary->smoothed_angle = 0;
     tree_boundary->curvature = 0;
-    tree_boundary->fragment = NULL;
   }
 
   if (output_boundary != NULL) {
