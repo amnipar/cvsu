@@ -151,18 +151,45 @@ result quad_forest_nullify
 );
 
 /**
-* Everything that can be nullified should be able to tell if it's null.
-*/
+ * Everything that can be nullified should be able to tell if it's null.
+ */
 truth_value quad_forest_is_null
 (
   /** The quad_forest structure to be checked for null. */
   quad_forest *target
 );
 
-void quad_forest_set_init(quad_forest *forest);
-void quad_forest_set_update(quad_forest *forest);
-void quad_forest_set_parse(quad_forest *forest);
-truth_value quad_forest_has_parse(quad_forest *forest);
+/**
+ * Sets forest status to 'initialized'
+ */
+void quad_forest_set_init
+(
+  quad_forest *forest
+);
+
+/**
+ * Sets forest status to 'updated'
+ */
+void quad_forest_set_update
+(
+  quad_forest *forest
+);
+
+/**
+ * Sets forest status to 'parsed'
+ */
+void quad_forest_set_parse
+(
+  quad_forest *forest
+);
+
+/**
+ * Checks whether the forest status is 'parsed'
+ */
+truth_value quad_forest_has_parse
+(
+  quad_forest *forest
+);
 
 /**
  * Updates a quad_forest structure; copies data from the original image,
@@ -247,7 +274,7 @@ result quad_forest_get_links
 
 /**
 * Collects all trees contained in a list of segments and draws them on a
-* pixel_image with a red color
+* pixel_image with given color
 */
 result quad_forest_highlight_segments
 (

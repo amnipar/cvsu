@@ -101,8 +101,6 @@ typedef enum link_visualization_mode_t {
 /* forward declaration */
 struct quad_forest_t;
 
-void quad_tree_ensure_neighborhood_stat();
-
 /**
  * Stores a quad tree holding image data.
  */
