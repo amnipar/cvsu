@@ -52,6 +52,7 @@ string pixel_image_draw_arcs_name = "pixel_image_draw_arcs";
 string pixel_image_draw_colored_arcs_name = "pixel_image_draw_colored_arcs";
 string pixel_image_draw_rects_name = "pixel_image_draw_rects";
 string pixel_image_draw_colored_rects_name = "pixel_image_draw_colored_rects";
+string pixel_image_dump_name = "pixel_image_dump";
 
 /******************************************************************************/
 
@@ -717,6 +718,47 @@ result pixel_image_draw_colored_rects
   }
 
   FINALLY(pixel_image_draw_colored_rects);
+  cvReleaseImageHeader(&dst);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result pixel_image_dump
+(
+  pixel_image *source
+)
+{
+  TRY();
+  IplImage *dst;
+  CvSize size;
+  struct timeval finish;
+  double timestamp;
+  char filename[256];
+
+  CHECK_POINTER(source);
+  CHECK_PARAM(source->type == p_U8);
+  CHECK_PARAM(source->format == GREY || source->format == RGB);
+
+  size.width = (signed)source->width;
+  size.height = (signed)source->height;
+  
+  if (source->format == GREY) {
+    dst = cvCreateImageHeader(size, IPL_DEPTH_8U, 1);
+  }
+  else
+  if (source->format == RGB) {
+    dst = cvCreateImageHeader(size, IPL_DEPTH_8U, 3);
+  }
+  
+  cvSetData(dst, source->data, (signed)source->stride);
+
+  gettimeofday(&finish, NULL);
+  timestamp = (((double)finish.tv_sec) + (((double)finish.tv_usec) / 1000000.0));
+  sprintf(filename, "capture/%.6f.png", timestamp);
+  cvSaveImage(filename, dst, 0);
+
+  FINALLY(pixel_image_dump);
   cvReleaseImageHeader(&dst);
   RETURN();
 }

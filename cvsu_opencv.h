@@ -139,7 +139,7 @@ result pixel_image_draw_colored_arcs
 );
 
 /**
- * Draw a list of rects over an image using OpenCV cvRectangle function.
+ * Draws a list of rects over an image using OpenCV cvRectangle function.
  */
 result pixel_image_draw_rects
 (
@@ -150,13 +150,21 @@ result pixel_image_draw_rects
 );
 
 /**
- * Draw a list of colored rects over an image using OpenCV cvRectangle function.
+ * Draws a list of colored rects over an image using OpenCV cvRectangle function.
  */
 result pixel_image_draw_colored_rects
 (
   pixel_image *source,
   list *rects,
   uint32 width
+);
+
+/**
+ * Dumps the image into a file using 'capture/[timestamp].png' as file name
+ */
+result pixel_image_dump
+(
+  pixel_image *source
 );
 
 #ifdef __cplusplus
