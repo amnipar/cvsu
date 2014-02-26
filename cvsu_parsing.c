@@ -1603,15 +1603,26 @@ result quad_forest_parse
 {
   TRY();
   list edgelist, boundarylist, fragmentlist;
-
+  
   CHECK_POINTER(forest);
 
   CHECK(list_create(&edgelist, 1000, sizeof(quad_tree*), 1));
   CHECK(list_create(&boundarylist, 1000, sizeof(boundary*), 1));
   CHECK(list_create(&fragmentlist, 1000, sizeof(boundary*), 1));
-
+  
+  {
+    list_item *trees, *endtrees;
+    quad_tree *tree1;
+    trees = forest->trees.first.next;
+    endtrees = &forest->trees.last;
+    while (trees != endtrees) {
+      tree1 = (quad_tree*)trees->data;
+      tree1->annotation.token = forest->token;
+      trees = trees->next;
+    }
+  }
+  
   CHECK(quad_forest_calculate_edge_stats(forest));
-
   /* in the first round, find nodes with strong outgoing links */
   {
     list_item *trees, *endtrees, *links, *endlinks;
@@ -1629,6 +1640,7 @@ result quad_forest_parse
     endtrees = &forest->trees.last;
     while (trees != endtrees) {
       tree1 = (quad_tree*)trees->data;
+      
       CHECK(expect_neighborhood_stat(&nstat1, &tree1->annotation));
 
       best_towards = NULL;
@@ -1713,7 +1725,6 @@ result quad_forest_parse
       trees = trees->next;
     }
   }
-
   /* in the second round, check the incoming links and extract undisputed frags */
   {
     list_item *edges, *endedges, *links, *endlinks;
@@ -2056,7 +2067,6 @@ result quad_forest_parse
       edges = edges->next;
     }
   }
-
   /* in the third round, analyze and merge boundary fragments */
   {
     quad_tree *tree;
@@ -2068,13 +2078,14 @@ result quad_forest_parse
     integral_value dist, radius;
     uint32 count;
     boundary_category category1;
-
+    
     boundaries = boundarylist.first.next;
     endboundaries = &boundarylist.last;
     while (boundaries != endboundaries) {
       boundary1 = *((boundary**)boundaries->data);
       tree = boundary1->tree;
       CHECK(expect_edge_response(&eresp, &tree->annotation));
+      
       boundary1->x = eresp->x;
       boundary1->y = eresp->y;
       rx = -eresp->dy;
@@ -2089,6 +2100,7 @@ result quad_forest_parse
       x1 = (integral_value)boundary1->x;
       y1 = (integral_value)boundary1->y;
       count = 0;
+      
       boundary2 = boundary1->next;
       if (boundary2 != NULL) {
         tree = boundary2->tree;
@@ -2143,7 +2155,7 @@ result quad_forest_parse
           }
         }
       }
-
+      
       boundary3 = boundary1->prev;
       if (boundary3 != NULL) {
         tree = boundary3->tree;
@@ -2223,7 +2235,6 @@ result quad_forest_parse
 
       boundaries = boundaries->next;
     }
-
     /* next, categorize the fragment shape */
     boundaries = boundarylist.first.next;
     endboundaries = &boundarylist.last;
@@ -2560,7 +2571,7 @@ result quad_forest_parse
 
       boundaries = boundaries->next;
     }
-
+    
     /* finally merge nodes into their best parent (one with longest chain) */
     counter++;
     boundaries = fragmentlist.first.next;
@@ -2618,7 +2629,7 @@ result quad_forest_parse
     }
     }
   }
-
+  
   /* set the state of forest */
   quad_forest_set_parse(forest);
 
