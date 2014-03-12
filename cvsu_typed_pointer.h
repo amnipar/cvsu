@@ -61,6 +61,13 @@ typedef enum type_label_t {
   t_F64,
   t_tuple,
   t_list,
+  t_set,
+  t_graph,
+  t_node,
+  t_attribute,
+  t_attribute_list,
+  t_link,
+  t_link_head,
   /* tree annotation types */
   t_statistics,
   t_accumulated_stat,

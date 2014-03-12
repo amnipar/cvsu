@@ -33,6 +33,8 @@
 #include "cvsu_typed_pointer.h"
 #include "cvsu_memory.h"
 #include "cvsu_list.h"
+#include "cvsu_set.h"
+#include "cvsu_graph.h"
 #include "cvsu_context.h"
 #include "cvsu_annotation.h"
 
@@ -72,6 +74,13 @@ uint32 typesize[] = {
   sizeof(real64),
   sizeof(typed_pointer),
   sizeof(list),
+  sizeof(set),
+  sizeof(graph),
+  sizeof(node),
+  sizeof(attribute),
+  sizeof(attribute_list),
+  sizeof(link),
+  sizeof(link_head),
   /* tree annotation types */
   sizeof(statistics),
   sizeof(accumulated_stat),
