@@ -82,7 +82,7 @@ result memory_allocate
 }
 
 /******************************************************************************/
-
+/* TODO: should make this (and all destroy functions) void. */
 result memory_deallocate
 (
   data_pointer *target

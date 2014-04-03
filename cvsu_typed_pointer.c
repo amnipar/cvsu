@@ -41,6 +41,8 @@
 /******************************************************************************/
 /* constants for reporting function names in error messages                   */
 
+string typed_pointer_alloc_name = "typed_pointer_alloc"
+string typed_pointer_free_name = "typed_pointer_free";
 string typed_pointer_create_name = "typed_pointer_create";
 string tuple_create_name ="tuple_create";
 string tuple_promote_name = "tuple_promote";
@@ -96,6 +98,39 @@ uint32 typesize[] = {
   /* parsing context types */
   sizeof(stat_accumulator)
 };
+
+/******************************************************************************/
+
+typed_pointer *typed_pointer_alloc
+()
+{
+  TRY();
+  typed_pointer *ptr;
+
+  CHECK(memory_allocate((data_pointer*)&ptr, 1, sizeof(typed_pointer)));
+  typed_pointer_nullify(ptr);
+
+  FINALLY(typed_pointer_alloc);
+  return ptr;
+}
+
+/******************************************************************************/
+
+void typed_pointer_free
+(
+  typed_pointer *ptr
+)
+{
+  TRY();
+
+  r = SUCCESS;
+  if (ptr != NULL) {
+    typed_pointer_destroy(ptr);
+    CHECK(memory_deallocate((data_pointer*)&ptr));
+  }
+
+  FINALLY(typed_pointer_free);
+}
 
 /******************************************************************************/
 
@@ -181,6 +216,37 @@ truth_value is_typed_pointer
     return TRUE;
   }
   return FALSE;
+}
+
+/******************************************************************************/
+
+result typed_pointer_copy
+(
+  typed_pointer *target,
+  typed_pointer *source
+)
+{
+
+}
+
+/******************************************************************************/
+
+result typed_pointer_set_value
+(
+  typed_pointer *tptr,
+  uint32 index,
+  pointer new_value
+)
+{
+  TRY();
+
+  CHECK(tptr);
+  CHECK_PARAM(index < tptr->count);
+
+  memory_copy((data_pointer*)&tptr->value[index],
+              (const data_pointer*)new_value,
+              1,
+              typesize[tptr->type]);
 }
 
 /******************************************************************************/

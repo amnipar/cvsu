@@ -97,6 +97,13 @@ typedef struct typed_pointer_t {
   pointer value;
 } typed_pointer;
 
+typed_pointer *typed_pointer_alloc();
+
+void typed_pointer_free
+(
+  typed_pointer *ptr
+);
+
 /**
  * Creates a typed pointer containing the given amount of values of given type.
  */
@@ -142,6 +149,27 @@ truth_value typed_pointer_is_null
 truth_value is_typed_pointer
 (
   const typed_pointer *tptr
+);
+
+/**
+ * Copies the content of a typed_pointer into another typed_pointer. The old
+ * content of target will be destroyed.
+ */
+result typed_pointer_copy
+(
+  typed_pointer *target,
+  typed_pointer *source
+);
+
+/**
+ * Sets the value of typed_pointer. Care must be taken to ensure that the value
+ * pointed to actually matches the type_label of the typed_pointer.
+ */
+result typed_pointer_set_value
+(
+  typed_pointer *tptr,
+  uint32 index,
+  pointer new_value
 );
 
 /**

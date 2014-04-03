@@ -46,6 +46,35 @@ typedef struct attribute_t {
   typed_pointer value;
 } attribute;
 
+attribute *attribute_alloc();
+
+void attribute_free
+(
+  attribute *ptr
+);
+
+result attribute_create
+(
+  attribute *target,
+  uint32 key,
+  typed_pointer *value
+);
+
+result attribute_destroy
+(
+  attribute *target
+);
+
+void attribute_nullify
+(
+  attribute *target
+);
+
+truth_value attribute_is_null
+(
+  attribute *target
+);
+
 /******************************************************************************/
 
 typedef struct attribute_list_t {
@@ -80,8 +109,6 @@ truth_value attribute_list_is_null
 (
   attribute_list *target
 );
-
-/******************************************************************************/
 
 void attribute_add
 (
@@ -147,33 +174,62 @@ typedef struct graph_t {
 } graph;
 
 typedef enum graph_neighborhood_t {
-  NEIGHBORHOOD_4 = 0,
-  NEIGHBORHOOD_8
+  NEIGHBORHOOD_0 = 0,
+  NEIGHBORHOOD_4 = 4,
+  NEIGHBORHOOD_6 = 6,
+  NEIGHBORHOOD_8 = 8
 } graph_neighborhood;
 
+/**
+ * Allocates memory for a graph structure and returns the pointer.
+ */
 graph *graph_alloc();
 
-void graph_free(graph *ptr);
+/**
+ * Frees the memory allocated for a graph structure, and destroys the structure.
+ */
+void graph_free
+(
+  graph *ptr
+);
 
 /**
- * Creates an empty graph with a pre-allocated node and link lists.
+ * Creates an empty graph with a pre-allocated node and link list. An attribute
+ * can be given, indicating the key and value type for node attributes.
  */
 result graph_create
 (
   graph *target,
   uint32 node_size,
-  uint32 link_size
+  uint32 link_size,
+  attribute *attr_label
 );
 
 /**
- * Creates a regular grid graph structure from a single image.
+ * Destroys a graph and deallocates all memory
+ */
+void graph_destroy
+(
+  graph *target
+);
+
+/**
+ * Creates a regular grid graph structure from a single image. The offset from
+ * the top left corner of the image before the first node and the step between
+ * nodes, both expressed in pixels, can be given. The attr_label specifies
+ * which key should be used for the attribute storing the pixel values, as well
+ * as the type used in the attribute.
  */
 result graph_create_from_image
 (
   graph *target,
   pixel_image *source,
-  uint32 node_step,
-  uint32 attribute_id
+  uint32 node_offset_x,
+  uint32 node_offset_y,
+  uint32 node_step_x,
+  uint32 node_step_y,
+  graph_neighborhood neighborhood,
+  attribute *attr_label
 );
 
 #ifdef __cplusplus

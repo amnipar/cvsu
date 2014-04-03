@@ -47,6 +47,107 @@ string attribute_find_name = "attribute_find";
 
 /******************************************************************************/
 
+attribute *attribute_alloc
+()
+{
+  TRY();
+  attribute *ptr;
+
+  CHECK(memory_allocate((data_pointer*)&ptr, 1, sizeof(attribute)));
+  CHECK(attribute_nullify(ptr));
+
+  FINALLY(attribute_alloc);
+  return ptr;
+}
+
+/******************************************************************************/
+
+void attribute_free
+(
+  attribute *ptr
+)
+{
+  TRY();
+
+  r = SUCCESS;
+  if (ptr != NULL) {
+    CHECK(attribute_destroy(ptr));
+    CHECK(memory_deallocate((data_pointer*)&ptr));
+  }
+
+  FINALLY(attribute_free);
+}
+
+/******************************************************************************/
+
+result attribute_create
+(
+  attribute *target,
+  uint32 key,
+  typed_pointer *value
+)
+{
+  TRY();
+
+  CHECK_POINTER(target);
+  CHECK_POINTER(value);
+
+  attribute_destroy(target);
+  if (value->type == t_tuple) {
+    ERROR(NOT_IMPLEMENTED);
+  }
+  else {
+    CHECK(typed_pointer_create(&target->value, value->type, value->count));
+  }
+  CHECK(typed_pointer_copy(&target->value, value));
+  target->key = key;
+
+  FINALLY(attribute_create);
+  RETURN();
+}
+
+/******************************************************************************/
+
+void attribute_destroy
+(
+  attribute *target
+)
+{
+  if (IS_FALSE(attribute_is_null(target))) {
+    typed_pointer_destroy(&target->value);
+    attribute_nullify(target);
+  }
+}
+
+/******************************************************************************/
+
+void attribute_nullify
+(
+  attribute *target
+)
+{
+  if (target != NULL) {
+    target->key = 0;
+    typed_pointer_nullify(&target->value);
+  }
+}
+
+/******************************************************************************/
+
+truth_value attribute_is_null
+(
+  attribute *target
+)
+{
+  if (target != NULL) {
+    if (target->key == 0 && IS_TRUE(typed_pointer_is_null(&target->value))) {
+      return TRUE
+    }
+  }
+}
+
+/******************************************************************************/
+
 attribute_list *attribute_list_alloc
 ()
 {
@@ -179,6 +280,122 @@ result attribute_find
   TRY();
 
   FINALLY(attribute_find);
+  RETURN();
+}
+
+/******************************************************************************/
+
+graph *graph_alloc
+()
+{
+  TRY();
+  graph *ptr;
+
+  CHECK(memory_allocate((data_pointer*)&ptr, 1, sizeof(graph)))
+  graph_nullify(ptr);
+
+  FINALLY(graph_alloc);
+  return ptr;
+}
+
+/******************************************************************************/
+
+void graph_free
+(
+  graph *ptr
+)
+{
+  TRY();
+
+  r = SUCCESS;
+  if (ptr != NULL) {
+    graph_destroy(ptr);
+    CHECK(memory_deallocate((data_pointer*)&ptr));
+  }
+
+  FINALLY(graph_free);
+}
+
+/******************************************************************************/
+
+result graph_create
+(
+  graph *target,
+  uint32 node_size,
+  uint32 link_size,
+  attribute *attr_label
+)
+{
+
+}
+
+/******************************************************************************/
+
+void graph_destroy
+(
+  graph *target
+)
+{
+  if (target != NULL) {
+    CHECK(attribute_list_destroy(&target->images));
+    CHECK(list_destroy(&target->links));
+    /* destroying the nodes might be a bit tricky - typed pointers in attrs */
+    CHECK(list_destroy(&target->nodes));
+  }
+}
+
+/******************************************************************************/
+
+result graph_create_from_image
+(
+  graph *target,
+  pixel_image *source,
+  uint32 node_offset_x,
+  uint32 node_offset_y,
+  uint32 node_step_x,
+  uint32 node_step_y,
+  graph_neighborhood neighborhood,
+  attribute *attr_label
+)
+{
+  TRY();
+  uint32 w, h, step, stride, offset, size, i, j;
+  float *image_data, *image_pos;
+  node *node_data, *node_pos;
+
+  CHECK_POINTER(target);
+  CHECK_POINTER(source);
+  /* TODO: allow null label and create a default attribute with key 1 */
+  CHECK_POINTER(attr_label);
+  /* for now, support just float images */
+  CHECK_PARAM(source->type == p_F32);
+
+  w = source->width;
+  h = source->height;
+  step = source->step;
+  stride = source->stride;
+  offset = source->offset;
+  size = w*h;
+  image_data = (float*)source->data;
+
+  /* create structures */
+  CHECK(list_create(&target->nodes, size, sizeof(node)));
+  CHECK(list_create(&target->links, neighborhood*size, sizeof(link)));
+  CHECK(attribute_list_create(&target->images, 4));
+
+  node_data = (node*)target->nodes
+
+  for (j = 0; j < h; j++) {
+    pos = image_data + j * stride + offset;
+    for (i = 0; i < w; i++) {
+
+      pos += step;
+    }
+  }
+
+  /* initialize nodes and links */
+
+  FINALLY(graph_create_from_image);
   RETURN();
 }
 

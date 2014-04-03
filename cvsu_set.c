@@ -47,10 +47,10 @@ disjoint_set *disjoint_set_alloc
 {
   TRY();
   disjoint_set *ptr;
-  
+
   CHECK(memory_allocate((data_pointer*)&ptr, 1, sizeof(disjoint_set)));
   CHECK(disjoint_set_nullify(ptr));
-  
+
   FINALLY(disjoint_set_alloc);
   return ptr;
 }
@@ -63,12 +63,12 @@ void disjoint_set_free
 )
 {
   TRY();
-  
+
   r = SUCCESS;
   if (ptr != NULL) {
-    CHECK(memory_allocate((data_pointer*)&ptr));
+    CHECK(memory_deallocate((data_pointer*)&ptr));
   }
-  
+
   FINALLY(disjoint_set_free);
 }
 
