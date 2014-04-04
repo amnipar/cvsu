@@ -37,12 +37,12 @@
 #include "cvsu_graph.h"
 #include "cvsu_context.h"
 #include "cvsu_annotation.h"
-#include "cvsu_pixel_image"
+#include "cvsu_pixel_image.h"
 
 /******************************************************************************/
 /* constants for reporting function names in error messages                   */
 
-string typed_pointer_alloc_name = "typed_pointer_alloc"
+string typed_pointer_alloc_name = "typed_pointer_alloc";
 string typed_pointer_create_name = "typed_pointer_create";
 string typed_pointer_clone_name = "typed_pointer_clone";
 string typed_pointer_copy_name = "typed_pointer_copy";
@@ -79,7 +79,7 @@ uint32 typesize[] = {
   sizeof(real64),
   sizeof(typed_pointer),
   sizeof(list),
-  sizeof(set),
+  sizeof(disjoint_set),
   sizeof(graph),
   sizeof(node),
   sizeof(attribute),
@@ -143,13 +143,20 @@ result typed_pointer_create
 )
 {
   TRY();
+  uint32 size;
 
   CHECK_POINTER(tptr);
   typed_pointer_destroy(tptr);
-  CHECK(memory_allocate((data_pointer*)&tptr->value, count, typesize[((uint32)type)]));
-  CHECK(memory_clear((data_pointer)tptr->value, count, typesize[((uint32)type)]));
+  size = typesize[((uint32)type)];
+  CHECK(memory_allocate((data_pointer*)&tptr->value, count, size));
+  CHECK(memory_clear((data_pointer)tptr->value, count, size));
   tptr->type = type;
   tptr->count = count;
+  tptr->token = token;
+  if (value != NULL) {
+    CHECK(memory_copy((data_pointer)tptr->value, (data_pointer)value, count,
+                      size));
+  }
 
   FINALLY(typed_pointer_create);
   RETURN();
@@ -221,13 +228,45 @@ truth_value is_typed_pointer
 
 /******************************************************************************/
 
+result typed_pointer_clone
+(
+  typed_pointer *target,
+  typed_pointer *source
+)
+{
+  TRY();
+  if (target->type != source->type || target->count != source->count) {
+    CHECK(typed_pointer_create(target, source->type, source->count, 
+                               source->token, NULL));
+  }
+  FINALLY(typed_pointer_clone);
+  RETURN();
+}
+
+/******************************************************************************/
+
 result typed_pointer_copy
 (
   typed_pointer *target,
   typed_pointer *source
 )
 {
-
+  TRY();
+  
+  if (target->type != source->type || target->count != source->count) {
+    CHECK(typed_pointer_create(target, source->type, source->count, 
+                               source->token, source->value));
+  }
+  else {
+    if (source->value != NULL) {
+      CHECK(memory_copy((data_pointer)target->value, (data_pointer)source->value, 
+                        source->count, typesize[((uint32)source->type)]));
+    }
+    target->token = source->token;
+  }
+  
+  FINALLY(typed_pointer_copy);
+  RETURN();
 }
 
 /******************************************************************************/
@@ -240,14 +279,18 @@ result typed_pointer_set_value
 )
 {
   TRY();
+  uint32 size;
 
-  CHECK(tptr);
+  CHECK_POINTER(tptr);
   CHECK_PARAM(index < tptr->count);
 
-  memory_copy((data_pointer*)&tptr->value[index],
-              (const data_pointer*)new_value,
-              1,
-              typesize[tptr->type]);
+  size = typesize[tptr->type];
+  if (new_value != NULL) {
+    CHECK(memory_copy(((data_pointer)&tptr->value) + index * size,
+                      (data_pointer)new_value, 1, size));
+  }
+  FINALLY(typed_pointer_set_value);
+  RETURN();
 }
 
 /******************************************************************************/
@@ -381,7 +424,7 @@ result tuple_ensure_has_unique
   }
   else
   if (tuple->type == t_UNDEF) {
-    CHECK(typed_pointer_create(tuple, type, 1));
+    CHECK(typed_pointer_create(tuple, type, 1, 0, NULL));
     *res = tuple;
   }
   else {
@@ -402,7 +445,7 @@ result tuple_ensure_has_unique
     if (*res == NULL) {
       typed_pointer new_ptr;
       typed_pointer_nullify(&new_ptr);
-      CHECK(typed_pointer_create(&new_ptr, type, 1));
+      CHECK(typed_pointer_create(&new_ptr, type, 1, 0, NULL));
       CHECK(tuple_extend(tuple, &new_ptr, res));
     }
   }
@@ -470,7 +513,7 @@ result ensure_has
   /*
   else {
   if (tptr->type == t_UNDEF) {
-    CHECK(typed_pointer_create(tptr, type, 1));
+    CHECK(typed_pointer_create(tptr, type, 1, 0, NULL));
     new_pointer = tptr;
   }
   */
@@ -494,7 +537,7 @@ result ensure_has
   if (new_pointer == NULL) {
     typed_pointer new_element;
     typed_pointer_nullify(&new_element);
-    CHECK(typed_pointer_create(&new_element, type, 1));
+    CHECK(typed_pointer_create(&new_element, type, 1, 0, NULL));
     CHECK(tuple_extend(tptr, &new_element, &new_pointer));
   }
 
@@ -522,7 +565,7 @@ result ensure_is
   CHECK_POINTER(tptr);
 
   if (tptr->type != type) {
-    CHECK(typed_pointer_create(tptr, type, 1));
+    CHECK(typed_pointer_create(tptr, type, 1, 0, NULL));
   }
   *res = tptr;
 

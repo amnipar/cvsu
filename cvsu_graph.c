@@ -91,14 +91,14 @@ result attribute_create
   CHECK_POINTER(value);
 
   attribute_destroy(target);
+  
   if (value->type == t_tuple) {
     ERROR(NOT_IMPLEMENTED);
   }
   else {
-    CHECK(typed_pointer_create(&target->value, value->type, value->count));
-    /* TODO: typed_pointer_clone ? */
+    CHECK(typed_pointer_copy(&target->value, value));
   }
-  CHECK(typed_pointer_copy(&target->value, value));
+  
   target->key = key;
 
   FINALLY(attribute_create);
@@ -213,7 +213,7 @@ void attribute_list_destroy
     }
     /* TODO: need a destroy functionality for structured attributes */
     if (target->items[target->count].key > 0) {
-      ERROR(NOT_IMPLEMENTED);
+      printf("not implemented functionality used in attribute_list_destroy");
     }
     memory_deallocate((data_pointer*)&target->items);
     attribute_list_nullify(target);
@@ -294,7 +294,7 @@ graph *graph_alloc
   TRY();
   graph *ptr;
 
-  CHECK(memory_allocate((data_pointer*)&ptr, 1, sizeof(graph)))
+  CHECK(memory_allocate((data_pointer*)&ptr, 1, sizeof(graph)));
   graph_nullify(ptr);
 
   FINALLY(graph_alloc);
@@ -308,15 +308,10 @@ void graph_free
   graph *ptr
 )
 {
-  TRY();
-
-  r = SUCCESS;
   if (ptr != NULL) {
     graph_destroy(ptr);
-    CHECK(memory_deallocate((data_pointer*)&ptr));
+    memory_deallocate((data_pointer*)&ptr);
   }
-
-  FINALLY(graph_free);
 }
 
 /******************************************************************************/
@@ -335,8 +330,8 @@ result graph_create
   CHECK_POINTER(attr_label);
 
   /* create structures */
-  CHECK(list_create(&target->nodes, size, sizeof(node)));
-  CHECK(list_create(&target->links, neighborhood*size, sizeof(link)));
+  CHECK(list_create(&target->nodes, node_size, sizeof(node), 1));
+  CHECK(list_create(&target->links, link_size, sizeof(link), 1));
 
   FINALLY(graph_create);
   RETURN();
@@ -351,9 +346,9 @@ void graph_destroy
 {
   if (target != NULL) {
     /*CHECK(attribute_list_destroy(&target->images));*/
-    CHECK(list_destroy(&target->links));
+    list_destroy(&target->links);
     /* destroying the nodes might be a bit tricky - typed pointers in attrs */
-    CHECK(list_destroy(&target->nodes));
+    list_destroy(&target->nodes);
   }
 }
 
@@ -367,7 +362,7 @@ void graph_nullify
   if (target != NULL) {
     list_nullify(&target->nodes);
     list_nullify(&target->links);
-    attribute_list_nullify(&target->images);
+    attribute_list_nullify(&target->sources);
   }
 }
 
@@ -402,13 +397,12 @@ result graph_create_from_image
 {
   TRY();
   uint32 w, h, step, stride, offset, size, i, j;
-  float *image_data, *image_pos;
-  node *node_data, *node_pos;
-  int value;
+  byte *image_data, *image_pos;
+  sint32 value;
   type_label type;
 
   printf("entered graph_create_from_image ");
-  printf("ox=%ul oy=%ul sx=%ul sy=%ul n=%ul\n",
+  printf("ox=%lu oy=%lu sx=%lu sy=%lu n=%lu\n",
          node_offset_x,
          node_offset_y,
          node_step_x,
@@ -420,10 +414,11 @@ result graph_create_from_image
   /* TODO: allow null label and create a default attribute with key 1 */
   CHECK_POINTER(attr_label);
   type = attr_label->value.type;
-  value = *((int*)attr_label->value.value);
-  printf("attr type %d id %d value %d\n", (int)type, attr_label->key, value);
-  /* for now, support just float images */
-  CHECK_PARAM(source->type == p_F32);
+  value = *((sint32*)attr_label->value.value);
+  printf("attr type %lu id %lu value %d\n", (uint32)type, attr_label->key, 
+         value);
+  /* for now, support just byte images */
+  CHECK_PARAM(source->type == p_U8);
 
 
   w = source->width;
@@ -432,28 +427,27 @@ result graph_create_from_image
   stride = source->stride;
   offset = source->offset;
   size = w*h;
-  image_data = (float*)source->data;
+  image_data = (byte*)source->data;
 
   /* create structures */
-  CHECK(list_create(&target->nodes, size, sizeof(node)));
-  CHECK(list_create(&target->links, neighborhood*size, sizeof(link)));
+  CHECK(list_create(&target->nodes, size, sizeof(node), 1));
+  CHECK(list_create(&target->links, ((uint32)neighborhood)*size, 
+                    sizeof(link), 1));
 
   /*CHECK(attribute_list_create(&target->images, 4));*/
 
-  node_data = (node*)target->nodes
-
   for (j = 0; j < h; j++) {
-    pos = image_data + j * stride + offset;
+    image_pos = image_data + j * stride + offset;
     for (i = 0; i < w; i++) {
 
-      pos += step;
+      image_pos += step;
     }
   }
 
   /* initialize nodes and links */
 
   FINALLY(graph_create_from_image);
-  printf("exiting graph_create_from_image\n")
+  printf("exiting graph_create_from_image\n");
   RETURN();
 }
 

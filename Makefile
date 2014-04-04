@@ -44,10 +44,10 @@ CFLAGS=-I. \
 
 .PHONY: clean
 
-all: edges segment threshold parse
+all: edges segment threshold parse graph
 
 clean:
-	rm -f find_edges quad_forest_segment threshold_adaptive *.o
+	rm -f find_edges quad_forest_segment threshold_adaptive parse graph *.o
 
 edges: cvsu_memory.o cvsu_output.o cvsu_types.o cvsu_pixel_image.o \
 		cvsu_integral.o cvsu_filter.o cvsu_edges.o cvsu_list.o \
@@ -88,3 +88,11 @@ parse: cvsu_memory.o cvsu_output.o cvsu_types.o cvsu_typed_pointer.o \
 		cvsu_quad_forest.o cvsu_context.o cvsu_annotation.o \
 		cvsu_parsing.o cvsu_opencv.o \
 		parse.o -lm -lopencv_core -lopencv_highgui -I.
+
+graph: cvsu_memory.o cvsu_output.o cvsu_types.o cvsu_typed_pointer.o \
+		cvsu_pixel_image.o cvsu_list.o cvsu_graph.o cvsu_opencv.o \
+		graph.o
+	gcc -o graph cvsu_memory.o cvsu_output.o cvsu_types.o \
+		cvsu_typed_pointer.o cvsu_pixel_image.o cvsu_list.o \
+		cvsu_graph.o cvsu_opencv.o graph.o \
+		-lm -lopencv_core -lopencv_highgui -I.

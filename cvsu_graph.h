@@ -143,7 +143,16 @@ typedef struct node_t {
 /******************************************************************************/
 
 /* forward declaration */
-struct link_head_t;
+struct link_t;
+
+typedef struct link_head_t {
+  struct link_t *body;
+  struct link_head_t *other;
+  struct node_t *origin;
+  attribute_list attributes;
+} link_head;
+
+/******************************************************************************/
 
 /**
  * Defines a generic graph edge with two heads. Each node has one head.
@@ -154,15 +163,6 @@ typedef struct link_t {
   integral_value weight;
   attribute_list attributes;
 } link;
-
-/******************************************************************************/
-
-typedef struct link_head_t {
-  struct link_t *body;
-  struct link_head_t *other;
-  struct node_t *origin;
-  attribute_list attributes;
-} link_head;
 
 /******************************************************************************/
 

@@ -61,7 +61,7 @@ typedef enum type_label_t {
   t_F64,
   t_tuple,
   t_list,
-  t_set,
+  t_disjoint_set,
   t_graph,
   t_node,
   t_attribute,

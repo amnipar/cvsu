@@ -49,7 +49,7 @@ disjoint_set *disjoint_set_alloc
   disjoint_set *ptr;
 
   CHECK(memory_allocate((data_pointer*)&ptr, 1, sizeof(disjoint_set)));
-  CHECK(disjoint_set_nullify(ptr));
+  disjoint_set_nullify(ptr);
 
   FINALLY(disjoint_set_alloc);
   return ptr;
