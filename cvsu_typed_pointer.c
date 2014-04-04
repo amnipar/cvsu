@@ -37,13 +37,16 @@
 #include "cvsu_graph.h"
 #include "cvsu_context.h"
 #include "cvsu_annotation.h"
+#include "cvsu_pixel_image"
 
 /******************************************************************************/
 /* constants for reporting function names in error messages                   */
 
 string typed_pointer_alloc_name = "typed_pointer_alloc"
-string typed_pointer_free_name = "typed_pointer_free";
 string typed_pointer_create_name = "typed_pointer_create";
+string typed_pointer_clone_name = "typed_pointer_clone";
+string typed_pointer_copy_name = "typed_pointer_copy";
+string typed_pointer_set_value_name = "typed_pointer_set_value";
 string tuple_create_name ="tuple_create";
 string tuple_promote_name = "tuple_promote";
 string tuple_extend_name = "tuple_extend";
@@ -96,7 +99,8 @@ uint32 typesize[] = {
   sizeof(segment_message),
   sizeof(segment),
   /* parsing context types */
-  sizeof(stat_accumulator)
+  sizeof(stat_accumulator),
+  sizeof(pixel_image)
 };
 
 /******************************************************************************/
@@ -121,15 +125,10 @@ void typed_pointer_free
   typed_pointer *ptr
 )
 {
-  TRY();
-
-  r = SUCCESS;
   if (ptr != NULL) {
     typed_pointer_destroy(ptr);
-    CHECK(memory_deallocate((data_pointer*)&ptr));
+    memory_deallocate((data_pointer*)&ptr);
   }
-
-  FINALLY(typed_pointer_free);
 }
 
 /******************************************************************************/
@@ -138,7 +137,9 @@ result typed_pointer_create
 (
   typed_pointer *tptr,
   type_label type,
-  uint32 count
+  uint32 count,
+  uint32 token,
+  pointer value
 )
 {
   TRY();

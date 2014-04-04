@@ -37,13 +37,16 @@
 /******************************************************************************/
 /* constants for reporting function names in error messages                   */
 
+string attribute_alloc_name = "attribute_alloc";
+string attribute_create_name = "attribute_create";
 string attribute_list_alloc_name = "attribute_list_alloc";
-string attribute_list_free_name = "attribute_list_free";
 string attribute_list_create_name = "attribute_list_create";
-string attribute_list_destroy_name = "attribute_list_destroy";
 string attribute_list_nullify_name = "attribute_list_nullify";
 string attribute_add_name = "attribute_add";
 string attribute_find_name = "attribute_find";
+string graph_alloc_name = "graph_alloc";
+string graph_create_name = "graph_create";
+string graph_create_from_image_name = "graph_create_from_image";
 
 /******************************************************************************/
 
@@ -54,7 +57,7 @@ attribute *attribute_alloc
   attribute *ptr;
 
   CHECK(memory_allocate((data_pointer*)&ptr, 1, sizeof(attribute)));
-  CHECK(attribute_nullify(ptr));
+  attribute_nullify(ptr);
 
   FINALLY(attribute_alloc);
   return ptr;
@@ -67,15 +70,10 @@ void attribute_free
   attribute *ptr
 )
 {
-  TRY();
-
-  r = SUCCESS;
   if (ptr != NULL) {
-    CHECK(attribute_destroy(ptr));
-    CHECK(memory_deallocate((data_pointer*)&ptr));
+    attribute_destroy(ptr);
+    memory_deallocate((data_pointer*)&ptr);
   }
-
-  FINALLY(attribute_free);
 }
 
 /******************************************************************************/
@@ -98,6 +96,7 @@ result attribute_create
   }
   else {
     CHECK(typed_pointer_create(&target->value, value->type, value->count));
+    /* TODO: typed_pointer_clone ? */
   }
   CHECK(typed_pointer_copy(&target->value, value));
   target->key = key;
@@ -113,7 +112,7 @@ void attribute_destroy
   attribute *target
 )
 {
-  if (IS_FALSE(attribute_is_null(target))) {
+  if (target != NULL) {
     typed_pointer_destroy(&target->value);
     attribute_nullify(target);
   }
@@ -140,10 +139,11 @@ truth_value attribute_is_null
 )
 {
   if (target != NULL) {
-    if (target->key == 0 && IS_TRUE(typed_pointer_is_null(&target->value))) {
-      return TRUE
+    if (target->key == 0) {
+      return TRUE;
     }
   }
+  return FALSE;
 }
 
 /******************************************************************************/
@@ -154,8 +154,8 @@ attribute_list *attribute_list_alloc
   TRY();
   attribute_list *ptr;
 
-  CHECK(memory_allocate((data_pointer *)&ptr, 1, sizeof(attribute_list)));
-  CHECK(attribute_list_nullify(ptr));
+  CHECK(memory_allocate((data_pointer*)&ptr, 1, sizeof(attribute_list)));
+  attribute_list_nullify(ptr);
 
   FINALLY(attribute_list_alloc);
   return ptr;
@@ -168,20 +168,15 @@ void attribute_list_free
   attribute_list *ptr
 )
 {
-  TRY();
-
-  r = SUCCESS;
   if (ptr != NULL) {
-    CHECK(attribute_list_destroy(ptr));
-    CHECK(memory_deallocate((data_pointer *)&ptr));
+    attribute_list_destroy(ptr);
+    memory_deallocate((data_pointer*)&ptr);
   }
-
-  FINALLY(attribute_list_free);
 }
 
 /******************************************************************************/
 
-void attribute_list_create
+result attribute_list_create
 (
   attribute_list *target,
   uint32 count
@@ -193,7 +188,7 @@ void attribute_list_create
   CHECK_TRUE(attribute_list_is_null(target));
   CHECK_PARAM(count > 0);
 
-  CHECK(memory_allocate((data_pointer *)&target->items, count+1,
+  CHECK(memory_allocate((data_pointer*)&target->items, count+1,
                         sizeof(attribute)));
   target->count = count;
 
@@ -208,33 +203,34 @@ void attribute_list_destroy
   attribute_list *target
 )
 {
-  TRY();
+  if (target != NULL) {
+    int i;
 
-  CHECK_POINTER(target);
-
-  CHECK(memory_deallocate((data_pointer*)&target->items));
-  CHECK(attribute_list_nullify(target));
-
-  FINALLY(attribute_list_destroy);
-  RETURN();
+    for (i = 0; i < target->count; i++) {
+      if (target->items[i].key > 0 ) {
+        attribute_destroy(&target->items[i]);
+      }
+    }
+    /* TODO: need a destroy functionality for structured attributes */
+    if (target->items[target->count].key > 0) {
+      ERROR(NOT_IMPLEMENTED);
+    }
+    memory_deallocate((data_pointer*)&target->items);
+    attribute_list_nullify(target);
+  }
 }
 
 /******************************************************************************/
 
-result attribute_list_nullify
+void attribute_list_nullify
 (
   attribute_list *target
 )
 {
-  TRY();
-
-  CHECK_POINTER(target);
-
-  target->items = NULL;
-  target->count = 0;
-
-  FINALLY(attribute_list_nullify);
-  RETURN();
+  if (target != NULL) {
+    target->items = NULL;
+    target->count = 0;
+  }
 }
 
 /******************************************************************************/
@@ -257,30 +253,37 @@ truth_value attribute_list_is_null
 result attribute_add
 (
   attribute_list *target,
-  uint32 key,
-  type_label type,
-  void *value
+  attribute *source
 )
 {
   TRY();
-
+  ERROR(NOT_IMPLEMENTED);
   FINALLY(attribute_add);
   RETURN();
 }
 
 /******************************************************************************/
 
-result attribute_find
+attribute *attribute_find
 (
   attribute_list *source,
-  attribute **target,
   uint32 key
 )
 {
-  TRY();
-
-  FINALLY(attribute_find);
-  RETURN();
+  int i;
+  attribute *ptr;
+  ptr = NULL;
+  if (source != NULL) {
+    for (i = 0; i < source->count; i++) {
+      if (source->items[i].key == 0) {
+        break;
+      }
+      if (source->items[i].key == key) {
+        ptr = &source->items[i];
+      }
+    }
+  }
+  return ptr;
 }
 
 /******************************************************************************/
@@ -326,7 +329,17 @@ result graph_create
   attribute *attr_label
 )
 {
+  TRY();
 
+  CHECK_POINTER(target);
+  CHECK_POINTER(attr_label);
+
+  /* create structures */
+  CHECK(list_create(&target->nodes, size, sizeof(node)));
+  CHECK(list_create(&target->links, neighborhood*size, sizeof(link)));
+
+  FINALLY(graph_create);
+  RETURN();
 }
 
 /******************************************************************************/
@@ -337,11 +350,40 @@ void graph_destroy
 )
 {
   if (target != NULL) {
-    CHECK(attribute_list_destroy(&target->images));
+    /*CHECK(attribute_list_destroy(&target->images));*/
     CHECK(list_destroy(&target->links));
     /* destroying the nodes might be a bit tricky - typed pointers in attrs */
     CHECK(list_destroy(&target->nodes));
   }
+}
+
+/******************************************************************************/
+
+void graph_nullify
+(
+  graph *target
+)
+{
+  if (target != NULL) {
+    list_nullify(&target->nodes);
+    list_nullify(&target->links);
+    attribute_list_nullify(&target->images);
+  }
+}
+
+/******************************************************************************/
+
+truth_value graph_is_null
+(
+  graph *target
+)
+{
+  if (target != NULL) {
+    if (list_is_null(&target->nodes) || list_is_null(&target->links)) {
+      return TRUE;
+    }
+  }
+  return FALSE;
 }
 
 /******************************************************************************/
@@ -362,13 +404,27 @@ result graph_create_from_image
   uint32 w, h, step, stride, offset, size, i, j;
   float *image_data, *image_pos;
   node *node_data, *node_pos;
+  int value;
+  type_label type;
+
+  printf("entered graph_create_from_image ");
+  printf("ox=%ul oy=%ul sx=%ul sy=%ul n=%ul\n",
+         node_offset_x,
+         node_offset_y,
+         node_step_x,
+         node_step_y,
+         (unsigned long)neighborhood);
 
   CHECK_POINTER(target);
   CHECK_POINTER(source);
   /* TODO: allow null label and create a default attribute with key 1 */
   CHECK_POINTER(attr_label);
+  type = attr_label->value.type;
+  value = *((int*)attr_label->value.value);
+  printf("attr type %d id %d value %d\n", (int)type, attr_label->key, value);
   /* for now, support just float images */
   CHECK_PARAM(source->type == p_F32);
+
 
   w = source->width;
   h = source->height;
@@ -381,7 +437,8 @@ result graph_create_from_image
   /* create structures */
   CHECK(list_create(&target->nodes, size, sizeof(node)));
   CHECK(list_create(&target->links, neighborhood*size, sizeof(link)));
-  CHECK(attribute_list_create(&target->images, 4));
+
+  /*CHECK(attribute_list_create(&target->images, 4));*/
 
   node_data = (node*)target->nodes
 
@@ -396,6 +453,7 @@ result graph_create_from_image
   /* initialize nodes and links */
 
   FINALLY(graph_create_from_image);
+  printf("exiting graph_create_from_image\n")
   RETURN();
 }
 

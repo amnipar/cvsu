@@ -37,7 +37,9 @@ extern "C" {
 #endif
 
 #include "cvsu_types.h"
+#include "cvsu_typed_pointer.h"
 #include "cvsu_list.h"
+#include "cvsu_pixel_image.h"
 
 /******************************************************************************/
 
@@ -60,7 +62,7 @@ result attribute_create
   typed_pointer *value
 );
 
-result attribute_destroy
+void attribute_destroy
 (
   attribute *target
 );
@@ -95,12 +97,12 @@ result attribute_list_create
   uint32 count
 );
 
-result attribute_list_destroy
+void attribute_list_destroy
 (
   attribute_list *target
 );
 
-result attribute_list_nullify
+void attribute_list_nullify
 (
   attribute_list *target
 );
@@ -110,18 +112,15 @@ truth_value attribute_list_is_null
   attribute_list *target
 );
 
-void attribute_add
+result attribute_add
 (
   attribute_list *target,
-  uint32 key,
-  type_label type,
-  void *value
+  attribute *source
 );
 
-void attribute_find
+attribute *attribute_find
 (
   attribute_list *source,
-  attribute **target,
   uint32 key
 );
 
@@ -170,7 +169,7 @@ typedef struct link_head_t {
 typedef struct graph_t {
   list nodes;
   list links;
-  attribute_list images;
+  attribute_list sources;
 } graph;
 
 typedef enum graph_neighborhood_t {
@@ -209,6 +208,16 @@ result graph_create
  * Destroys a graph and deallocates all memory
  */
 void graph_destroy
+(
+  graph *target
+);
+
+void graph_nullify
+(
+  graph *target
+);
+
+truth_value graph_is_null
 (
   graph *target
 );

@@ -81,7 +81,8 @@ typedef enum type_label_t {
   t_segment_message,
   t_segment,
   /* parsing context types */
-  t_stat_accumulator
+  t_stat_accumulator,
+  t_pixel_image
 } type_label;
 
 /**
@@ -111,7 +112,9 @@ result typed_pointer_create
 (
   typed_pointer *tptr,
   type_label type,
-  uint32 count
+  uint32 count,
+  uint32 token,
+  pointer value
 );
 
 /**
@@ -149,6 +152,16 @@ truth_value typed_pointer_is_null
 truth_value is_typed_pointer
 (
   const typed_pointer *tptr
+);
+
+/**
+ * Clones the structure of a typed_pointer, without copying the data. The old
+ * content of the target will be destroyed.
+ */
+result typed_pointer_clone
+(
+  typed_pointer *target,
+  typed_pointer *source
 );
 
 /**
