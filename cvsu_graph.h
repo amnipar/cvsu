@@ -81,6 +81,7 @@ truth_value attribute_is_null
 
 typedef struct attribute_list_t {
   attribute *items;
+  uint32 size;
   uint32 count;
 } attribute_list;
 
@@ -94,7 +95,7 @@ void attribute_list_free
 result attribute_list_create
 (
   attribute_list *target,
-  uint32 count
+  uint32 size
 );
 
 void attribute_list_destroy
@@ -115,7 +116,8 @@ truth_value attribute_list_is_null
 result attribute_add
 (
   attribute_list *target,
-  attribute *source
+  attribute *source,
+  attribute **added
 );
 
 attribute *attribute_find
@@ -137,8 +139,29 @@ typedef struct node_t {
   uint32 scale;
   attribute_list attributes;
   attribute_list links;
-  attribute_list bonds;
 } node;
+
+result node_create
+(
+  node *target,
+  uint32 attr_size,
+  uint32 link_size
+);
+
+void node_destroy
+(
+  node *target
+);
+
+void node_nullify
+(
+  node *target
+);
+
+truth_value node_is_null
+(
+  node *target
+);
 
 /******************************************************************************/
 

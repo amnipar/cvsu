@@ -95,7 +95,7 @@ typedef struct typed_pointer_t {
   type_label type;
   uint32 count;
   uint32 token;
-  pointer value;
+  pointer value; /* TODO: change name to data? */
 } typed_pointer;
 
 typed_pointer *typed_pointer_alloc();
