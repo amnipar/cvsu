@@ -126,11 +126,79 @@ attribute *attribute_find
   uint32 key
 );
 
+/* maybe adding and finding attributes should be a function of node and link? */
+
+/******************************************************************************/
+
+/* forward declaration */
+struct link_t;
+
+typedef struct link_head_t {
+  struct link_t *body;
+  struct link_head_t *other;
+  struct node_t *origin;
+  direction dir;
+  attribute_list attributes;
+} link_head;
+
+/**
+ * Defines a generic graph edge with two heads. Each node has one head.
+ */
+typedef struct link_t {
+  struct link_head_t a;
+  struct link_head_t b;
+  integral_value weight;
+  attribute_list attributes;
+} link;
+
+void link_nullify
+(
+  link *target
+);
+
+/******************************************************************************/
+
+typedef struct link_list_t {
+  link_head **items;
+  uint32 size;
+  uint32 count;
+} link_list;
+
+link_list *link_list_alloc();
+
+void link_list_free
+(
+  link_list *ptr
+);
+
+result link_list_create
+(
+  link_list *target,
+  uint32 size
+);
+
+void link_list_destroy
+(
+  link_list *target
+);
+
+void link_list_nullify
+(
+  link_list *target
+);
+
+truth_value link_list_is_null
+(
+  link_list *target
+);
+
+/* adding and finding links are functions of the graph. */
+
 /******************************************************************************/
 
 /**
  * Defines a generic graph node structure for use in sparse graphs, where most
- * nodes have only a few neighbors. Edges are stored within nodes.
+ * nodes have only a few neighbors. Links are stored within nodes.
  */
 typedef struct node_t {
   integral_value x;
@@ -138,7 +206,7 @@ typedef struct node_t {
   integral_value orientation;
   uint32 scale;
   attribute_list attributes;
-  attribute_list links;
+  link_list links;
 } node;
 
 result node_create
@@ -162,30 +230,6 @@ truth_value node_is_null
 (
   node *target
 );
-
-/******************************************************************************/
-
-/* forward declaration */
-struct link_t;
-
-typedef struct link_head_t {
-  struct link_t *body;
-  struct link_head_t *other;
-  struct node_t *origin;
-  attribute_list attributes;
-} link_head;
-
-/******************************************************************************/
-
-/**
- * Defines a generic graph edge with two heads. Each node has one head.
- */
-typedef struct link_t {
-  struct link_head_t a;
-  struct link_head_t b;
-  integral_value weight;
-  attribute_list attributes;
-} link;
 
 /******************************************************************************/
 
