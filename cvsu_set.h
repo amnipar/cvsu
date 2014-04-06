@@ -44,8 +44,7 @@ extern "C" {
  * union-find system.
  */
 typedef struct disjoint_set_t {
-  struct disjoint_set_t *parent;
-  uint32 id;
+  struct disjoint_set_t *id;
   uint32 rank;
 } disjoint_set;
 
@@ -68,8 +67,7 @@ truth_value disjoint_set_is_null
 
 void disjoint_set_create
 (
-  disjoint_set *target,
-  uint32 id
+  disjoint_set *target
 );
 
 disjoint_set *disjoint_set_union
@@ -79,6 +77,11 @@ disjoint_set *disjoint_set_union
 );
 
 disjoint_set *disjoint_set_find
+(
+  disjoint_set *target
+);
+
+uint32 disjoint_set_id
 (
   disjoint_set *target
 );

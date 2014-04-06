@@ -38,7 +38,6 @@
 /* constants for reporting function names in error messages                   */
 
 string disjoint_set_alloc_name = "disjoint_set_alloc";
-string disjoint_set_free_name = "disjoint_set_free";
 
 /******************************************************************************/
 
@@ -62,14 +61,9 @@ void disjoint_set_free
   disjoint_set *ptr
 )
 {
-  TRY();
-
-  r = SUCCESS;
   if (ptr != NULL) {
     CHECK(memory_deallocate((data_pointer*)&ptr));
   }
-
-  FINALLY(disjoint_set_free);
 }
 
 /******************************************************************************/
@@ -80,8 +74,7 @@ void disjoint_set_nullify
 )
 {
   if (target != NULL) {
-    target->parent = NULL;
-    target->id = 0;
+    target->id = NULL;
     target->rank = 0;
   }
 }
@@ -94,7 +87,7 @@ truth_value disjoint_set_is_null
 )
 {
   if (target != NULL) {
-    if (target->parent == NULL) {
+    if (target->id == NULL) {
       return TRUE;
     }
   }
@@ -105,13 +98,11 @@ truth_value disjoint_set_is_null
 
 void disjoint_set_create
 (
-  disjoint_set *target,
-  uint32 id
+  disjoint_set *target
 )
 {
   if (target != NULL) {
-    target->parent = target;
-    target->id = id;
+    target->id = target;
     target->rank = 0;
   }
 }
@@ -127,23 +118,24 @@ disjoint_set *disjoint_set_union
   if (a != NULL && b != NULL) {
     a = disjoint_set_find(a);
     b = disjoint_set_find(b);
-    if (a == b) {
-      return;
-    }
-    else {
+    if (a != b) {
       if (a->rank < b->rank) {
-        a->parent = b;
+        a->id = b;
+        return b;
       }
       else
       if (a->rank > b->rank) {
-        b->parent = a;
+        b->id = a;
+        return a;
       }
       else {
-        b->parent = a;
+        b->id = a;
         a->rank += 1;
+        return a;
       }
     }
   }
+  return NULL;
 }
 
 /******************************************************************************/
@@ -154,12 +146,22 @@ disjoint_set *disjoint_set_find
 )
 {
   if (target != NULL) {
-    if (target->parent != NULL && target->parent != target) {
-      target->parent = disjoint_set_find(target->parent);
+    if (target->id != NULL && target->id != target) {
+      target->id = disjoint_set_find(target->id);
     }
-    return target->parent;
+    return target->id;
   }
   return NULL;
+}
+
+/******************************************************************************/
+
+uint32 disjoint_set_id
+(
+  disjoint_set *target
+)
+{
+  return (uint32)disjoint_set_find(target);
 }
 
 /* end of file                                                                */
