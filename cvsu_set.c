@@ -62,7 +62,7 @@ void disjoint_set_free
 )
 {
   if (ptr != NULL) {
-    CHECK(memory_deallocate((data_pointer*)&ptr));
+    memory_deallocate((data_pointer*)&ptr);
   }
 }
 

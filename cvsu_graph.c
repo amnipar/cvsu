@@ -691,7 +691,7 @@ result graph_create_from_image
   new_node.scale = 1;
   link_nullify(&new_link);
   new_link.weight = 1;
-  printf("creating nodes\n");
+  printf("creating nodes %lu %lu %lu\n", node_w, node_h, node_size);
   /* initialize nodes */
   node_j = 0;
   for (y = node_offset_y; y < h; y += node_step_y) {
