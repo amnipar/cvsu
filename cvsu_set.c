@@ -134,6 +134,9 @@ disjoint_set *disjoint_set_union
         return a;
       }
     }
+    else {
+      return a;
+    }
   }
   return NULL;
 }
