@@ -93,16 +93,16 @@ result attribute_create
   CHECK_POINTER(target);
   CHECK_POINTER(value);
   CHECK_PARAM(key > 0);
-  
+
   /*attribute_destroy(target);*/
-  
+
   if (value->type == t_tuple) {
     ERROR(NOT_IMPLEMENTED);
   }
   else {
     CHECK(typed_pointer_copy(&target->value, value));
   }
-  
+
   target->key = key;
 
   FINALLY(attribute_create);
@@ -265,7 +265,11 @@ result attribute_add
 {
   TRY();
   attribute *new_attr;
-  
+
+  CHECK_POINTER(target);
+  CHECK_POINTER(source);
+  CHECK_POINTER(added);
+
   *added = NULL;
   if (target->count < target->size) {
     new_attr = &target->items[target->count];
@@ -281,7 +285,7 @@ result attribute_add
   else {
     ERROR(NOT_IMPLEMENTED);
   }
-  
+
   FINALLY(attribute_add);
   RETURN();
 }
@@ -337,10 +341,10 @@ link_list *link_list_alloc
 {
   TRY();
   link_list *ptr;
-  
+
   CHECK(memory_allocate((data_pointer*)&ptr, 1, sizeof(link_list)));
   link_list_nullify(ptr);
-  
+
   FINALLY(link_list_alloc);
   return ptr;
 }
@@ -367,18 +371,18 @@ result link_list_create
 )
 {
   TRY();
-  
+
   CHECK_POINTER(target);
   CHECK_TRUE(link_list_is_null(target));
   CHECK_PARAM(size > 0);
-  
+
   /* reserve one extra slot at the end for extending the list */
   CHECK(memory_allocate((data_pointer*)&target->items, size+1,
                         sizeof(link_head*)));
   CHECK(memory_clear((data_pointer)target->items, size+1, sizeof(link_head*)));
   target->size = size;
   target->count = 0;
-  
+
   FINALLY(link_list_create);
   RETURN();
 }
@@ -438,17 +442,17 @@ result node_create
 )
 {
   TRY();
-  
+
   CHECK_POINTER(target);
   node_nullify(target);
-  
+
   if (attr_size > 0) {
     CHECK(attribute_list_create(&target->attributes, attr_size));
   }
   if (link_size > 0) {
     CHECK(link_list_create(&target->links, link_size));
   }
-  
+
   FINALLY(node_create);
   RETURN();
 }
@@ -522,6 +526,7 @@ void graph_free
   graph *ptr
 )
 {
+  printf("graph_free\n");
   if (ptr != NULL) {
     graph_destroy(ptr);
     memory_deallocate((data_pointer*)&ptr);
@@ -571,7 +576,7 @@ void graph_destroy
       item = item->next;
     }
     list_destroy(&target->links);
-    
+
     item = target->nodes.first.next;
     end = &target->nodes.last;
     while (item != end) {
@@ -634,20 +639,12 @@ result graph_create_from_image
   type_label type;
   attribute *new_attr;
   node new_node, *node_ptr;
-  link new_link, *link_ptr, *prev_e, **prev_s, **curr_s, **temp_s;
+  link new_link, *link_ptr, *prev_e, **prev_s;/*, **curr_s, **temp_s;*/
   link_head *head_ptr;
-
-  printf("entered graph_create_from_image ");
-  printf("ox=%lu oy=%lu sx=%lu sy=%lu n=%lu\n",
-         node_offset_x,
-         node_offset_y,
-         node_step_x,
-         node_step_y,
-         (unsigned long)neighborhood);
 
   CHECK_POINTER(target);
   CHECK_POINTER(source);
-  
+
   w = source->width;
   h = source->height;
   step = source->step;
@@ -655,52 +652,49 @@ result graph_create_from_image
   offset = source->offset;
   size = w*h;
   image_data = (byte*)source->data;
-  
+
   CHECK_PARAM(node_step_x > 0 && node_step_x < w);
   CHECK_PARAM(node_step_y > 0 && node_step_y < h);
   CHECK_PARAM(node_offset_x < w);
   CHECK_PARAM(node_offset_y < h);
-  
+
   /* TODO: allow null label and create a default attribute with key 1 */
   CHECK_POINTER(attr_label);
   type = attr_label->value.type;
   value = *((sint32*)attr_label->value.value);
-  printf("attr type %lu id %lu value %li\n", (uint32)type, attr_label->key, 
-         value);
+
   /* for now, support just byte images */
   CHECK_PARAM(source->type == p_U8);
 
   /* create structures */
-  node_w = (uint32)((w - node_offset_x) / node_step_x);
-  node_h = (uint32)((h - node_offset_y) / node_step_y);
+  node_w = (uint32)((w - node_offset_x - 1) / node_step_x) + 1;
+  node_h = (uint32)((h - node_offset_y - 1) / node_step_y) + 1;
   node_size = node_w * node_h;
   CHECK(list_create(&target->nodes, node_size, sizeof(node), 1));
   CHECK(list_create(&target->links, 4*node_size, sizeof(link), 1));
 
   /*CHECK(attribute_list_create(&target->sources, 4));*/
-  
+
   /* create temporary arrays for caching links */
   CHECK(memory_allocate((data_pointer*)&prev_s, node_w, sizeof(link*)));
   CHECK(memory_clear((data_pointer)prev_s, node_w, sizeof(link*)));
-  CHECK(memory_allocate((data_pointer*)&curr_s, node_w, sizeof(link*)));
-  CHECK(memory_clear((data_pointer)curr_s, node_w, sizeof(link*)));
-  temp_s = NULL;
   prev_e = NULL;
-  
+
   node_nullify(&new_node);
   new_node.scale = 1;
   link_nullify(&new_link);
   new_link.weight = 1;
-  printf("creating nodes %lu %lu %lu\n", node_w, node_h, node_size);
+
   /* initialize nodes */
   node_j = 0;
   for (y = node_offset_y; y < h; y += node_step_y) {
     image_pos = image_data + y * stride + (offset + node_offset_x) * step;
     node_i = 0;
     for (x = node_offset_x; x < w; x += node_step_x) {
-      value = (sint32)*image_pos;
-      
-      image_pos += node_step_x*step;
+      value = (sint32)(*image_pos);
+      /* got pixel value, can move image pos */
+      image_pos += (node_step_x*step);
+
       CHECK(list_append_return_pointer(&target->nodes, (pointer)&new_node,
                                        (pointer*)&node_ptr));
       CHECK(node_create(node_ptr, 4, 4));
@@ -708,19 +702,17 @@ result graph_create_from_image
       node_ptr->y = (integral_value)y;
       CHECK(attribute_add(&node_ptr->attributes, attr_label, &new_attr));
       (*((sint32*)new_attr->value.value)) = value;
-      
+
       /* initialize links */
-      /* add s link if not at edge, cache */
-      if (node_j < node_h-1) {
-        CHECK(list_append_return_pointer(&target->links, (pointer)&new_link,
-                                         (pointer*)&link_ptr));
-        head_ptr = &link_ptr->a;
+      /* add n link by using cached node's link */
+      if (node_j > 0) {
+        link_ptr = prev_s[node_i];
+        head_ptr = &link_ptr->b;
         head_ptr->body = link_ptr;
-        head_ptr->other = &link_ptr->b;
+        head_ptr->other = &link_ptr->a;
         head_ptr->origin = node_ptr;
-        head_ptr->dir = d_S;
-        node_ptr->links.items[2] = head_ptr;
-        curr_s[node_i] = link_ptr;
+        head_ptr->dir = d_N;
+        node_ptr->links.items[0] = head_ptr;
       }
       /* add w link by using cached node's link */
       if (node_i > 0) {
@@ -732,8 +724,20 @@ result graph_create_from_image
         head_ptr->dir = d_W;
         node_ptr->links.items[3] = head_ptr;
       }
+      /* add s link if not at edge, cache */
+      if (node_j < (node_h-1)) {
+        CHECK(list_append_return_pointer(&target->links, (pointer)&new_link,
+                                         (pointer*)&link_ptr));
+        head_ptr = &link_ptr->a;
+        head_ptr->body = link_ptr;
+        head_ptr->other = &link_ptr->b;
+        head_ptr->origin = node_ptr;
+        head_ptr->dir = d_S;
+        node_ptr->links.items[2] = head_ptr;
+        prev_s[node_i] = link_ptr;
+      }
       /* add e link if not at edge, cache */
-      if (node_i < node_w-1) {
+      if (node_i < (node_w-1)) {
         CHECK(list_append_return_pointer(&target->links, (pointer)&new_link,
                                          (pointer*)&link_ptr));
         head_ptr = &link_ptr->a;
@@ -744,29 +748,17 @@ result graph_create_from_image
         node_ptr->links.items[1] = head_ptr;
         prev_e = link_ptr;
       }
-      /* add n link by using cached node's link */
-      if (node_j > 0) {
-        link_ptr = prev_s[node_i];
-        head_ptr = &link_ptr->b;
-        head_ptr->body = link_ptr;
-        head_ptr->other = &link_ptr->b;
-        head_ptr->origin = node_ptr;
-        head_ptr->dir = d_N;
-        node_ptr->links.items[0] = head_ptr;
-      }
       node_ptr->links.count = (uint32)neighborhood;
       node_i++;
     }
-    temp_s = prev_s;
-    prev_s = curr_s;
-    curr_s = temp_s;
     node_j++;
   }
 
   FINALLY(graph_create_from_image);
+
+  prev_e = NULL;
   memory_deallocate((data_pointer*)&prev_s);
-  memory_deallocate((data_pointer*)&curr_s);
-  printf("exiting graph_create_from_image\n");
+
   RETURN();
 }
 

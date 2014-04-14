@@ -135,38 +135,38 @@ int main(int argc, char *argv[])
 
   PRINT0("load image...\n");
   CHECK(pixel_image_create_from_file(&src_image, source_file, p_U8, GREY));
-  CHECK(pixel_image_create(&dst_image, p_U8, RGB, src_image.width, 
+  CHECK(pixel_image_create(&dst_image, p_U8, RGB, src_image.width,
                            src_image.height, 3, 3 * src_image.width));
   CHECK(convert_grey8_to_grey24(&src_image, &dst_image));
-  
+
   PRINT0("create typed pointer...\n");
   def = 5;
   tptr = typed_pointer_alloc();
   CHECK(typed_pointer_create(tptr, t_S32, 1, 1, (pointer)&def));
-  
+
   PRINT0("create attribute...\n");
   attr = attribute_alloc();
   CHECK(attribute_create(attr, 1, tptr));
-  
+
   PRINT0("create graph...\n");
-  CHECK(graph_create_from_image(&g, &src_image, 0, 0, stepx, stepy, 
+  CHECK(graph_create_from_image(&g, &src_image, 5, 5, stepx, stepy,
                                 NEIGHBORHOOD_4, attr));
-  
+
   switch (mode) {
     case m_CONNECTED:
       PRINT0("finding connected components...\n");
-      
+
       break;
     case m_CONTOUR:
       PRINT0("finding contours...\n");
-      
+
       break;
     default:
       PRINT0("unknown mode\n");
       ERROR(BAD_PARAM);
   }
   /* draw nodes on image */
-  
+
   PRINT0("writing result to file...\n");
   CHECK(pixel_image_write_to_file(&dst_image, target_file));
   PRINT0("done!\n");
