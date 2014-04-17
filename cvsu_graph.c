@@ -37,279 +37,12 @@
 /******************************************************************************/
 /* constants for reporting function names in error messages                   */
 
-string attribute_alloc_name = "attribute_alloc";
-string attribute_create_name = "attribute_create";
-string attribute_list_alloc_name = "attribute_list_alloc";
-string attribute_list_create_name = "attribute_list_create";
-string attribute_list_nullify_name = "attribute_list_nullify";
-string attribute_add_name = "attribute_add";
-string attribute_find_name = "attribute_find";
 string link_list_alloc_name = "link_list_alloc";
 string link_list_create_name = "link_list_create";
 string node_create_name = "node_create";
 string graph_alloc_name = "graph_alloc";
 string graph_create_name = "graph_create";
 string graph_create_from_image_name = "graph_create_from_image";
-
-/******************************************************************************/
-
-attribute *attribute_alloc
-()
-{
-  TRY();
-  attribute *ptr;
-
-  CHECK(memory_allocate((data_pointer*)&ptr, 1, sizeof(attribute)));
-  attribute_nullify(ptr);
-
-  FINALLY(attribute_alloc);
-  return ptr;
-}
-
-/******************************************************************************/
-
-void attribute_free
-(
-  attribute *ptr
-)
-{
-  if (ptr != NULL) {
-    attribute_destroy(ptr);
-    memory_deallocate((data_pointer*)&ptr);
-  }
-}
-
-/******************************************************************************/
-
-result attribute_create
-(
-  attribute *target,
-  uint32 key,
-  typed_pointer *value
-)
-{
-  TRY();
-
-  CHECK_POINTER(target);
-  CHECK_POINTER(value);
-  CHECK_PARAM(key > 0);
-
-  /*attribute_destroy(target);*/
-
-  if (value->type == t_tuple) {
-    ERROR(NOT_IMPLEMENTED);
-  }
-  else {
-    CHECK(typed_pointer_copy(&target->value, value));
-  }
-
-  target->key = key;
-
-  FINALLY(attribute_create);
-  RETURN();
-}
-
-/******************************************************************************/
-
-void attribute_destroy
-(
-  attribute *target
-)
-{
-  if (target != NULL) {
-    typed_pointer_destroy(&target->value);
-    attribute_nullify(target);
-  }
-}
-
-/******************************************************************************/
-
-void attribute_nullify
-(
-  attribute *target
-)
-{
-  if (target != NULL) {
-    target->key = 0;
-    typed_pointer_nullify(&target->value);
-  }
-}
-
-/******************************************************************************/
-
-truth_value attribute_is_null
-(
-  attribute *target
-)
-{
-  if (target != NULL) {
-    if (target->key == 0) {
-      return TRUE;
-    }
-  }
-  return FALSE;
-}
-
-/******************************************************************************/
-
-attribute_list *attribute_list_alloc
-()
-{
-  TRY();
-  attribute_list *ptr;
-
-  CHECK(memory_allocate((data_pointer*)&ptr, 1, sizeof(attribute_list)));
-  attribute_list_nullify(ptr);
-
-  FINALLY(attribute_list_alloc);
-  return ptr;
-}
-
-/******************************************************************************/
-
-void attribute_list_free
-(
-  attribute_list *ptr
-)
-{
-  if (ptr != NULL) {
-    attribute_list_destroy(ptr);
-    memory_deallocate((data_pointer*)&ptr);
-  }
-}
-
-/******************************************************************************/
-
-result attribute_list_create
-(
-  attribute_list *target,
-  uint32 size
-)
-{
-  TRY();
-
-  CHECK_POINTER(target);
-  CHECK_TRUE(attribute_list_is_null(target));
-  CHECK_PARAM(size > 0);
-
-  /* reserve one extra slot at the end for extending the list */
-  CHECK(memory_allocate((data_pointer*)&target->items, size+1,
-                        sizeof(attribute)));
-  CHECK(memory_clear((data_pointer)target->items, size+1, sizeof(attribute)));
-  target->size = size;
-  target->count = 0;
-
-  FINALLY(attribute_list_create);
-  RETURN();
-}
-
-/******************************************************************************/
-
-void attribute_list_destroy
-(
-  attribute_list *target
-)
-{
-  if (target != NULL) {
-    int i;
-
-    for (i = 0; i < target->count; i++) {
-      attribute_destroy(&target->items[i]);
-    }
-    /* TODO: need a destroy functionality for structured attributes */
-    if (target->items[target->size].key > 0) {
-      printf("not implemented functionality used in attribute_list_destroy");
-    }
-    memory_deallocate((data_pointer*)&target->items);
-    attribute_list_nullify(target);
-  }
-}
-
-/******************************************************************************/
-
-void attribute_list_nullify
-(
-  attribute_list *target
-)
-{
-  if (target != NULL) {
-    target->items = NULL;
-    target->size = 0;
-    target->count = 0;
-  }
-}
-
-/******************************************************************************/
-
-truth_value attribute_list_is_null
-(
-  attribute_list *target
-)
-{
-  if (target != NULL) {
-    if (target->items == NULL) {
-      return TRUE;
-    }
-  }
-  return FALSE;
-}
-
-/******************************************************************************/
-
-result attribute_add
-(
-  attribute_list *target,
-  attribute *source,
-  attribute **added
-)
-{
-  TRY();
-  attribute *new_attr;
-
-  CHECK_POINTER(target);
-  CHECK_POINTER(source);
-  CHECK_POINTER(added);
-
-  *added = NULL;
-  if (target->count < target->size) {
-    new_attr = &target->items[target->count];
-    attribute_nullify(new_attr);
-    CHECK(attribute_create(new_attr, source->key, &source->value));
-    target->count++;
-    /*
-    new_attr->key = source->key;
-    CHECK(typed_pointer_copy(&new_attr->value, &source->value));
-    */
-    *added = new_attr;
-  }
-  else {
-    ERROR(NOT_IMPLEMENTED);
-  }
-
-  FINALLY(attribute_add);
-  RETURN();
-}
-
-/******************************************************************************/
-
-attribute *attribute_find
-(
-  attribute_list *source,
-  uint32 key
-)
-{
-  int i;
-  attribute *ptr;
-  ptr = NULL;
-  if (source != NULL) {
-    for (i = 0; i < source->count; i++) {
-      if (source->items[i].key == key) {
-        ptr = &source->items[i];
-      }
-    }
-  }
-  return ptr;
-}
 
 /******************************************************************************/
 
@@ -712,6 +445,7 @@ result graph_create_from_image
         head_ptr->other = &link_ptr->a;
         head_ptr->origin = node_ptr;
         head_ptr->dir = d_N;
+        link_ptr->weight = fabs(link_ptr->weight - (integral_value)value);
         node_ptr->links.items[0] = head_ptr;
       }
       /* add w link by using cached node's link */
@@ -722,6 +456,7 @@ result graph_create_from_image
         head_ptr->other = &link_ptr->a;
         head_ptr->origin = node_ptr;
         head_ptr->dir = d_W;
+        link_ptr->weight = fabs(link_ptr->weight - (integral_value)value);
         node_ptr->links.items[3] = head_ptr;
       }
       /* add s link if not at edge, cache */
@@ -734,6 +469,7 @@ result graph_create_from_image
         head_ptr->origin = node_ptr;
         head_ptr->dir = d_S;
         node_ptr->links.items[2] = head_ptr;
+        link_ptr->weight = (integral_value)value;
         prev_s[node_i] = link_ptr;
       }
       /* add e link if not at edge, cache */
@@ -746,6 +482,7 @@ result graph_create_from_image
         head_ptr->origin = node_ptr;
         head_ptr->dir = d_E;
         node_ptr->links.items[1] = head_ptr;
+        link_ptr->weight = (integral_value)value;
         prev_e = link_ptr;
       }
       node_ptr->links.count = (uint32)neighborhood;

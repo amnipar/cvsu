@@ -37,96 +37,9 @@ extern "C" {
 #endif
 
 #include "cvsu_types.h"
-#include "cvsu_typed_pointer.h"
+#include "cvsu_attribute.h"
 #include "cvsu_list.h"
 #include "cvsu_pixel_image.h"
-
-/******************************************************************************/
-
-typedef struct attribute_t {
-  uint32 key;
-  typed_pointer value;
-} attribute;
-
-attribute *attribute_alloc();
-
-void attribute_free
-(
-  attribute *ptr
-);
-
-result attribute_create
-(
-  attribute *target,
-  uint32 key,
-  typed_pointer *value
-);
-
-void attribute_destroy
-(
-  attribute *target
-);
-
-void attribute_nullify
-(
-  attribute *target
-);
-
-truth_value attribute_is_null
-(
-  attribute *target
-);
-
-/******************************************************************************/
-
-typedef struct attribute_list_t {
-  attribute *items;
-  uint32 size;
-  uint32 count;
-} attribute_list;
-
-attribute_list *attribute_list_alloc();
-
-void attribute_list_free
-(
-  attribute_list *ptr
-);
-
-result attribute_list_create
-(
-  attribute_list *target,
-  uint32 size
-);
-
-void attribute_list_destroy
-(
-  attribute_list *target
-);
-
-void attribute_list_nullify
-(
-  attribute_list *target
-);
-
-truth_value attribute_list_is_null
-(
-  attribute_list *target
-);
-
-result attribute_add
-(
-  attribute_list *target,
-  attribute *source,
-  attribute **added
-);
-
-attribute *attribute_find
-(
-  attribute_list *source,
-  uint32 key
-);
-
-/* maybe adding and finding attributes should be a function of node and link? */
 
 /******************************************************************************/
 

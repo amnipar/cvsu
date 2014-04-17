@@ -37,6 +37,7 @@ extern "C" {
 #endif
 
 #include "cvsu_types.h"
+#include "cvsu_attribute.h"
 
 /**
  * Defines a disjoint set datatype, which is used to encode set membership by
@@ -46,6 +47,8 @@ extern "C" {
 typedef struct disjoint_set_t {
   struct disjoint_set_t *id;
   uint32 rank;
+  uint32 size;
+  attribute_list attributes;
 } disjoint_set;
 
 disjoint_set *disjoint_set_alloc();
@@ -65,22 +68,49 @@ truth_value disjoint_set_is_null
   disjoint_set *target
 );
 
-void disjoint_set_create
+/**
+ * Create a set with size 1, itself its own representative, with the given
+ * amount of slots for attributes.
+ */
+result disjoint_set_create
+(
+  disjoint_set *target,
+  uint32 attribute_count
+);
+
+void disjoint_set_destroy
 (
   disjoint_set *target
 );
 
+/**
+ * Creates a union of two sets by selecting one of the sets as the
+ * representative of the union. The size of the union will be the sum of the
+ * sizes of the two sets.
+ * NOTE: If the sets have attributes, handling the attributes of the union must
+ * be taken care of separately. It is advisable to write a specialized function
+ * to handle the unions of attributed sets.
+ */
 disjoint_set *disjoint_set_union
 (
   disjoint_set *a,
   disjoint_set *b
 );
 
+/**
+ * Finds the representative of the sets by following the id links and caching
+ * the direct link to it to every node along the way. This compresses the search
+ * path and speeds up using the data structure.
+ */
 disjoint_set *disjoint_set_find
 (
   disjoint_set *target
 );
 
+/**
+ * A utility function for turning the pointer of the set representative into an
+ * id number. Calls find before returning the id.
+ */
 uint32 disjoint_set_id
 (
   disjoint_set *target

@@ -38,6 +38,7 @@
 /* constants for reporting function names in error messages                   */
 
 string disjoint_set_alloc_name = "disjoint_set_alloc";
+string disjoint_set_create_name = "disjoint_set_create";
 
 /******************************************************************************/
 
@@ -62,6 +63,7 @@ void disjoint_set_free
 )
 {
   if (ptr != NULL) {
+    disjoint_set_destroy(ptr);
     memory_deallocate((data_pointer*)&ptr);
   }
 }
@@ -76,6 +78,8 @@ void disjoint_set_nullify
   if (target != NULL) {
     target->id = NULL;
     target->rank = 0;
+    target->size = 0;
+    attribute_list_nullify(&target->attributes);
   }
 }
 
@@ -96,14 +100,42 @@ truth_value disjoint_set_is_null
 
 /******************************************************************************/
 
-void disjoint_set_create
+result disjoint_set_create
+(
+  disjoint_set *target,
+  uint32 attribute_count
+)
+{
+  TRY();
+
+  CHECK_POINTER(target);
+
+  disjoint_set_destroy(target);
+  if (target != NULL) {
+    target->id = target;
+    target->rank = 0;
+    target->size = 1;
+    /*
+    if (attribute_count > 0) {
+      CHECK(attribute_list_create(&target->attributes, attribute_count));
+    }
+    */
+  }
+
+  FINALLY(disjoint_set_create);
+  RETURN();
+}
+
+/******************************************************************************/
+
+void disjoint_set_destroy
 (
   disjoint_set *target
 )
 {
   if (target != NULL) {
-    target->id = target;
-    target->rank = 0;
+    attribute_list_destroy(&target->attributes);
+    disjoint_set_nullify(target);
   }
 }
 
@@ -121,16 +153,19 @@ disjoint_set *disjoint_set_union
     if (a != b) {
       if (a->rank < b->rank) {
         a->id = b;
+        b->size += a->size;
         return b;
       }
       else
       if (a->rank > b->rank) {
         b->id = a;
+        a->size += b->size;
         return a;
       }
       else {
         b->id = a;
         a->rank += 1;
+        a->size += b->size;
         return a;
       }
     }
