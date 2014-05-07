@@ -373,6 +373,23 @@ typedef struct statistics_t
 #endif
 } statistics;
 
+statistics *statistics_alloc();
+
+void statistics_free
+(
+  statistics *ptr
+);
+
+typedef struct moments_t
+{
+  integral_value m00;
+  integral_value m10;
+  integral_value m01;
+  integral_value m11;
+  integral_value m20;
+  integral_value m02;
+} moments;
+
 typedef struct consistency_t
 {
   integral_value row_mean;

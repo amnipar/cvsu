@@ -34,6 +34,11 @@
 #include "cvsu_macros.h"
 
 /******************************************************************************/
+/* constants for reporting function names in error messages                   */
+
+string statistics_alloc_name = "statistics_alloc";
+
+/******************************************************************************/
 
 sint32 signum
 (
@@ -196,6 +201,39 @@ integral_value cast_pixel_value
 )
 {
   return (casts[(uint32)type])(data, offset);
+}
+
+/******************************************************************************/
+
+statistics *statistics_alloc
+()
+{
+  TRY();
+  statistics *ptr;
+
+  CHECK(memory_allocate((data_pointer*)&ptr, 1, sizeof(statistics)));
+
+  ptr->N = 0;
+  ptr->sum = 0;
+  ptr->sum2 = 0;
+  ptr->mean = 0;
+  ptr->variance = 0;
+  ptr->deviation = 0;
+
+  FINALLY(statistics_alloc);
+  return ptr;
+}
+
+/******************************************************************************/
+
+void statistics_free
+(
+  statistics *ptr
+)
+{
+  if (ptr != NULL) {
+    memory_deallocate((data_pointer*)&ptr);
+  }
 }
 
 /******************************************************************************/

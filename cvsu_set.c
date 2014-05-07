@@ -115,11 +115,9 @@ result disjoint_set_create
     target->id = target;
     target->rank = 0;
     target->size = 1;
-    /*
     if (attribute_count > 0) {
       CHECK(attribute_list_create(&target->attributes, attribute_count));
     }
-    */
   }
 
   FINALLY(disjoint_set_create);
