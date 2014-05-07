@@ -88,6 +88,7 @@ uint32 typesize[] = {
   sizeof(link_head),
   /* tree annotation types */
   sizeof(statistics),
+  sizeof(raw_moments),
   sizeof(accumulated_stat),
   sizeof(neighborhood_stat),
   sizeof(edge_response),

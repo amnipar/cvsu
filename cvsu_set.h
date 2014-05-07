@@ -83,6 +83,12 @@ void disjoint_set_destroy
   disjoint_set *target
 );
 
+result disjoint_set_attributes_create
+(
+  disjoint_set *target,
+  uint32 attribute_count
+);
+
 /**
  * Creates a union of two sets by selecting one of the sets as the
  * representative of the union. The size of the union will be the sum of the
@@ -112,6 +118,11 @@ disjoint_set *disjoint_set_find
  * id number. Calls find before returning the id.
  */
 uint32 disjoint_set_id
+(
+  disjoint_set *target
+);
+
+uint32 disjoint_set_attrib_size
 (
   disjoint_set *target
 );

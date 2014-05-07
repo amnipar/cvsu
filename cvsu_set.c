@@ -39,6 +39,7 @@
 
 string disjoint_set_alloc_name = "disjoint_set_alloc";
 string disjoint_set_create_name = "disjoint_set_create";
+string disjoint_set_attributes_create_name = "disjoint_set_attributes_create";
 
 /******************************************************************************/
 
@@ -115,9 +116,7 @@ result disjoint_set_create
     target->id = target;
     target->rank = 0;
     target->size = 1;
-    if (attribute_count > 0) {
-      CHECK(attribute_list_create(&target->attributes, attribute_count));
-    }
+    CHECK(disjoint_set_attributes_create(target, attribute_count));
   }
 
   FINALLY(disjoint_set_create);
@@ -139,6 +138,126 @@ void disjoint_set_destroy
 
 /******************************************************************************/
 
+result disjoint_set_attributes_create
+(
+  disjoint_set *target,
+  uint32 attribute_count
+)
+{
+  TRY();
+  
+  CHECK_POINTER(target);
+  
+  if (attribute_count > 0) {
+    CHECK(attribute_list_create(&target->attributes, attribute_count));
+  }
+  
+  FINALLY(disjoint_set_attributes_create);
+  RETURN();
+}
+
+/******************************************************************************/
+
+void disjoint_set_attributes_clear
+(
+  disjoint_set *target
+)
+{
+  if (target != NULL) {
+    memory_clear((data_pointer)target->attributes.items, 
+                 target->attributes.size+1, sizeof(attribute));
+    target->attributes.count = 0;
+  }
+}
+
+/******************************************************************************/
+
+void union_S32(typed_pointer *a, typed_pointer *b)
+{
+  *((sint32*)a->value) = *((sint32*)a->value) + *((sint32*)b->value);
+}
+
+void union_U32(typed_pointer *a, typed_pointer *b)
+{
+  *((uint32*)a->value) = *((uint32*)a->value) + *((uint32*)b->value);
+}
+
+void union_F32(typed_pointer *a, typed_pointer *b)
+{
+  *((float*)a->value) = *((float*)a->value) + *((float*)b->value);
+}
+
+void union_F64(typed_pointer *a, typed_pointer *b)
+{
+  *((double*)a->value) = *((double*)a->value) + *((double*)b->value);
+}
+
+void union_statistics(typed_pointer *a, typed_pointer *b)
+{
+  statistics *astat, *bstat;
+  astat = (statistics*)a->value;
+  bstat = (statistics*)b->value;
+  astat->N += bstat->N;
+  astat->sum += bstat->sum;
+  astat->sum2 += bstat->sum2;
+}
+
+void union_raw_moments(typed_pointer *a, typed_pointer *b)
+{
+  raw_moments *araw, *braw;
+  araw = (raw_moments*)a->value;
+  braw = (raw_moments*)b->value;
+  araw->m00 += braw->m00;
+  araw->m10 += braw->m10;
+  araw->m01 += braw->m01;
+  araw->m11 += braw->m11;
+  araw->m20 += braw->m20;
+  araw->m02 += braw->m02;
+}
+
+void attribute_union
+(
+  disjoint_set *a,
+  disjoint_set *b
+)
+{
+  uint32 acount, bcount, count, i;
+  acount = a->attributes.count;
+  bcount = b->attributes.count;
+  if (acount > 0 && bcount > 0) {
+    typed_pointer avalue, bvalue;
+    count = acount < bcount ? acount : bcount;
+    for (i = 0; i < count; i++) {
+      if (a->attributes.items[i].key == b->attributes.items[i].key) {
+        avalue = a->attributes.items[i].value;
+        bvalue = b->attributes.items[i].value;
+        if (avalue.type == bvalue.type) {
+          switch (avalue.type) {
+            case t_S32:
+              union_S32(&avalue, &bvalue);
+              break;
+            case t_U32:
+              union_U32(&avalue, &bvalue);
+              break;
+            case t_F32:
+              union_F32(&avalue, &bvalue);
+              break;
+            case t_F64:
+              union_F64(&avalue, &bvalue);
+              break;
+            case t_statistics:
+              union_statistics(&avalue, &bvalue);
+              break;
+            case t_raw_moments:
+              union_raw_moments(&avalue, &bvalue);
+              break;
+          }
+        }
+      }
+    }
+  }
+}
+
 disjoint_set *disjoint_set_union
 (
   disjoint_set *a,
@@ -152,18 +271,21 @@ disjoint_set *disjoint_set_union
       if (a->rank < b->rank) {
         a->id = b;
         b->size += a->size;
+        attribute_union(b, a);
         return b;
       }
       else
       if (a->rank > b->rank) {
         b->id = a;
         a->size += b->size;
+        attribute_union(a, b);
         return a;
       }
       else {
         b->id = a;
         a->rank += 1;
         a->size += b->size;
+        attribute_union(a, b);
         return a;
       }
     }
@@ -198,6 +320,19 @@ uint32 disjoint_set_id
 )
 {
   return (uint32)disjoint_set_find(target);
+}
+
+/******************************************************************************/
+
+uint32 disjoint_set_attrib_size
+(
+  disjoint_set *target
+)
+{
+  if (target != NULL) {
+    return target->attributes.size;
+  }
+  return 0;
 }
 
 /* end of file                                                                */

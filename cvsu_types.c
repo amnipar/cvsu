@@ -37,6 +37,7 @@
 /* constants for reporting function names in error messages                   */
 
 string statistics_alloc_name = "statistics_alloc";
+string raw_moments_alloc_name = "raw_moments_alloc";
 
 /******************************************************************************/
 
@@ -249,6 +250,39 @@ void statistics_init
   stat->skewness = 0;
   stat->kurtosis = 0;
 #endif
+}
+
+/******************************************************************************/
+
+raw_moments *raw_moments_alloc
+()
+{
+  TRY();
+  raw_moments *ptr;
+
+  CHECK(memory_allocate((data_pointer*)&ptr, 1, sizeof(raw_moments)));
+
+  ptr->m00 = 0;
+  ptr->m10 = 0;
+  ptr->m01 = 0;
+  ptr->m11 = 0;
+  ptr->m20 = 0;
+  ptr->m02 = 0;
+
+  FINALLY(raw_moments_alloc);
+  return ptr;
+}
+
+/******************************************************************************/
+
+void raw_moments_free
+(
+  raw_moments *ptr
+)
+{
+  if (ptr != NULL) {
+    memory_deallocate((data_pointer*)&ptr);
+  }
 }
 
 /******************************************************************************/

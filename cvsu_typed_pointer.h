@@ -70,6 +70,7 @@ typedef enum type_label_t {
   t_link_head,
   /* tree annotation types */
   t_statistics,
+  t_raw_moments,
   t_accumulated_stat,
   t_neighborhood_stat,
   t_edge_response,

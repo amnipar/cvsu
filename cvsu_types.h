@@ -351,6 +351,8 @@ typedef struct image_block_t {
   pointer value;
 } image_block;
 
+/******************************************************************************/
+
 /**
  * Stores the statistical properties of an image region, and the sums and item
  * counts necessary for calculating them for combined regions.
@@ -380,7 +382,17 @@ void statistics_free
   statistics *ptr
 );
 
-typedef struct moments_t
+void statistics_init
+(
+  statistics *stat
+);
+
+/******************************************************************************/
+
+/**
+ * Stores the raw sums for calculating the moments of image regions.
+ */
+typedef struct raw_moments_t
 {
   integral_value m00;
   integral_value m10;
@@ -388,7 +400,16 @@ typedef struct moments_t
   integral_value m11;
   integral_value m20;
   integral_value m02;
-} moments;
+} raw_moments;
+
+raw_moments *raw_moments_alloc();
+
+void raw_moments_free
+(
+  raw_moments *ptr
+);
+
+/******************************************************************************/
 
 typedef struct consistency_t
 {
@@ -397,6 +418,8 @@ typedef struct consistency_t
   integral_value col_mean;
   integral_value col_deviation;
 } consistency;
+
+/******************************************************************************/
 
 /**
  * Useful for getting a pixel value in a generic type
@@ -408,10 +431,7 @@ integral_value cast_pixel_value
   uint32 offset
 );
 
-void statistics_init
-(
-  statistics *stat
-);
+/******************************************************************************/
 
 void point_create
 (
@@ -434,6 +454,8 @@ void point_subtract
   coord y
 );
 
+/******************************************************************************/
+
 void line_create
 (
   line *target,
@@ -450,6 +472,8 @@ void line_create_from_points
   point end
 );
 
+/******************************************************************************/
+
 void rect_create
 (
   rect *target,
@@ -465,6 +489,8 @@ void rect_create_from_points
   point first,
   point second
 );
+
+/******************************************************************************/
 
 /* utility functions for angles */
 
