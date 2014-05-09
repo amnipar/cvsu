@@ -44,6 +44,7 @@ extern "C" {
 typedef struct attribute_t {
   uint32 key;
   typed_pointer value;
+  struct attribute_t *dependency;
 } attribute;
 
 attribute *attribute_alloc();
