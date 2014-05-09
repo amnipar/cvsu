@@ -83,6 +83,17 @@ void disjoint_set_destroy
   disjoint_set *target
 );
 
+/**
+ * Creates a new set as a copy of another set. Mainly intended for copying the
+ * structure - i.e. the attributes. Everything is initialized to default. This
+ * is used in adding set attributes to nodes using a prototype.
+ */
+result disjoint_set_copy
+(
+  disjoint_set *target,
+  disjoint_set *source
+);
+
 result disjoint_set_attributes_create
 (
   disjoint_set *target,
