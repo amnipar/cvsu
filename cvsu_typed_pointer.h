@@ -66,6 +66,7 @@ typedef enum type_label_t {
   t_node,
   t_attribute,
   t_attribute_list,
+  t_attribute_stat,
   t_link,
   t_link_head,
   /* tree annotation types */

@@ -44,7 +44,6 @@ extern "C" {
 typedef struct attribute_t {
   uint32 key;
   typed_pointer value;
-  struct attribute_t *dependency;
 } attribute;
 
 attribute *attribute_alloc();
@@ -54,11 +53,26 @@ void attribute_free
   attribute *ptr
 );
 
+/**
+ * Creates an attribute that has the given key and value.
+ */
 result attribute_create
 (
   attribute *target,
   uint32 key,
   typed_pointer *value
+);
+
+/**
+ * Creates an attribute that has the same value as the given source attribute,
+ * taking into account the attribute structure and dependencies. The attribute
+ * list parameter is required for resolving the possible attribute dependencies.
+ */
+result attribute_clone
+(
+  attribute_list *target_list,
+  attribute *target,
+  attribute *source
 );
 
 void attribute_destroy
@@ -74,6 +88,15 @@ void attribute_nullify
 truth_value attribute_is_null
 (
   attribute *target
+);
+
+/******************************************************************************/
+
+typedef void (*attribute_cloning_function)
+(
+  attribute_list *target_list,
+  typed_pointer *target,
+  typed_pointer *source
 );
 
 /******************************************************************************/
@@ -112,6 +135,12 @@ truth_value attribute_list_is_null
   attribute_list *target
 );
 
+result attribute_list_clone
+(
+  attribute_list *target,
+  attribute_list *source
+);
+
 result attribute_add
 (
   attribute_list *target,
@@ -125,7 +154,23 @@ attribute *attribute_find
   uint32 key
 );
 
-/* maybe adding and finding attributes should be a function of node and link? */
+typedef struct attribute_stat_acc_t {
+  real64 n;
+  real64 sx;
+  real64 sy;
+  real64 sval1;
+  real64 sval2;
+  real64 cx;
+  real64 cy;
+  real64 mean;
+  real64 variance;
+  real64 deviation;
+} attribute_stat_acc;
+
+typedef struct attribute_stat_t
+  attribute *parent;
+  attribute_stat_acc *acc;
+} attribute_stat;
 
 #ifdef __cplusplus
 }

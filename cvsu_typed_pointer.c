@@ -34,6 +34,7 @@
 #include "cvsu_memory.h"
 #include "cvsu_list.h"
 #include "cvsu_set.h"
+#include "cvsu_attribute.h"
 #include "cvsu_graph.h"
 #include "cvsu_context.h"
 #include "cvsu_annotation.h"
@@ -84,6 +85,7 @@ uint32 typesize[] = {
   sizeof(node),
   sizeof(attribute),
   sizeof(attribute_list),
+  sizeof(attribute_stat),
   sizeof(link),
   sizeof(link_head),
   /* tree annotation types */
@@ -237,7 +239,7 @@ result typed_pointer_clone
 {
   TRY();
   if (target->type != source->type || target->count != source->count) {
-    CHECK(typed_pointer_create(target, source->type, source->count, 
+    CHECK(typed_pointer_create(target, source->type, source->count,
                                source->token, NULL));
   }
   FINALLY(typed_pointer_clone);
@@ -253,19 +255,19 @@ result typed_pointer_copy
 )
 {
   TRY();
-  
+
   if (target->type != source->type || target->count != source->count) {
-    CHECK(typed_pointer_create(target, source->type, source->count, 
+    CHECK(typed_pointer_create(target, source->type, source->count,
                                source->token, source->value));
   }
   else {
     if (source->value != NULL) {
-      CHECK(memory_copy((data_pointer)target->value, (data_pointer)source->value, 
+      CHECK(memory_copy((data_pointer)target->value, (data_pointer)source->value,
                         source->count, typesize[((uint32)source->type)]));
     }
     target->token = source->token;
   }
-  
+
   FINALLY(typed_pointer_copy);
   RETURN();
 }
