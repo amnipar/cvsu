@@ -59,6 +59,8 @@ typedef signed short   sint16;
 typedef unsigned short uint16;
 typedef signed long    sint32;
 typedef unsigned long  uint32;
+/* later a typedef real is defined, that can be either real32 or real64 */
+/* the specific type is determined by a compilation flag */
 typedef float          real32;
 typedef double         real64;
 
@@ -252,8 +254,10 @@ typedef enum pixel_type_t {
 
 /* convenience definitions for integral images */
 
+/* TODO: should create a separate flag for determining real type */
 #if INTEGRAL_IMAGE_DATA_TYPE == INTEGRAL_IMAGE_USING_FLOAT
 
+typedef real32 real;
 typedef real32 integral_value;
 typedef real32 I_1_t;
 typedef real32 I_2_t;
@@ -261,6 +265,7 @@ typedef real32 I_2_t;
 
 #elif INTEGRAL_IMAGE_DATA_TYPE == INTEGRAL_IMAGE_USING_DOUBLE
 
+typedef real64 real;
 typedef real64 integral_value;
 typedef real64 I_1_t;
 typedef real64 I_2_t;
@@ -424,11 +429,40 @@ typedef struct consistency_t
 /**
  * Useful for getting a pixel value in a generic type
  */
-integral_value cast_pixel_value
+real cast_pixel_value
 (
   void *data,
   pixel_type type,
   uint32 offset
+);
+
+/******************************************************************************/
+
+/**
+ * Defines a structure for accessing and caching a pixel value by offset into a
+ * data array. The value is accessed and cached as real, which may be a float
+ * (real32) or double (real64) depending on compilation flags. Generic casting
+ * functions are used for reading pixel values and converting to real. The token
+ * field can be used for determining whether the value has been cached already
+ * during the current round of processing; for example when reading video frames
+ * one after one and using the same graph structure for all frames.
+ */
+typedef struct pixel_value_t {
+  uint32 offset;
+  uint32 token;
+  real cache;
+} pixel_value;
+
+/**
+ * Caches the value by reading and casting from data array, if the token is not
+ * the same as given as parameter.
+ */
+real pixel_value_cache
+(
+  pixel_value *target,
+  void *data,
+  pixel_type type,
+  uint32 token
 );
 
 /******************************************************************************/

@@ -59,6 +59,7 @@ typedef enum type_label_t {
 */
   t_F32,
   t_F64,
+  t_pixel_value,
   t_tuple,
   t_list,
   t_disjoint_set,
@@ -186,6 +187,26 @@ result typed_pointer_set_value
   uint32 index,
   pointer new_value
 );
+
+/******************************************************************************/
+
+typedef real (*typed_pointer_cast_from_function)
+(
+  typed_pointer *tptr
+);
+
+real typed_pointer_cast_from
+(
+  typed_pointer *tptr
+);
+
+void typed_pointer_cast_into
+(
+  typed_pointer *tptr,
+  real value
+);
+
+/******************************************************************************/
 
 /**
  * Creates a tuple, which is basically a typed pointer with multiple typed

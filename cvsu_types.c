@@ -53,7 +53,7 @@ sint32 signum
 
 /******************************************************************************/
 
-typedef integral_value (*pixel_casting_function)
+typedef real (*pixel_casting_function)
 (
   void *data,
   uint32 offset
@@ -61,7 +61,7 @@ typedef integral_value (*pixel_casting_function)
 
 /******************************************************************************/
 
-integral_value cast_none
+real cast_none
 (
   void *data,
   uint32 offset
@@ -74,104 +74,104 @@ integral_value cast_none
 
 /******************************************************************************/
 
-integral_value cast_u8
+real cast_u8
 (
   void *data,
   uint32 offset
 )
 {
-  return (integral_value)*(((byte *)data) + offset);
+  return (real)*(((byte *)data) + offset);
 }
 
 /******************************************************************************/
 
-integral_value cast_s8
+real cast_s8
 (
   void *data,
   uint32 offset
 )
 {
-  return (integral_value)*(((char *)data) + offset);
+  return (real)*(((char *)data) + offset);
 }
 
 /******************************************************************************/
 
-integral_value cast_u16
+real cast_u16
 (
   void *data,
   uint32 offset
 )
 {
-  return (integral_value)*(((uint16 *)data) + offset);
+  return (real)*(((uint16 *)data) + offset);
 }
 
 /******************************************************************************/
 
-integral_value cast_s16
+real cast_s16
 (
   void *data,
   uint32 offset
 )
 {
-  return (integral_value)*(((sint16 *)data) + offset);
+  return (real)*(((sint16 *)data) + offset);
 }
 
 /******************************************************************************/
 
-integral_value cast_u32
+real cast_u32
 (
   void *data,
   uint32 offset
 )
 {
-  return (integral_value)*(((uint32 *)data) + offset);
+  return (real)*(((uint32 *)data) + offset);
 }
 
 /******************************************************************************/
 
-integral_value cast_s32
+real cast_s32
 (
   void *data,
   uint32 offset
 )
 {
-  return (integral_value)*(((sint32 *)data) + offset);
+  return (real)*(((sint32 *)data) + offset);
 }
 
 /******************************************************************************/
 /*
-integral_value cast_u64(void *data, uint32 offset)
+real cast_u64(void *data, uint32 offset)
 {
-  return (integral_value)*(((uint64 *)data) + offset);
+  return (real)*(((uint64 *)data) + offset);
 }
 */
 /******************************************************************************/
 /*
-integral_value cast_s64(void *data, uint32 offset)
+real cast_s64(void *data, uint32 offset)
 {
-  return (integral_value)*(((sint64 *)data) + offset);
+  return (real)*(((sint64 *)data) + offset);
 }
 */
 /******************************************************************************/
 
-integral_value cast_f32
+real cast_f32
 (
   void *data,
   uint32 offset
 )
 {
-  return (integral_value)*(((real32 *)data) + offset);
+  return (real)*(((real32 *)data) + offset);
 }
 
 /******************************************************************************/
 
-integral_value cast_f64
+real cast_f64
 (
   void *data,
   uint32 offset
 )
 {
-  return (integral_value)*(((real64 *)data) + offset);
+  return (real)*(((real64 *)data) + offset);
 }
 
 /******************************************************************************/
@@ -194,7 +194,7 @@ pixel_casting_function casts[] = {
 
 /******************************************************************************/
 
-integral_value cast_pixel_value
+real cast_pixel_value
 (
   void *data,
   pixel_type type,
@@ -202,6 +202,26 @@ integral_value cast_pixel_value
 )
 {
   return (casts[(uint32)type])(data, offset);
+}
+
+/******************************************************************************/
+
+real pixel_value_cache
+(
+  pixel_value *target,
+  void *data,
+  pixel_type type,
+  uint32 token
+)
+{
+  if (target != NULL && data != NULL) {
+    if (target->token != token) {
+      target->token = token;
+      target->cache = cast_pixel_value(data, type, offset);
+    }
+    return target->cache;
+  }
+  return 0;
 }
 
 /******************************************************************************/

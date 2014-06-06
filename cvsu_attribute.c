@@ -43,8 +43,10 @@ string attribute_clone_name = "attribute_clone";
 string attribute_list_alloc_name = "attribute_list_alloc";
 string attribute_list_create_name = "attribute_list_create";
 string attribute_list_nullify_name = "attribute_list_nullify";
+string attribute_list_clone_name = "attribute_list_clone";
 string attribute_add_name = "attribute_add";
 string attribute_find_name = "attribute_find";
+string attribute_stat_create_name = "attribute_stat_create";
 
 /* this is for non-trivial functions that are not implemented yet */
 result cloning_not_implemented
@@ -489,6 +491,131 @@ attribute *attribute_find
     }
   }
   return ptr;
+}
+
+/******************************************************************************/
+
+void attribute_stat_init
+(
+  attribute_stat *target,
+  attribute *parent
+)
+{
+  if (target != NULL) {
+    target->parent = parent;
+    if (target->acc != NULL) {
+      memory_deallocate(&target->acc);
+    }
+  }
+}
+
+/******************************************************************************/
+
+result attribute_stat_create
+(
+  attribute_stat *target
+)
+{
+  if (target != NULL) {
+    if (target->acc == NULL) {
+      CHECK(memory_allocate((data_pointer*)&target->acc, 1,
+                            sizeof(attribute_stat_acc)));
+      attribute_stat_acc_nullify(target->acc);
+    }
+    
+  }
+}
+
+/******************************************************************************/
+
+void attribute_stat_destroy
+(
+  attribute_stat *target
+)
+{
+  if (target != NULL) {
+    memory_deallocate((data_pointer*)&target->acc);
+    target->parent = NULL;
+  }
+}
+
+void attribute_stat_acc_nullify
+(
+  attribute_stat_acc *target
+)
+{
+  if (target != NULL) {
+    target->n = 0;
+    target->sx = 0;
+    target->sy = 0;
+    target->sval1 = 0;
+    target->sval2 = 0;
+    target->cx = 0;
+    target->cy = 0;
+    target->mean = 0;
+    target->variance = 0;
+    target->deviation = 0;
+  }
+}
+
+/******************************************************************************/
+
+void attribute_stat_get
+(
+  attribute_stat *source,
+  attribute_stat_acc *target
+)
+{
+  if (source != NULL && target != NULL) {
+    if (source->acc != NULL) {
+      memory_copy((data_pointer)target, (data_pointer)source->acc, 1,
+                  sizeof(attribute_stat_acc));
+    }
+    else
+    if (source->parent != NULL) {
+      integral_value value;
+      value = typed_pointer_cast_from(source->parent->value);
+      target->n = 1;
+      target->sx = 0;
+      target->sy = 0;
+      target->sval1 = value;
+      target->sval2 = value*value;
+      target->cx = 0;
+      target->cy = 0;
+      target->mean = value;
+      target->variance = 1;
+      target->deviation = 1;
+    }
+    else {
+      attribute_stat_acc_nullify(target);
+    }
+  }
+}
+
+/******************************************************************************/
+
+void attribute_stat_combine
+(
+  attribute_stat *target,
+  attribute_stat *source
+)
+{
+  if (target != NULL && source != NULL) {
+    /*target->acc->n +=*/
+  }
+}
+
+/******************************************************************************/
+
+void attribute_stat_sum
+(
+  attribute_stat *a,
+  attribute_stat *b,
+  attribute_stat *c
+)
+{
+  attribute_stat_acc temp;
+  
 }
 
 /* end of file                                                                */

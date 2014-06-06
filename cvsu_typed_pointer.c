@@ -78,6 +78,7 @@ uint32 typesize[] = {
 */
   sizeof(real32),
   sizeof(real64),
+  sizeof(pixel_value),
   sizeof(typed_pointer),
   sizeof(list),
   sizeof(disjoint_set),
@@ -105,6 +106,162 @@ uint32 typesize[] = {
   sizeof(stat_accumulator),
   sizeof(pixel_image)
 };
+
+/******************************************************************************/
+
+real cast_from_none
+(
+  typed_pointer *tptr
+)
+{
+  return 0;
+}
+
+real cast_from_unsupported
+(
+  typed_pointer *tptr
+)
+{
+  printf("Error: casting from unsupported typed_pointer\n");
+  return 0;
+}
+
+real cast_from_truth_value
+(
+  typed_pointer *tptr
+)
+{
+  return (real)*((truth_value*)tptr->value);
+}
+
+real cast_from_typed_pointer
+(
+  typed_pointer *tptr
+)
+{
+  return typed_pointer_cast_from((typed_pointer*)tptr->value);
+}
+
+real cast_from_s8
+(
+  typed_pointer *tptr
+)
+{
+  return (real)*((char *)tptr->value);
+}
+
+real cast_from_u8
+(
+  typed_pointer *tptr
+)
+{
+  return (real)*((byte *)tptr->value);
+}
+
+real cast_from_s16
+(
+  typed_pointer *tptr
+)
+{
+  return (real)*((sint16 *)tptr->value);
+}
+
+real cast_from_u16
+(
+  typed_pointer *tptr
+)
+{
+  return (real)*((uint16 *)tptr->value);
+}
+
+real cast_from_s32
+(
+  typed_pointer *tptr
+)
+{
+  return (real)*((sint32 *)tptr->value);
+}
+
+real cast_from_u32
+(
+  typed_pointer *tptr
+)
+{
+  return (real)*((uint32 *)tptr->value);
+}
+
+real cast_from_f32
+(
+  typed_pointer *tptr
+)
+{
+  return (real)*((real32 *)tptr->value);
+}
+
+real cast_from_f64
+(
+  typed_pointer *tptr
+)
+{
+  return (real)*((real64 *)tptr->value);
+}
+
+real cast_from_pixel_value
+(
+  typed_pointer *tptr
+)
+{
+  return ((pixel_value*)tptr->value)->cache;
+}
+
+typed_pointer_cast_from_funtion cast_from_functions[] = {
+  &cast_from_none, /* t_UNDEF */
+  /* basic types */
+  &cast_from_unsupported, /* t_type */
+  &cast_from_truth_value, /* t_truth_value */
+  &cast_from_unsupported, /* t_pointer */
+  &cast_from_typed_pointer, /* t_typed_pointer */
+  &cast_from_unsupported, /* t_string */
+  &cast_from_s8, /* t_S8 */
+  &cast_from_u8, /* t_U8 */
+  &cast_from_s16, /*t_S16 */
+  &cast_from_u16, /* t_U16 */
+  &cast_from_s32, /* t_S32 */
+  &cast_from_u32, /* t_U32 */
+/*
+  t_S64,
+  t_U64,
+*/
+  &cast_from_f32, /* t_F32 */
+  &cast_from_f64, /* t_F64 */
+  &cast_from_pixel_value, /* t_pixel_value */
+  &cast_from_unsupported, /* t_tuple */
+  &cast_from_unsupported, /* t_list */
+  &cast_from_unsupported, /* t_disjoint_set */
+  &cast_from_unsupported, /* t_graph */
+  &cast_from_unsupported, /* t_node */
+  &cast_from_unsupported, /* t_attribute */
+  &cast_from_unsupported, /* t_attribute_list */
+  &cast_from_unsupported, /* t_attribute_stat */
+  &cast_from_unsupported, /* t_link */
+  &cast_from_unsupported, /* t_link_head */
+  /* tree annotation types */
+  &cast_from_unsupported, /* t_statistics */
+  &cast_from_unsupported, /* t_raw_moments */
+  &cast_from_unsupported, /* t_accumulated_stat */
+  &cast_from_unsupported, /* t_neighborhood_stat */
+  &cast_from_unsupported, /* t_edge_response */
+  &cast_from_unsupported, /* t_link_measure */
+  &cast_from_unsupported, /* t_edge_profile */
+  &cast_from_unsupported, /* t_edge_links */
+  &cast_from_unsupported, /* t_boundary_message */
+  &cast_from_unsupported, /* t_boundary */
+  &cast_from_unsupported, /* t_segment_message */
+  &cast_from_unsupported, /* t_segment */
+  /* parsing context types */
+  &cast_from_unsupported, /* t_stat_accumulator */
+  &cast_from_unsupported, /* t_pixel_image */
+}
 
 /******************************************************************************/
 
@@ -294,6 +451,28 @@ result typed_pointer_set_value
   }
   FINALLY(typed_pointer_set_value);
   RETURN();
+}
+
+/******************************************************************************/
+
+real typed_pointer_cast_from
+(
+  typed_pointer *tptr
+)
+{
+  (cast_from_functions[tptr->type])(tptr);
+}
+
+/******************************************************************************/
+
+void typed_pointer_cast_into
+(
+  typed_pointer *tptr,
+  real value
+)
+{
+  (void)tptr;
+  (void)value;
 }
 
 /******************************************************************************/

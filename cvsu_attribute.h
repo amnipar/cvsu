@@ -154,23 +154,93 @@ attribute *attribute_find
   uint32 key
 );
 
+/******************************************************************************/
+
 typedef struct attribute_stat_acc_t {
-  real64 n;
-  real64 sx;
-  real64 sy;
-  real64 sval1;
-  real64 sval2;
-  real64 cx;
-  real64 cy;
-  real64 mean;
-  real64 variance;
-  real64 deviation;
+  real n;
+  real sx;
+  real sy;
+  real sval1;
+  real sval2;
+  real cx;
+  real cy;
+  real mean;
+  real variance;
+  real deviation;
 } attribute_stat_acc;
 
 typedef struct attribute_stat_t
   attribute *parent;
   attribute_stat_acc *acc;
 } attribute_stat;
+
+/**
+ * Initializes the attribute_stat structure into the default state, which means
+ * the accumulator structure is NULL and the stats are considered as single
+ * value read from the parent attribute.
+ */
+void attribute_stat_init
+(
+  attribute_stat *target,
+  attribute *parent
+);
+
+/**
+ * Creates the accumulator structure, replacing the default behavior of getting
+ * parent attribute as a single value.
+ */
+result attribute_stat_create
+(
+  attribute_stat *target
+);
+
+/**
+ * Destroys and nullifies the attribute_stat structure, frees the accumulator
+ * structure if it is allocated.
+ */ 
+void attribute_stat_destroy
+(
+  attribute_stat *target
+);
+
+void attribute_stat_acc_nullify
+(
+  attribute_stat_acc *target
+);
+
+/**
+ * Copies the stat values into the given accumulator, taking into account
+ * whether the structure is in the default state or not.
+ */
+void attribute_stat_get
+(
+  attribute_stat *source,
+  attribute_stat_acc *target
+);
+
+/**
+ * Combines two attribute_stat structures such, that the first one will end up
+ * containing the combined statistics and the second one will be reverted to the
+ * default state (accumulator is destroyed). This is typically used for
+ * calculating the statistics of the union of two disjoint_sets of elements.
+ */
+void attribute_stat_combine
+(
+  attribute_stat *target,
+  attribute_stat *source
+);
+
+/**
+ * Calculates the sum of two attribute_stat structures a and b such, that their
+ * sum is stored in the third structure, c. All the values of c will be updated
+ * such that they reflect the sums.
+ */
+void attribute_stat_sum
+(
+  attribute_stat *a,
+  attribute_stat *b,
+  attribute_stat *c
+);
 
 #ifdef __cplusplus
 }
