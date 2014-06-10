@@ -158,12 +158,8 @@ attribute *attribute_find
 
 typedef struct attribute_stat_acc_t {
   real n;
-  real sx;
-  real sy;
   real sval1;
   real sval2;
-  real cx;
-  real cy;
   real mean;
   real variance;
   real deviation;
@@ -187,7 +183,8 @@ void attribute_stat_init
 
 /**
  * Creates the accumulator structure, replacing the default behavior of getting
- * parent attribute as a single value.
+ * parent attribute as a single value. The accumulator is initialized with the
+ * default values based on the parent attribute's value.
  */
 result attribute_stat_create
 (
@@ -203,9 +200,21 @@ void attribute_stat_destroy
   attribute_stat *target
 );
 
+/**
+ * Sets the accumulator to null value.
+ */
 void attribute_stat_acc_nullify
 (
   attribute_stat_acc *target
+);
+
+/**
+ * Initializes the accumulator based on single value.
+ */
+void attribute_stat_acc_init
+(
+  attribute_stat_acc *target,
+  real value
 );
 
 /**
@@ -233,7 +242,9 @@ void attribute_stat_combine
 /**
  * Calculates the sum of two attribute_stat structures a and b such, that their
  * sum is stored in the third structure, c. All the values of c will be updated
- * such that they reflect the sums.
+ * such that they reflect the sums. The implementation is done in such a way,
+ * that it is safe to use either a or b also as c. If c is different from a and
+ * b, then the a and b structures are not changed.
  */
 void attribute_stat_sum
 (
@@ -241,6 +252,38 @@ void attribute_stat_sum
   attribute_stat *b,
   attribute_stat *c
 );
+
+/******************************************************************************/
+
+typedef struct attribute_moments_acc_2d_t {
+  real m00;
+  real m10;
+  real m01;
+  real m20;
+  real m11;
+  real m02;
+  real cx;
+  real cy;
+  real r1;
+  real r2;
+  real a;
+} attribute_moments_acc_2d;
+
+/**
+ * Maintains 2-dimensional shape moments based on positions of a set of nodes.
+ */
+typedef struct attribute_moments_2d_t {
+  attribute *parent;
+  attribute_moments_acc_2d *acc;
+} attribute_moments_2d;
+
+/**
+ * Maintains n-dimensional shape moments based on positions of a set of nodes.
+ */
+typedef struct attribute_moments_nd_t {
+  attribute *parent;
+  attribute_moments_acc_nd *acc;
+} attribute_moments_nd;
 
 #ifdef __cplusplus
 }

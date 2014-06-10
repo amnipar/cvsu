@@ -47,6 +47,10 @@ string attribute_list_clone_name = "attribute_list_clone";
 string attribute_add_name = "attribute_add";
 string attribute_find_name = "attribute_find";
 string attribute_stat_create_name = "attribute_stat_create";
+string attribute_stat_combine_name = "attribute_stat_combine";
+string attribute_stat_sum_name = "attribute_stat_sum";
+
+/******************************************************************************/
 
 /* this is for non-trivial functions that are not implemented yet */
 result cloning_not_implemented
@@ -516,14 +520,25 @@ result attribute_stat_create
   attribute_stat *target
 )
 {
-  if (target != NULL) {
-    if (target->acc == NULL) {
-      CHECK(memory_allocate((data_pointer*)&target->acc, 1,
-                            sizeof(attribute_stat_acc)));
-      attribute_stat_acc_nullify(target->acc);
-    }
-    
+  TRY();
+  
+  CHECK_POINTER(target);
+  
+  if (target->acc == NULL) {
+    CHECK(memory_allocate((data_pointer*)&target->acc, 1,
+                          sizeof(attribute_stat_acc)));
   }
+  
+  if (target->parent != NULL) {
+    real value = typed_pointer_cast_from(&target->parent->value);
+    attribute_stat_acc_init(target->acc, value);
+  }
+  else {
+    attribute_stat_acc_nullify(target->acc);
+  }
+  
+  FINALLY(attribute_stat_create);
+  RETURN();
 }
 
 /******************************************************************************/
@@ -539,20 +554,41 @@ void attribute_stat_destroy
   }
 }
 
+/******************************************************************************/
+
 void attribute_stat_acc_nullify
 (
   attribute_stat_acc *target
 )
 {
   if (target != NULL) {
+    memory_clear((data_pointer)target, 1, sizeof(attribute_stat_acc));
+    /* TODO: should put this choice behind a flag and run some tests to */
+    /* determine whether it is something that matters or not */
+    /*
     target->n = 0;
-    target->sx = 0;
-    target->sy = 0;
     target->sval1 = 0;
     target->sval2 = 0;
-    target->cx = 0;
-    target->cy = 0;
     target->mean = 0;
+    target->variance = 0;
+    target->deviation = 0;
+    */
+  }
+}
+
+/******************************************************************************/
+
+void attribute_stat_acc_init
+(
+  attribute_stat_acc *target,
+  real value
+)
+{
+  if (target != NULL) {
+    target->n = 1;
+    target->sval1 = value;
+    target->sval2 = value*value;
+    target->mean = value;
     target->variance = 0;
     target->deviation = 0;
   }
@@ -567,24 +603,16 @@ void attribute_stat_get
 )
 {
   if (source != NULL && target != NULL) {
+    /* accumulator exists: copy the values contained in the acc */
     if (source->acc != NULL) {
       memory_copy((data_pointer)target, (data_pointer)source->acc, 1,
                   sizeof(attribute_stat_acc));
     }
     else
+    /* default case: acc initialized with values based on one node's value */
     if (source->parent != NULL) {
-      integral_value value;
-      value = typed_pointer_cast_from(source->parent->value);
-      target->n = 1;
-      target->sx = 0;
-      target->sy = 0;
-      target->sval1 = value;
-      target->sval2 = value*value;
-      target->cx = 0;
-      target->cy = 0;
-      target->mean = value;
-      target->variance = 1;
-      target->deviation = 1;
+      real value = typed_pointer_cast_from(&source->parent->value);
+      attribute_stat_acc_init(target, value);
     }
     else {
       attribute_stat_acc_nullify(target);
@@ -600,9 +628,38 @@ void attribute_stat_combine
   attribute_stat *source
 )
 {
-  if (target != NULL && source != NULL) {
-    /*target->acc->n +=*/
+  TRY();
+  attribute_stat_acc *target_acc, source_acc;
+  real n, s1, s2, m, v;
+  
+  CHECK_POINTER(target);
+  CHECK_POINTER(source);
+  
+  if (target->acc == NULL) {
+    CHECK(attribute_stat_create(target));
   }
+  target_acc = target->acc;
+  attribute_stat_get(source, &source_acc);
+  
+  n  = target_acc->n     += source_acc.n;
+  s1 = target_acc->sval1 += source_acc.sval1;
+  s2 = target_acc->sval2 += source_acc.sval2;
+  m  = target_acc->mean   = s1 / n;
+  
+  v  = s2 / n - m*m;
+  v  = v < 0 ? 0 : v;
+  
+  target_acc->variance = v;
+  target_acc->deviation = sqrt(v);
+  
+  /* the source node will be reverted to the default state */
+  if (source->acc != NULL) {
+    memory_deallocate(&source->acc);
+    source->acc = NULL;
+  }
+  
+  FINALLY(attribute_stat_combine);
+  return;
 }
 
 /******************************************************************************/
@@ -614,8 +671,34 @@ void attribute_stat_sum
   attribute_stat *c
 )
 {
-  attribute_stat_acc temp;
+  TRY();
+  attribute_stat_acc acc_a, acc_b, *acc_c;
+  real n, s1, s2, m, v;
   
+  CHECK_POINTER(a);
+  CHECK_POINTER(b);
+  CHECK_POINTER(c);
+  
+  attribute_stat_get(a, &acc_a);
+  attribute_stat_get(b, &acc_b);
+  if (c->acc == NULL) {
+    CHECK(attribute_stat_create(c));
+  }
+  acc_c = c->acc;
+  
+  n  = acc_c->n     = acc_a.n     + acc_b.n;
+  s1 = acc_c->sval1 = acc_a.sval1 + acc_b.sval1;
+  s2 = acc_c->sval2 = acc_a.sval2 + acc_b.sval2;
+  m  = acc_c->mean = s1 / n;
+  
+  v = s2 / n - m*m;
+  v = v < 0 ? 0 : v;
+  
+  acc_c->variance  = v;
+  acc_c->deviation = sqrt(v);
+  
+  FINALLY(attribute_stat_sum);
+  return;
 }
 
 /* end of file                                                                */

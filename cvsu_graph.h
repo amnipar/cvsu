@@ -109,15 +109,25 @@ truth_value link_list_is_null
 
 /******************************************************************************/
 
+typedef struct position_2d_t {
+  real x;
+  real y;
+} position_2d;
+
+typedef struct position_nd_t {
+  uint32 n;
+  real position[];
+} position_nd;
+
 /**
  * Defines a generic graph node structure for use in sparse graphs, where most
  * nodes have only a few neighbors. Links are stored within nodes.
+ * All nodes have an id and a 2d position. For n-dimensional nodes, the 2d
+ * position is used for visualizations.
  */
 typedef struct node_t {
-  integral_value x;
-  integral_value y;
-  integral_value orientation;
-  uint32 scale;
+  uint32 id;
+  position_2d pos;
   attribute_list attributes;
   link_list links;
 } node;
