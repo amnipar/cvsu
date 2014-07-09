@@ -422,6 +422,13 @@ result pick_1_channel_from_3_channels
   uint32 channel
 );
 
+result pixel_image_replicate_pixels
+(
+  const pixel_image *source,
+  pixel_image *target,
+  uint32 n
+);
+
 /**
  * Scales the image down by factor of two without smoothing.
  * Takes every other pixel on every other row.

@@ -73,6 +73,7 @@ string convert_yuv24_to_grey8_name = "convert_yuv24_to_grey8";
 string convert_uyvy16_to_grey8_name = "convert_uyvy16_to_grey8";
 string convert_uyvy16_to_yuv24_name = "convert_uyvy16_to_yuv24";
 string convert_yuyv16_to_grey8_name = "convert_yuyv16_to_grey8";
+string pixel_image_replicate_pixels_name = "pixel_image_replicate_pixels";
 string pick_1_channel_from_3_channels_name = "pick_1_channel_from_3_channels";
 
 /******************************************************************************/
@@ -1913,8 +1914,9 @@ result convert_uyvy16_to_grey8
     }
   }
   else {
-    DISCONTINUOUS_IMAGE_VARIABLES(byte, byte);
     uint32 offset, x, y;
+    DISCONTINUOUS_IMAGE_VARIABLES(byte, byte);
+    
     /* for discontinuous images offset is applied to row table */
     /* therefore must correct the offset in case it's other than 0 */
     offset = 1 - source->offset;
@@ -1975,8 +1977,9 @@ result convert_uyvy16_to_yuv24
     }
   }
   else {
-    DISCONTINUOUS_IMAGE_VARIABLES(byte, byte);
     uint32 x, y;
+    DISCONTINUOUS_IMAGE_VARIABLES(byte, byte);
+    
     FOR_2_DISCONTINUOUS_IMAGES()
     {
       u  = PIXEL_VALUE(source);
@@ -2032,8 +2035,9 @@ result convert_yuyv16_to_grey8
     }
   }
   else {
-    DISCONTINUOUS_IMAGE_VARIABLES(byte, byte);
     uint32 offset, x, y;
+    DISCONTINUOUS_IMAGE_VARIABLES(byte, byte);
+    
     /* for discontinuous images offset is applied to row table */
     /* therefore must correct the offset in case it's other than 0 */
     offset = 0 - source->offset;
@@ -2093,6 +2097,63 @@ result pick_1_channel_from_3_channels
 
 /******************************************************************************/
 
+result pixel_image_replicate_pixels
+(
+  const pixel_image *source,
+  pixel_image *target,
+  uint32 n
+)
+{
+  TRY();
+  byte *source_data, *target_data;
+  uint32 source_pos, source_step, source_stride, source_offset;
+  uint32 target_pos, target_step, target_stride, target_offset;
+  uint32 target_x, target_y, target_w, target_h, target_c;
+
+  CHECK_POINTER(source);
+  CHECK_POINTER(target);
+  CHECK_POINTER(source->data);
+  CHECK_POINTER(target->data);
+  CHECK_PARAM(source->type == p_U8);
+  CHECK_PARAM(target->type == p_U8);
+  CHECK_PARAM(source->step == target->step);
+  CHECK_PARAM(source->format == target->format);
+  CHECK_PARAM(n > 1);
+  CHECK_PARAM(target->width >= n * source->width);
+  CHECK_PARAM(target->height >= n * source->height);
+
+  source_data = (byte *)source->data;
+  source_step = source->step;
+  source_stride = source->stride;
+  source_offset = source->offset;
+  target_data = (byte *)target->data;
+  target_step = target->step;
+  target_stride = target->stride;
+  target_offset = target->offset;
+  target_w = target->width;
+  target_h = target->height;
+  
+  for (target_y = 0; target_y < target_h; target_y++) {
+    for (target_x = 0; target_x < target_w; target_x++) {
+      target_pos = 
+          target_y * target_stride + target_x * target_step + target_offset;
+      source_pos = 
+          (uint32)(target_y / n) * source_stride + 
+          (uint32)(target_x / n) * source_step +
+          source_offset;
+      for (target_c = 0; target_c < target_step; target_c++) {
+        target_data[target_pos + target_c] = 
+            source_data[source_pos + target_c];
+      }
+    }
+  }
+
+  FINALLY(pixel_image_replicate_pixels);
+  RETURN();
+}
+
+/******************************************************************************/
+
 result scale_down
 (
   const pixel_image *source,
@@ -2141,7 +2202,7 @@ result scale_up
   CHECK_PARAM(target->type == p_U8);
   CHECK_PARAM(target->width >= 2 * source->width);
   CHECK_PARAM(target->height >= 2 * source->height);
-
+  
   {
     uint32 x, y, offset_1, offset_2, offset_3;
     IMAGE_WITH_STEP_VARIABLES(byte, byte);
