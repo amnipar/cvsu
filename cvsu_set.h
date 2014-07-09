@@ -138,6 +138,31 @@ uint32 disjoint_set_attrib_size
   disjoint_set *target
 );
 
+result disjoint_set_attr_create
+(
+  attribute *target,
+  uint32 attribute_count
+);
+
+result disjoint_set_create_with_stat
+(
+  disjoint_set *target,
+  uint32 attribute_count,
+  uint32 stat_attr
+);
+
+result disjoint_set_add_attr
+(
+  attribute_list *attrs,
+  pointer params
+);
+
+result disjoint_set_add_stat_attr
+(
+  attribute_list *attrs,
+  pointer params
+);
+
 #ifdef __cplusplus
 }
 #endif

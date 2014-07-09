@@ -88,6 +88,18 @@ typedef enum type_label_t {
   t_pixel_image
 } type_label;
 
+#if INTEGRAL_IMAGE_DATA_TYPE == INTEGRAL_IMAGE_USING_FLOAT
+
+#define t_real t_F32
+
+#elif INTEGRAL_IMAGE_DATA_TYPE == INTEGRAL_IMAGE_USING_DOUBLE
+
+#define t_real t_F64
+
+#else
+#error "integral image data type not defined"
+#endif
+
 /**
  * Stores a generic pointer value, with attached type label and possibility of
  * storing multiple values (arrays or tuples) in one object. Intended to be
@@ -190,10 +202,7 @@ result typed_pointer_set_value
 
 /******************************************************************************/
 
-typedef real (*typed_pointer_cast_from_function)
-(
-  typed_pointer *tptr
-);
+typedef real (*typed_pointer_cast_from_function)(typed_pointer *tptr);
 
 real typed_pointer_cast_from
 (

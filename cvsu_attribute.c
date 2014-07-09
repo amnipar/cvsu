@@ -89,6 +89,7 @@ result cloning_default
 )
 {
   (void)target_list;
+  /*printf("clone default\n");*/
   return typed_pointer_copy(target, source);
 }
 
@@ -100,7 +101,10 @@ result cloning_disjoint_set
   typed_pointer *source
 )
 {
-
+  (void)target_list;
+  (void)target;
+  (void)source;
+  return NOT_IMPLEMENTED;
 }
 
 /* with attribute statistics, need to clone also the attribute dependency */
@@ -115,7 +119,7 @@ result cloning_attribute_stat
   attribute *dependency;
   dependency = ((attribute_stat*)source->value)->parent;
   if (dependency != NULL) {
-    dependency = attribute_find(target_list, dependency_key);
+    dependency = attribute_find(target_list, dependency->key);
     if (dependency != NULL) {
       attribute_stat new_attr_stat;
       new_attr_stat.parent = dependency;
@@ -152,6 +156,7 @@ attribute_cloning_function cloning_functions[] = {
   */
   &cloning_default,          /* t_F32 */
   &cloning_default,          /* t_F64 */
+  &cloning_default,          /* t_pixel_value */
   &cloning_not_implemented,  /* t_tuple */
   &cloning_not_implemented,  /* t_list */
   &cloning_disjoint_set,     /* t_disjoint_set */
@@ -254,9 +259,10 @@ result attribute_clone
   CHECK_POINTER(source);
 
   target->key = source->key;
+  /*printf("clone i\n");*/
   (cloning_functions[source->value.type])(target_list, &target->value,
                                           &source->value);
-
+  /*printf("clone o\n");*/
   FINALLY(attribute_clone);
   RETURN();
 }
@@ -363,7 +369,7 @@ void attribute_list_destroy
 )
 {
   if (target != NULL && target->size > 0) {
-    int i;
+    uint32 i;
 
     for (i = 0; i < target->count; i++) {
       attribute_destroy(&target->items[i]);
@@ -484,7 +490,7 @@ attribute *attribute_find
   uint32 key
 )
 {
-  int i;
+  uint32 i;
   attribute *ptr;
   ptr = NULL;
   if (source != NULL) {
@@ -499,6 +505,27 @@ attribute *attribute_find
 
 /******************************************************************************/
 
+pixel_value *value_attribute_add
+(
+  attribute_list *target,
+  uint32 key,
+  uint32 offset
+)
+{
+  result r;
+  attribute new_attr, *attr_ptr;
+  r = SUCCESS;
+  new_attr.key = key;
+  /* TODO: implement? needed? */
+  (void)target;
+  (void)offset;
+  (void)new_attr;
+  (void)attr_ptr;
+  return NULL;
+}
+
+/******************************************************************************/
+
 void attribute_stat_init
 (
   attribute_stat *target,
@@ -508,7 +535,7 @@ void attribute_stat_init
   if (target != NULL) {
     target->parent = parent;
     if (target->acc != NULL) {
-      memory_deallocate(&target->acc);
+      memory_deallocate((data_pointer*)&target->acc);
     }
   }
 }
@@ -654,7 +681,7 @@ void attribute_stat_combine
   
   /* the source node will be reverted to the default state */
   if (source->acc != NULL) {
-    memory_deallocate(&source->acc);
+    memory_deallocate((data_pointer*)&source->acc);
     source->acc = NULL;
   }
   

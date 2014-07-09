@@ -32,6 +32,8 @@
 #include "cvsu_config.h"
 #include "cvsu_macros.h"
 #include "cvsu_opencv.h"
+#include "cvsu_typed_pointer.h"
+#include "cvsu_attribute.h"
 #include <opencv2/highgui/highgui_c.h>
 #include <stdio.h>
 #include <sys/time.h>
@@ -53,6 +55,7 @@ string pixel_image_draw_colored_arcs_name = "pixel_image_draw_colored_arcs";
 string pixel_image_draw_rects_name = "pixel_image_draw_rects";
 string pixel_image_draw_colored_rects_name = "pixel_image_draw_colored_rects";
 string pixel_image_dump_name = "pixel_image_dump";
+string graph_draw_nodes_name = "graph_draw_nodes";
 
 /******************************************************************************/
 
@@ -759,6 +762,184 @@ result pixel_image_dump
   cvSaveImage(filename, dst, 0);
 
   FINALLY(pixel_image_dump);
+  cvReleaseImageHeader(&dst);
+  RETURN();
+}
+
+/******************************************************************************/
+
+string node_visualize_attribute_name = "node_visualize_attribute";
+string link_visualize_attribute_name = "link_visualize_attribute";
+
+/******************************************************************************/
+
+typedef struct graph_visualize_params_t {
+  IplImage *dst;
+  attribute_range *attr_range;
+  real scale;
+  int node_size;
+  int link_size;
+} graph_visualize_params;
+
+/******************************************************************************/
+
+result node_visualize_attribute
+(
+  node *target,
+  pointer params
+)
+{
+  TRY();
+  graph_visualize_params *vparams;
+  attribute *attr;
+  int x1, y1;
+  real value;
+  
+  CHECK_POINTER(target);
+  CHECK_POINTER(params);
+  
+  vparams = (graph_visualize_params*)params;
+  x1 = (int)(vparams->scale * target->pos.x);
+  y1 = (int)(vparams->scale * target->pos.y);
+  value = 0;
+  attr = attribute_find(&target->attributes, vparams->attr_range->key);
+  if (attr != NULL) {
+    value = typed_pointer_cast_from(&attr->value);
+    value = (value - vparams->attr_range->min_value) * 255 /
+            vparams->attr_range->range;
+  }
+  else {
+    printf("attr not found\n");
+  }
+  cvCircle(vparams->dst,
+           cvPoint(x1, y1), vparams->node_size,
+           cvScalar(0, 0, value, 0), -1, 8, 0);
+  
+  FINALLY(node_visualize_attribute);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result link_visualize_attribute
+(
+  link *target,
+  pointer params
+)
+{
+  TRY();
+  graph_visualize_params *vparams;
+  attribute *attr;
+  int x1, y1, x2, y2;
+  real value;
+  
+  CHECK_POINTER(target);
+  CHECK_POINTER(params);
+  
+  vparams = (graph_visualize_params*)params;
+  value = 0;
+  attr = attribute_find(&target->attributes, vparams->attr_range->key);
+  if (attr != NULL) {
+    value = typed_pointer_cast_from(&attr->value);
+    value = (value - vparams->attr_range->min_value) * 255 /
+            vparams->attr_range->range;
+  }
+  else {
+    printf("attr not found\n");
+  }
+  
+  x1 = (int)(vparams->scale * target->a.origin->pos.x);
+  y1 = (int)(vparams->scale * target->a.origin->pos.y);
+  x2 = (int)(vparams->scale * target->b.origin->pos.x);
+  y2 = (int)(vparams->scale * target->b.origin->pos.y);
+  cvLine(vparams->dst,
+         cvPoint(x1, y1), cvPoint(x2, y2),
+         cvScalar(value, 0, 0, 0), vparams->link_size, 8, 0);
+
+  FINALLY(link_visualize_attribute);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result graph_draw_nodes
+(
+  graph *source,
+  pixel_image *target,
+  uint32 node_attr,
+  uint32 link_attr,
+  real scale
+)
+{
+  TRY();
+  IplImage *dst;
+  CvSize size;
+  int channels;
+  list_item *items, *end;
+  node *current_node;
+  link *current_link;
+  attribute *attr;
+  attribute_range attr_range;
+  int x1, y1, x2, y2;
+  real val, min_val, max_val, val_range;
+  real weight, min_weight, max_weight, weight_range;
+  graph_visualize_params vparams;
+  
+  CHECK_POINTER(source);
+  CHECK_POINTER(target);
+  CHECK_PARAM(target->type == p_U8);
+  
+  if (target->format == RGB) {
+    CHECK_PARAM(target->step == 3);
+    channels = 3;
+  }
+  else
+  if (target->format == RGBA) {
+    CHECK_PARAM(target->step == 4);
+    channels = 4;
+  }
+  size.width = (signed)target->width;
+  size.height = (signed)target->height;
+  dst = cvCreateImageHeader(size, IPL_DEPTH_8U, channels);
+  cvSetData(dst, target->data, (signed)target->stride);
+  
+  vparams.dst = dst;
+  vparams.scale = scale;
+  vparams.node_size = 5;
+  vparams.link_size = 3;
+  vparams.attr_range = &attr_range;
+  
+  attr_range.key = link_attr;
+  attr_range.min_value = 255;
+  attr_range.max_value = 0;
+  
+  CHECK(graph_for_each_link(source, &link_attribute_range_update,
+                            (pointer)&attr_range));
+
+  /*
+  printf("min weight = %.3f max weight = %.3f\n", 
+         attr_range.min_value, attr_range.max_value);
+  */
+  attr_range.range = attr_range.max_value - attr_range.min_value;
+  
+  CHECK(graph_for_each_link(source, &link_visualize_attribute,
+                            (pointer)&vparams));
+  
+  attr_range.key = node_attr;
+  attr_range.min_value = 255;
+  attr_range.max_value = 0;
+  CHECK(graph_for_each_node(source, &node_attribute_range_update, 
+                            (pointer)&attr_range));
+  /*
+  printf("min val = %.3f max val = %.3f\n", 
+         attr_range.min_value, attr_range.max_value);
+  */
+  attr_range.range = attr_range.max_value - attr_range.min_value;
+    
+  CHECK(graph_for_each_node(source, &node_visualize_attribute, 
+                            (pointer)&vparams));
+  
+  FINALLY(graph_draw_nodes);
   cvReleaseImageHeader(&dst);
   RETURN();
 }

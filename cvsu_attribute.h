@@ -63,18 +63,6 @@ result attribute_create
   typed_pointer *value
 );
 
-/**
- * Creates an attribute that has the same value as the given source attribute,
- * taking into account the attribute structure and dependencies. The attribute
- * list parameter is required for resolving the possible attribute dependencies.
- */
-result attribute_clone
-(
-  attribute_list *target_list,
-  attribute *target,
-  attribute *source
-);
-
 void attribute_destroy
 (
   attribute *target
@@ -90,14 +78,15 @@ truth_value attribute_is_null
   attribute *target
 );
 
-/******************************************************************************/
-
-typedef void (*attribute_cloning_function)
-(
-  attribute_list *target_list,
-  typed_pointer *target,
-  typed_pointer *source
-);
+/**
+ * Tracks the range of a scalar-valued attribute, identified by its key.
+ */
+typedef struct attribute_range_t {
+  uint32 key;
+  real min_value;
+  real max_value;
+  real range;
+} attribute_range;
 
 /******************************************************************************/
 
@@ -106,6 +95,8 @@ typedef struct attribute_list_t {
   uint32 size;
   uint32 count;
 } attribute_list;
+
+typedef result (*attribute_list_function)(attribute_list *target, pointer params);
 
 attribute_list *attribute_list_alloc();
 
@@ -141,6 +132,18 @@ result attribute_list_clone
   attribute_list *source
 );
 
+/**
+ * Creates an attribute that has the same value as the given source attribute,
+ * taking into account the attribute structure and dependencies. The attribute
+ * list parameter is required for resolving the possible attribute dependencies.
+ */
+result attribute_clone
+(
+  attribute_list *target_list,
+  attribute *target,
+  attribute *source
+);
+
 result attribute_add
 (
   attribute_list *target,
@@ -154,6 +157,17 @@ attribute *attribute_find
   uint32 key
 );
 
+pixel_value *value_attribute_add
+(
+  attribute_list *target,
+  uint32 key,
+  uint32 offset
+);
+
+/******************************************************************************/
+
+typedef result (*attribute_cloning_function)(attribute_list *target_list, typed_pointer *target, typed_pointer *source);
+
 /******************************************************************************/
 
 typedef struct attribute_stat_acc_t {
@@ -165,7 +179,7 @@ typedef struct attribute_stat_acc_t {
   real deviation;
 } attribute_stat_acc;
 
-typedef struct attribute_stat_t
+typedef struct attribute_stat_t {
   attribute *parent;
   attribute_stat_acc *acc;
 } attribute_stat;
@@ -280,11 +294,12 @@ typedef struct attribute_moments_2d_t {
 /**
  * Maintains n-dimensional shape moments based on positions of a set of nodes.
  */
+/*
 typedef struct attribute_moments_nd_t {
   attribute *parent;
   attribute_moments_acc_nd *acc;
 } attribute_moments_nd;
-
+*/
 #ifdef __cplusplus
 }
 #endif

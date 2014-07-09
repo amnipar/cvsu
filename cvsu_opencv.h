@@ -40,6 +40,7 @@ extern "C" {
 #include "cvsu_pixel_image.h"
 #include "cvsu_list.h"
 #include "cvsu_annotation.h"
+#include "cvsu_graph.h"
 
 /**
  * Convert from pixel_image to IplImage.
@@ -150,7 +151,8 @@ result pixel_image_draw_rects
 );
 
 /**
- * Draws a list of colored rects over an image using OpenCV cvRectangle function.
+ * Draws a list of colored rects over an image using OpenCV cvRectangle
+ * function.
  */
 result pixel_image_draw_colored_rects
 (
@@ -165,6 +167,19 @@ result pixel_image_draw_colored_rects
 result pixel_image_dump
 (
   pixel_image *source
+);
+
+/**
+ * Draws a graph over an image as nodes connected by links; it may be necessary
+ * to scale the image if distances between the nodes are very short.
+ */
+result graph_draw_nodes
+(
+  graph *source,
+  pixel_image *target,
+  uint32 node_attr,
+  uint32 link_attr,
+  real scale
 );
 
 #ifdef __cplusplus

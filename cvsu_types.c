@@ -214,11 +214,13 @@ real pixel_value_cache
   uint32 token
 )
 {
+  /*printf("cache i\n");*/
   if (target != NULL && data != NULL) {
     if (target->token != token) {
+      target->cache = cast_pixel_value(data, type, target->offset);
       target->token = token;
-      target->cache = cast_pixel_value(data, type, offset);
     }
+    /*printf("cache o %.3f\n", target->cache);*/
     return target->cache;
   }
   return 0;

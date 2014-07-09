@@ -90,9 +90,9 @@ parse: cvsu_memory.o cvsu_output.o cvsu_types.o cvsu_typed_pointer.o \
 		parse.o -lm -lopencv_core -lopencv_highgui -I.
 
 graph: cvsu_memory.o cvsu_output.o cvsu_types.o cvsu_typed_pointer.o \
-		cvsu_pixel_image.o cvsu_list.o cvsu_graph.o cvsu_opencv.o \
-		graph.o
+		cvsu_pixel_image.o cvsu_list.o cvsu_attribute.o cvsu_set.o \
+		cvsu_graph.o cvsu_opencv.o graph.o
 	gcc -o graph cvsu_memory.o cvsu_output.o cvsu_types.o \
 		cvsu_typed_pointer.o cvsu_pixel_image.o cvsu_list.o \
-		cvsu_graph.o cvsu_opencv.o graph.o \
+		cvsu_attribute.o cvsu_set.o cvsu_graph.o cvsu_opencv.o graph.o \
 		-lm -lopencv_core -lopencv_highgui -I.

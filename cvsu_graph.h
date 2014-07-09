@@ -60,13 +60,44 @@ typedef struct link_head_t {
 typedef struct link_t {
   struct link_head_t a;
   struct link_head_t b;
-  integral_value weight;
+  attribute *weight_attribute;
+  real weight;
   attribute_list attributes;
 } link;
+
+typedef result (*link_function)(link *target, pointer params);
+
+result link_create
+(
+  link *target,
+  uint32 attr_size
+);
+
+void link_destroy
+(
+  link *target
+);
 
 void link_nullify
 (
   link *target
+);
+
+truth_value link_is_null
+(
+  link *target
+);
+
+result link_weight_range_update
+(
+  link *target,
+  pointer params
+);
+
+result link_attribute_range_update
+(
+  link *target,
+  pointer params
 );
 
 /******************************************************************************/
@@ -116,7 +147,7 @@ typedef struct position_2d_t {
 
 typedef struct position_nd_t {
   uint32 n;
-  real position[];
+  real *position;
 } position_nd;
 
 /**
@@ -128,9 +159,12 @@ typedef struct position_nd_t {
 typedef struct node_t {
   uint32 id;
   position_2d pos;
+  attribute *weight_attribute;
   attribute_list attributes;
   link_list links;
 } node;
+
+typedef result (*node_function)(node *target, pointer params);
 
 result node_create
 (
@@ -152,6 +186,18 @@ void node_nullify
 truth_value node_is_null
 (
   node *target
+);
+
+result node_weight_range_update
+(
+  node *target,
+  pointer params
+);
+
+result node_attribute_range_update
+(
+  node *target,
+  pointer params
 );
 
 /******************************************************************************/
@@ -202,22 +248,58 @@ void graph_destroy
   graph *target
 );
 
+/**
+ * Sets the graph to the NULL (default) state.
+ */
 void graph_nullify
 (
   graph *target
 );
 
+/**
+ * Checks whether the graph is in the NULL (default) state.
+ */
 truth_value graph_is_null
 (
   graph *target
 );
 
+result graph_for_each_node
+(
+  graph *target,
+  node_function func,
+  pointer params
+);
+
+result graph_for_attrs_in_each_node
+(
+  graph *target,
+  attribute_list_function func,
+  pointer params
+);
+
+result graph_for_each_link
+(
+  graph *target,
+  link_function func,
+  pointer params
+);
+
+result graph_for_attrs_in_each_link
+(
+  graph *target,
+  attribute_list_function func,
+  pointer params
+);
+
 /**
- * Creates a regular grid graph structure from a single image. The offset from
- * the top left corner of the image before the first node and the step between
- * nodes, both expressed in pixels, can be given. The attr_label specifies
- * which key should be used for the attribute storing the pixel values, as well
- * as the type used in the attribute.
+ * Creates a regular grid graph structure from a single image. Pixel values are
+ * stored in the nodes as value attributes (using pixel_value types, which
+ * stores values as doubles). The offset from the top left corner of the image
+ * before the first node and the step between nodes, both expressed in pixels,
+ * can be given. The value_attr argument tells which key should be used for the
+ * value attribute storing the pixel values, as well as the type used in the
+ * attribute.
  */
 result graph_create_from_image
 (
@@ -228,7 +310,8 @@ result graph_create_from_image
   uint32 node_step_x,
   uint32 node_step_y,
   graph_neighborhood neighborhood,
-  attribute *attr_label
+  uint32 value_key,
+  uint32 weight_key
 );
 
 #ifdef __cplusplus

@@ -358,6 +358,14 @@ typedef struct image_block_t {
 
 /******************************************************************************/
 
+typedef struct value_range_t {
+  real min_value;
+  real max_value;
+  real range;
+} value_range;
+
+/******************************************************************************/
+
 /**
  * Stores the statistical properties of an image region, and the sums and item
  * counts necessary for calculating them for combined regions.

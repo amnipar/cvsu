@@ -37,12 +37,60 @@
 /******************************************************************************/
 /* constants for reporting function names in error messages                   */
 
+string link_create_name = "link_create";
+string link_weight_range_update_name = "link_weight_range_update";
+string link_attribute_range_update_name = "link_attribute_range_update";
+
 string link_list_alloc_name = "link_list_alloc";
 string link_list_create_name = "link_list_create";
+
 string node_create_name = "node_create";
+string node_weight_range_update_name = "node_weight_range_update";
+string node_attribute_range_update_name = "node_attribute_range_update";
+
 string graph_alloc_name = "graph_alloc";
 string graph_create_name = "graph_create";
+
+string graph_for_each_node_name = "graph_for_each_node";
+string graph_for_attrs_in_each_node_name = "graph_for_attrs_in_each_node";
+string graph_for_each_link_name = "graph_for_each_link";
+string graph_for_attrs_in_each_link_name = "graph_for_attrs_in_each_link";
+
 string graph_create_from_image_name = "graph_create_from_image";
+
+/******************************************************************************/
+
+result link_create
+(
+  link *target,
+  uint32 attr_size
+)
+{
+  TRY();
+
+  CHECK_POINTER(target);
+  link_nullify(target);
+
+  if (attr_size > 0) {
+    CHECK(attribute_list_create(&target->attributes, attr_size));
+  }
+
+  FINALLY(link_create);
+  RETURN();
+}
+
+/******************************************************************************/
+
+void link_destroy
+(
+  link *target
+)
+{
+  if (target != NULL) {
+    attribute_list_destroy(&target->attributes);
+    link_nullify(target);
+  }
+}
 
 /******************************************************************************/
 
@@ -62,9 +110,92 @@ void link_nullify
     target->b.origin = NULL;
     target->b.dir = d_UNDEF;
     attribute_list_nullify(&target->b.attributes);
+    target->weight_attribute = NULL;
     target->weight = 0;
     attribute_list_nullify(&target->attributes);
   }
+}
+
+/******************************************************************************/
+
+truth_value link_is_null
+(
+  link *target
+)
+{
+  if (target != NULL) {
+    if (IS_TRUE(attribute_list_is_null(&target->attributes))) {
+      return TRUE;
+    }
+  }
+  return FALSE;
+}
+
+/******************************************************************************/
+
+result link_weight_range_update
+(
+  link *target,
+  pointer params
+)
+{
+  TRY();
+  attribute *attr;
+  value_range *current;
+  real value;
+  
+  CHECK_POINTER(target);
+  CHECK_POINTER(params);
+  
+  current = (value_range*)params;
+  attr = target->weight_attribute;
+  value = 0;
+  if (attr != NULL) {
+    value = typed_pointer_cast_from(&attr->value);
+  }
+  if (value < current->min_value) {
+    current->min_value = value;
+  }
+  if (value > current->max_value) {
+    current->max_value = value;
+  }
+  
+  FINALLY(link_weight_range_update);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result link_attribute_range_update
+(
+  link *target,
+  pointer params
+)
+{
+  TRY();
+  attribute *attr;
+  attribute_range *current;
+  real value;
+  
+  CHECK_POINTER(target);
+  CHECK_POINTER(params);
+  
+  current = (attribute_range*)params;
+  
+  attr = attribute_find(&target->attributes, current->key);
+  value = 0;
+  if (attr != NULL) {
+    value = typed_pointer_cast_from(&attr->value);
+  }
+  if (value < current->min_value) {
+    current->min_value = value;
+  }
+  if (value > current->max_value) {
+    current->max_value = value;
+  }
+  
+  FINALLY(link_attribute_range_update);
+  RETURN();
 }
 
 /******************************************************************************/
@@ -212,10 +343,10 @@ void node_nullify
 )
 {
   if (target != NULL) {
-    target->x = 0;
-    target->y = 0;
-    target->orientation = 0;
-    target->scale = 0;
+    target->id = 0;
+    target->pos.x = 0;
+    target->pos.y = 0;
+    target->weight_attribute = NULL;
     attribute_list_nullify(&target->attributes);
     link_list_nullify(&target->links);
   }
@@ -235,6 +366,69 @@ truth_value node_is_null
     }
   }
   return FALSE;
+}
+
+/******************************************************************************/
+
+result node_weight_range_update
+(
+  node *target,
+  pointer params
+)
+{
+  TRY();
+  attribute *attr;
+  value_range *current;
+  
+  CHECK_POINTER(target);
+  CHECK_POINTER(params);
+  
+  current = (value_range*)params;
+  attr = target->weight_attribute;
+  if (attr != NULL) {
+    real value = typed_pointer_cast_from(&attr->value);
+    if (value < current->min_value) {
+      current->min_value = value;
+    }
+    if (value > current->max_value) {
+      current->max_value = value;
+    }
+  }
+  
+  FINALLY(node_weight_range_update);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result node_attribute_range_update
+(
+  node *target,
+  pointer params
+)
+{
+  TRY();
+  attribute *attr;
+  attribute_range *current;
+  real value;
+  
+  CHECK_POINTER(target);
+  CHECK_POINTER(params);
+  
+  current = (attribute_range*)params;
+  attr = attribute_find(&target->attributes, current->key);
+  if (attr != NULL) {
+    value = typed_pointer_cast_from(&attr->value);
+    if (value < current->min_value) {
+      current->min_value = value;
+    }
+    if (value > current->max_value) {
+      current->max_value = value;
+    }
+  }
+  
+  FINALLY(node_attribute_range_update);
+  RETURN();
 }
 
 /******************************************************************************/
@@ -305,7 +499,7 @@ void graph_destroy
     end = &target->links.last;
     while (item != end) {
       current_link = (link*)item->data;
-      /*link_destroy(current_link);*/
+      link_destroy(current_link);
       item = item->next;
     }
     list_destroy(&target->links);
@@ -352,6 +546,114 @@ truth_value graph_is_null
 
 /******************************************************************************/
 
+result graph_for_each_node
+(
+  graph *target,
+  node_function func,
+  pointer params
+)
+{
+  TRY();
+  list_item *items, *end;
+  node *current_node;
+  
+  CHECK_POINTER(target);
+
+  items = target->nodes.first.next;
+  end = &target->nodes.last;
+  while (items != end) {
+    current_node = (node*)items->data;
+    CHECK(func(current_node, params));
+    items = items->next;
+  }
+  
+  FINALLY(graph_for_each_node);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result graph_for_attrs_in_each_node
+(
+  graph *target,
+  attribute_list_function func,
+  pointer params
+)
+{
+  TRY();
+  list_item *items, *end;
+  node *current_node;
+  
+  CHECK_POINTER(target);
+  
+  items = target->nodes.first.next;
+  end = &target->nodes.last;
+  while (items != end) {
+    current_node = (node*)items->data;
+    CHECK(func(&current_node->attributes, params));
+    items = items->next;
+  }
+  
+  FINALLY(graph_for_attrs_in_each_node);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result graph_for_each_link
+(
+  graph *target,
+  link_function func,
+  pointer params
+)
+{
+  TRY();
+  list_item *items, *end;
+  link *current_link;
+  
+  CHECK_POINTER(target);
+  
+  items = target->links.first.next;
+  end = &target->links.last;
+  while (items != end) {
+    current_link = (link*)items->data;
+    CHECK(func(current_link, params));
+    items = items->next;
+  }
+  
+  FINALLY(graph_for_each_link);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result graph_for_attrs_in_each_link
+(
+  graph *target,
+  attribute_list_function func,
+  pointer params
+)
+{
+  TRY();
+  list_item *items, *end;
+  link *current_link;
+  
+  CHECK_POINTER(target);
+  
+  items = target->links.first.next;
+  end = &target->links.last;
+  while (items != end) {
+    current_link = (link*)items->data;
+    CHECK(func(&current_link->attributes, params));
+    items = items->next;
+  }
+  
+  FINALLY(graph_for_attrs_in_each_link);
+  RETURN();
+}
+
+/******************************************************************************/
+
 result graph_create_from_image
 (
   graph *target,
@@ -361,16 +663,20 @@ result graph_create_from_image
   uint32 node_step_x,
   uint32 node_step_y,
   graph_neighborhood neighborhood,
-  attribute *attr_label
+  uint32 value_key,
+  uint32 weight_key
 )
 {
   TRY();
-  uint32 w, h, step, stride, offset, size, x, y;
-  uint32 node_w, node_h, node_size, node_i, node_j;
-  byte *image_data, *image_pos;
-  sint32 value;
-  type_label type;
-  attribute *new_attr;
+  uint32 w, h, step, stride, offset, size, x, y, pixel_offset;
+  uint32 node_w, node_h, node_size, node_i, node_j, link_size;
+  void *image_data;
+  pixel_type type;
+  pixel_value value, *new_value;
+  real weight, *new_weight;
+  typed_pointer tptr_value, tptr_weight;
+  attribute value_attr, *value_ptr;
+  attribute weight_attr, *weight_ptr;
   node new_node, *node_ptr;
   link new_link, *link_ptr, *prev_e, **prev_s;/*, **curr_s, **temp_s;*/
   link_head *head_ptr;
@@ -384,27 +690,45 @@ result graph_create_from_image
   stride = source->stride;
   offset = source->offset;
   size = w*h;
-  image_data = (byte*)source->data;
+  image_data = source->data;
+  type = source->type;
 
   CHECK_PARAM(node_step_x > 0 && node_step_x < w);
   CHECK_PARAM(node_step_y > 0 && node_step_y < h);
   CHECK_PARAM(node_offset_x < w);
   CHECK_PARAM(node_offset_y < h);
+  CHECK_PARAM(neighborhood == NEIGHBORHOOD_4 || neighborhood == NEIGHBORHOOD_8);
 
   /* TODO: allow null label and create a default attribute with key 1 */
-  CHECK_POINTER(attr_label);
-  type = attr_label->value.type;
-  value = *((sint32*)attr_label->value.value);
-
+  value.offset = 0;
+  value.token = 0;
+  value.cache = 0;
+  weight = 0;
+  
+  typed_pointer_nullify(&tptr_value);
+  CHECK(typed_pointer_create(&tptr_value, t_pixel_value, 1, 1, 
+                             (pointer)&value));
+  
+  attribute_nullify(&value_attr);
+  CHECK(attribute_create(&value_attr, value_key, &tptr_value));
+  
+  typed_pointer_nullify(&tptr_weight);
+  CHECK(typed_pointer_create(&tptr_weight, t_real, 1, 1, (pointer)&weight));
+  
+  attribute_nullify(&weight_attr);
+  CHECK(attribute_create(&weight_attr, weight_key, &tptr_weight));
+  
   /* for now, support just byte images */
-  CHECK_PARAM(source->type == p_U8);
+  /* CHECK_PARAM(source->type == p_U8); */
 
   /* create structures */
   node_w = (uint32)((w - node_offset_x - 1) / node_step_x) + 1;
   node_h = (uint32)((h - node_offset_y - 1) / node_step_y) + 1;
   node_size = node_w * node_h;
+  link_size = (uint32)neighborhood;
+  
   CHECK(list_create(&target->nodes, node_size, sizeof(node), 1));
-  CHECK(list_create(&target->links, 4*node_size, sizeof(link), 1));
+  CHECK(list_create(&target->links, link_size*node_size, sizeof(link), 1));
 
   /*CHECK(attribute_list_create(&target->sources, 4));*/
 
@@ -414,27 +738,32 @@ result graph_create_from_image
   prev_e = NULL;
 
   node_nullify(&new_node);
-  new_node.scale = 1;
   link_nullify(&new_link);
   new_link.weight = 1;
-
+  
   /* initialize nodes */
   node_j = 0;
   for (y = node_offset_y; y < h; y += node_step_y) {
-    image_pos = image_data + y * stride + (offset + node_offset_x) * step;
+    /*image_pos = image_data + y * stride + (offset + node_offset_x) * step;*/
+    pixel_offset = y * stride + (offset + node_offset_x) * step;
     node_i = 0;
     for (x = node_offset_x; x < w; x += node_step_x) {
-      value = (sint32)(*image_pos);
-      /* got pixel value, can move image pos */
-      image_pos += (node_step_x*step);
+      /*value = (sint32)(*image_pos);*/
 
       CHECK(list_append_return_pointer(&target->nodes, (pointer)&new_node,
                                        (pointer*)&node_ptr));
       CHECK(node_create(node_ptr, 4, 4));
-      node_ptr->x = (integral_value)x;
-      node_ptr->y = (integral_value)y;
-      CHECK(attribute_add(&node_ptr->attributes, attr_label, &new_attr));
-      (*((sint32*)new_attr->value.value)) = value;
+      node_ptr->pos.x = (real)x;
+      node_ptr->pos.y = (real)y;
+      CHECK(attribute_add(&node_ptr->attributes, &value_attr, &value_ptr));
+      /*printf("init value attr\n");*/
+      new_value = ((pixel_value*)value_ptr->value.value);
+      new_value->offset = pixel_offset;
+      pixel_value_cache(new_value, image_data, type, 1);
+      /*(*((sint32*)new_attr->value.value)) = value;*/
+      /* got pixel value, can move pixel offset */
+      /*image_pos += (node_step_x*step);*/
+      pixel_offset += (node_step_x*step);
 
       /* initialize links */
       /* add n link by using cached node's link */
@@ -445,7 +774,8 @@ result graph_create_from_image
         head_ptr->other = &link_ptr->a;
         head_ptr->origin = node_ptr;
         head_ptr->dir = d_N;
-        link_ptr->weight = fabs(link_ptr->weight - (integral_value)value);
+        new_weight = ((real*)link_ptr->weight_attribute->value.value);
+        *new_weight = fabs(*new_weight - new_value->cache);
         node_ptr->links.items[0] = head_ptr;
       }
       /* add w link by using cached node's link */
@@ -456,33 +786,42 @@ result graph_create_from_image
         head_ptr->other = &link_ptr->a;
         head_ptr->origin = node_ptr;
         head_ptr->dir = d_W;
-        link_ptr->weight = fabs(link_ptr->weight - (integral_value)value);
+        new_weight = ((real*)link_ptr->weight_attribute->value.value);
+        *new_weight = fabs(*new_weight - new_value->cache);
         node_ptr->links.items[3] = head_ptr;
       }
       /* add s link if not at edge, cache */
       if (node_j < (node_h-1)) {
         CHECK(list_append_return_pointer(&target->links, (pointer)&new_link,
                                          (pointer*)&link_ptr));
+        CHECK(link_create(link_ptr, 4));
+        CHECK(attribute_add(&link_ptr->attributes, &weight_attr, &weight_ptr));
+        new_weight = ((real*)weight_ptr->value.value);
+        link_ptr->weight_attribute = weight_ptr;
         head_ptr = &link_ptr->a;
         head_ptr->body = link_ptr;
         head_ptr->other = &link_ptr->b;
         head_ptr->origin = node_ptr;
         head_ptr->dir = d_S;
         node_ptr->links.items[2] = head_ptr;
-        link_ptr->weight = (integral_value)value;
+        *new_weight = new_value->cache;
         prev_s[node_i] = link_ptr;
       }
       /* add e link if not at edge, cache */
       if (node_i < (node_w-1)) {
         CHECK(list_append_return_pointer(&target->links, (pointer)&new_link,
                                          (pointer*)&link_ptr));
+        CHECK(link_create(link_ptr, 4));
+        CHECK(attribute_add(&link_ptr->attributes, &weight_attr, &weight_ptr));
+        new_weight = ((real*)weight_ptr->value.value);
+        link_ptr->weight_attribute = weight_ptr;
         head_ptr = &link_ptr->a;
         head_ptr->body = link_ptr;
         head_ptr->other = &link_ptr->b;
         head_ptr->origin = node_ptr;
         head_ptr->dir = d_E;
         node_ptr->links.items[1] = head_ptr;
-        link_ptr->weight = (integral_value)value;
+        *new_weight = new_value->cache;
         prev_e = link_ptr;
       }
       node_ptr->links.count = (uint32)neighborhood;

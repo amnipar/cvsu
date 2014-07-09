@@ -41,6 +41,11 @@ string disjoint_set_alloc_name = "disjoint_set_alloc";
 string disjoint_set_create_name = "disjoint_set_create";
 string disjoint_set_attributes_create_name = "disjoint_set_attributes_create";
 
+string disjoint_set_attr_create_name = "disjoint_set_attr_create";
+string disjoint_set_create_with_stat_name = "disjoint_set_create_with_stat";
+string disjoint_set_add_attr_name = "disjoint_set_add_attr";
+string disjoint_set_add_stat_attr_name = "disjoint_set_add_stat_attr";
+
 /******************************************************************************/
 
 disjoint_set *disjoint_set_alloc
@@ -251,6 +256,9 @@ void attribute_union
             case t_raw_moments:
               union_raw_moments(&avalue, &bvalue);
               break;
+            default:
+              /* should generate BAD_TYPE error or something? */
+              break;
           }
         }
       }
@@ -333,6 +341,71 @@ uint32 disjoint_set_attrib_size
     return target->attributes.size;
   }
   return 0;
+}
+
+/******************************************************************************/
+
+result disjoint_set_attr_create
+(
+  attribute *target,
+  uint32 attribute_count
+)
+{
+  TRY();
+  
+  CHECK_POINTER(target);
+  
+  FINALLY(disjoint_set_attr_create);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result disjoint_set_create_with_stat
+(
+  disjoint_set *target,
+  uint32 attribute_count,
+  uint32 stat_attr
+)
+{
+  TRY();
+  
+  CHECK_POINTER(target);
+  
+  FINALLY(disjoint_set_create_with_stat);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result disjoint_set_add_attr
+(
+  attribute_list *attrs,
+  pointer params
+)
+{
+  TRY();
+  
+  CHECK_POINTER(attrs);
+  
+  FINALLY(disjoint_set_add_attr);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result disjoint_set_add_stat_attr
+(
+  attribute_list *attrs,
+  pointer params
+)
+{
+  TRY();
+  
+  CHECK_POINTER(attrs);
+  
+  FINALLY(disjoint_set_add_stat_attr);
+  RETURN();
 }
 
 /* end of file                                                                */

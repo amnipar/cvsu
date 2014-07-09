@@ -114,6 +114,7 @@ real cast_from_none
   typed_pointer *tptr
 )
 {
+  (void)tptr;
   return 0;
 }
 
@@ -122,6 +123,7 @@ real cast_from_unsupported
   typed_pointer *tptr
 )
 {
+  (void)tptr;
   printf("Error: casting from unsupported typed_pointer\n");
   return 0;
 }
@@ -214,7 +216,7 @@ real cast_from_pixel_value
   return ((pixel_value*)tptr->value)->cache;
 }
 
-typed_pointer_cast_from_funtion cast_from_functions[] = {
+typed_pointer_cast_from_function cast_from_functions[] = {
   &cast_from_none, /* t_UNDEF */
   /* basic types */
   &cast_from_unsupported, /* t_type */
@@ -261,7 +263,7 @@ typed_pointer_cast_from_funtion cast_from_functions[] = {
   /* parsing context types */
   &cast_from_unsupported, /* t_stat_accumulator */
   &cast_from_unsupported, /* t_pixel_image */
-}
+};
 
 /******************************************************************************/
 
@@ -460,7 +462,7 @@ real typed_pointer_cast_from
   typed_pointer *tptr
 )
 {
-  (cast_from_functions[tptr->type])(tptr);
+  return (cast_from_functions[tptr->type])(tptr);
 }
 
 /******************************************************************************/
