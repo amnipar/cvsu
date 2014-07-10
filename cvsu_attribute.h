@@ -151,17 +151,32 @@ result attribute_add
   attribute **added
 );
 
+result attribute_list_add_new
+(
+  attribute_list *target,
+  uint32 key,
+  type_label type,
+  attribute **added
+);
+
 attribute *attribute_find
 (
   attribute_list *source,
   uint32 key
 );
 
-pixel_value *value_attribute_add
+pixel_value *pixel_value_attribute_add
 (
   attribute_list *target,
   uint32 key,
   uint32 offset
+);
+
+real *scalar_attribute_add
+(
+  attribute_list *target,
+  uint32 key,
+  real scalar
 );
 
 /******************************************************************************/

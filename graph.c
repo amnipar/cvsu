@@ -66,16 +66,11 @@ int main(int argc, char *argv[])
   TRY();
   pixel_image src_image, tmp_image, dst_image;
   uint32 value_key, weight_key, set_key, stat_key;
-  /*typed_pointer *tptr;*/
-  /*attribute *attr;*/
-  attribute *set_attr;
   graph g;
   uint32 stepx, stepy;
   string smode, source_file, target_file;
   enum mode_t mode;
   
-  set_attr = NULL;
-
   if (argc < 6) {
     PRINT0("\nError: wrong number of parameters\n\n");
     print_usage();
@@ -154,13 +149,7 @@ int main(int argc, char *argv[])
   weight_key = 2;
   set_key = 3;
   stat_key = 4;
-  /*tptr = typed_pointer_alloc();*/
-  /*CHECK(typed_pointer_create(tptr, t_S32, 1, 1, (pointer)&def));*/
-  /*
-  PRINT0("create attribute...\n");
-  attr = attribute_alloc();
-  CHECK(attribute_create(attr, 1, tptr));
-  */
+
   PRINT0("create graph...\n");
   CHECK(graph_create_from_image(&g, &src_image, 5, 5, stepx, stepy,
                                 NEIGHBORHOOD_4, value_key, weight_key));
@@ -174,9 +163,19 @@ int main(int argc, char *argv[])
     case m_MSF:
       PRINT0("finding minimum spanning forest...\n");
       {
-        /*typed_pointer *tptr;*/
+        disjoint_set_stat_attribute_params sparams;
+        /* the set attribute will have statistics dependent on the value attr */
+        sparams.set_key = set_key;
+        sparams.attribute_count = 1;
+        sparams.stat_key = stat_key;
+        sparams.dependency_key = value_key;
         /* add a set attribute containing statistics into each node */
-        graph_for_attrs_in_each_node(&g, &disjoint_set_add_stat_attr, &set_key);
+        graph_for_attrs_in_each_node(&g, 
+                                     &disjoint_set_add_stat_attr, 
+                                     (pointer)&sparams);
+        /* sort links by ascending weight using counting sort */
+        /* 'remove' links by union of linked nodes meeting the criteria */
+        /* clean up by eliminating too small regions */
       }
       break;
     case m_CONTOUR:

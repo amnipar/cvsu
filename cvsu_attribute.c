@@ -45,6 +45,7 @@ string attribute_list_create_name = "attribute_list_create";
 string attribute_list_nullify_name = "attribute_list_nullify";
 string attribute_list_clone_name = "attribute_list_clone";
 string attribute_add_name = "attribute_add";
+string attribute_list_add_new_name = "attribute_list_add_new";
 string attribute_find_name = "attribute_find";
 string attribute_stat_create_name = "attribute_stat_create";
 string attribute_stat_combine_name = "attribute_stat_combine";
@@ -479,6 +480,46 @@ result attribute_add
   }
 
   FINALLY(attribute_add);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result attribute_list_add_new
+(
+  attribute_list *target,
+  uint32 key,
+  type_label type,
+  attribute **added
+)
+{
+  TRY();
+  attribute *new_attr;
+  
+  CHECK_POINTER(target);
+  CHECK_POINTER(added);
+  
+  new_attr = attribute_find(target, source->key);
+  if (new_attr != NULL) {
+    if (new_attr->value.type != type) {
+      ERROR(BAD_TYPE);
+    }
+  }
+  else {
+    if (target->count < target->size) {
+      new_attr = &target->items[target->count];
+      attribute_nullify(new_attr);
+      CHECK(typed_pointer_create(&new_attr->value, type, 1, 1, NULL));
+      new_attr->key = key;
+      target->count++;
+    }
+    else {
+      ERROR(NOT_IMPLEMENTED);
+    }
+  }
+  *added = new_attr;
+  
+  FINALLY(attribute_list_add_new);
   RETURN();
 }
 

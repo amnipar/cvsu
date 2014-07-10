@@ -43,6 +43,8 @@ string disjoint_set_attributes_create_name = "disjoint_set_attributes_create";
 
 string disjoint_set_attr_create_name = "disjoint_set_attr_create";
 string disjoint_set_create_with_stat_name = "disjoint_set_create_with_stat";
+string disjoint_set_attribute_add_name = "disjoint_set_attribute_add";
+string disjoint_set_stat_attribute_add_name = "disjoint_set_stat_attribute_add";
 string disjoint_set_add_attr_name = "disjoint_set_add_attr";
 string disjoint_set_add_stat_attr_name = "disjoint_set_add_stat_attr";
 
@@ -345,34 +347,80 @@ uint32 disjoint_set_attrib_size
 
 /******************************************************************************/
 
-result disjoint_set_attr_create
+result disjoint_set_pointer_create
 (
-  attribute *target,
-  uint32 attribute_count
+  typed_pointer *tptr
+)
+{
+  
+}
+
+/******************************************************************************/
+
+result disjoint_set_attribute_add
+(
+  attribute_list *target,
+  uint32 key,
+  uint32 attribute_count,
+  disjoint_set **added
 )
 {
   TRY();
+  attribute *set_attr;
+  disjoint_set *new_set;
   
   CHECK_POINTER(target);
+  CHECK_POINTER(added);
   
-  FINALLY(disjoint_set_attr_create);
+  *added = NULL;
+  CHECK(attribute_list_add_new(target, key, t_disjoint_set, &set_attr));
+  new_set = (disjoint_set*)new_attr->value.value;
+  if (IS_FALSE(disjoint_set_is_null)) {
+    disjoint_set_destroy(new_set);
+  }
+  CHECK(disjoint_set_create(new_set, attribute_count));
+  *added = new_set;
+  
+  FINALLY(disjoint_set_attribute_add);
   RETURN();
 }
 
 /******************************************************************************/
 
-result disjoint_set_create_with_stat
+result disjoint_set_stat_attribute_add
 (
-  disjoint_set *target,
+  attribute_list *target,
+  uint32 set_key,
   uint32 attribute_count,
-  uint32 stat_attr
+  uint32 stat_key,
+  uint32 dep_key,
+  disjoint_set **added
 )
 {
   TRY();
+  attribute *dep_attr, *set_attr, *stat_attr;
+  disjoint_set *new_set;
+  attribute_stat *new_stat;
   
   CHECK_POINTER(target);
+  CHECK_POINTER(added);
   
-  FINALLY(disjoint_set_create_with_stat);
+  *added = NULL;
+  dep_attr = attribute_find(target, dependency_key);
+  if (dep_attr == NULL) {
+    ERROR(NOT_FOUND);
+  }
+  else {
+    CHECK(disjoint_set_attribute_add(target, set_key, attribute_count, 
+                                     &set_attr));
+    CHECK(attribute_list_add_new(&set_attr->attributes, stat_key,
+                                 t_attribute_stat, &stat_attr));
+    new_stat = (attribute_stat*)stat_attr->value.value;
+    attribute_stat_init(new_stat, dep_attr);
+  }
+  *added = new_stat;
+  
+  FINALLY(disjoint_set_stat_attribute_add);
   RETURN();
 }
 
