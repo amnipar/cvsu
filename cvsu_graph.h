@@ -215,6 +215,11 @@ typedef enum graph_neighborhood_t {
   NEIGHBORHOOD_8 = 8
 } graph_neighborhood;
 
+/*
+typedef struct graph_visualization_params_t {
+} graph_visualization_params;
+*/
+
 /**
  * Allocates memory for a graph structure and returns the pointer.
  */
@@ -236,8 +241,7 @@ result graph_create
 (
   graph *target,
   uint32 node_size,
-  uint32 link_size,
-  attribute *attr_label
+  uint32 link_size
 );
 
 /**
@@ -262,6 +266,21 @@ void graph_nullify
 truth_value graph_is_null
 (
   graph *target
+);
+
+result graph_add_node
+(
+  graph *target,
+  uint32 attr_size,
+  uint32 link_size,
+  node **added
+);
+
+result graph_add_link
+(
+  graph *target,
+  uint32 attr_size,
+  link **added
 );
 
 result graph_for_each_node

@@ -78,6 +78,11 @@ truth_value attribute_is_null
   attribute *target
 );
 
+real attribute_to_real
+(
+  attribute *target
+);
+
 /**
  * Tracks the range of a scalar-valued attribute, identified by its key.
  */
@@ -165,18 +170,35 @@ attribute *attribute_find
   uint32 key
 );
 
-pixel_value *pixel_value_attribute_add
+attribute *attribute_find_by_type
 (
-  attribute_list *target,
-  uint32 key,
-  uint32 offset
+  attribute_list *source,
+  type_label type
 );
 
-real *scalar_attribute_add
+result pixel_value_attribute_add
 (
   attribute_list *target,
   uint32 key,
-  real scalar
+  uint32 offset,
+  uint32 token,
+  pixel_value **added
+);
+
+result scalar_attribute_add
+(
+  attribute_list *target,
+  uint32 key,
+  real value,
+  real **added
+);
+
+result pointer_attribute_add
+(
+  attribute_list *target,
+  uint32 key,
+  pointer ptr,
+  pointer **added
 );
 
 /******************************************************************************/

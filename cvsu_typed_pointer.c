@@ -48,6 +48,8 @@ string typed_pointer_create_name = "typed_pointer_create";
 string typed_pointer_clone_name = "typed_pointer_clone";
 string typed_pointer_copy_name = "typed_pointer_copy";
 string typed_pointer_set_value_name = "typed_pointer_set_value";
+string cast_from_unsupported_name = "cast_from_unsupported";
+string typed_pointer_cast_from_name = "typed_pointer_cast_from";
 string tuple_create_name ="tuple_create";
 string tuple_promote_name = "tuple_promote";
 string tuple_extend_name = "tuple_extend";
@@ -123,8 +125,10 @@ real cast_from_unsupported
   typed_pointer *tptr
 )
 {
+  TRY();
   (void)tptr;
-  printf("Error: casting from unsupported typed_pointer\n");
+  TERMINATE(BAD_TYPE);
+  FINALLY(cast_from_unsupported);
   return 0;
 }
 
@@ -149,7 +153,7 @@ real cast_from_s8
   typed_pointer *tptr
 )
 {
-  return (real)*((char *)tptr->value);
+  return (real)*((char*)tptr->value);
 }
 
 real cast_from_u8
@@ -157,7 +161,7 @@ real cast_from_u8
   typed_pointer *tptr
 )
 {
-  return (real)*((byte *)tptr->value);
+  return (real)*((byte*)tptr->value);
 }
 
 real cast_from_s16
@@ -165,7 +169,7 @@ real cast_from_s16
   typed_pointer *tptr
 )
 {
-  return (real)*((sint16 *)tptr->value);
+  return (real)*((sint16*)tptr->value);
 }
 
 real cast_from_u16
@@ -173,7 +177,7 @@ real cast_from_u16
   typed_pointer *tptr
 )
 {
-  return (real)*((uint16 *)tptr->value);
+  return (real)*((uint16*)tptr->value);
 }
 
 real cast_from_s32
@@ -181,7 +185,7 @@ real cast_from_s32
   typed_pointer *tptr
 )
 {
-  return (real)*((sint32 *)tptr->value);
+  return (real)*((sint32*)tptr->value);
 }
 
 real cast_from_u32
@@ -189,7 +193,7 @@ real cast_from_u32
   typed_pointer *tptr
 )
 {
-  return (real)*((uint32 *)tptr->value);
+  return (real)*((uint32*)tptr->value);
 }
 
 real cast_from_f32
@@ -197,7 +201,7 @@ real cast_from_f32
   typed_pointer *tptr
 )
 {
-  return (real)*((real32 *)tptr->value);
+  return (real)*((real32*)tptr->value);
 }
 
 real cast_from_f64
@@ -205,7 +209,7 @@ real cast_from_f64
   typed_pointer *tptr
 )
 {
-  return (real)*((real64 *)tptr->value);
+  return (real)*((real64*)tptr->value);
 }
 
 real cast_from_pixel_value
@@ -214,6 +218,26 @@ real cast_from_pixel_value
 )
 {
   return ((pixel_value*)tptr->value)->cache;
+}
+
+real cast_from_set
+(
+  typed_pointer *tptr
+)
+{
+  disjoint_set *parent;
+  attribute *stat_attr;
+  parent = disjoint_set_find((disjoint_set*)tptr->value);
+  if (parent != NULL) {
+    stat_attr = attribute_find_by_type(&parent->attributes, t_attribute_stat);
+    if (stat_attr != NULL) {
+      attribute_stat_acc acc;
+      attribute_stat_get((attribute_stat*)stat_attr->value.value, &acc);
+      return acc.mean;
+    }
+    return (real)parent->size;
+  }
+  return 0;
 }
 
 typed_pointer_cast_from_function cast_from_functions[] = {
@@ -234,12 +258,12 @@ typed_pointer_cast_from_function cast_from_functions[] = {
   t_S64,
   t_U64,
 */
-  &cast_from_f32, /* t_F32 */
-  &cast_from_f64, /* t_F64 */
+  &cast_from_f32,         /* t_F32 */
+  &cast_from_f64,         /* t_F64 */
   &cast_from_pixel_value, /* t_pixel_value */
   &cast_from_unsupported, /* t_tuple */
   &cast_from_unsupported, /* t_list */
-  &cast_from_unsupported, /* t_disjoint_set */
+  &cast_from_set,         /* t_disjoint_set */
   &cast_from_unsupported, /* t_graph */
   &cast_from_unsupported, /* t_node */
   &cast_from_unsupported, /* t_attribute */
@@ -462,7 +486,13 @@ real typed_pointer_cast_from
   typed_pointer *tptr
 )
 {
-  return (cast_from_functions[tptr->type])(tptr);
+  TRY();
+  real value = 0;
+  
+  CHECK_POINTER(tptr);
+  value = (cast_from_functions[tptr->type])(tptr);
+  FINALLY(typed_pointer_cast_from);
+  return value;
 }
 
 /******************************************************************************/

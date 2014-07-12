@@ -50,6 +50,8 @@ string node_attribute_range_update_name = "node_attribute_range_update";
 
 string graph_alloc_name = "graph_alloc";
 string graph_create_name = "graph_create";
+string graph_add_node_name = "graph_add_node";
+string graph_add_link_name = "graph_add_link";
 
 string graph_for_each_node_name = "graph_for_each_node";
 string graph_for_attrs_in_each_node_name = "graph_for_attrs_in_each_node";
@@ -87,6 +89,7 @@ void link_destroy
 )
 {
   if (target != NULL) {
+    /* TODO: need to destroy attribute lists of heads when applicable */
     attribute_list_destroy(&target->attributes);
     link_nullify(target);
   }
@@ -102,7 +105,7 @@ void link_nullify
   if (target != NULL) {
     target->a.body = NULL;
     target->a.other = NULL;
-    target->a.other = NULL;
+    target->a.origin = NULL;
     target->a.dir = d_UNDEF;
     attribute_list_nullify(&target->a.attributes);
     target->b.body = NULL;
@@ -466,14 +469,12 @@ result graph_create
 (
   graph *target,
   uint32 node_size,
-  uint32 link_size,
-  attribute *attr_label
+  uint32 link_size
 )
 {
   TRY();
 
   CHECK_POINTER(target);
-  CHECK_POINTER(attr_label);
 
   /* create structures */
   CHECK(list_create(&target->nodes, node_size, sizeof(node), 1));
@@ -537,11 +538,62 @@ truth_value graph_is_null
 )
 {
   if (target != NULL) {
-    if (list_is_null(&target->nodes) || list_is_null(&target->links)) {
+    if (list_is_null(&target->nodes) && list_is_null(&target->links)) {
       return TRUE;
     }
   }
   return FALSE;
+}
+
+/******************************************************************************/
+
+result graph_add_node
+(
+  graph *target,
+  uint32 attr_size,
+  uint32 link_size,
+  node **added
+)
+{
+  TRY();
+  node new_node, *node_ptr;
+  
+  CHECK_POINTER(target);
+  CHECK_POINTER(added);
+  
+  CHECK(list_append_return_pointer(&target->nodes, (pointer)&new_node,
+                                       (pointer*)&node_ptr));
+  CHECK(node_create(node_ptr, attr_size, link_size));
+  
+  *added = node_ptr;
+  
+  FINALLY(graph_add_node);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result graph_add_link
+(
+  graph *target,
+  uint32 attr_size,
+  link **added
+)
+{
+  TRY();
+  link new_link, *link_ptr;
+ 
+  CHECK_POINTER(target);
+  CHECK_POINTER(added);
+  
+  CHECK(list_append_return_pointer(&target->links, (pointer)&new_link,
+                                         (pointer*)&link_ptr));
+  CHECK(link_create(link_ptr, attr_size));
+  
+  *added = link_ptr;
+  
+  FINALLY(graph_add_link);
+  RETURN();
 }
 
 /******************************************************************************/
@@ -717,9 +769,6 @@ result graph_create_from_image
   
   attribute_nullify(&weight_attr);
   CHECK(attribute_create(&weight_attr, weight_key, &tptr_weight));
-  
-  /* for now, support just byte images */
-  /* CHECK_PARAM(source->type == p_U8); */
 
   /* create structures */
   node_w = (uint32)((w - node_offset_x - 1) / node_step_x) + 1;
@@ -727,19 +776,17 @@ result graph_create_from_image
   node_size = node_w * node_h;
   link_size = (uint32)neighborhood;
   
+  CHECK(graph_create(target, node_size, link_size*node_size));
+  /*
   CHECK(list_create(&target->nodes, node_size, sizeof(node), 1));
   CHECK(list_create(&target->links, link_size*node_size, sizeof(link), 1));
-
+  */
   /*CHECK(attribute_list_create(&target->sources, 4));*/
 
   /* create temporary arrays for caching links */
   CHECK(memory_allocate((data_pointer*)&prev_s, node_w, sizeof(link*)));
   CHECK(memory_clear((data_pointer)prev_s, node_w, sizeof(link*)));
   prev_e = NULL;
-
-  node_nullify(&new_node);
-  link_nullify(&new_link);
-  new_link.weight = 1;
   
   /* initialize nodes */
   node_j = 0;
@@ -748,11 +795,12 @@ result graph_create_from_image
     pixel_offset = y * stride + (offset + node_offset_x) * step;
     node_i = 0;
     for (x = node_offset_x; x < w; x += node_step_x) {
-      /*value = (sint32)(*image_pos);*/
-
+      CHECK(graph_add_node(target, 4, 4, &node_ptr));
+      /*
       CHECK(list_append_return_pointer(&target->nodes, (pointer)&new_node,
                                        (pointer*)&node_ptr));
       CHECK(node_create(node_ptr, 4, 4));
+      */
       node_ptr->pos.x = (real)x;
       node_ptr->pos.y = (real)y;
       CHECK(attribute_add(&node_ptr->attributes, &value_attr, &value_ptr));
@@ -760,6 +808,7 @@ result graph_create_from_image
       new_value = ((pixel_value*)value_ptr->value.value);
       new_value->offset = pixel_offset;
       pixel_value_cache(new_value, image_data, type, 1);
+      node_ptr->weight_attribute = value_ptr;
       /*(*((sint32*)new_attr->value.value)) = value;*/
       /* got pixel value, can move pixel offset */
       /*image_pos += (node_step_x*step);*/
@@ -792,9 +841,12 @@ result graph_create_from_image
       }
       /* add s link if not at edge, cache */
       if (node_j < (node_h-1)) {
+        CHECK(graph_add_link(target, 4, &link_ptr));
+        /*
         CHECK(list_append_return_pointer(&target->links, (pointer)&new_link,
                                          (pointer*)&link_ptr));
         CHECK(link_create(link_ptr, 4));
+        */
         CHECK(attribute_add(&link_ptr->attributes, &weight_attr, &weight_ptr));
         new_weight = ((real*)weight_ptr->value.value);
         link_ptr->weight_attribute = weight_ptr;
@@ -809,9 +861,12 @@ result graph_create_from_image
       }
       /* add e link if not at edge, cache */
       if (node_i < (node_w-1)) {
+        CHECK(graph_add_link(target, 4, &link_ptr));
+        /*
         CHECK(list_append_return_pointer(&target->links, (pointer)&new_link,
                                          (pointer*)&link_ptr));
         CHECK(link_create(link_ptr, 4));
+        */
         CHECK(attribute_add(&link_ptr->attributes, &weight_attr, &weight_ptr));
         new_weight = ((real*)weight_ptr->value.value);
         link_ptr->weight_attribute = weight_ptr;

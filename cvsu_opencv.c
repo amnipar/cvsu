@@ -768,7 +768,9 @@ result pixel_image_dump
 
 /******************************************************************************/
 
+string node_draw_name = "node_draw";
 string node_visualize_attribute_name = "node_visualize_attribute";
+string link_draw_name = "link_draw";
 string link_visualize_attribute_name = "link_visualize_attribute";
 
 /******************************************************************************/
@@ -782,6 +784,31 @@ typedef struct graph_visualize_params_t {
 } graph_visualize_params;
 
 /******************************************************************************/
+
+result node_draw
+(
+  node *target,
+  pointer params
+)
+{
+  TRY();
+  graph_visualize_params *vparams;
+  int x1, y1;
+  
+  CHECK_POINTER(target);
+  CHECK_POINTER(params);
+  
+  vparams = (graph_visualize_params*)params;
+  x1 = (int)(vparams->scale * target->pos.x);
+  y1 = (int)(vparams->scale * target->pos.y);
+  
+  cvCircle(vparams->dst,
+           cvPoint(x1, y1), vparams->node_size,
+           cvScalar(0, 255, 255, 0), -1, 8, 0);
+  
+  FINALLY(node_draw);
+  RETURN();
+}
 
 result node_visualize_attribute
 (
@@ -820,6 +847,33 @@ result node_visualize_attribute
 }
 
 /******************************************************************************/
+
+result link_draw
+(
+  link *target,
+  pointer params
+)
+{
+  TRY();
+  graph_visualize_params *vparams;
+  int x1, y1, x2, y2;
+  
+  CHECK_POINTER(target);
+  CHECK_POINTER(params);
+  
+  vparams = (graph_visualize_params*)params;
+  x1 = (int)(vparams->scale * target->a.origin->pos.x);
+  y1 = (int)(vparams->scale * target->a.origin->pos.y);
+  x2 = (int)(vparams->scale * target->b.origin->pos.x);
+  y2 = (int)(vparams->scale * target->b.origin->pos.y);
+  
+  cvLine(vparams->dst,
+         cvPoint(x1, y1), cvPoint(x2, y2),
+         cvScalar(255, 255, 0, 0), vparams->link_size, 8, 0);
+  
+  FINALLY(link_draw);
+  RETURN();
+}
 
 result link_visualize_attribute
 (
@@ -909,35 +963,47 @@ result graph_draw_nodes
   vparams.link_size = 3;
   vparams.attr_range = &attr_range;
   
-  attr_range.key = link_attr;
-  attr_range.min_value = 255;
-  attr_range.max_value = 0;
-  
-  CHECK(graph_for_each_link(source, &link_attribute_range_update,
-                            (pointer)&attr_range));
-
-  /*
-  printf("min weight = %.3f max weight = %.3f\n", 
-         attr_range.min_value, attr_range.max_value);
-  */
-  attr_range.range = attr_range.max_value - attr_range.min_value;
-  
-  CHECK(graph_for_each_link(source, &link_visualize_attribute,
-                            (pointer)&vparams));
-  
-  attr_range.key = node_attr;
-  attr_range.min_value = 255;
-  attr_range.max_value = 0;
-  CHECK(graph_for_each_node(source, &node_attribute_range_update, 
-                            (pointer)&attr_range));
-  /*
-  printf("min val = %.3f max val = %.3f\n", 
-         attr_range.min_value, attr_range.max_value);
-  */
-  attr_range.range = attr_range.max_value - attr_range.min_value;
+  if (link_attr != 0) {
+    attr_range.key = link_attr;
+    attr_range.min_value = 255;
+    attr_range.max_value = 0;
     
-  CHECK(graph_for_each_node(source, &node_visualize_attribute, 
-                            (pointer)&vparams));
+    CHECK(graph_for_each_link(source, &link_attribute_range_update,
+                              (pointer)&attr_range));
+
+    /*
+    printf("min weight = %.3f max weight = %.3f\n", 
+          attr_range.min_value, attr_range.max_value);
+    */
+    attr_range.range = attr_range.max_value - attr_range.min_value;
+    
+    CHECK(graph_for_each_link(source, &link_visualize_attribute,
+                              (pointer)&vparams));
+  }
+  else {
+    CHECK(graph_for_each_link(source, &link_draw,
+                              (pointer)&vparams));
+  }
+  
+  if (node_attr != 0) {
+    attr_range.key = node_attr;
+    attr_range.min_value = 255;
+    attr_range.max_value = 0;
+    CHECK(graph_for_each_node(source, &node_attribute_range_update, 
+                              (pointer)&attr_range));
+    
+    printf("min val = %.3f max val = %.3f\n", 
+          attr_range.min_value, attr_range.max_value);
+    
+    attr_range.range = attr_range.max_value - attr_range.min_value;
+      
+    CHECK(graph_for_each_node(source, &node_visualize_attribute, 
+                              (pointer)&vparams));
+  }
+  else {
+    CHECK(graph_for_each_node(source, &node_draw,
+                              (pointer)&vparams));
+  }
   
   FINALLY(graph_draw_nodes);
   cvReleaseImageHeader(&dst);

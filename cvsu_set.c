@@ -222,6 +222,11 @@ void union_raw_moments(typed_pointer *a, typed_pointer *b)
   araw->m02 += braw->m02;
 }
 
+void union_attribute_stat(typed_pointer *a, typed_pointer *b)
+{
+  attribute_stat_combine((attribute_stat*)a->value, (attribute_stat*)b->value);
+}
+
 void attribute_union
 (
   disjoint_set *a,
@@ -258,8 +263,12 @@ void attribute_union
             case t_raw_moments:
               union_raw_moments(&avalue, &bvalue);
               break;
+            case t_attribute_stat:
+              union_attribute_stat(&avalue, &bvalue);
+              break;
             default:
               /* should generate BAD_TYPE error or something? */
+              printf("no handler for attribute union\n");
               break;
           }
         }
@@ -347,16 +356,6 @@ uint32 disjoint_set_attrib_size
 
 /******************************************************************************/
 
-result disjoint_set_pointer_create
-(
-  typed_pointer *tptr
-)
-{
-  
-}
-
-/******************************************************************************/
-
 result disjoint_set_attribute_add
 (
   attribute_list *target,
@@ -374,8 +373,8 @@ result disjoint_set_attribute_add
   
   *added = NULL;
   CHECK(attribute_list_add_new(target, key, t_disjoint_set, &set_attr));
-  new_set = (disjoint_set*)new_attr->value.value;
-  if (IS_FALSE(disjoint_set_is_null)) {
+  new_set = (disjoint_set*)set_attr->value.value;
+  if (IS_FALSE(disjoint_set_is_null(new_set))) {
     disjoint_set_destroy(new_set);
   }
   CHECK(disjoint_set_create(new_set, attribute_count));
@@ -398,7 +397,7 @@ result disjoint_set_stat_attribute_add
 )
 {
   TRY();
-  attribute *dep_attr, *set_attr, *stat_attr;
+  attribute *dep_attr, *stat_attr;
   disjoint_set *new_set;
   attribute_stat *new_stat;
   
@@ -406,19 +405,19 @@ result disjoint_set_stat_attribute_add
   CHECK_POINTER(added);
   
   *added = NULL;
-  dep_attr = attribute_find(target, dependency_key);
+  dep_attr = attribute_find(target, dep_key);
   if (dep_attr == NULL) {
     ERROR(NOT_FOUND);
   }
   else {
     CHECK(disjoint_set_attribute_add(target, set_key, attribute_count, 
-                                     &set_attr));
-    CHECK(attribute_list_add_new(&set_attr->attributes, stat_key,
+                                     &new_set));
+    CHECK(attribute_list_add_new(&new_set->attributes, stat_key,
                                  t_attribute_stat, &stat_attr));
     new_stat = (attribute_stat*)stat_attr->value.value;
     attribute_stat_init(new_stat, dep_attr);
   }
-  *added = new_stat;
+  *added = new_set;
   
   FINALLY(disjoint_set_stat_attribute_add);
   RETURN();
@@ -428,13 +427,19 @@ result disjoint_set_stat_attribute_add
 
 result disjoint_set_add_attr
 (
-  attribute_list *attrs,
+  attribute_list *target,
   pointer params
 )
 {
   TRY();
+  disjoint_set_attribute_params *sparams;
   
-  CHECK_POINTER(attrs);
+  CHECK_POINTER(target);
+  CHECK_POINTER(params);
+  
+  sparams = (disjoint_set_attribute_params*)params;
+  CHECK(disjoint_set_attribute_add(target, sparams->key, 
+                                   sparams->attribute_count, &sparams->added));
   
   FINALLY(disjoint_set_add_attr);
   RETURN();
@@ -444,13 +449,21 @@ result disjoint_set_add_attr
 
 result disjoint_set_add_stat_attr
 (
-  attribute_list *attrs,
+  attribute_list *target,
   pointer params
 )
 {
   TRY();
+  disjoint_set_stat_attribute_params *sparams;
   
-  CHECK_POINTER(attrs);
+  CHECK_POINTER(target);
+  CHECK_POINTER(params);
+  
+  sparams = (disjoint_set_stat_attribute_params*)params;
+  CHECK(disjoint_set_stat_attribute_add(target, sparams->set_key,
+                                        sparams->attribute_count, 
+                                        sparams->stat_key, sparams->dep_key,
+                                        &sparams->added));
   
   FINALLY(disjoint_set_add_stat_attr);
   RETURN();

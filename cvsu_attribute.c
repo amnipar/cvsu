@@ -40,13 +40,18 @@
 string attribute_alloc_name = "attribute_alloc";
 string attribute_create_name = "attribute_create";
 string attribute_clone_name = "attribute_clone";
+string attribute_to_real_name = "attribute_to_real";
 string attribute_list_alloc_name = "attribute_list_alloc";
 string attribute_list_create_name = "attribute_list_create";
 string attribute_list_nullify_name = "attribute_list_nullify";
 string attribute_list_clone_name = "attribute_list_clone";
 string attribute_add_name = "attribute_add";
 string attribute_list_add_new_name = "attribute_list_add_new";
-string attribute_find_name = "attribute_find";
+
+string pixel_value_attribute_add_name = "pixel_value_attribute_add";
+string scalar_attribute_add_name = "scalar_attribute_add";
+string pointer_attribute_add_name = "pointer_attribute_add";
+
 string attribute_stat_create_name = "attribute_stat_create";
 string attribute_stat_combine_name = "attribute_stat_combine";
 string attribute_stat_sum_name = "attribute_stat_sum";
@@ -311,6 +316,21 @@ truth_value attribute_is_null
 
 /******************************************************************************/
 
+real attribute_to_real
+(
+  attribute *target
+)
+{
+  TRY();
+  
+  CHECK_POINTER(target);
+  
+  FINALLY(attribute_to_real);
+  return typed_pointer_cast_from(&target->value);
+}
+
+/******************************************************************************/
+
 attribute_list *attribute_list_alloc
 ()
 {
@@ -499,7 +519,7 @@ result attribute_list_add_new
   CHECK_POINTER(target);
   CHECK_POINTER(added);
   
-  new_attr = attribute_find(target, source->key);
+  new_attr = attribute_find(target, key);
   if (new_attr != NULL) {
     if (new_attr->value.type != type) {
       ERROR(BAD_TYPE);
@@ -546,23 +566,110 @@ attribute *attribute_find
 
 /******************************************************************************/
 
-pixel_value *value_attribute_add
+attribute *attribute_find_by_type
+(
+  attribute_list *source,
+  type_label type
+)
+{
+  uint32 i;
+  attribute *ptr;
+  ptr = NULL;
+  if (source != NULL) {
+    for (i = 0; i < source->count; i++) {
+      if (source->items[i].value.type == type) {
+        ptr = &source->items[i];
+      }
+    }
+  }
+  return ptr;
+}
+
+/******************************************************************************/
+
+result pixel_value_attribute_add
 (
   attribute_list *target,
   uint32 key,
-  uint32 offset
+  uint32 offset,
+  uint32 token,
+  pixel_value **added
 )
 {
-  result r;
-  attribute new_attr, *attr_ptr;
-  r = SUCCESS;
-  new_attr.key = key;
-  /* TODO: implement? needed? */
-  (void)target;
-  (void)offset;
-  (void)new_attr;
-  (void)attr_ptr;
-  return NULL;
+  TRY();
+  attribute *new_attr;
+  pixel_value *new_value;
+  
+  CHECK_POINTER(target);
+  
+  CHECK(attribute_list_add_new(target, key, t_pixel_value, &new_attr));
+  new_value = (pixel_value*)new_attr->value.value;
+  new_value->offset = offset;
+  new_value->token = token;
+  new_value->cache = 0;
+  
+  if (added != NULL) {
+    *added = new_value;
+  }
+  
+  FINALLY(pixel_value_attribute_add);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result scalar_attribute_add
+(
+  attribute_list *target,
+  uint32 key,
+  real value,
+  real **added
+)
+{
+  TRY();
+  attribute *new_attr;
+  real *new_scalar;
+  
+  CHECK_POINTER(target);
+  
+  CHECK(attribute_list_add_new(target, key, t_real, &new_attr));
+  new_scalar = (real*)new_attr->value.value;
+  *new_scalar = value;
+  
+  if (added != NULL) {
+    *added = new_scalar;
+  }
+    
+  FINALLY(scalar_attribute_add);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result pointer_attribute_add
+(
+  attribute_list *target,
+  uint32 key,
+  pointer ptr,
+  pointer **added
+)
+{
+  TRY();
+  attribute *new_attr;
+  pointer *new_ptr;
+  
+  CHECK_POINTER(target);
+  
+  CHECK(attribute_list_add_new(target, key, t_pointer, &new_attr));
+  new_ptr = (pointer*)new_attr->value.value;
+  *new_ptr = ptr;
+  
+  if (added != NULL) {
+    *added = new_ptr;
+  }
+  
+  FINALLY(pointer_attribute_add);
+  RETURN();
 }
 
 /******************************************************************************/
