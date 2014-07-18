@@ -60,8 +60,7 @@ typedef struct link_head_t {
 typedef struct link_t {
   struct link_head_t a;
   struct link_head_t b;
-  attribute *weight_attribute;
-  real weight;
+  real *weight;
   attribute_list attributes;
 } link;
 
@@ -136,19 +135,22 @@ truth_value link_list_is_null
   link_list *target
 );
 
+result link_list_add
+(
+  link_list *target,
+  link_head *source
+);
+
+result link_list_add_in_pos
+(
+  link_list *target,
+  link_head *source,
+  uint32 pos
+);
+
 /* adding and finding links are functions of the graph. */
 
 /******************************************************************************/
-
-typedef struct position_2d_t {
-  real x;
-  real y;
-} position_2d;
-
-typedef struct position_nd_t {
-  uint32 n;
-  real *position;
-} position_nd;
 
 /**
  * Defines a generic graph node structure for use in sparse graphs, where most
@@ -158,8 +160,8 @@ typedef struct position_nd_t {
  */
 typedef struct node_t {
   uint32 id;
-  position_2d pos;
-  attribute *weight_attribute;
+  position_2d *pos;
+  real *weight;
   attribute_list attributes;
   link_list links;
 } node;
@@ -188,6 +190,12 @@ truth_value node_is_null
   node *target
 );
 
+truth_value node_has_link_to
+(
+  node *node_1,
+  node *node_2
+);
+
 result node_weight_range_update
 (
   node *target,
@@ -198,6 +206,20 @@ result node_attribute_range_update
 (
   node *target,
   pointer params
+);
+
+result node_ref_attribute_add
+(
+  attribute_list *target,
+  uint32 key,
+  node *source,
+  node ***added
+);
+
+node *node_ref_attribute_get
+(
+  attribute_list *target,
+  uint32 key
 );
 
 /******************************************************************************/
@@ -283,6 +305,13 @@ result graph_add_link
   link **added
 );
 
+result graph_link_nodes
+(
+  link *target,
+  node *node_a,
+  node *node_b
+);
+
 result graph_for_each_node
 (
   graph *target,
@@ -329,6 +358,7 @@ result graph_create_from_image
   uint32 node_step_x,
   uint32 node_step_y,
   graph_neighborhood neighborhood,
+  uint32 pos_key,
   uint32 value_key,
   uint32 weight_key
 );

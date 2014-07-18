@@ -81,6 +81,7 @@ uint32 typesize[] = {
   sizeof(real32),
   sizeof(real64),
   sizeof(pixel_value),
+  sizeof(position_2d),
   sizeof(typed_pointer),
   sizeof(list),
   sizeof(disjoint_set),
@@ -89,6 +90,7 @@ uint32 typesize[] = {
   sizeof(attribute),
   sizeof(attribute_list),
   sizeof(attribute_stat),
+  sizeof(attribute_2d_pos),
   sizeof(link),
   sizeof(link_head),
   /* tree annotation types */
@@ -106,7 +108,8 @@ uint32 typesize[] = {
   sizeof(segment),
   /* parsing context types */
   sizeof(stat_accumulator),
-  sizeof(pixel_image)
+  sizeof(pixel_image),
+  sizeof(node*)
 };
 
 /******************************************************************************/
@@ -261,6 +264,7 @@ typed_pointer_cast_from_function cast_from_functions[] = {
   &cast_from_f32,         /* t_F32 */
   &cast_from_f64,         /* t_F64 */
   &cast_from_pixel_value, /* t_pixel_value */
+  &cast_from_unsupported, /* t_position_2d */
   &cast_from_unsupported, /* t_tuple */
   &cast_from_unsupported, /* t_list */
   &cast_from_set,         /* t_disjoint_set */
@@ -269,6 +273,7 @@ typed_pointer_cast_from_function cast_from_functions[] = {
   &cast_from_unsupported, /* t_attribute */
   &cast_from_unsupported, /* t_attribute_list */
   &cast_from_unsupported, /* t_attribute_stat */
+  &cast_from_unsupported, /* t_attribute_2d_pos */
   &cast_from_unsupported, /* t_link */
   &cast_from_unsupported, /* t_link_head */
   /* tree annotation types */
@@ -287,6 +292,7 @@ typed_pointer_cast_from_function cast_from_functions[] = {
   /* parsing context types */
   &cast_from_unsupported, /* t_stat_accumulator */
   &cast_from_unsupported, /* t_pixel_image */
+  &cast_from_unsupported  /* t_node_ref */
 };
 
 /******************************************************************************/

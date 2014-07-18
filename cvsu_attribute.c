@@ -49,12 +49,21 @@ string attribute_add_name = "attribute_add";
 string attribute_list_add_new_name = "attribute_list_add_new";
 
 string pixel_value_attribute_add_name = "pixel_value_attribute_add";
+string position_2d_attribute_add_name = "position_2d_attribute_add";
 string scalar_attribute_add_name = "scalar_attribute_add";
 string pointer_attribute_add_name = "pointer_attribute_add";
 
+string attribute_stat_init_name = "attribute_stat_init";
 string attribute_stat_create_name = "attribute_stat_create";
 string attribute_stat_combine_name = "attribute_stat_combine";
 string attribute_stat_sum_name = "attribute_stat_sum";
+string attribute_stat_attribute_add_name = "attribute_stat_attribute_add";
+
+string attribute_2d_pos_init_name = "attribute_2d_pos_init";
+string attribute_2d_pos_create_name = "attribute_2d_pos_create";
+string attribute_2d_pos_combine_name = "attribute_2d_pos_combine";
+string attribute_2d_pos_sum_name = "attribute_2d_pos_sum";
+string attribute_2d_pos_attribute_add_name = "attribute_2d_pos_attribute_add";
 
 /******************************************************************************/
 
@@ -123,12 +132,12 @@ result cloning_attribute_stat
 )
 {
   attribute *dependency;
-  dependency = ((attribute_stat*)source->value)->parent;
+  dependency = ((attribute_stat*)source->value)->dependency;
   if (dependency != NULL) {
     dependency = attribute_find(target_list, dependency->key);
     if (dependency != NULL) {
       attribute_stat new_attr_stat;
-      new_attr_stat.parent = dependency;
+      new_attr_stat.dependency = dependency;
       new_attr_stat.acc = NULL;
       return typed_pointer_create(target, t_attribute_stat, 1, 0,
                                   (pointer)&new_attr_stat);
@@ -189,6 +198,7 @@ attribute_cloning_function cloning_functions[] = {
   /* parsing context types */
   &cloning_not_implemented,  /* t_stat_accumulator */
   &cloning_not_implemented,  /* t_pixel_image */
+  &cloning_not_implemented   /* t_node_ref */
 };
 
 /******************************************************************************/
@@ -618,6 +628,66 @@ result pixel_value_attribute_add
 
 /******************************************************************************/
 
+pixel_value *pixel_value_attribute_get
+(
+  attribute_list *target,
+  uint32 key
+)
+{
+  attribute *attr = attribute_find(target, key);
+  if (attr != NULL && attr->value.type == t_pixel_value) {
+    return (pixel_value*)attr->value.value;
+  }
+  return NULL;
+}
+
+/******************************************************************************/
+
+result position_2d_attribute_add
+(
+  attribute_list *target,
+  uint32 key,
+  real x,
+  real y,
+  position_2d **added
+)
+{
+  TRY();
+  attribute *new_attr;
+  position_2d *new_pos;
+  
+  CHECK_POINTER(target);
+  
+  CHECK(attribute_list_add_new(target, key, t_position_2d, &new_attr));
+  new_pos = (position_2d*)new_attr->value.value;
+  new_pos->x = x;
+  new_pos->y = y;
+  
+  if (added != NULL) {
+    *added = new_pos;
+  }
+  
+  FINALLY(position_2d_attribute_add);
+  RETURN();
+}
+
+/******************************************************************************/
+
+position_2d *position_2d_attribute_get
+(
+  attribute_list *target,
+  uint32 key
+)
+{
+  attribute *attr = attribute_find(target, key);
+  if (attr != NULL && attr->value.type == t_position_2d) {
+    return (position_2d*)attr->value.value;
+  }
+  return NULL;
+}
+
+/******************************************************************************/
+
 result scalar_attribute_add
 (
   attribute_list *target,
@@ -642,6 +712,21 @@ result scalar_attribute_add
     
   FINALLY(scalar_attribute_add);
   RETURN();
+}
+
+/******************************************************************************/
+
+real *scalar_attribute_get
+(
+  attribute_list *target,
+  uint32 key
+)
+{
+  attribute *attr = attribute_find(target, key);
+  if (attr != NULL && attr->value.type == t_real) {
+    return (real*)attr->value.value;
+  }
+  return NULL;
 }
 
 /******************************************************************************/
@@ -674,18 +759,52 @@ result pointer_attribute_add
 
 /******************************************************************************/
 
-void attribute_stat_init
+pointer *pointer_attribute_get
 (
-  attribute_stat *target,
-  attribute *parent
+  attribute_list *target,
+  uint32 key
 )
 {
-  if (target != NULL) {
-    target->parent = parent;
-    if (target->acc != NULL) {
-      memory_deallocate((data_pointer*)&target->acc);
-    }
+  attribute *attr = attribute_find(target, key);
+  if (attr != NULL && attr->value.type == t_pointer) {
+    return (pointer*)attr->value.value;
   }
+  return NULL;
+}
+
+/******************************************************************************/
+
+result attribute_stat_init
+(
+  attribute_stat *target,
+  attribute *dependency
+)
+{
+  TRY();
+  
+  CHECK_POINTER(target);
+  CHECK_POINTER(dependency);
+  
+  if (dependency->value.type == t_real) {
+    real *value = (real*)dependency->value.value;
+    target->value = value;
+  }
+  else
+  if (dependency->value.type == t_pixel_value) {
+    pixel_value *value = (real*)dependency->value.value;
+    target->value = &value->cache;
+  }
+  else {
+    ERROR(BAD_TYPE);
+  }
+  
+  target->dependency = dependency;
+  if (target->acc != NULL) {
+    memory_deallocate((data_pointer*)&target->acc);
+  }
+  
+  FINALLY(attribute_stat_init);
+  RETURN();
 }
 
 /******************************************************************************/
@@ -704,9 +823,8 @@ result attribute_stat_create
                           sizeof(attribute_stat_acc)));
   }
   
-  if (target->parent != NULL) {
-    real value = typed_pointer_cast_from(&target->parent->value);
-    attribute_stat_acc_init(target->acc, value);
+  if (target->dependency != NULL) {
+    attribute_stat_acc_init(target->acc, *target->value);
   }
   else {
     attribute_stat_acc_nullify(target->acc);
@@ -725,7 +843,8 @@ void attribute_stat_destroy
 {
   if (target != NULL) {
     memory_deallocate((data_pointer*)&target->acc);
-    target->parent = NULL;
+    target->dependency = NULL;
+    target->value = NULL;
   }
 }
 
@@ -785,9 +904,8 @@ void attribute_stat_get
     }
     else
     /* default case: acc initialized with values based on one node's value */
-    if (source->parent != NULL) {
-      real value = typed_pointer_cast_from(&source->parent->value);
-      attribute_stat_acc_init(target, value);
+    if (source->value != NULL) {
+      attribute_stat_acc_init(target, *source->value);
     }
     else {
       attribute_stat_acc_nullify(target);
@@ -874,6 +992,294 @@ void attribute_stat_sum
   
   FINALLY(attribute_stat_sum);
   return;
+}
+
+/******************************************************************************/
+
+result attribute_stat_attribute_add
+(
+  attribute_list *target,
+  uint32 key,
+  attribute *dependency,
+  attribute_stat **added
+)
+{
+  TRY();
+  attribute *new_attr;
+  attribute_stat *new_stat;
+  
+  CHECK_POINTER(target);
+  
+  CHECK(attribute_list_add_new(target, key, t_attribute_stat, &new_attr));
+  new_stat = (attribute_stat*)new_attr->value.value;
+  CHECK(attribute_stat_init(new_stat, dependency));
+  
+  if (added != NULL) {
+    *added = new_stat;
+  }
+  
+  FINALLY(attribute_stat_attribute_add);
+  RETURN();
+}
+
+/******************************************************************************/
+
+attribute_stat *attribute_stat_attribute_get
+(
+  attribute_list *target,
+  uint32 key
+)
+{
+  attribute *attr = attribute_find(target, key);
+  if (attr != NULL && attr->value.type == t_attribute_stat) {
+    return (attribute_stat*)attr->value.value;
+  }
+  return NULL;
+}
+
+/******************************************************************************/
+
+result attribute_2d_pos_init
+(
+  attribute_2d_pos *target,
+  attribute *dependency
+)
+{
+  TRY();
+  
+  CHECK_POINTER(target);
+  CHECK_POINTER(dependency);
+  CHECK_PARAM(dependency->value.type == t_position_2d);
+  
+  target->dependency = dependency;
+  target->pos = (position_2d*)dependency->value.value;
+  if (target->acc != NULL) {
+    memory_deallocate((data_pointer*)&target->dependency);
+  }
+  
+  FINALLY(attribute_2d_pos_init);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result attribute_2d_pos_create
+(
+  attribute_2d_pos *target
+)
+{
+  TRY();
+  
+  CHECK_POINTER(target);
+  
+  if (target->acc == NULL) {
+    CHECK(memory_allocate((data_pointer*)&target->acc, 1,
+                          sizeof(attribute_2d_pos_acc)));
+  }
+  
+  if (target->pos != NULL) {
+    attribute_2d_pos_acc_init(target->acc, target->pos);
+  }
+  else {
+    attribute_2d_pos_acc_nullify(target->acc);
+  }
+  
+  FINALLY(attribute_2d_pos_create);
+  RETURN();
+}
+
+/******************************************************************************/
+
+void attribute_2d_pos_destroy
+(
+  attribute_2d_pos *target
+)
+{
+  if (target != NULL) {
+    memory_deallocate((data_pointer*)&target->acc);
+    target->dependency = NULL;
+    target->pos = NULL;
+  }
+}
+
+/******************************************************************************/
+
+void attribute_2d_pos_acc_nullify
+(
+  attribute_2d_pos_acc *target
+)
+{
+  if (target != NULL) {
+    memory_clear((data_pointer)target, 1, sizeof(attribute_2d_pos_acc));
+    /* TODO: should put this choice behind a flag and run some tests to */
+    /* determine whether it is something that matters or not */
+    /*
+    target->n = 0;
+    target->sval1 = 0;
+    target->sval2 = 0;
+    target->mean = 0;
+    target->variance = 0;
+    target->deviation = 0;
+    */
+  }
+}
+
+/******************************************************************************/
+
+void attribute_2d_pos_acc_init
+(
+  attribute_2d_pos_acc *target,
+  position_2d *pos
+)
+{
+  if (target != NULL && pos != NULL) {
+    target->n = 1;
+    target->sx = pos->x;
+    target->cx = pos->x;
+    target->sy = pos->y;
+    target->cy = pos->y;
+  }
+}
+
+/******************************************************************************/
+
+void attribute_2d_pos_get
+(
+  attribute_2d_pos *source,
+  attribute_2d_pos_acc *target
+)
+{
+  if (source != NULL && target != NULL) {
+    /* accumulator exists: copy the values contained in the acc */
+    if (source->acc != NULL) {
+      memory_copy((data_pointer)target, (data_pointer)source->acc, 1,
+                  sizeof(attribute_2d_pos_acc));
+    }
+    else
+    /* default case: acc initialized with values based on one node's value */
+    if (source->pos != NULL) {
+      attribute_2d_pos_acc_init(target, source->pos);
+    }
+    else {
+      attribute_2d_pos_acc_nullify(target);
+    }
+  }
+}
+
+/******************************************************************************/
+
+void attribute_2d_pos_combine
+(
+  attribute_2d_pos *target,
+  attribute_2d_pos *source
+)
+{
+  TRY();
+  attribute_2d_pos_acc *target_acc, source_acc;
+  real n, sx, sy;
+  
+  CHECK_POINTER(target);
+  CHECK_POINTER(source);
+  
+  if (target->acc == NULL) {
+    CHECK(attribute_2d_pos_create(target));
+  }
+  target_acc = target->acc;
+  attribute_2d_pos_get(source, &source_acc);
+  
+  n  = target_acc->n  += source_acc.n;
+  sx = target_acc->sx += source_acc.sx;
+  sy = target_acc->sy += source_acc.sy;
+  
+  target_acc->cx = sx / n;
+  target_acc->cy = sy / n;
+  
+  /* the source node will be reverted to the default state */
+  if (source->acc != NULL) {
+    memory_deallocate((data_pointer*)&source->acc);
+    source->acc = NULL;
+  }
+  
+  FINALLY(attribute_2d_pos_combine);
+  return;
+}
+
+/******************************************************************************/
+
+void attribute_2d_pos_sum
+(
+  attribute_2d_pos *a,
+  attribute_2d_pos *b,
+  attribute_2d_pos *c
+)
+{
+  TRY();
+  attribute_2d_pos_acc acc_a, acc_b, *acc_c;
+  real n, sx, sy;
+  
+  CHECK_POINTER(a);
+  CHECK_POINTER(b);
+  CHECK_POINTER(c);
+  
+  attribute_2d_pos_get(a, &acc_a);
+  attribute_2d_pos_get(b, &acc_b);
+  if (c->acc == NULL) {
+    CHECK(attribute_2d_pos_create(c));
+  }
+  acc_c = c->acc;
+  
+  n  = acc_c->n  = acc_a.n  + acc_b.n;
+  sx = acc_c->sx = acc_a.sx + acc_b.sx;
+  sy = acc_c->sy = acc_a.sy + acc_b.sy;
+  
+  acc_c->cx = sx / n;
+  acc_c->cy = sy / n;
+  
+  FINALLY(attribute_2d_pos_sum);
+  return;
+}
+
+/******************************************************************************/
+
+result attribute_2d_pos_attribute_add
+(
+  attribute_list *target,
+  uint32 key,
+  attribute *dependency,
+  attribute_2d_pos **added
+)
+{
+  TRY();
+  attribute *new_attr;
+  attribute_2d_pos *new_pos;
+  
+  CHECK_POINTER(target);
+  
+  CHECK(attribute_list_add_new(target, key, t_attribute_2d_pos, &new_attr));
+  new_pos = (attribute_2d_pos*)new_attr->value.value;
+  CHECK(attribute_2d_pos_init(new_pos, dependency));
+  
+  if (added != NULL) {
+    *added = new_pos;
+  }
+  
+  FINALLY(attribute_2d_pos_attribute_add);
+  RETURN();
+}
+
+/******************************************************************************/
+
+attribute_2d_pos *attribute_2d_pos_attribute_get
+(
+  attribute_list *target,
+  uint32 key
+)
+{
+  attribute *attr = attribute_find(target, key);
+  if (attr != NULL && attr->value.type == t_attribute_2d_pos) {
+    return (attribute_2d_pos*)attr->value.value;
+  }
+  return NULL;
 }
 
 /* end of file                                                                */

@@ -45,8 +45,11 @@ string disjoint_set_attr_create_name = "disjoint_set_attr_create";
 string disjoint_set_create_with_stat_name = "disjoint_set_create_with_stat";
 string disjoint_set_attribute_add_name = "disjoint_set_attribute_add";
 string disjoint_set_stat_attribute_add_name = "disjoint_set_stat_attribute_add";
+string disjoint_set_stat_pos_attribute_add_name =
+    "disjoint_set_stat_pos_attribute_add";
 string disjoint_set_add_attr_name = "disjoint_set_add_attr";
 string disjoint_set_add_stat_attr_name = "disjoint_set_add_stat_attr";
+string disjoint_set_add_stat_pos_attr_name = "disjoint_set_add_stat_pos_attr";
 
 /******************************************************************************/
 
@@ -222,11 +225,6 @@ void union_raw_moments(typed_pointer *a, typed_pointer *b)
   araw->m02 += braw->m02;
 }
 
-void union_attribute_stat(typed_pointer *a, typed_pointer *b)
-{
-  attribute_stat_combine((attribute_stat*)a->value, (attribute_stat*)b->value);
-}
-
 void attribute_union
 (
   disjoint_set *a,
@@ -264,7 +262,12 @@ void attribute_union
               union_raw_moments(&avalue, &bvalue);
               break;
             case t_attribute_stat:
-              union_attribute_stat(&avalue, &bvalue);
+              attribute_stat_combine((attribute_stat*)avalue.value,
+                                     (attribute_stat*)bvalue.value);
+              break;
+            case t_attribute_2d_pos:
+              attribute_2d_pos_combine((attribute_2d_pos*)avalue.value,
+                                       (attribute_2d_pos*)bvalue.value);
               break;
             default:
               /* should generate BAD_TYPE error or something? */
@@ -365,23 +368,39 @@ result disjoint_set_attribute_add
 )
 {
   TRY();
-  attribute *set_attr;
+  attribute *new_attr;
   disjoint_set *new_set;
   
   CHECK_POINTER(target);
-  CHECK_POINTER(added);
   
-  *added = NULL;
-  CHECK(attribute_list_add_new(target, key, t_disjoint_set, &set_attr));
-  new_set = (disjoint_set*)set_attr->value.value;
+  CHECK(attribute_list_add_new(target, key, t_disjoint_set, &new_attr));
+  new_set = (disjoint_set*)new_attr->value.value;
   if (IS_FALSE(disjoint_set_is_null(new_set))) {
     disjoint_set_destroy(new_set);
   }
   CHECK(disjoint_set_create(new_set, attribute_count));
-  *added = new_set;
+  
+  if (added != NULL) {
+    *added = new_set;
+  }
   
   FINALLY(disjoint_set_attribute_add);
   RETURN();
+}
+
+/******************************************************************************/
+
+disjoint_set *disjoint_set_attribute_get
+(
+  attribute_list *target,
+  uint32 key
+)
+{
+  attribute *attr = attribute_find(target, key);
+  if (attr != NULL && attr->value.type == t_disjoint_set) {
+    return (disjoint_set*)attr->value.value;
+  }
+  return NULL;
 }
 
 /******************************************************************************/
@@ -397,29 +416,71 @@ result disjoint_set_stat_attribute_add
 )
 {
   TRY();
-  attribute *dep_attr, *stat_attr;
+  attribute *dep_attr;
   disjoint_set *new_set;
-  attribute_stat *new_stat;
   
   CHECK_POINTER(target);
-  CHECK_POINTER(added);
   
-  *added = NULL;
   dep_attr = attribute_find(target, dep_key);
+  
   if (dep_attr == NULL) {
     ERROR(NOT_FOUND);
   }
   else {
     CHECK(disjoint_set_attribute_add(target, set_key, attribute_count, 
                                      &new_set));
-    CHECK(attribute_list_add_new(&new_set->attributes, stat_key,
-                                 t_attribute_stat, &stat_attr));
-    new_stat = (attribute_stat*)stat_attr->value.value;
-    attribute_stat_init(new_stat, dep_attr);
+    CHECK(attribute_stat_attribute_add(&new_set->attributes, stat_key,
+                                       dep_attr, NULL));
   }
-  *added = new_set;
+  
+  if (added != NULL) {
+    *added = new_set;
+  }
   
   FINALLY(disjoint_set_stat_attribute_add);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result disjoint_set_stat_pos_attribute_add
+(
+  attribute_list *target,
+  uint32 set_key,
+  uint32 attribute_count,
+  uint32 stat_key,
+  uint32 stat_dep_key,
+  uint32 pos_key,
+  uint32 pos_dep_key,
+  disjoint_set **added
+)
+{
+  TRY();
+  attribute *stat_dep_attr, *pos_dep_attr;
+  disjoint_set *new_set;
+  
+  CHECK_POINTER(target);
+  
+  stat_dep_attr = attribute_find(target, stat_dep_key);
+  pos_dep_attr = attribute_find(target, pos_dep_key);
+  
+  if (stat_dep_attr == NULL || pos_dep_attr == NULL) {
+    ERROR(NOT_FOUND);
+  }
+  else {
+    CHECK(disjoint_set_attribute_add(target, set_key, attribute_count, 
+                                     &new_set));
+    CHECK(attribute_stat_attribute_add(&new_set->attributes, stat_key,
+                                       stat_dep_attr, NULL));
+    CHECK(attribute_2d_pos_attribute_add(&new_set->attributes, pos_key,
+                                         pos_dep_attr, NULL));
+  }
+  
+  if (added != NULL) {
+    *added = new_set;
+  }
+  
+  FINALLY(disjoint_set_stat_pos_attribute_add);
   RETURN();
 }
 
@@ -466,6 +527,33 @@ result disjoint_set_add_stat_attr
                                         &sparams->added));
   
   FINALLY(disjoint_set_add_stat_attr);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result disjoint_set_add_stat_pos_attr
+(
+  attribute_list *target,
+  pointer params
+)
+{
+  TRY();
+  disjoint_set_stat_pos_attribute_params *sparams;
+  
+  CHECK_POINTER(target);
+  CHECK_POINTER(params);
+  
+  sparams = (disjoint_set_stat_pos_attribute_params*)params;
+  CHECK(disjoint_set_stat_pos_attribute_add(target, sparams->set_key,
+                                            sparams->attribute_count, 
+                                            sparams->stat_key, 
+                                            sparams->stat_dep_key, 
+                                            sparams->pos_key, 
+                                            sparams->pos_dep_key,
+                                            &sparams->added));
+  
+  FINALLY(disjoint_set_add_stat_pos_attr);
   RETURN();
 }
 

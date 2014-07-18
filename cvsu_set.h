@@ -146,6 +146,12 @@ result disjoint_set_attribute_add
   disjoint_set **added
 );
 
+disjoint_set *disjoint_set_attribute_get
+(
+  attribute_list *target,
+  uint32 key
+);
+
 typedef struct disjoint_set_attribute_params_t {
   uint32 key;
   uint32 attribute_count;
@@ -170,6 +176,28 @@ typedef struct disjoint_set_stat_attribute_params_t {
   disjoint_set *added;
 } disjoint_set_stat_attribute_params;
 
+result disjoint_set_stat_pos_attribute_add
+(
+  attribute_list *target,
+  uint32 set_key,
+  uint32 attribute_count,
+  uint32 stat_key,
+  uint32 stat_dep_key,
+  uint32 pos_key,
+  uint32 pos_dep_key,
+  disjoint_set **added
+);
+
+typedef struct disjoint_set_stat_pos_attribute_params_t {
+  uint32 set_key;
+  uint32 attribute_count;
+  uint32 stat_key;
+  uint32 stat_dep_key;
+  uint32 pos_key;
+  uint32 pos_dep_key;
+  disjoint_set *added;
+} disjoint_set_stat_pos_attribute_params;
+
 result disjoint_set_add_attr
 (
   attribute_list *target,
@@ -177,6 +205,12 @@ result disjoint_set_add_attr
 );
 
 result disjoint_set_add_stat_attr
+(
+  attribute_list *target,
+  pointer params
+);
+
+result disjoint_set_add_stat_pos_attr
 (
   attribute_list *target,
   pointer params

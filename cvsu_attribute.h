@@ -185,6 +185,27 @@ result pixel_value_attribute_add
   pixel_value **added
 );
 
+pixel_value *pixel_value_attribute_get
+(
+  attribute_list *target,
+  uint32 key
+);
+
+result position_2d_attribute_add
+(
+  attribute_list *target,
+  uint32 key,
+  real x,
+  real y,
+  position_2d **added
+);
+
+position_2d *position_2d_attribute_get
+(
+  attribute_list *target,
+  uint32 key
+);
+
 result scalar_attribute_add
 (
   attribute_list *target,
@@ -193,12 +214,24 @@ result scalar_attribute_add
   real **added
 );
 
+real *scalar_attribute_get
+(
+  attribute_list *target,
+  uint32 key
+);
+
 result pointer_attribute_add
 (
   attribute_list *target,
   uint32 key,
   pointer ptr,
   pointer **added
+);
+
+pointer *pointer_attribute_get
+(
+  attribute_list *target,
+  uint32 key
 );
 
 /******************************************************************************/
@@ -217,7 +250,8 @@ typedef struct attribute_stat_acc_t {
 } attribute_stat_acc;
 
 typedef struct attribute_stat_t {
-  attribute *parent;
+  attribute *dependency;
+  real *value;
   attribute_stat_acc *acc;
 } attribute_stat;
 
@@ -226,10 +260,10 @@ typedef struct attribute_stat_t {
  * the accumulator structure is NULL and the stats are considered as single
  * value read from the parent attribute.
  */
-void attribute_stat_init
+result attribute_stat_init
 (
   attribute_stat *target,
-  attribute *parent
+  attribute *dependency
 );
 
 /**
@@ -302,6 +336,96 @@ void attribute_stat_sum
   attribute_stat *a,
   attribute_stat *b,
   attribute_stat *c
+);
+
+result attribute_stat_attribute_add
+(
+  attribute_list *target,
+  uint32 key,
+  attribute *dependency,
+  attribute_stat **added
+);
+
+attribute_stat *attribute_stat_attribute_get
+(
+  attribute_list *target,
+  uint32 key
+);
+
+/******************************************************************************/
+
+typedef struct attribute_2d_pos_acc_t {
+  real n;
+  real sx;
+  real sy;
+  real cx;
+  real cy;
+} attribute_2d_pos_acc;
+
+typedef struct attribute_2d_pos_t {
+  attribute *dependency;
+  position_2d *pos;
+  attribute_2d_pos_acc *acc;
+} attribute_2d_pos;
+
+result attribute_2d_pos_init
+(
+  attribute_2d_pos *target,
+  attribute *dependency
+);
+
+result attribute_2d_pos_create
+(
+  attribute_2d_pos *target
+);
+
+void attribute_2d_pos_destroy
+(
+  attribute_2d_pos *target
+);
+
+void attribute_2d_pos_acc_nullify
+(
+  attribute_2d_pos_acc *target
+);
+
+void attribute_2d_pos_acc_init
+(
+  attribute_2d_pos_acc *target,
+  position_2d *pos
+);
+
+void attribute_2d_pos_get
+(
+  attribute_2d_pos *source,
+  attribute_2d_pos_acc *target
+);
+
+void attribute_2d_pos_combine
+(
+  attribute_2d_pos *target,
+  attribute_2d_pos *source
+);
+
+void attribute_2d_pos_sum
+(
+  attribute_2d_pos *a,
+  attribute_2d_pos *b,
+  attribute_2d_pos *c
+);
+
+result attribute_2d_pos_attribute_add
+(
+  attribute_list *target,
+  uint32 key,
+  attribute *dependency,
+  attribute_2d_pos **added
+);
+
+attribute_2d_pos *attribute_2d_pos_attribute_get
+(
+  attribute_list *target,
+  uint32 key
 );
 
 /******************************************************************************/

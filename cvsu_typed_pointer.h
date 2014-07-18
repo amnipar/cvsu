@@ -60,6 +60,7 @@ typedef enum type_label_t {
   t_F32,
   t_F64,
   t_pixel_value,
+  t_position_2d,
   t_tuple,
   t_list,
   t_disjoint_set,
@@ -68,6 +69,7 @@ typedef enum type_label_t {
   t_attribute,
   t_attribute_list,
   t_attribute_stat,
+  t_attribute_2d_pos,
   t_link,
   t_link_head,
   /* tree annotation types */
@@ -85,7 +87,8 @@ typedef enum type_label_t {
   t_segment,
   /* parsing context types */
   t_stat_accumulator,
-  t_pixel_image
+  t_pixel_image,
+  t_node_ref
 } type_label;
 
 #if INTEGRAL_IMAGE_DATA_TYPE == INTEGRAL_IMAGE_USING_FLOAT

@@ -799,8 +799,8 @@ result node_draw
   CHECK_POINTER(params);
   
   vparams = (graph_visualize_params*)params;
-  x1 = (int)(vparams->scale * target->pos.x);
-  y1 = (int)(vparams->scale * target->pos.y);
+  x1 = (int)(vparams->scale * target->pos->x);
+  y1 = (int)(vparams->scale * target->pos->y);
   
   cvCircle(vparams->dst,
            cvPoint(x1, y1), vparams->node_size,
@@ -826,8 +826,8 @@ result node_visualize_attribute
   CHECK_POINTER(params);
   
   vparams = (graph_visualize_params*)params;
-  x1 = (int)(vparams->scale * target->pos.x);
-  y1 = (int)(vparams->scale * target->pos.y);
+  x1 = (int)(vparams->scale * target->pos->x);
+  y1 = (int)(vparams->scale * target->pos->y);
   value = 0;
   attr = attribute_find(&target->attributes, vparams->attr_range->key);
   if (attr != NULL) {
@@ -862,10 +862,10 @@ result link_draw
   CHECK_POINTER(params);
   
   vparams = (graph_visualize_params*)params;
-  x1 = (int)(vparams->scale * target->a.origin->pos.x);
-  y1 = (int)(vparams->scale * target->a.origin->pos.y);
-  x2 = (int)(vparams->scale * target->b.origin->pos.x);
-  y2 = (int)(vparams->scale * target->b.origin->pos.y);
+  x1 = (int)(vparams->scale * target->a.origin->pos->x);
+  y1 = (int)(vparams->scale * target->a.origin->pos->y);
+  x2 = (int)(vparams->scale * target->b.origin->pos->x);
+  y2 = (int)(vparams->scale * target->b.origin->pos->y);
   
   cvLine(vparams->dst,
          cvPoint(x1, y1), cvPoint(x2, y2),
@@ -902,10 +902,10 @@ result link_visualize_attribute
     printf("attr not found\n");
   }
   
-  x1 = (int)(vparams->scale * target->a.origin->pos.x);
-  y1 = (int)(vparams->scale * target->a.origin->pos.y);
-  x2 = (int)(vparams->scale * target->b.origin->pos.x);
-  y2 = (int)(vparams->scale * target->b.origin->pos.y);
+  x1 = (int)(vparams->scale * target->a.origin->pos->x);
+  y1 = (int)(vparams->scale * target->a.origin->pos->y);
+  x2 = (int)(vparams->scale * target->b.origin->pos->x);
+  y2 = (int)(vparams->scale * target->b.origin->pos->y);
   cvLine(vparams->dst,
          cvPoint(x1, y1), cvPoint(x2, y2),
          cvScalar(value, 0, 0, 0), vparams->link_size, 8, 0);
@@ -932,11 +932,7 @@ result graph_draw_nodes
   list_item *items, *end;
   node *current_node;
   link *current_link;
-  attribute *attr;
   attribute_range attr_range;
-  int x1, y1, x2, y2;
-  real val, min_val, max_val, val_range;
-  real weight, min_weight, max_weight, weight_range;
   graph_visualize_params vparams;
   
   CHECK_POINTER(source);

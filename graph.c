@@ -42,7 +42,17 @@
 
 string union_for_smaller_than_name = "union_for_smaller_than";
 string node_for_each_set_name = "node_for_each_set";
+string link_for_neighboring_sets_name = "link_for_neighboring_sets";
 string main_name = "graph";
+
+const uint32 POS_ATTR = 1;
+const uint32 VALUE_ATTR = 2;
+const uint32 WEIGHT_ATTR = 3;
+const uint32 SET_ATTR = 4;
+const uint32 SET_STAT_ATTR = 5;
+const uint32 SET_POS_ATTR = 6;
+const uint32 SET_NODE_ATTR = 7;
+const uint32 SET_COLOR_ATTR = 8;
 
 result union_for_smaller_than
 (
@@ -53,7 +63,6 @@ result union_for_smaller_than
   TRY();
   real a, b, threshold;
   node *node_a, *node_b;
-  attribute *attr;
   disjoint_set *set_a, *set_b;
   
   CHECK_POINTER(target);
@@ -63,18 +72,16 @@ result union_for_smaller_than
   node_a = target->a.origin;
   node_b = target->b.origin;
   
-  attr = attribute_find(&node_a->attributes, 3);
-  if (attr == NULL) {
+  set_a = disjoint_set_attribute_get(&node_a->attributes, SET_ATTR);
+  if (set_a == NULL) {
     TERMINATE(NOT_FOUND);
   }
-  set_a = (disjoint_set*)attr->value.value;
-  a = attribute_to_real(node_a->weight_attribute);
-  attr = attribute_find(&node_b->attributes, 3);
-  if (attr == NULL) {
+  a = *node_a->weight;
+  set_b = disjoint_set_attribute_get(&node_b->attributes, SET_ATTR);
+  if (set_b == NULL) {
     TERMINATE(NOT_FOUND);
   }
-  set_b = (disjoint_set*)attr->value.value;
-  b = attribute_to_real(node_b->weight_attribute);
+  b = *node_b->weight;
   
   if (fabs(a-b) < threshold) {
     disjoint_set_union(set_a, set_b);
@@ -93,31 +100,89 @@ result node_for_each_set
   TRY();
   graph *g;
   node *node_ptr;
-  attribute *set_attr, *node_attr;
   disjoint_set *set, *parent;
+  position_2d *node_pos;
+  attribute_2d_pos *set_pos;
+  attribute_2d_pos_acc acc;
   
   CHECK_POINTER(target);
   CHECK_POINTER(params);
   
   g = (graph*)params;
   
-  set_attr = attribute_find(&target->attributes, 3);
-  if (set_attr == NULL) {
+  set = disjoint_set_attribute_get(&target->attributes, SET_ATTR);
+  if (set == NULL) {
     TERMINATE(NOT_FOUND);
   }
-  set = (disjoint_set*)set_attr->value.value;
   parent = disjoint_set_find(set);
-  if (set == parent && set->size > 1) {
-    node_attr = attribute_find(&target->attributes, 5);
-    if (node_attr == NULL) {
-      CHECK(graph_add_node(g, 4, 10, &node_ptr));
-      node_ptr->pos = target->pos;
-      CHECK(pointer_attribute_add(&target->attributes, 5, (pointer)node_ptr, 
-                                  NULL));
+  
+  if (set == parent && set->size > 0) {
+    node_ptr = node_ref_attribute_get(&set->attributes, SET_NODE_ATTR);
+    if (node_ptr == NULL) {
+      CHECK(graph_add_node(g, 4, 100, &node_ptr));
+      set_pos = attribute_2d_pos_attribute_get(&set->attributes, SET_POS_ATTR);
+      if (set_pos == NULL) {
+        node_ptr->pos = target->pos;
+      }
+      else {
+        attribute_2d_pos_get(set_pos, &acc);
+        CHECK(position_2d_attribute_add(&node_ptr->attributes, POS_ATTR,
+                                        acc.cx, acc.cy, &node_pos));
+        node_ptr->pos = node_pos;
+      }
+      CHECK(node_ref_attribute_add(&set->attributes, SET_NODE_ATTR, node_ptr,
+                                   NULL));
     }
   }
   
   FINALLY(node_for_each_set);
+  RETURN();
+}
+
+result link_for_neighboring_sets
+(
+  link *target,
+  pointer params
+)
+{
+  TRY();
+  graph *g;
+  node *node_a1, *node_a2, *node_b1, *node_b2;
+  disjoint_set *set_a, *set_b;
+  link *link_ptr;
+  
+  CHECK_POINTER(target);
+  CHECK_POINTER(params);
+  
+  g = (graph*)params;
+  node_a1 = target->a.origin;
+  node_b1 = target->b.origin;
+  /*
+   * check if the two nodes belong to different sets
+   * find the second-level nodes for the sets
+   * check if there is a link between the nodes
+   * if not, add it
+   */
+  set_a = disjoint_set_find(disjoint_set_attribute_get(&node_a1->attributes,
+                                                       SET_ATTR));
+  set_b = disjoint_set_find(disjoint_set_attribute_get(&node_b1->attributes,
+                                                       SET_ATTR));
+  if (set_a != NULL && set_b != NULL && set_a != set_b) {
+    node_a2 = node_ref_attribute_get(&set_a->attributes, SET_NODE_ATTR);
+    node_b2 = node_ref_attribute_get(&set_b->attributes, SET_NODE_ATTR);
+    if (node_a2 != NULL && node_b2 != NULL && node_a2 != node_b2) {
+      if (IS_FALSE(node_has_link_to(node_a2, node_b2))) {
+        /*
+        printf("link list %lu %lu\n", node_a2->links.size, node_a2->links.count);
+        printf("link list %lu %lu\n", node_b2->links.size, node_b2->links.count);
+        */
+        CHECK(graph_add_link(g, 4, &link_ptr));
+        CHECK(graph_link_nodes(link_ptr, node_a2, node_b2));
+      }
+    }
+  }
+  
+  FINALLY(link_for_neighboring_sets);
   RETURN();
 }
 
@@ -145,7 +210,6 @@ int main(int argc, char *argv[])
 {
   TRY();
   pixel_image src_image, tmp_image, dst_image;
-  uint32 value_key, weight_key, set_key, stat_key;
   graph g, greg;
   uint32 stepx, stepy;
   string smode, source_file, target_file;
@@ -225,14 +289,9 @@ int main(int argc, char *argv[])
   CHECK(convert_grey8_to_grey24(&src_image, &tmp_image));
   CHECK(pixel_image_replicate_pixels(&tmp_image, &dst_image, 5));
   
-  value_key = 1;
-  weight_key = 2;
-  set_key = 3;
-  stat_key = 4;
-
   PRINT0("create graph...\n");
   CHECK(graph_create_from_image(&g, &src_image, 5, 5, stepx, stepy,
-                                NEIGHBORHOOD_4, value_key, weight_key));
+                                NEIGHBORHOOD_4, POS_ATTR, VALUE_ATTR, WEIGHT_ATTR));
   
   /* run the requested algorithm on the graph */
   switch (mode) {
@@ -243,20 +302,22 @@ int main(int argc, char *argv[])
     case m_MSF:
       PRINT0("finding minimum spanning forest...\n");
       {
-        disjoint_set_stat_attribute_params sparams;
+        disjoint_set_stat_pos_attribute_params sparams;
         real threshold;
         
         /* the set attribute will have statistics dependent on the value attr */
-        sparams.set_key = set_key;
-        sparams.attribute_count = 1;
-        sparams.stat_key = stat_key;
-        sparams.dep_key = value_key;
+        sparams.set_key = SET_ATTR;
+        sparams.attribute_count = 4;
+        sparams.stat_key = SET_STAT_ATTR;
+        sparams.stat_dep_key = VALUE_ATTR;
+        sparams.pos_key = SET_POS_ATTR;
+        sparams.pos_dep_key = POS_ATTR;
         
         threshold = 5.1;
         
         /* add a set attribute containing statistics into each node */
         CHECK(graph_for_attrs_in_each_node(&g, 
-                                           &disjoint_set_add_stat_attr, 
+                                           &disjoint_set_add_stat_pos_attr, 
                                            (pointer)&sparams));
         /* sort links by ascending weight using counting sort */
         /* 'remove' links by union of linked nodes meeting the criteria */
@@ -268,6 +329,11 @@ int main(int argc, char *argv[])
         CHECK(graph_for_each_node(&g,
                                   &node_for_each_set,
                                   (pointer)&greg));
+        printf("adding links between new nodes\n");
+        CHECK(graph_for_each_link(&g,
+                                  &link_for_neighboring_sets,
+                                  (pointer)&greg));
+        printf("links added\n");
       }
       break;
     case m_CONTOUR:
@@ -281,7 +347,7 @@ int main(int argc, char *argv[])
   
   /* draw nodes on image */
   PRINT0("drawing graph...\n");
-  CHECK(graph_draw_nodes(&g, &dst_image, 3, 2, 5));
+  CHECK(graph_draw_nodes(&g, &dst_image, SET_ATTR, WEIGHT_ATTR, 5));
   CHECK(graph_draw_nodes(&greg, &dst_image, 0, 0, 5));
   
   /* write the resulting image to file */

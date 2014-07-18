@@ -435,18 +435,6 @@ typedef struct consistency_t
 /******************************************************************************/
 
 /**
- * Useful for getting a pixel value in a generic type
- */
-real cast_pixel_value
-(
-  void *data,
-  pixel_type type,
-  uint32 offset
-);
-
-/******************************************************************************/
-
-/**
  * Defines a structure for accessing and caching a pixel value by offset into a
  * data array. The value is accessed and cached as real, which may be a float
  * (real32) or double (real64) depending on compilation flags. Generic casting
@@ -472,6 +460,28 @@ real pixel_value_cache
   pixel_type type,
   uint32 token
 );
+
+/**
+ * Useful for getting a pixel value in a generic type
+ */
+real cast_pixel_value
+(
+  void *data,
+  pixel_type type,
+  uint32 offset
+);
+
+/******************************************************************************/
+
+typedef struct position_2d_t {
+  real x;
+  real y;
+} position_2d;
+
+typedef struct position_nd_t {
+  uint32 n;
+  real *position;
+} position_nd;
 
 /******************************************************************************/
 
