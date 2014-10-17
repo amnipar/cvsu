@@ -441,7 +441,9 @@ typedef struct consistency_t
  * functions are used for reading pixel values and converting to real. The token
  * field can be used for determining whether the value has been cached already
  * during the current round of processing; for example when reading video frames
- * one after one and using the same graph structure for all frames.
+ * one by one and using the same graph structure for all frames.
+ * TODO: token is already stored in typed pointer.
+ * TODO: make this generic scalar value. add similarly vector value.
  */
 typedef struct pixel_value_t {
   uint32 offset;

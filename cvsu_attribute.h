@@ -44,6 +44,8 @@ extern "C" {
 typedef struct attribute_t {
   uint32 key;
   typed_pointer value;
+  /** Attribute dependencies for updating the value. May be NULL. */
+  struct attribute_dependency_t *dependencies;
 } attribute;
 
 attribute *attribute_alloc();
@@ -92,6 +94,52 @@ typedef struct attribute_range_t {
   real max_value;
   real range;
 } attribute_range;
+
+/**
+ * Tracks the difference of the given attribute in two elements; most suitable
+ * as a link attribute for tracking the difference between linked nodes. The
+ * value is cached, so calculating the difference each time it is accessed is
+ * not necessary.
+ * TODO: would be possible to achieve with a scalar attribute with dependencies
+ */
+typedef struct attribute_diff_t {
+  uint32 key;
+  attribute *attr_a;
+  attribute *attr_b;
+  real cached;
+} attribute_diff;
+
+/**
+ * A function for evaluating the new value for an attribute based on its list of
+ * dependencies. The function should use CHECK macros for ensuring the types are
+ * correct. These checks can be then turned off after verifying that the
+ * application has been built correctly.
+ * TODO: create a CHECK_TYPE macro (for tptr) and CHECK_ATTR_TYPE?
+ */
+typedef result (*attribute_evaluator)(attribute *target, attribute **dependencies, uint32 length, uint32 token);
+
+/**
+ * Defines the dependencies of an attribute by listing the depended attributes
+ * and a function for evaluating the new value.
+ */
+typedef struct attribute_dependency_t {
+  uint32 length;
+  attribute **dependencies;
+  attribute_evaluator eval;
+} attribute_dependency;
+
+/**
+ * Updates an attribute by checking the token value; if the token value in the
+ * attribute is different, the attribute value is outdated and must be evaluated
+ * again. This is done by calling the dependency evaluation function, which in
+ * turn checks the tokens on the dependencies and may update those that are not 
+ * up to date.
+ */
+result attribute_update
+(
+  attribute *target,
+  uint32 token
+);
 
 /******************************************************************************/
 

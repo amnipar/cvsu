@@ -41,6 +41,7 @@ string attribute_alloc_name = "attribute_alloc";
 string attribute_create_name = "attribute_create";
 string attribute_clone_name = "attribute_clone";
 string attribute_to_real_name = "attribute_to_real";
+string attribute_update_name = "attribute_update";
 string attribute_list_alloc_name = "attribute_list_alloc";
 string attribute_list_create_name = "attribute_list_create";
 string attribute_list_nullify_name = "attribute_list_nullify";
@@ -337,6 +338,20 @@ real attribute_to_real
   
   FINALLY(attribute_to_real);
   return typed_pointer_cast_from(&target->value);
+}
+
+/******************************************************************************/
+
+result attribute_update
+(
+  attribute *target,
+  uint32 token
+)
+{
+  TRY();
+  
+  FINALLY(attribute_update);
+  RETURN();
 }
 
 /******************************************************************************/

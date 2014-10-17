@@ -924,7 +924,7 @@ result graph_create_from_image
     pixel_offset = y * stride + (offset + node_offset_x) * step;
     node_i = 0;
     for (x = node_offset_x; x < w; x += node_step_x) {
-      CHECK(graph_add_node(target, 4, 4, &node_ptr));
+      CHECK(graph_add_node(target, 8, 8, &node_ptr));
       CHECK(position_2d_attribute_add(&node_ptr->attributes, pos_key,
                                       (real)x, (real)y, &new_pos));
       node_ptr->pos = new_pos;

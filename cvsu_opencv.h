@@ -172,6 +172,8 @@ result pixel_image_dump
 /**
  * Draws a graph over an image as nodes connected by links; it may be necessary
  * to scale the image if distances between the nodes are very short.
+ * TODO: create a version that allows visualizing two attributes per node, one
+ * as the line around the circle and another as the fill?
  */
 result graph_draw_nodes
 (
@@ -180,6 +182,23 @@ result graph_draw_nodes
   uint32 node_attr,
   uint32 link_attr,
   real scale
+);
+
+/**
+ * Draws a graph into an image as pixels, visualizing the given attribute. The
+ * scale parameter allows drawing each node as a rectangle larger than 1 pixel.
+ * TODO: create another version that allows giving a function which will analyze
+ * the node and its neighborhood to calculate the value used in the
+ * visualization.
+ */
+result graph_draw_pixels
+(
+  graph *source,
+  pixel_image *target,
+  uint32 attr,
+  real scale,
+  uint32 stepx,
+  uint32 stepy
 );
 
 #ifdef __cplusplus

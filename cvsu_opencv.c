@@ -56,6 +56,7 @@ string pixel_image_draw_rects_name = "pixel_image_draw_rects";
 string pixel_image_draw_colored_rects_name = "pixel_image_draw_colored_rects";
 string pixel_image_dump_name = "pixel_image_dump";
 string graph_draw_nodes_name = "graph_draw_nodes";
+string graph_draw_pixels_name = "graph_draw_pixels";
 
 /******************************************************************************/
 
@@ -768,6 +769,7 @@ result pixel_image_dump
 
 /******************************************************************************/
 
+string node_set_pixel_name = "node_set_pixel";
 string node_draw_name = "node_draw";
 string node_visualize_attribute_name = "node_visualize_attribute";
 string link_draw_name = "link_draw";
@@ -779,11 +781,55 @@ typedef struct graph_visualize_params_t {
   IplImage *dst;
   attribute_range *attr_range;
   real scale;
+  uint32 stepx;
+  uint32 stepy;
   int node_size;
   int link_size;
 } graph_visualize_params;
 
 /******************************************************************************/
+
+result node_set_pixel
+(
+  node *target,
+  pointer params
+)
+{
+  TRY();
+  graph_visualize_params *vparams;
+  attribute *attr;
+  int x1, y1, x2, y2;
+  real value;
+  
+  CHECK_POINTER(target);
+  CHECK_POINTER(params);
+  
+  vparams = (graph_visualize_params*)params;
+  
+  x1 = (int)(vparams->scale * target->pos->x);
+  y1 = (int)(vparams->scale * target->pos->y);
+  x2 = (int)(vparams->scale * (target->pos->x + vparams->stepx)) - 1;
+  y2 = (int)(vparams->scale * (target->pos->y + vparams->stepy)) - 1;
+  
+  value = 0;
+  attr = attribute_find(&target->attributes, vparams->attr_range->key);
+  if (attr != NULL) {
+    value = typed_pointer_cast_from(&attr->value);
+    value = (value - vparams->attr_range->min_value) * 255 /
+            vparams->attr_range->range;
+  }
+  else {
+    /*printf("attr not found\n");*/
+  }
+  
+  cvRectangle(vparams->dst,
+              cvPoint(x1, y1), cvPoint(x2, y2),
+              cvScalar(value, value, value, 0),
+              -1, 8, 0);
+  
+  FINALLY(node_set_pixel);
+  RETURN();
+}
 
 result node_draw
 (
@@ -1002,6 +1048,74 @@ result graph_draw_nodes
   }
   
   FINALLY(graph_draw_nodes);
+  cvReleaseImageHeader(&dst);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result graph_draw_pixels
+(
+  graph *source,
+  pixel_image *target,
+  uint32 attr,
+  real scale,
+  uint32 stepx,
+  uint32 stepy
+)
+{
+  TRY();
+  IplImage *dst;
+  CvSize size;
+  int channels;
+  list_item *items, *end;
+  node *current_node;
+  attribute_range attr_range;
+  graph_visualize_params vparams;
+  
+  CHECK_POINTER(source);
+  CHECK_POINTER(target);
+  CHECK_PARAM(target->type == p_U8);
+  
+  if (target->format == RGB) {
+    CHECK_PARAM(target->step == 3);
+    channels = 3;
+  }
+  else
+  if (target->format == RGBA) {
+    CHECK_PARAM(target->step == 4);
+    channels = 4;
+  }
+  size.width = (signed)target->width;
+  size.height = (signed)target->height;
+  dst = cvCreateImageHeader(size, IPL_DEPTH_8U, channels);
+  cvSetData(dst, target->data, (signed)target->stride);
+  
+  vparams.dst = dst;
+  vparams.scale = scale;
+  vparams.stepx = stepx;
+  vparams.stepy = stepy;
+  vparams.node_size = 1;
+  vparams.link_size = 0;
+  vparams.attr_range = &attr_range;
+  
+  if (attr != 0) {
+    attr_range.key = attr;
+    attr_range.min_value = 255;
+    attr_range.max_value = 0;
+    CHECK(graph_for_each_node(source, &node_attribute_range_update, 
+                              (pointer)&attr_range));
+    
+    printf("min val = %.3f max val = %.3f\n", 
+          attr_range.min_value, attr_range.max_value);
+    
+    attr_range.range = attr_range.max_value - attr_range.min_value;
+      
+    CHECK(graph_for_each_node(source, &node_set_pixel, 
+                              (pointer)&vparams));
+  }
+  
+  FINALLY(graph_draw_pixels);
   cvReleaseImageHeader(&dst);
   RETURN();
 }

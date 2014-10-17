@@ -318,8 +318,8 @@ result ensure_is
 /******************************************************************************/
 /* macros for managing typed pointers and tuples                              */
 
-#define IS_TYPE(tptr,type)\
-  ((tptr != NULL && tptr->type == t_##type) ? (type*)tptr->value : NULL)
+#define IS_TYPE(tptr,exp)\
+  ((tptr != NULL && tptr->type == t_##exp) ? (exp*)tptr->value : NULL)
 
 #define HAS_TYPE(tptr,ttype,ttoken)\
   (((tptr) != NULL && (tptr)->type == t_##ttype) ? \
@@ -327,8 +327,9 @@ result ensure_is
   ({ typed_pointer *elem = tuple_has_type((tptr), t_##ttype, 1, 1);\
     (elem != NULL && elem->token == (ttoken)) ? (ttype*)(elem->value) : NULL }))
 
-#define EXPECT_TYPE(tptr,type)\
-  ((tptr != NULL && tptr->type == t_##type) ? (type*)tptr->value : ERROR(BAD_TYPE))
+#define EXPECT_TYPE(tptr,exp)\
+  ((tptr != NULL && tptr->type == exp) ? ((exp*)tptr->value) : \
+  ERROR(BAD_TYPE),NULL)
 
 #define ENSURE_HAS(tptr,type)\
   (tptr != NULL ? { typed_pointer *elem; CHECK(ensure_has(tptr, t_##type, &elem)); (type*)elem->value; } : NULL)
