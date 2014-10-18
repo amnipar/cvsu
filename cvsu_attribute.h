@@ -124,9 +124,21 @@ typedef result (*attribute_evaluator)(attribute *target, attribute **dependencie
  */
 typedef struct attribute_dependency_t {
   uint32 length;
-  attribute **dependencies;
+  attribute **attributes;
   attribute_evaluator eval;
 } attribute_dependency;
+
+/**
+ * Creates the dependency structure and initializes the attribute pointer array.
+ * The array must be then filled manually in the calling function.
+ * TODO: figure out how to make it easier?
+ */
+result attribute_add_dependencies
+(
+  attribute *target,
+  uint32 length,
+  attribute_evaluator eval
+);
 
 /**
  * Updates an attribute by checking the token value; if the token value in the

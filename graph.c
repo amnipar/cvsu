@@ -40,11 +40,14 @@
 
 #include <string.h>
 
-string add_diffusion_attrs_name = "add_diffusion_attrs";
 string evaluate_diff_acc_attr_name = "evaluate_diff_acc_attr";
 string evaluate_idiff_pool_attr_name = "evaluate_idiff_pool_attr";
 string evaluate_adiff_pool_attr_name = "evaluate_adiff_pool_attr";
 string evaluate_difference_attr_name = "evaluate_difference_attr";
+string add_diffusion_attrs_name = "add_diffusion_attrs";
+string add_difference_attrs_name = "add_difference_attrs";
+string add_diffusion_dependencies_name = "add_diffusion_dependencies";
+string run_isotropic_diffusion_name = "run_isotropic_diffusion";
 string union_for_smaller_than_name = "union_for_smaller_than";
 string node_for_each_set_name = "node_for_each_set";
 string link_for_neighboring_sets_name = "link_for_neighboring_sets";
@@ -117,34 +120,55 @@ result evaluate_idiff_pool_attr
 {
   TRY();
   real *pool, c, w, n, e, s;
-  
+  printf("eval pool i\n");
   CHECK_POINTER(target);
   CHECK_POINTER(dependencies);
   CHECK_PARAM(length == 5);
   CHECK_PARAM(dependencies[0]->value.type == t_real);
-  CHECK_PARAM(dependencies[1]->value.type == t_real);
-  CHECK_PARAM(dependencies[2]->value.type == t_real);
-  CHECK_PARAM(dependencies[3]->value.type == t_real);
-  CHECK_PARAM(dependencies[4]->value.type == t_real);
+  
   pool = IS_TYPE((&target->value), real);
   CHECK_PARAM(pool != NULL);
   
   /* ensure the dependencies are up to date */
   /* the pooled value and differences must be from the *previous* time step */
   CHECK(attribute_update(dependencies[0], token - 1));
-  CHECK(attribute_update(dependencies[1], token - 1));
-  CHECK(attribute_update(dependencies[2], token - 1));
-  CHECK(attribute_update(dependencies[3], token - 1));
-  CHECK(attribute_update(dependencies[4], token - 1));
   
   c = attribute_to_real(dependencies[0]);
-  w = attribute_to_real(dependencies[1]);
-  n = attribute_to_real(dependencies[2]);
-  e = attribute_to_real(dependencies[3]);
-  s = attribute_to_real(dependencies[4]);
+  if (dependencies[1] == NULL) {
+    w = 0;
+  }
+  else {
+    CHECK_PARAM(dependencies[1]->value.type == t_real);
+    CHECK(attribute_update(dependencies[1], token - 1));
+    w = attribute_to_real(dependencies[1]);
+  }
+  if (dependencies[2] == NULL) {
+    n = 0;
+  }
+  else {
+    CHECK_PARAM(dependencies[2]->value.type == t_real);
+    CHECK(attribute_update(dependencies[2], token - 1));
+    n = attribute_to_real(dependencies[2]);
+  }
+  if (dependencies[3] == NULL) {
+    e = 0;
+  }
+  else {
+    CHECK_PARAM(dependencies[3]->value.type == t_real);
+    CHECK(attribute_update(dependencies[3], token - 1));
+    e = -attribute_to_real(dependencies[3]);
+  }
+  if (dependencies[4] == NULL) {
+    s = 0;
+  }
+  else {
+    CHECK_PARAM(dependencies[4]->value.type == t_real);
+    CHECK(attribute_update(dependencies[4], token - 1));
+    s = -attribute_to_real(dependencies[4]);
+  }
   
   *pool = c + 0.25 * (w + n + e + s);
-  
+  printf("eval pool o\n");
   FINALLY(evaluate_idiff_pool_attr);
   RETURN();
 }
@@ -180,26 +204,47 @@ result evaluate_adiff_pool_attr
   CHECK_POINTER(dependencies);
   CHECK_PARAM(length == 5);
   CHECK_PARAM(dependencies[0]->value.type == t_real);
-  CHECK_PARAM(dependencies[1]->value.type == t_real);
-  CHECK_PARAM(dependencies[2]->value.type == t_real);
-  CHECK_PARAM(dependencies[3]->value.type == t_real);
-  CHECK_PARAM(dependencies[4]->value.type == t_real);
+  
   pool = IS_TYPE((&target->value), real);
   CHECK_PARAM(pool != NULL);
   
   /* ensure the dependencies are up to date */
   /* the pooled value and differences must be from the *previous* time step */
   CHECK(attribute_update(dependencies[0], token - 1));
-  CHECK(attribute_update(dependencies[1], token - 1));
-  CHECK(attribute_update(dependencies[2], token - 1));
-  CHECK(attribute_update(dependencies[3], token - 1));
-  CHECK(attribute_update(dependencies[4], token - 1));
   
   c = attribute_to_real(dependencies[0]);
-  dw = attribute_to_real(dependencies[1]);
-  dn = attribute_to_real(dependencies[2]);
-  de = attribute_to_real(dependencies[3]);
-  ds = attribute_to_real(dependencies[4]);
+  if (dependencies[1] == NULL) {
+    dw = 0;
+  }
+  else {
+    CHECK_PARAM(dependencies[1]->value.type == t_real);
+    CHECK(attribute_update(dependencies[1], token - 1));
+    dw = attribute_to_real(dependencies[1]);
+  }
+  if (dependencies[2] == NULL) {
+    dn = 0;
+  }
+  else {
+    CHECK_PARAM(dependencies[2]->value.type == t_real);
+    CHECK(attribute_update(dependencies[2], token - 1));
+    dn = attribute_to_real(dependencies[2]);
+  }
+  if (dependencies[3] == NULL) {
+    de = 0;
+  }
+  else {
+    CHECK_PARAM(dependencies[3]->value.type == t_real);
+    CHECK(attribute_update(dependencies[3], token - 1));
+    de = -attribute_to_real(dependencies[3]);
+  }
+  if (dependencies[4] == NULL) {
+    ds = 0;
+  }
+  else {
+    CHECK_PARAM(dependencies[4]->value.type == t_real);
+    CHECK(attribute_update(dependencies[4], token - 1));
+    ds = -attribute_to_real(dependencies[4]);
+  }
   
   /* calculate the dynamic conduction coefficients */
   cw = gtoc(dw);
@@ -253,6 +298,143 @@ result evaluate_difference_attr
   RETURN();
 }
 
+result add_diffusion_attrs
+(
+  node *target,
+  pointer params
+)
+{
+  TRY();
+  pixel_value *value_attr;
+  real *value;
+  
+  CHECK_POINTER(target);
+  /*CHECK_POINTER(params);*/
+  (void)params;
+  
+  CHECK(scalar_attribute_add(&target->attributes, DIFF_ACC_ATTR, 0, &value));
+  CHECK(scalar_attribute_add(&target->attributes, DIFF_POOL_ATTR, 0, NULL));
+  
+  value_attr = pixel_value_attribute_get(&target->attributes, VALUE_ATTR);
+  if (value_attr != NULL) {
+    *value = value_attr->cache;
+  }
+  
+  FINALLY(add_diffusion_attrs);
+  RETURN();
+}
+
+result add_difference_attrs
+(
+  link *target,
+  pointer params
+)
+{
+  TRY();
+  attribute *new_attr, *a_attr, *b_attr;
+  
+  CHECK_POINTER(target);
+  (void)params;
+  
+  a_attr = attribute_find(&target->a.origin->attributes, DIFF_ACC_ATTR);
+  b_attr = attribute_find(&target->b.origin->attributes, DIFF_ACC_ATTR);
+  CHECK_PARAM(a_attr != NULL && b_attr != NULL);
+  
+  CHECK(attribute_list_add_new(&target->attributes, DIFF_DIFF_ATTR, t_real,
+                               &new_attr));
+  CHECK(attribute_add_dependencies(new_attr, 2, &evaluate_difference_attr));
+  
+  new_attr->dependencies->attributes[0] = a_attr;
+  new_attr->dependencies->attributes[1] = b_attr;
+  
+  FINALLY(add_difference_attrs);
+  RETURN();
+}
+
+result add_diffusion_dependencies
+(
+  node *target,
+  pointer params
+)
+{
+  TRY();
+  attribute *pool_attr, *c_attr, *w_attr, *n_attr, *e_attr, *s_attr;
+  attribute_evaluator eval;
+  
+  CHECK_POINTER(target);
+  CHECK_POINTER(params);
+  CHECK_PARAM(target->links.count >= 4);
+  
+  eval = (attribute_evaluator)params;
+  
+  pool_attr = attribute_find(&target->attributes, DIFF_POOL_ATTR);
+  CHECK_PARAM(pool_attr != NULL);
+  
+  CHECK(attribute_add_dependencies(pool_attr, 5, eval));
+  
+  c_attr = attribute_find(&target->attributes, DIFF_ACC_ATTR);
+  CHECK_PARAM(c_attr != NULL);
+  
+  if (target->links.items[3] != NULL) {
+    w_attr = attribute_find(&target->links.items[3]->body->attributes,
+                            DIFF_DIFF_ATTR);
+    CHECK_PARAM(w_attr != NULL);
+  }
+  if (target->links.items[0] != NULL) {
+    n_attr = attribute_find(&target->links.items[0]->body->attributes,
+                            DIFF_DIFF_ATTR);
+    CHECK_PARAM(n_attr != NULL);
+  }
+  if (target->links.items[1] != NULL) {
+    e_attr = attribute_find(&target->links.items[1]->body->attributes,
+                            DIFF_DIFF_ATTR);
+    CHECK_PARAM(e_attr != NULL);
+  }
+  if (target->links.items[2] != NULL) {
+    s_attr = attribute_find(&target->links.items[2]->body->attributes,
+                            DIFF_DIFF_ATTR);
+    CHECK_PARAM(s_attr != NULL);
+  }
+  
+  pool_attr->dependencies->attributes[0] = c_attr;
+  pool_attr->dependencies->attributes[1] = w_attr;
+  pool_attr->dependencies->attributes[2] = n_attr;
+  pool_attr->dependencies->attributes[3] = e_attr;
+  pool_attr->dependencies->attributes[4] = s_attr;
+  
+  CHECK(attribute_add_dependencies(c_attr, 1, &evaluate_diff_acc_attr));
+  
+  c_attr->dependencies->attributes[0] = pool_attr;
+  
+  FINALLY(add_diffusion_dependencies);
+  RETURN();
+}
+
+result run_isotropic_diffusion
+(
+  node *target,
+  pointer params
+)
+{
+  TRY();
+  attribute *pool_attr;
+  uint32 token;
+  
+  CHECK_POINTER(target);
+  CHECK_POINTER(params);
+  
+  token = *(uint32*)params;
+  
+  pool_attr = attribute_find(&target->attributes, DIFF_POOL_ATTR);
+  printf("update attribute b\n");
+  CHECK(attribute_update(pool_attr, token));
+  printf("update attribute a\n");
+  
+  FINALLY(run_isotropic_diffusion);
+  RETURN();
+}
+
+
 result union_for_smaller_than
 (
   link *target,
@@ -287,31 +469,6 @@ result union_for_smaller_than
   }
   
   FINALLY(union_for_smaller_than);
-  RETURN();
-}
-
-result add_diffusion_attrs
-(
-  node *target,
-  pointer params
-)
-{
-  TRY();
-  pixel_value *value_attr;
-  real *value;
-  
-  CHECK_POINTER(target);
-  /*CHECK_POINTER(params);*/
-  
-  CHECK(scalar_attribute_add(&target->attributes, DIFF_ACC_ATTR, 0, &value));
-  CHECK(scalar_attribute_add(&target->attributes, DIFF_POOL_ATTR, 0, NULL));
-  
-  value_attr = pixel_value_attribute_get(&target->attributes, VALUE_ATTR);
-  if (value_attr != NULL) {
-    *value = value_attr->cache;
-  }
-  
-  FINALLY(add_diffusion_attrs);
   RETURN();
 }
 
@@ -588,19 +745,25 @@ int main(int argc, char *argv[])
     case m_IDIFFUSE:
       PRINT0("running isotropic diffusion...\n");
       {
+        uint32 i, diffusion_rounds;
+        
         graph_for_each_node(&g,
                             &add_diffusion_attrs,
                             NULL);
-        /*
+        
         graph_for_each_link(&g,
                             &add_difference_attrs,
                             NULL);
-        for (i = 0; i < diffusion_rounds; i++) {
+        graph_for_each_node(&g,
+                            &add_diffusion_dependencies,
+                            &evaluate_idiff_pool_attr);
+        
+        diffusion_rounds = 3;
+        for (i = 2; i < diffusion_rounds; i++) {
           graph_for_each_node(&g,
                               &run_isotropic_diffusion,
-                              NULL);
+                              &i);
         }
-        */
       }
       break;
     case m_CONNECTED:

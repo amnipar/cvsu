@@ -200,15 +200,15 @@ typedef struct uncertain_rect_t {
 } uncertain_rect;
 
 typedef enum result_t {
-  SUCCESS = 0,
-  FATAL,
-  CAUGHT_ERROR,
-  BAD_POINTER,
-  BAD_TYPE,
-  BAD_SIZE,
-  BAD_PARAM,
-  NOT_FOUND,
-  INPUT_ERROR,
+  SUCCESS        = 0,
+  FATAL,        /* 1 */
+  CAUGHT_ERROR, /* 2 */
+  BAD_POINTER,  /* 3 */
+  BAD_TYPE,     /* 4 */
+  BAD_SIZE,     /* 5 */
+  BAD_PARAM,    /* 6 */
+  NOT_FOUND,    /* 7 */
+  INPUT_ERROR,  /* 8 */
   NOT_IMPLEMENTED
 } result;
 

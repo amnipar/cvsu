@@ -41,6 +41,7 @@ string attribute_alloc_name = "attribute_alloc";
 string attribute_create_name = "attribute_create";
 string attribute_clone_name = "attribute_clone";
 string attribute_to_real_name = "attribute_to_real";
+string attribute_add_dependencies_name = "attribute_add_dependencies";
 string attribute_update_name = "attribute_update";
 string attribute_list_alloc_name = "attribute_list_alloc";
 string attribute_list_create_name = "attribute_list_create";
@@ -255,6 +256,7 @@ result attribute_create
   }
 
   target->key = key;
+  target->dependencies = NULL;
 
   FINALLY(attribute_create);
   RETURN();
@@ -293,6 +295,10 @@ void attribute_destroy
 {
   if (target != NULL) {
     typed_pointer_destroy(&target->value);
+    if (target->dependencies != NULL) {
+      memory_deallocate((data_pointer*)&target->dependencies->attributes);
+      memory_deallocate((data_pointer*)&target->dependencies);
+    }
     attribute_nullify(target);
   }
 }
@@ -307,6 +313,7 @@ void attribute_nullify
   if (target != NULL) {
     target->key = 0;
     typed_pointer_nullify(&target->value);
+    target->dependencies = NULL;
   }
 }
 
@@ -342,6 +349,32 @@ real attribute_to_real
 
 /******************************************************************************/
 
+result attribute_add_dependencies
+(
+  attribute *target,
+  uint32 length,
+  attribute_evaluator eval
+)
+{
+  TRY();
+  attribute_dependency *dep;
+  
+  CHECK_POINTER(target);
+  
+  CHECK(memory_allocate((data_pointer*)&dep, 1, sizeof(attribute_dependency)));
+  CHECK(memory_allocate((data_pointer*)&dep->attributes, length, 
+                        sizeof(attribute*)));
+  
+  dep->length = length;
+  dep->eval = eval;
+  target->dependencies = dep;
+  
+  FINALLY(attribute_add_dependencies);
+  RETURN();
+}
+
+/******************************************************************************/
+
 result attribute_update
 (
   attribute *target,
@@ -349,6 +382,15 @@ result attribute_update
 )
 {
   TRY();
+  
+  CHECK_POINTER(target);
+  
+  if (target->dependencies != NULL) {
+    CHECK(target->dependencies->eval(target,
+                                     target->dependencies->attributes,
+                                     target->dependencies->length,
+                                     token));
+  }
   
   FINALLY(attribute_update);
   RETURN();
