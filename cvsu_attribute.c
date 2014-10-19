@@ -386,10 +386,13 @@ result attribute_update
   CHECK_POINTER(target);
   
   if (target->dependencies != NULL) {
-    CHECK(target->dependencies->eval(target,
-                                     target->dependencies->attributes,
-                                     target->dependencies->length,
-                                     token));
+    if (target->value.token != token) {
+      CHECK(target->dependencies->eval(target,
+                                      target->dependencies->attributes,
+                                      target->dependencies->length,
+                                      token));
+      target->value.token = token;
+    }
   }
   
   FINALLY(attribute_update);

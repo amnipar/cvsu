@@ -47,7 +47,8 @@ string evaluate_difference_attr_name = "evaluate_difference_attr";
 string add_diffusion_attrs_name = "add_diffusion_attrs";
 string add_difference_attrs_name = "add_difference_attrs";
 string add_diffusion_dependencies_name = "add_diffusion_dependencies";
-string run_isotropic_diffusion_name = "run_isotropic_diffusion";
+string run_diffusion_name = "run_diffusion";
+string finish_diffusion_name = "finish_diffusion";
 string union_for_smaller_than_name = "union_for_smaller_than";
 string node_for_each_set_name = "node_for_each_set";
 string link_for_neighboring_sets_name = "link_for_neighboring_sets";
@@ -83,22 +84,25 @@ result evaluate_diff_acc_attr
 {
   TRY();
   real *acc, pool;
-  
+  /*printf("eval acc i\n");*/
   CHECK_POINTER(target);
   CHECK_POINTER(dependencies);
+  /*printf("1\n");*/
   CHECK_PARAM(length == 1);
+  /*printf("2\n");*/
   CHECK_PARAM(dependencies[0]->value.type == t_real);
+  /*printf("3\n");*/
   acc = IS_TYPE((&target->value), real);
   CHECK_PARAM(acc != NULL);
-  
+  /*printf("4\n");*/
   /* ensure the dependencies are up to date */
   /* the pooled value must be from the same time step */
   CHECK(attribute_update(dependencies[0], token));
-  
+  /*printf("5\n");*/
   pool = attribute_to_real(dependencies[0]);
   
   *acc = pool;
-  
+  /*printf("eval acc o\n");*/
   FINALLY(evaluate_diff_acc_attr);
   RETURN();
 }
@@ -120,28 +124,34 @@ result evaluate_idiff_pool_attr
 {
   TRY();
   real *pool, c, w, n, e, s;
-  printf("eval pool i\n");
+  /*printf("eval pool i\n");*/
   CHECK_POINTER(target);
   CHECK_POINTER(dependencies);
+  /*printf("1\n");*/
   CHECK_PARAM(length == 5);
+  /*printf("2\n");*/
   CHECK_PARAM(dependencies[0]->value.type == t_real);
-  
+  /*printf("3\n");*/
   pool = IS_TYPE((&target->value), real);
   CHECK_PARAM(pool != NULL);
-  
+  /*printf("4\n");*/
   /* ensure the dependencies are up to date */
   /* the pooled value and differences must be from the *previous* time step */
   CHECK(attribute_update(dependencies[0], token - 1));
-  
+  /*printf("5\n");*/
   c = attribute_to_real(dependencies[0]);
+  
   if (dependencies[1] == NULL) {
     w = 0;
   }
   else {
+    /*printf("5.1 %d %d\n", t_real, dependencies[1]->value.type);*/
     CHECK_PARAM(dependencies[1]->value.type == t_real);
+    /*printf("5.2\n");*/
     CHECK(attribute_update(dependencies[1], token - 1));
     w = attribute_to_real(dependencies[1]);
   }
+  /*printf("6\n");*/
   if (dependencies[2] == NULL) {
     n = 0;
   }
@@ -150,6 +160,7 @@ result evaluate_idiff_pool_attr
     CHECK(attribute_update(dependencies[2], token - 1));
     n = attribute_to_real(dependencies[2]);
   }
+  /*printf("7\n");*/
   if (dependencies[3] == NULL) {
     e = 0;
   }
@@ -158,6 +169,7 @@ result evaluate_idiff_pool_attr
     CHECK(attribute_update(dependencies[3], token - 1));
     e = -attribute_to_real(dependencies[3]);
   }
+  /*printf("8\n");*/
   if (dependencies[4] == NULL) {
     s = 0;
   }
@@ -166,9 +178,10 @@ result evaluate_idiff_pool_attr
     CHECK(attribute_update(dependencies[4], token - 1));
     s = -attribute_to_real(dependencies[4]);
   }
-  
+  /*printf("9\n");*/
   *pool = c + 0.25 * (w + n + e + s);
-  printf("eval pool o\n");
+  
+  /*printf("eval pool o\n");*/
   FINALLY(evaluate_idiff_pool_attr);
   RETURN();
 }
@@ -179,7 +192,7 @@ const real K = 4.0;
 
 real gtoc(real g)
 {
-  return 1.0 / (1.0 + pow(abs(g) / K, 2.0));
+  return 1.0 / (1.0 + pow(fabs(g) / K, 2.0));
 }
 
 /**
@@ -211,8 +224,8 @@ result evaluate_adiff_pool_attr
   /* ensure the dependencies are up to date */
   /* the pooled value and differences must be from the *previous* time step */
   CHECK(attribute_update(dependencies[0], token - 1));
-  
   c = attribute_to_real(dependencies[0]);
+  
   if (dependencies[1] == NULL) {
     dw = 0;
   }
@@ -253,7 +266,6 @@ result evaluate_adiff_pool_attr
   cs = gtoc(ds);
   
   *pool = c + 0.25 * (cw * dw + cn * dn + ce * de + cs * ds);
-  target->value.token = token;
   
   FINALLY(evaluate_adiff_pool_attr);
   RETURN();
@@ -305,20 +317,36 @@ result add_diffusion_attrs
 )
 {
   TRY();
+  attribute *pool_attr, *acc_attr;
   pixel_value *value_attr;
   real *value;
   
   CHECK_POINTER(target);
   /*CHECK_POINTER(params);*/
   (void)params;
-  
+  /*
   CHECK(scalar_attribute_add(&target->attributes, DIFF_ACC_ATTR, 0, &value));
+  */
+  CHECK(attribute_list_add_new(&target->attributes, DIFF_ACC_ATTR, t_real,
+                               &acc_attr));
+  acc_attr->value.token = 0;
+  /*
   CHECK(scalar_attribute_add(&target->attributes, DIFF_POOL_ATTR, 0, NULL));
+  */
+  CHECK(attribute_list_add_new(&target->attributes, DIFF_POOL_ATTR, t_real,
+                               &pool_attr));
   
+  value = (real*)pool_attr->value.value;
   value_attr = pixel_value_attribute_get(&target->attributes, VALUE_ATTR);
   if (value_attr != NULL) {
     *value = value_attr->cache;
   }
+  pool_attr->value.token = 1;
+  
+  CHECK(attribute_add_dependencies(acc_attr, 1, &evaluate_diff_acc_attr));
+  acc_attr->dependencies->attributes[0] = pool_attr;
+  
+  CHECK(attribute_update(acc_attr, 1));
   
   FINALLY(add_diffusion_attrs);
   RETURN();
@@ -331,7 +359,7 @@ result add_difference_attrs
 )
 {
   TRY();
-  attribute *new_attr, *a_attr, *b_attr;
+  attribute *diff_attr, *a_attr, *b_attr;
   
   CHECK_POINTER(target);
   (void)params;
@@ -341,11 +369,14 @@ result add_difference_attrs
   CHECK_PARAM(a_attr != NULL && b_attr != NULL);
   
   CHECK(attribute_list_add_new(&target->attributes, DIFF_DIFF_ATTR, t_real,
-                               &new_attr));
-  CHECK(attribute_add_dependencies(new_attr, 2, &evaluate_difference_attr));
+                               &diff_attr));
+  diff_attr->value.token = 0;
   
-  new_attr->dependencies->attributes[0] = a_attr;
-  new_attr->dependencies->attributes[1] = b_attr;
+  CHECK(attribute_add_dependencies(diff_attr, 2, &evaluate_difference_attr));
+  diff_attr->dependencies->attributes[0] = a_attr;
+  diff_attr->dependencies->attributes[1] = b_attr;
+  
+  CHECK(attribute_update(diff_attr, 1));
   
   FINALLY(add_difference_attrs);
   RETURN();
@@ -375,24 +406,32 @@ result add_diffusion_dependencies
   c_attr = attribute_find(&target->attributes, DIFF_ACC_ATTR);
   CHECK_PARAM(c_attr != NULL);
   
+  w_attr = NULL;
   if (target->links.items[3] != NULL) {
     w_attr = attribute_find(&target->links.items[3]->body->attributes,
                             DIFF_DIFF_ATTR);
+    CHECK_PARAM(w_attr->value.type == t_real);
     CHECK_PARAM(w_attr != NULL);
   }
+  n_attr = NULL;
   if (target->links.items[0] != NULL) {
     n_attr = attribute_find(&target->links.items[0]->body->attributes,
                             DIFF_DIFF_ATTR);
+    CHECK_PARAM(n_attr->value.type == t_real);
     CHECK_PARAM(n_attr != NULL);
   }
+  e_attr = NULL;
   if (target->links.items[1] != NULL) {
     e_attr = attribute_find(&target->links.items[1]->body->attributes,
                             DIFF_DIFF_ATTR);
+    CHECK_PARAM(e_attr->value.type == t_real);
     CHECK_PARAM(e_attr != NULL);
   }
+  s_attr = NULL;
   if (target->links.items[2] != NULL) {
     s_attr = attribute_find(&target->links.items[2]->body->attributes,
                             DIFF_DIFF_ATTR);
+    CHECK_PARAM(s_attr->value.type == t_real);
     CHECK_PARAM(s_attr != NULL);
   }
   
@@ -402,15 +441,11 @@ result add_diffusion_dependencies
   pool_attr->dependencies->attributes[3] = e_attr;
   pool_attr->dependencies->attributes[4] = s_attr;
   
-  CHECK(attribute_add_dependencies(c_attr, 1, &evaluate_diff_acc_attr));
-  
-  c_attr->dependencies->attributes[0] = pool_attr;
-  
   FINALLY(add_diffusion_dependencies);
   RETURN();
 }
 
-result run_isotropic_diffusion
+result run_diffusion
 (
   node *target,
   pointer params
@@ -426,14 +461,35 @@ result run_isotropic_diffusion
   token = *(uint32*)params;
   
   pool_attr = attribute_find(&target->attributes, DIFF_POOL_ATTR);
-  printf("update attribute b\n");
+  /*printf("update attribute b\n");*/
   CHECK(attribute_update(pool_attr, token));
-  printf("update attribute a\n");
+  /*printf("update attribute a\n");*/
   
-  FINALLY(run_isotropic_diffusion);
+  FINALLY(run_diffusion);
   RETURN();
 }
 
+result finish_diffusion
+(
+  node *target,
+  pointer params
+)
+{
+  TRY();
+  attribute *acc_attr;
+  uint32 token;
+  
+  CHECK_POINTER(target);
+  CHECK_POINTER(params);
+  
+  token = *(uint32*)params;
+  
+  acc_attr = attribute_find(&target->attributes, DIFF_ACC_ATTR);
+  CHECK(attribute_update(acc_attr, token));
+
+  FINALLY(finish_diffusion);
+  RETURN();
+}
 
 result union_for_smaller_than
 (
@@ -739,6 +795,9 @@ int main(int argc, char *argv[])
   PRINT0("create graph...\n");
   CHECK(graph_create_from_image(&g, &src_image, dx, dy, stepx, stepy,
                                 NEIGHBORHOOD_4, POS_ATTR, VALUE_ATTR, WEIGHT_ATTR));
+  /* this graph is not always created, need to make it null */
+  /* otherwise there are problems when trying to destroy it */
+  graph_nullify(&greg);
   
   /* run the requested algorithm on the graph */
   switch (mode) {
@@ -758,12 +817,48 @@ int main(int argc, char *argv[])
                             &add_diffusion_dependencies,
                             &evaluate_idiff_pool_attr);
         
-        diffusion_rounds = 3;
+        diffusion_rounds = 9;
         for (i = 2; i < diffusion_rounds; i++) {
           graph_for_each_node(&g,
-                              &run_isotropic_diffusion,
+                              &run_diffusion,
                               &i);
         }
+        /* acc attributes need to be updated one more time */
+        i--;
+        graph_for_each_node(&g,
+                            &finish_diffusion,
+                            &i);
+      }
+      break;
+    case m_ADIFFUSE:
+      PRINT0("running anisotropic diffusion...\n");
+      {
+        uint32 i, diffusion_rounds;
+        
+        graph_for_each_node(&g,
+                            &add_diffusion_attrs,
+                            NULL);
+        
+        graph_for_each_link(&g,
+                            &add_difference_attrs,
+                            NULL);
+        /* the only difference to isotropic diffusion is the function for */
+        /* evaluating the pool attributes */
+        graph_for_each_node(&g,
+                            &add_diffusion_dependencies,
+                            &evaluate_adiff_pool_attr);
+        
+        diffusion_rounds = 9;
+        for (i = 2; i < diffusion_rounds; i++) {
+          graph_for_each_node(&g,
+                              &run_diffusion,
+                              &i);
+        }
+        /* acc attributes need to be updated one more time */
+        i--;
+        graph_for_each_node(&g,
+                            &finish_diffusion,
+                            &i);
       }
       break;
     case m_CONNECTED:
@@ -835,7 +930,9 @@ int main(int argc, char *argv[])
 
   FINALLY(main);
   if (IS_FALSE(graph_is_null(&greg))) {
+    printf("d b\n");
     graph_destroy(&greg);
+    printf("d a\n");
   }
   PRINT0("destroy graph\n");
   graph_destroy(&g);
