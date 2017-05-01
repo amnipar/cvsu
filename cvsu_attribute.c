@@ -51,6 +51,7 @@ string attribute_add_name = "attribute_add";
 string attribute_list_add_new_name = "attribute_list_add_new";
 
 string pixel_value_attribute_add_name = "pixel_value_attribute_add";
+string scalar_value_attribute_add_name = "scalar_value_attribute_add";
 string position_2d_attribute_add_name = "position_2d_attribute_add";
 string scalar_attribute_add_name = "scalar_attribute_add";
 string pointer_attribute_add_name = "pointer_attribute_add";
@@ -703,6 +704,55 @@ pixel_value *pixel_value_attribute_get
 
 /******************************************************************************/
 
+result scalar_value_attribute_add
+(
+  attribute_list *target,
+  uint32 key,
+  uint32 offset,
+  uint32 token,
+  scalar_type type,
+  scalar_value **added
+)
+{
+  TRY();
+  attribute *new_attr;
+  scalar_value *new_value;
+  
+  CHECK_POINTER(target);
+  (void)type;
+  
+  CHECK(attribute_list_add_new(target, key, t_scalar_value, &new_attr));
+  new_value = (scalar_value*)new_attr->value.value;
+  new_value->offset = offset;
+  new_value->token = token;
+  /*new_value->type = type;*/
+  new_value->label = 0;
+  
+  if (added != NULL) {
+    *added = new_value;
+  }
+  
+  FINALLY(scalar_value_attribute_add);
+  RETURN();
+}
+
+/******************************************************************************/
+
+scalar_value *scalar_value_attribute_get
+(
+  attribute_list *target,
+  uint32 key
+)
+{
+  attribute *attr = attribute_find(target, key);
+  if (attr != NULL && attr->value.type == t_scalar_value) {
+    return (scalar_value*)attr->value.value;
+  }
+  return NULL;
+}
+
+/******************************************************************************/
+
 result position_2d_attribute_add
 (
   attribute_list *target,
@@ -851,7 +901,7 @@ result attribute_stat_init
   }
   else
   if (dependency->value.type == t_pixel_value) {
-    pixel_value *value = (real*)dependency->value.value;
+    pixel_value *value = (pixel_value*)dependency->value.value;
     target->value = &value->cache;
   }
   else {
@@ -1003,7 +1053,7 @@ void attribute_stat_combine
   v  = v < 0 ? 0 : v;
   
   target_acc->variance = v;
-  target_acc->deviation = sqrt(v);
+  target_acc->deviation = sqrtf(v);
   
   /* the source node will be reverted to the default state */
   if (source->acc != NULL) {
@@ -1048,7 +1098,7 @@ void attribute_stat_sum
   v = v < 0 ? 0 : v;
   
   acc_c->variance  = v;
-  acc_c->deviation = sqrt(v);
+  acc_c->deviation = sqrtf(v);
   
   FINALLY(attribute_stat_sum);
   return;

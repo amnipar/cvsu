@@ -60,6 +60,7 @@ typedef enum type_label_t {
   t_F32,
   t_F64,
   t_pixel_value,
+  t_scalar_value,
   t_position_2d,
   t_tuple,
   t_list,
@@ -91,6 +92,8 @@ typedef enum type_label_t {
   t_node_ref
 } type_label;
 
+#define t_real t_F32
+/*
 #if INTEGRAL_IMAGE_DATA_TYPE == INTEGRAL_IMAGE_USING_FLOAT
 
 #define t_real t_F32
@@ -102,7 +105,7 @@ typedef enum type_label_t {
 #else
 #error "integral image data type not defined"
 #endif
-
+*/
 /**
  * Stores a generic pointer value, with attached type label and possibility of
  * storing multiple values (arrays or tuples) in one object. Intended to be

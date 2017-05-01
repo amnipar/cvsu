@@ -322,6 +322,8 @@ result pixel_image_draw_lines
   CHECK_POINTER(lines);
   CHECK_PARAM(source->type == p_U8);
   CHECK_PARAM(source->format == RGB || source->format == RGBA);
+
+  channels = 0;
   if (source->format == RGB) {
     CHECK_PARAM(source->step == 3);
     channels = 3;
@@ -330,6 +332,9 @@ result pixel_image_draw_lines
   if (source->format == RGBA) {
     CHECK_PARAM(source->step == 4);
     channels = 4;
+  }
+  else {
+    TERMINATE(BAD_PARAM);
   }
 
   size.width = (signed)source->width;
@@ -375,6 +380,8 @@ result pixel_image_draw_weighted_lines
   CHECK_POINTER(lines);
   CHECK_PARAM(source->type == p_U8);
   CHECK_PARAM(source->format == RGB || source->format == RGBA);
+
+  channels = 0;
   if (source->format == RGB) {
     CHECK_PARAM(source->step == 3);
     channels = 3;
@@ -383,6 +390,9 @@ result pixel_image_draw_weighted_lines
   if (source->format == RGBA) {
     CHECK_PARAM(source->step == 4);
     channels = 4;
+  }
+  else {
+    TERMINATE(BAD_PARAM);
   }
 
   size.width = (signed)source->width;
@@ -428,6 +438,8 @@ result pixel_image_draw_colored_lines
   CHECK_POINTER(lines);
   CHECK_PARAM(source->type == p_U8);
   CHECK_PARAM(source->format == RGB || source->format == RGBA);
+
+  channels = 0;
   if (source->format == RGB) {
     CHECK_PARAM(source->step == 3);
     channels = 3;
@@ -436,6 +448,9 @@ result pixel_image_draw_colored_lines
   if (source->format == RGBA) {
     CHECK_PARAM(source->step == 4);
     channels = 4;
+  }
+  else {
+    TERMINATE(BAD_PARAM);
   }
 
   size.width = (signed)source->width;
@@ -481,6 +496,8 @@ result pixel_image_draw_circles
   CHECK_POINTER(circles);
   CHECK_PARAM(source->type == p_U8);
   CHECK_PARAM(source->format == RGB || source->format == RGBA);
+
+  channels = 0;
   if (source->format == RGB) {
     CHECK_PARAM(source->step == 3);
     channels = 3;
@@ -489,6 +506,9 @@ result pixel_image_draw_circles
   if (source->format == RGBA) {
     CHECK_PARAM(source->step == 4);
     channels = 4;
+  }
+  else {
+    TERMINATE(BAD_PARAM);
   }
 
   size.width = (signed)source->width;
@@ -533,6 +553,8 @@ result pixel_image_draw_arcs
   CHECK_POINTER(arcs);
   CHECK_PARAM(source->type == p_U8);
   CHECK_PARAM(source->format == RGB || source->format == RGBA);
+
+  channels = 0;
   if (source->format == RGB) {
     CHECK_PARAM(source->step == 3);
     channels = 3;
@@ -541,6 +563,9 @@ result pixel_image_draw_arcs
   if (source->format == RGBA) {
     CHECK_PARAM(source->step == 4);
     channels = 4;
+  }
+  else {
+    TERMINATE(BAD_PARAM);
   }
 
   size.width = (signed)source->width;
@@ -587,6 +612,8 @@ result pixel_image_draw_colored_arcs
   CHECK_POINTER(arcs);
   CHECK_PARAM(source->type == p_U8);
   CHECK_PARAM(source->format == RGB || source->format == RGBA);
+
+  channels = 0;
   if (source->format == RGB) {
     CHECK_PARAM(source->step == 3);
     channels = 3;
@@ -595,6 +622,9 @@ result pixel_image_draw_colored_arcs
   if (source->format == RGBA) {
     CHECK_PARAM(source->step == 4);
     channels = 4;
+  }
+  else {
+    TERMINATE(BAD_PARAM);
   }
 
   size.width = (signed)source->width;
@@ -643,6 +673,8 @@ result pixel_image_draw_rects
   CHECK_POINTER(rects);
   CHECK_PARAM(source->type == p_U8);
   CHECK_PARAM(source->format == RGB || source->format == RGBA);
+
+  channels = 0;
   if (source->format == RGB) {
     CHECK_PARAM(source->step == 3);
     channels = 3;
@@ -651,6 +683,9 @@ result pixel_image_draw_rects
   if (source->format == RGBA) {
     CHECK_PARAM(source->step == 4);
     channels = 4;
+  }
+  else {
+    TERMINATE(BAD_PARAM);
   }
 
   size.width = (signed)source->width;
@@ -694,6 +729,8 @@ result pixel_image_draw_colored_rects
   CHECK_POINTER(rects);
   CHECK_PARAM(source->type == p_U8);
   CHECK_PARAM(source->format == RGB || source->format == RGBA);
+
+  channels = 0;
   if (source->format == RGB) {
     CHECK_PARAM(source->step == 3);
     channels = 3;
@@ -702,6 +739,9 @@ result pixel_image_draw_colored_rects
   if (source->format == RGBA) {
     CHECK_PARAM(source->step == 4);
     channels = 4;
+  }
+  else {
+    TERMINATE(BAD_PARAM);
   }
 
   size.width = (signed)source->width;
@@ -798,7 +838,7 @@ result node_set_pixel
   TRY();
   graph_visualize_params *vparams;
   attribute *attr;
-  int x1, y1, x2, y2;
+  int x1, y1;/*, x2, y2;*/
   real value;
   
   CHECK_POINTER(target);
@@ -808,25 +848,27 @@ result node_set_pixel
   
   x1 = (int)(vparams->scale * target->pos->x);
   y1 = (int)(vparams->scale * target->pos->y);
-  x2 = (int)(vparams->scale * (target->pos->x + vparams->stepx)) - 1;
-  y2 = (int)(vparams->scale * (target->pos->y + vparams->stepy)) - 1;
-  
+  /*
+  x2 = (vparams->scale * (target->pos->x + vparams->stepx)) - 1;
+  y2 = (vparams->scale * (target->pos->y + vparams->stepy)) - 1;
+  */
   value = 0;
   attr = attribute_find(&target->attributes, vparams->attr_range->key);
   if (attr != NULL) {
     value = typed_pointer_cast_from(&attr->value);
-    value = (value - vparams->attr_range->min_value) * 255 /
+    value = (value - vparams->attr_range->min_value) /
             vparams->attr_range->range;
+    cvSet2D(vparams->dst, y1, x1, cvScalar(value, value, value, 0));
   }
   else {
     /*printf("attr not found\n");*/
   }
-  
+  /*
   cvRectangle(vparams->dst,
               cvPoint(x1, y1), cvPoint(x2, y2),
               cvScalar(value, value, value, 0),
               -1, 8, 0);
-  
+  */  
   FINALLY(node_set_pixel);
   RETURN();
 }
@@ -975,16 +1017,17 @@ result graph_draw_nodes
   IplImage *dst;
   CvSize size;
   int channels;
-  list_item *items, *end;
-  node *current_node;
-  link *current_link;
+  /*list_item *items, *end;*/
+  /*node *current_node;*/
+  /*link *current_link;*/
   attribute_range attr_range;
   graph_visualize_params vparams;
   
   CHECK_POINTER(source);
   CHECK_POINTER(target);
-  CHECK_PARAM(target->type == p_U8);
+  CHECK_PARAM(target->type == p_F32);
   
+  channels = 0;
   if (target->format == RGB) {
     CHECK_PARAM(target->step == 3);
     channels = 3;
@@ -994,21 +1037,24 @@ result graph_draw_nodes
     CHECK_PARAM(target->step == 4);
     channels = 4;
   }
+  else {
+    TERMINATE(BAD_PARAM);
+  }
   size.width = (signed)target->width;
   size.height = (signed)target->height;
-  dst = cvCreateImageHeader(size, IPL_DEPTH_8U, channels);
-  cvSetData(dst, target->data, (signed)target->stride);
+  dst = cvCreateImageHeader(size, IPL_DEPTH_32F, channels);
+  cvSetData(dst, target->data, (signed)(target->stride*(unsigned)sizeof(float)));
   
   vparams.dst = dst;
   vparams.scale = scale;
-  vparams.node_size = 5;
-  vparams.link_size = 3;
+  vparams.node_size = 3;
+  vparams.link_size = 1;
   vparams.attr_range = &attr_range;
   
   if (link_attr != 0) {
     attr_range.key = link_attr;
-    attr_range.min_value = 255;
-    attr_range.max_value = 0;
+    attr_range.min_value = 255.0f;
+    attr_range.max_value = 0.0f;
     
     CHECK(graph_for_each_link(source, &link_attribute_range_update,
                               (pointer)&attr_range));
@@ -1029,13 +1075,13 @@ result graph_draw_nodes
   
   if (node_attr != 0) {
     attr_range.key = node_attr;
-    attr_range.min_value = 255;
-    attr_range.max_value = 0;
+    attr_range.min_value = 255.0f;
+    attr_range.max_value = 0.0f;
     CHECK(graph_for_each_node(source, &node_attribute_range_update, 
                               (pointer)&attr_range));
     
-    printf("min val = %.3f max val = %.3f\n", 
-          attr_range.min_value, attr_range.max_value);
+    /*printf("min val = %.3f max val = %.3f\n", 
+          attr_range.min_value, attr_range.max_value);*/
     
     attr_range.range = attr_range.max_value - attr_range.min_value;
       
@@ -1068,28 +1114,37 @@ result graph_draw_pixels
   IplImage *dst;
   CvSize size;
   int channels;
-  list_item *items, *end;
-  node *current_node;
+  /*list_item *items, *end;*/
+  /*node *current_node;*/
   attribute_range attr_range;
   graph_visualize_params vparams;
   
   CHECK_POINTER(source);
   CHECK_POINTER(target);
-  CHECK_PARAM(target->type == p_U8);
+  CHECK_PARAM(target->type == p_F32);
   
+  channels = 0;
+  if (target->format == GREY) {
+    CHECK_PARAM(target->step == 1);
+    channels = 1;
+  }
+  else
   if (target->format == RGB) {
     CHECK_PARAM(target->step == 3);
     channels = 3;
-  }
+  } 
   else
   if (target->format == RGBA) {
     CHECK_PARAM(target->step == 4);
     channels = 4;
   }
+  else {
+    TERMINATE(BAD_PARAM);
+  }
   size.width = (signed)target->width;
   size.height = (signed)target->height;
-  dst = cvCreateImageHeader(size, IPL_DEPTH_8U, channels);
-  cvSetData(dst, target->data, (signed)target->stride);
+  dst = cvCreateImageHeader(size, IPL_DEPTH_32F, channels);
+  cvSetData(dst, target->data, (signed)(target->stride*(unsigned)sizeof(float)));
   
   vparams.dst = dst;
   vparams.scale = scale;
@@ -1101,16 +1156,16 @@ result graph_draw_pixels
   
   if (attr != 0) {
     attr_range.key = attr;
-    attr_range.min_value = 255;
-    attr_range.max_value = 0;
+    attr_range.min_value = 1000000.0f;
+    attr_range.max_value = 0.0f;
     CHECK(graph_for_each_node(source, &node_attribute_range_update, 
                               (pointer)&attr_range));
     
-    printf("min val = %.3f max val = %.3f\n", 
-          attr_range.min_value, attr_range.max_value);
+    /*printf("min val = %.3f max val = %.3f\n", 
+          attr_range.min_value, attr_range.max_value);*/
     
     attr_range.range = attr_range.max_value - attr_range.min_value;
-      
+    
     CHECK(graph_for_each_node(source, &node_set_pixel, 
                               (pointer)&vparams));
   }

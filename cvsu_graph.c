@@ -32,6 +32,7 @@
 #include "cvsu_config.h"
 #include "cvsu_macros.h"
 #include "cvsu_memory.h"
+#include "cvsu_set.h" /* TODO: temporary? */
 #include "cvsu_graph.h"
 
 /******************************************************************************/
@@ -62,6 +63,8 @@ string graph_for_each_node_name = "graph_for_each_node";
 string graph_for_attrs_in_each_node_name = "graph_for_attrs_in_each_node";
 string graph_for_each_link_name = "graph_for_each_link";
 string graph_for_attrs_in_each_link_name = "graph_for_attrs_in_each_link";
+
+string graph_export_image_name = "graph_export_image";
 
 string graph_create_from_image_name = "graph_create_from_image";
 
@@ -577,7 +580,7 @@ void graph_free
   graph *ptr
 )
 {
-  printf("graph_free\n");
+  /*printf("graph_free\n");*/
   if (ptr != NULL) {
     graph_destroy(ptr);
     memory_deallocate((data_pointer*)&ptr);
@@ -859,6 +862,48 @@ result graph_for_attrs_in_each_link
 
 /******************************************************************************/
 
+result graph_export_image
+(
+  graph *source,
+  pixel_image *target,
+  uint32 set_key,
+  uint32 label_key
+)
+{
+  TRY();
+  list_item *items, *end;
+  node *current_node;
+  float *data;
+  disjoint_set *set;
+  scalar_value *label;
+
+  CHECK_POINTER(source);
+  CHECK_POINTER(target);
+  CHECK_PARAM(target->type == p_F32);
+  data = (float*)target->data;
+
+  items = source->nodes.first.next;
+  end = &source->nodes.last;
+  while (items != end) {
+    current_node = (node*)items->data;
+    set = disjoint_set_attribute_get(&current_node->attributes, set_key);
+    if (set == NULL) {
+      TERMINATE(NOT_FOUND);
+    }
+    label = scalar_value_attribute_get(&set->attributes, label_key);
+    if (label == NULL) {
+      TERMINATE(NOT_FOUND);
+    }
+    data[label->offset] = (float)label->label;
+    items = items->next;
+  }
+  
+  FINALLY(graph_export_image);
+  RETURN();
+}
+
+/******************************************************************************/
+
 result graph_create_from_image
 (
   graph *target,
@@ -874,7 +919,7 @@ result graph_create_from_image
 )
 {
   TRY();
-  uint32 w, h, step, stride, offset, size, x, y, pixel_offset;
+  uint32 w, h, step, stride, offset, /*size,*/ x, y, pixel_offset;
   uint32 node_w, node_h, node_size, node_i, node_j, link_size;
   void *image_data;
   pixel_type type;
@@ -893,7 +938,7 @@ result graph_create_from_image
   step = source->step;
   stride = source->stride;
   offset = source->offset;
-  size = w*h;
+  /*size = w*h;*/
   image_data = source->data;
   type = source->type;
 
@@ -946,7 +991,7 @@ result graph_create_from_image
         head_ptr->origin = node_ptr;
         head_ptr->dir = d_N;
         new_weight = link_ptr->weight;
-        *new_weight = fabs(*new_weight - new_value->cache);
+        *new_weight = fabsf(*new_weight - new_value->cache);
         node_ptr->links.items[0] = head_ptr;
       }
       /* add w link by using cached node's link */
@@ -958,7 +1003,7 @@ result graph_create_from_image
         head_ptr->origin = node_ptr;
         head_ptr->dir = d_W;
         new_weight = link_ptr->weight;
-        *new_weight = fabs(*new_weight - new_value->cache);
+        *new_weight = fabsf(*new_weight - new_value->cache);
         node_ptr->links.items[3] = head_ptr;
       }
       /* add s link if not at edge, cache */
@@ -996,7 +1041,6 @@ result graph_create_from_image
   }
 
   FINALLY(graph_create_from_image);
-
   prev_e = NULL;
   memory_deallocate((data_pointer*)&prev_s);
 

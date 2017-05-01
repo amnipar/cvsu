@@ -32,6 +32,7 @@
 #include "cvsu_macros.h"
 #include "cvsu_output.h"
 #include "cvsu_pixel_image.h"
+#include "cvsu_connected_components.h"
 #include "cvsu_typed_pointer.h"
 #include "cvsu_attribute.h"
 #include "cvsu_graph.h"
@@ -50,9 +51,16 @@ string add_diffusion_dependencies_name = "add_diffusion_dependencies";
 string run_diffusion_name = "run_diffusion";
 string finish_diffusion_name = "finish_diffusion";
 string union_for_smaller_than_name = "union_for_smaller_than";
+string union_for_equal_name = "union_for_equal";
 string node_for_each_set_name = "node_for_each_set";
+string add_label_attr_name = "add_label_attr";
+string label_for_each_set_name = "label_for_each_set";
 string link_for_neighboring_sets_name = "link_for_neighboring_sets";
 string main_name = "graph";
+string idiffusion_name = "idiffusion";
+string adiffusion_name = "adiffusion";
+string msf_name = "msf";
+string cc_name = "cc";
 
 const uint32 POS_ATTR = 1;
 const uint32 VALUE_ATTR = 2;
@@ -62,9 +70,10 @@ const uint32 SET_STAT_ATTR = 5;
 const uint32 SET_POS_ATTR = 6;
 const uint32 SET_NODE_ATTR = 7;
 const uint32 SET_COLOR_ATTR = 8;
-const uint32 DIFF_POOL_ATTR = 9;
-const uint32 DIFF_ACC_ATTR = 10;
-const uint32 DIFF_DIFF_ATTR = 11;
+const uint32 SET_LABEL_ATTR = 9;
+const uint32 DIFF_POOL_ATTR = 10;
+const uint32 DIFF_ACC_ATTR = 11;
+const uint32 DIFF_DIFF_ATTR = 12;
 
 /**
  * Evaluator for accumulator attribute used in diffusion processes.
@@ -90,8 +99,10 @@ result evaluate_diff_acc_attr
   /*printf("1\n");*/
   CHECK_PARAM(length == 1);
   /*printf("2\n");*/
+  /* TODO: why did I not get an error from this?? */
   CHECK_PARAM(dependencies[0]->value.type == t_real);
   /*printf("3\n");*/
+  /* TODO: this changes value to 0 if not correct type! */
   acc = IS_TYPE((&target->value), real);
   CHECK_PARAM(acc != NULL);
   /*printf("4\n");*/
@@ -100,7 +111,7 @@ result evaluate_diff_acc_attr
   CHECK(attribute_update(dependencies[0], token));
   /*printf("5\n");*/
   pool = attribute_to_real(dependencies[0]);
-  
+  /*printf("pool %f\n", pool);*/
   *acc = pool;
   /*printf("eval acc o\n");*/
   FINALLY(evaluate_diff_acc_attr);
@@ -179,7 +190,8 @@ result evaluate_idiff_pool_attr
     s = -attribute_to_real(dependencies[4]);
   }
   /*printf("9\n");*/
-  *pool = c + 0.25 * (w + n + e + s);
+  *pool = c + 0.25f * (w + n + e + s);
+  /*printf("%f %f %f %f %f %f\n", *pool, c, w, n, e, s);*/
   
   /*printf("eval pool o\n");*/
   FINALLY(evaluate_idiff_pool_attr);
@@ -188,11 +200,11 @@ result evaluate_idiff_pool_attr
 
 /* constant describing the effect of noise in the gradient */
 /* could be calculated by taking e.g. the 90% point of diff histogram */
-const real K = 4.0;
+const real K = 16.0f;
 
 real gtoc(real g)
 {
-  return 1.0 / (1.0 + pow(fabs(g) / K, 2.0));
+  return 1.0f / (1.0f + powf(fabsf(g) / K, 2.0f));
 }
 
 /**
@@ -265,7 +277,7 @@ result evaluate_adiff_pool_attr
   ce = gtoc(de);
   cs = gtoc(ds);
   
-  *pool = c + 0.25 * (cw * dw + cn * dn + ce * de + cs * ds);
+  *pool = c + 0.25f * (cw * dw + cn * dn + ce * de + cs * ds);
   
   FINALLY(evaluate_adiff_pool_attr);
   RETURN();
@@ -340,6 +352,7 @@ result add_diffusion_attrs
   value_attr = pixel_value_attribute_get(&target->attributes, VALUE_ATTR);
   if (value_attr != NULL) {
     *value = value_attr->cache;
+    /*printf("value %f\n", value_attr->cache);*/
   }
   pool_attr->value.token = 1;
   
@@ -382,6 +395,10 @@ result add_difference_attrs
   RETURN();
 }
 
+typedef struct evaluator_param_t {
+  attribute_evaluator eval;
+} evaluator_param;
+
 result add_diffusion_dependencies
 (
   node *target,
@@ -390,13 +407,15 @@ result add_diffusion_dependencies
 {
   TRY();
   attribute *pool_attr, *c_attr, *w_attr, *n_attr, *e_attr, *s_attr;
+  evaluator_param *eparams;
   attribute_evaluator eval;
   
   CHECK_POINTER(target);
   CHECK_POINTER(params);
   CHECK_PARAM(target->links.count >= 4);
   
-  eval = (attribute_evaluator)params;
+  eparams = (evaluator_param *)params;
+  eval = eparams->eval;
   
   pool_attr = attribute_find(&target->attributes, DIFF_POOL_ATTR);
   CHECK_PARAM(pool_attr != NULL);
@@ -505,7 +524,7 @@ result union_for_smaller_than
   CHECK_POINTER(target);
   CHECK_POINTER(params);
   
-  threshold = *(real*)params;
+  threshold = *(float*)params;
   node_a = target->a.origin;
   node_b = target->b.origin;
   
@@ -521,10 +540,117 @@ result union_for_smaller_than
   b = *node_b->weight;
   
   if (fabs(a-b) < threshold) {
+    /*printf("%f %f\n", a, b);*/
     disjoint_set_union(set_a, set_b);
+  } else {
+    /*printf("%f %f %f %f\n", a, b, fabs(a-b), threshold);*/
   }
   
   FINALLY(union_for_smaller_than);
+  RETURN();
+}
+
+result union_for_equal
+(
+  link *target,
+  pointer params
+)
+{
+  TRY();
+  real a, b;
+  node *node_a, *node_b;
+  disjoint_set *set_a, *set_b;
+  
+  CHECK_POINTER(target);
+  (void)params;
+  
+  node_a = target->a.origin;
+  node_b = target->b.origin;
+  
+  set_a = disjoint_set_attribute_get(&node_a->attributes, SET_ATTR);
+  if (set_a == NULL) {
+    TERMINATE(NOT_FOUND);
+  }
+  a = *node_a->weight;
+  set_b = disjoint_set_attribute_get(&node_b->attributes, SET_ATTR);
+  if (set_b == NULL) {
+    TERMINATE(NOT_FOUND);
+  }
+  b = *node_b->weight;
+  
+  if (fabs(a-b) < 0.000001f) {
+    disjoint_set_union(set_a, set_b);
+  }
+  
+  FINALLY(union_for_equal);
+  RETURN();
+}
+
+typedef struct label_params_t {
+  uint32 set_key;
+  uint32 label_key;
+  uint32 next_label;
+  pixel_image *dst;
+} label_params;
+
+result add_label_attr
+(
+  node *target,
+  pointer params
+)
+{
+  TRY();
+  uint32 x, y, offset;
+  label_params *lparams;
+
+  CHECK_POINTER(target);
+  CHECK_POINTER(params);
+  
+  lparams = (label_params*)params;
+  x = (uint32)target->pos->x;
+  y = (uint32)target->pos->y;
+  offset = y * lparams->dst->stride + x;
+
+  CHECK(disjoint_set_label_attribute_add(&target->attributes,
+      lparams->set_key,
+      1,
+      lparams->label_key,
+      offset,
+      NULL));
+  FINALLY(add_label_attr);
+  RETURN();
+}
+
+result label_for_each_set
+(
+  node *target,
+  pointer params
+)
+{
+  TRY();
+  label_params *lparams;
+  disjoint_set *set, *parent;
+  scalar_value *label, *parent_label;
+
+  CHECK_POINTER(target);
+  CHECK_POINTER(params);
+  
+  lparams = (label_params*)params;
+  set = disjoint_set_attribute_get(&target->attributes, lparams->set_key);
+  if (set == NULL) {
+    TERMINATE(NOT_FOUND);
+  }
+  parent = disjoint_set_find(set);
+  label = scalar_value_attribute_get(&set->attributes, lparams->label_key);
+  parent_label = scalar_value_attribute_get(&parent->attributes, lparams->label_key);
+  /* TODO: typically token would be used for checking if updated */
+  if (parent_label->label == 0) {
+    parent_label->label = lparams->next_label;
+    lparams->next_label = lparams->next_label + 1;
+  }
+  label->label = parent_label->label;
+
+  FINALLY(label_for_each_set);
   RETURN();
 }
 
@@ -553,7 +679,7 @@ result node_for_each_set
   }
   parent = disjoint_set_find(set);
   
-  if (set == parent && set->size > 0) {
+  if (set == parent && set->size > 1) {
     node_ptr = node_ref_attribute_get(&set->attributes, SET_NODE_ATTR);
     if (node_ptr == NULL) {
       CHECK(graph_add_node(g, 4, 1000, &node_ptr));
@@ -655,6 +781,7 @@ enum viz_t {
   v_PIXELS
 };
 
+/*
 int main(int argc, char *argv[])
 {
   TRY();
@@ -783,14 +910,244 @@ int main(int argc, char *argv[])
 
   PRINT0("load image...\n");
   CHECK(pixel_image_create_from_file(&src_image, source_file, p_U8, GREY));
+*/
+
+void idiffusion(float *src, float *dst, uint32 rows, uint32 cols, uint32 rounds) {
+  TRY();
+  pixel_image src_image, dst_image;
+  graph g;
+  uint32 i, dx, dy, stepx, stepy;
+  real scale;
+  evaluator_param eparams;
+  dx = 0;
+  dy = 0;
+  stepx = 1;
+  stepy = 1;
+  scale = 1.0f;
+  CHECK(pixel_image_borrow_data(&src_image, (data_pointer)src, p_F32, GREY, cols, rows, 1, cols));
+  CHECK(pixel_image_borrow_data(&dst_image, (data_pointer)dst, p_F32, GREY, cols, rows, 1, cols));
+  CHECK(graph_create_from_image(&g, &src_image, dx, dy, stepx, stepy,
+                                NEIGHBORHOOD_4, POS_ATTR, VALUE_ATTR, WEIGHT_ATTR));
+  
+  graph_for_each_node(&g,
+                      &add_diffusion_attrs,
+                      NULL);
+  
+  graph_for_each_link(&g,
+                      &add_difference_attrs,
+                      NULL);
+  /* TODO: must not pass function via void pointer!! */
+  eparams.eval = &evaluate_idiff_pool_attr;
+  graph_for_each_node(&g,
+                      &add_diffusion_dependencies,
+                      &eparams);
+  
+  for (i = 2; i < rounds; i++) {
+    graph_for_each_node(&g,
+                        &run_diffusion,
+                        &i);
+  }
+  /* acc attributes need to be updated one more time */
+  i--;
+  graph_for_each_node(&g,
+                      &finish_diffusion,
+                      &i);
+  CHECK(graph_draw_pixels(&g, &dst_image, DIFF_ACC_ATTR,
+                          scale, stepx, stepy));
+  FINALLY(idiffusion);
+  graph_destroy(&g);
+  pixel_image_return_data(&dst_image);
+  pixel_image_return_data(&src_image);
+  return;
+}
+
+void adiffusion(float *src, float *dst, uint32 rows, uint32 cols, uint32 rounds) {
+  TRY();
+  pixel_image src_image, dst_image;
+  graph g;
+  uint32 i, dx, dy, stepx, stepy;
+  real scale;
+  evaluator_param eparams;
+  dx = 0;
+  dy = 0;
+  stepx = 1;
+  stepy = 1;
+  scale = 1.0f;
+  CHECK(pixel_image_borrow_data(&src_image, (data_pointer)src, p_F32, GREY, cols, rows, 1, cols));
+  CHECK(pixel_image_borrow_data(&dst_image, (data_pointer)dst, p_F32, GREY, cols, rows, 1, cols));
+  CHECK(graph_create_from_image(&g, &src_image, dx, dy, stepx, stepy,
+                                NEIGHBORHOOD_4, POS_ATTR, VALUE_ATTR, WEIGHT_ATTR));
+  graph_for_each_node(&g,
+                      &add_diffusion_attrs,
+                      NULL);
+  
+  graph_for_each_link(&g,
+                      &add_difference_attrs,
+                      NULL);
+  /* the only difference to isotropic diffusion is the function for */
+  /* evaluating the pool attributes */
+  eparams.eval = &evaluate_adiff_pool_attr;
+  graph_for_each_node(&g,
+                      &add_diffusion_dependencies,
+                      &eparams);
+  
+  for (i = 2; i < rounds; i++) {
+    graph_for_each_node(&g,
+                        &run_diffusion,
+                        &i);
+  }
+  /* acc attributes need to be updated one more time */
+  i--;
+  graph_for_each_node(&g,
+                      &finish_diffusion,
+                      &i);
+  CHECK(graph_draw_pixels(&g, &dst_image, DIFF_ACC_ATTR,
+                          scale, stepx, stepy));
+  FINALLY(adiffusion);
+  graph_destroy(&g);
+  pixel_image_return_data(&dst_image);
+  pixel_image_return_data(&src_image);
+  return;
+}
+
+void msf(float *src, float *dst, uint32 rows, uint32 cols, float threshold) {
+  TRY();
+  pixel_image src_image, dst_image;
+  graph g;/*, greg;*/
+  uint32 dx, dy, stepx, stepy;
+  real scale;
+  disjoint_set_stat_pos_attribute_params sparams;
+  /*real threshold;*/
+  dx = 0;
+  dy = 0;
+  stepx = 1;
+  stepy = 1;
+  scale = 1.0f;
+  CHECK(pixel_image_borrow_data(&src_image, (data_pointer)src, p_F32, GREY, cols, rows, 1, cols));
+  CHECK(pixel_image_borrow_data(&dst_image, (data_pointer)dst, p_F32, RGB, cols, rows, 3, 3 * cols));
+  CHECK(graph_create_from_image(&g, &src_image, dx, dy, stepx, stepy,
+                                NEIGHBORHOOD_4, POS_ATTR, VALUE_ATTR, WEIGHT_ATTR));
+  
+  /* the set attribute will have statistics dependent on the value attr */
+  sparams.set_key = SET_ATTR;
+  sparams.attribute_count = 4;
+  sparams.stat_key = SET_STAT_ATTR;
+  sparams.stat_dep_key = VALUE_ATTR;
+  sparams.pos_key = SET_POS_ATTR;
+  sparams.pos_dep_key = POS_ATTR;
+  
+  /* add a set attribute containing statistics into each node */
+  CHECK(graph_for_attrs_in_each_node(&g, 
+                                     &disjoint_set_add_stat_pos_attr, 
+                                     (pointer)&sparams));
+  /* sort links by ascending weight using counting sort */
+  /* 'remove' links by union of linked nodes meeting the criteria */
+  CHECK(graph_for_each_link(&g,
+                            &union_for_smaller_than,
+                            (pointer)&threshold));
+  CHECK(graph_draw_pixels(&g, &dst_image, SET_ATTR,
+                          scale, stepx, stepy));
+  /* clean up by eliminating too small regions */
+  /*CHECK(graph_create(&greg, 1000, 1000));*/
+  /* adding a node for each set parent */
+  /*CHECK(graph_for_each_node(&g,
+                            &node_for_each_set,
+                            (pointer)&greg));*/
+  /* adding links between sets with neighboring pixel nodes */
+  /*CHECK(graph_for_each_link(&g,
+                            &link_for_neighboring_sets,
+                            (pointer)&greg));*/
+  
+  /*CHECK(graph_draw_nodes(&greg, &dst_image, 0, 0, (real)scale));*/
+  FINALLY(msf);
+  graph_destroy(&g);
+  /*graph_destroy(&greg);*/
+  pixel_image_return_data(&dst_image);
+  pixel_image_return_data(&src_image);
+  return;
+}
+
+void cc(unsigned char *src, unsigned char *dst, uint32 rows, uint32 cols) {
+  TRY();
+  pixel_image src_image, dst_image;
+  connected_components comp;
+  /*
+  graph g;
+  uint32 dx, dy, stepx, stepy;
+  label_params lparams;
+
+  dx = 0;
+  dy = 0;
+  stepx = 1;
+  stepy = 1;
+  */
+  /*printf("rows %lu cols %lu\n", rows, cols);*/
+  CHECK(pixel_image_borrow_data(&src_image, (data_pointer)src, p_U8, GREY, cols, rows, 1, cols));
+  CHECK(pixel_image_borrow_data(&dst_image, (data_pointer)dst, p_U8, RGB, cols, rows, 3, 3*cols));
+  CHECK(connected_components_create(&comp, &src_image));
+  CHECK(connected_components_update(&comp));
+  CHECK(connected_components_draw_image(&comp, &dst_image));
+  
+  /*
+  CHECK(graph_create_from_image(&g, &src_image, dx, dy, stepx, stepy,
+                                NEIGHBORHOOD_4, POS_ATTR, VALUE_ATTR, WEIGHT_ATTR));
+
+  lparams.set_key = SET_ATTR;
+  lparams.label_key = SET_LABEL_ATTR;
+  lparams.dst = &dst_image;
+  lparams.next_label = 1;
+  PRINT0("add labels\n");
+  CHECK(graph_for_each_node(&g,
+                            &add_label_attr,
+                            (pointer)&lparams));
+  PRINT0("union\n");
+  CHECK(graph_for_each_link(&g,
+                            &union_for_equal,
+                            NULL));
+  PRINT0("update labels\n");
+  CHECK(graph_for_each_node(&g,
+                            &label_for_each_set,
+                            (pointer)&lparams));
+  PRINT1("label %lu\n", lparams.next_label);
+  PRINT0("export\n");
+  CHECK(graph_export_image(&g, &dst_image, SET_ATTR, SET_LABEL_ATTR));
+  PRINT0("done\n");
+  */
+  FINALLY(cc);
+  /*graph_destroy(&g);*/
+  connected_components_destroy(&comp);
+  pixel_image_return_data(&dst_image);
+  pixel_image_return_data(&src_image);
+  return;
+}
+
+void process_data(float *src, float *dst, uint32 rows, uint32 cols) {
+  TRY();
+  pixel_image src_image, /*tmp_image,*/ dst_image;
+  graph g, greg;
+  uint32 dx, dy, stepx, stepy;
+  real scale;
+  /*string smode, vmode, source_file, target_file;*/
+  evaluator_param eparams;
+  enum mode_t mode;
+  enum viz_t viz;
+  dx = 0;
+  dy = 0;
+  stepx = 1;
+  stepy = 1;
+  scale = 1.0f;
+  mode = m_IDIFFUSE;
+  viz = v_PIXELS;
+
+  CHECK(pixel_image_borrow_data(&src_image, (data_pointer)src, p_F32, GREY, cols, rows, 1, cols));
+  /*
   CHECK(pixel_image_create(&tmp_image, p_U8, RGB, src_image.width,
                            src_image.height, 3, 3 * src_image.width));
-  CHECK(pixel_image_create(&dst_image, p_U8, RGB, scale * src_image.width,
-                           scale * src_image.height, 3, 
-                           3 * scale * src_image.width));
+  */
+  CHECK(pixel_image_borrow_data(&dst_image, (data_pointer)dst, p_F32, RGB, cols, rows, 3, 3 * cols));
   
-  CHECK(convert_grey8_to_grey24(&src_image, &tmp_image));
-  CHECK(pixel_image_replicate_pixels(&tmp_image, &dst_image, scale));
+  /*CHECK(convert_grey8_to_grey24(&src_image, &tmp_image));*/
+  /*CHECK(pixel_image_replicate_pixels(&tmp_image, &dst_image, scale));*/
   
   PRINT0("create graph...\n");
   CHECK(graph_create_from_image(&g, &src_image, dx, dy, stepx, stepy,
@@ -813,9 +1170,10 @@ int main(int argc, char *argv[])
         graph_for_each_link(&g,
                             &add_difference_attrs,
                             NULL);
+        eparams.eval = &evaluate_idiff_pool_attr;
         graph_for_each_node(&g,
                             &add_diffusion_dependencies,
-                            &evaluate_idiff_pool_attr);
+                            &eparams);
         
         diffusion_rounds = 9;
         for (i = 2; i < diffusion_rounds; i++) {
@@ -844,9 +1202,10 @@ int main(int argc, char *argv[])
                             NULL);
         /* the only difference to isotropic diffusion is the function for */
         /* evaluating the pool attributes */
+        eparams.eval = &evaluate_adiff_pool_attr;
         graph_for_each_node(&g,
                             &add_diffusion_dependencies,
-                            &evaluate_adiff_pool_attr);
+                            &eparams);
         
         diffusion_rounds = 9;
         for (i = 2; i < diffusion_rounds; i++) {
@@ -879,7 +1238,7 @@ int main(int argc, char *argv[])
         sparams.pos_key = SET_POS_ATTR;
         sparams.pos_dep_key = POS_ATTR;
         
-        threshold = 5.1;
+        threshold = 5.1f;
         
         /* add a set attribute containing statistics into each node */
         CHECK(graph_for_attrs_in_each_node(&g, 
@@ -915,30 +1274,30 @@ int main(int argc, char *argv[])
   PRINT0("drawing graph...\n");
   if (viz == v_NODES) {
     CHECK(graph_draw_nodes(&g, &dst_image, SET_ATTR, WEIGHT_ATTR, scale));
-    CHECK(graph_draw_nodes(&greg, &dst_image, 0, 0, (real)scale));
+    CHECK(graph_draw_nodes(&greg, &dst_image, 0, 0, scale));
   }
   else {
     CHECK(graph_draw_pixels(&g, &dst_image, DIFF_ACC_ATTR,
-                            (real)scale, stepx, stepy));
+                            scale, stepx, stepy));
     /*CHECK(graph_draw_nodes(&greg, &dst_image, 0, 0, (real)scale));*/
   }
   
   /* write the resulting image to file */
   PRINT0("writing result to file...\n");
+  /*
   CHECK(pixel_image_write_to_file(&dst_image, target_file));
+  */
   PRINT0("done!\n");
 
   FINALLY(main);
   if (IS_FALSE(graph_is_null(&greg))) {
-    printf("d b\n");
     graph_destroy(&greg);
-    printf("d a\n");
   }
   PRINT0("destroy graph\n");
   graph_destroy(&g);
   PRINT0("destroyed\n");
-  pixel_image_destroy(&dst_image);
-  pixel_image_destroy(&tmp_image);
-  pixel_image_destroy(&src_image);
-  return 0;
+  pixel_image_return_data(&dst_image);
+  /*pixel_image_destroy(&tmp_image);*/
+  pixel_image_return_data(&src_image);
+  return;
 }

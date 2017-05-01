@@ -81,6 +81,7 @@ uint32 typesize[] = {
   sizeof(real32),
   sizeof(real64),
   sizeof(pixel_value),
+  sizeof(scalar_value),
   sizeof(position_2d),
   sizeof(typed_pointer),
   sizeof(list),
@@ -223,6 +224,28 @@ real cast_from_pixel_value
   return ((pixel_value*)tptr->value)->cache;
 }
 
+real cast_from_scalar_value
+(
+  typed_pointer *tptr
+)
+{
+  scalar_value *s;
+  s = (scalar_value*)tptr->value;
+  return (real)s->label;
+  /*
+  switch (s->type) {
+    case s_u32:
+      return (real)s->u32_val;
+    case s_s32:
+      return (real)s->s32_val;
+    case s_f32:
+      return (real)s->f32_val;
+    case s_f64:
+      return (real)s->f64_val;
+  }
+  */
+}
+
 real cast_from_set
 (
   typed_pointer *tptr
@@ -264,6 +287,7 @@ typed_pointer_cast_from_function cast_from_functions[] = {
   &cast_from_f32,         /* t_F32 */
   &cast_from_f64,         /* t_F64 */
   &cast_from_pixel_value, /* t_pixel_value */
+  &cast_from_scalar_value, /* t_scalar_value */
   &cast_from_unsupported, /* t_position_2d */
   &cast_from_unsupported, /* t_tuple */
   &cast_from_unsupported, /* t_list */
@@ -427,6 +451,7 @@ result typed_pointer_clone
 )
 {
   TRY();
+  r = SUCCESS;
   if (target->type != source->type || target->count != source->count) {
     CHECK(typed_pointer_create(target, source->type, source->count,
                                source->token, NULL));

@@ -340,6 +340,14 @@ result graph_for_attrs_in_each_link
   pointer params
 );
 
+result graph_export_image
+(
+  graph *source,
+  pixel_image *target,
+  uint32 set_key,
+  uint32 label_key
+);
+
 /**
  * Creates a regular grid graph structure from a single image. Pixel values are
  * stored in the nodes as value attributes (using pixel_value types, which

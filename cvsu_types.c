@@ -461,6 +461,8 @@ integral_value angle_plus_angle
   integral_value angle2
 )
 {
+  (void)angle1;
+  (void)angle2;
   return 0;
 }
 

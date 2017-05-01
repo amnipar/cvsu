@@ -251,6 +251,22 @@ pixel_value *pixel_value_attribute_get
   uint32 key
 );
 
+result scalar_value_attribute_add
+(
+  attribute_list *target,
+  uint32 key,
+  uint32 offset,
+  uint32 token,
+  scalar_type type,
+  scalar_value **added
+);
+
+scalar_value *scalar_value_attribute_get
+(
+  attribute_list *target,
+  uint32 key
+);
+
 result position_2d_attribute_add
 (
   attribute_list *target,

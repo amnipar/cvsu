@@ -44,10 +44,13 @@ string disjoint_set_attributes_create_name = "disjoint_set_attributes_create";
 string disjoint_set_attr_create_name = "disjoint_set_attr_create";
 string disjoint_set_create_with_stat_name = "disjoint_set_create_with_stat";
 string disjoint_set_attribute_add_name = "disjoint_set_attribute_add";
+string disjoint_set_label_attribute_add_name = 
+    "disjoint_set_label_attribute_add";
 string disjoint_set_stat_attribute_add_name = "disjoint_set_stat_attribute_add";
 string disjoint_set_stat_pos_attribute_add_name =
     "disjoint_set_stat_pos_attribute_add";
 string disjoint_set_add_attr_name = "disjoint_set_add_attr";
+string disjoint_set_add_label_attr_name = "disjoint_set_add_label_attr";
 string disjoint_set_add_stat_attr_name = "disjoint_set_add_stat_attr";
 string disjoint_set_add_stat_pos_attr_name = "disjoint_set_add_stat_pos_attr";
 
@@ -255,6 +258,9 @@ void attribute_union
             case t_F64:
               union_F64(&avalue, &bvalue);
               break;
+            case t_scalar_value:
+              /*union_scalar(&avalue, &bvalue);*/
+              break;
             case t_statistics:
               union_statistics(&avalue, &bvalue);
               break;
@@ -405,6 +411,36 @@ disjoint_set *disjoint_set_attribute_get
 
 /******************************************************************************/
 
+result disjoint_set_label_attribute_add
+(
+  attribute_list *target,
+  uint32 set_key,
+  uint32 attribute_count,
+  uint32 label_key,
+  uint32 offset,
+  disjoint_set **added
+)
+{
+  TRY();
+  disjoint_set *new_set;
+  
+  CHECK_POINTER(target);
+  
+  CHECK(disjoint_set_attribute_add(target, set_key, attribute_count, 
+                                   &new_set));
+  CHECK(scalar_value_attribute_add(&new_set->attributes, label_key,
+                                   offset, 0, s_u32, NULL));
+  
+  if (added != NULL) {
+    *added = new_set;
+  }
+  
+  FINALLY(disjoint_set_label_attribute_add);
+  RETURN();
+}
+
+/******************************************************************************/
+
 result disjoint_set_stat_attribute_add
 (
   attribute_list *target,
@@ -503,6 +539,32 @@ result disjoint_set_add_attr
                                    sparams->attribute_count, &sparams->added));
   
   FINALLY(disjoint_set_add_attr);
+  RETURN();
+}
+
+/******************************************************************************/
+
+result disjoint_set_add_label_attr
+(
+  attribute_list *target,
+  pointer params
+)
+{
+  TRY();
+  disjoint_set_label_attribute_params *lparams;
+  
+  CHECK_POINTER(target);
+  CHECK_POINTER(params);
+  
+  lparams = (disjoint_set_label_attribute_params*)params;
+  CHECK(disjoint_set_label_attribute_add(target,
+                                         lparams->set_key,
+                                         lparams->attribute_count, 
+                                         lparams->label_key,
+                                         lparams->offset,
+                                         &lparams->added));
+  
+  FINALLY(disjoint_set_add_label_attr);
   RETURN();
 }
 

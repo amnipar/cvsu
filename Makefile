@@ -34,10 +34,19 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-CC=gcc
-CFLAGS=-I. \
-		-Wall -W -Wconversion -Wshadow -Wcast-qual -ansi \
-		-pedantic -std=c89
+CC = gcc
+CFLAGS = -I. \
+		 -Wall -W -Wconversion -Wshadow -Wcast-qual -ansi \
+		 -pedantic -std=c89 -fPIC -O2
+LDFLAGS = -shared
+TARGET = libcvsu.so
+SOURCES = cvsu_memory.c cvsu_output.c cvsu_types.c cvsu_typed_pointer.c \
+		  cvsu_pixel_image.c cvsu_list.c cvsu_attribute.c cvsu_set.c \
+		  cvsu_opencv.c cvsu_graph.c graph.c cvsu_connected_components.c
+HEADERS = cvsu_config.h cvsu_macros.h cvsu_memory.h cvsu_output.h cvsu_types.h \
+          cvsu_typed_pointer.h cvsu_pixel_image.h cvsu_list.h cvsu_attribute.h \
+          cvsu_set.h cvsu_opencv.h cvsu_graph.h graph.h cvsu_connected_components.h
+OBJECTS = $(SOURCES:.c=.o)
 
 %.o: %.c
 	$(CC) -c -o $@ $< $(CFLAGS)
@@ -45,6 +54,11 @@ CFLAGS=-I. \
 .PHONY: clean
 
 all: edges segment threshold parse graph
+
+lib: $(TARGET)
+
+$(TARGET): $(OBJECTS)
+	$(CC) $(CFLAGS) -o $@ $(OBJECTS) -lm -lopencv_core -lopencv_highgui $(LDFLAGS)
 
 clean:
 	rm -f find_edges quad_forest_segment threshold_adaptive parse graph *.o

@@ -169,7 +169,7 @@ result connected_components_create
   target->width = width;
   target->height = height;
   target->channels = source->step;
-
+  
   {
     SINGLE_DISCONTINUOUS_IMAGE_VARIABLES(source, byte);
 
@@ -354,9 +354,9 @@ result connected_components_draw_image
 
   width = source->width;
   height = source->height;
-
+/*
   CHECK(pixel_image_create(target, p_U8, RGB, width, height, 3, 3 * width));
-
+*/
   target_pos = (byte *)target->data;
   for (i = width*height, pixel = source->pixels; i--; pixel++) {
     region = region_find(pixel);

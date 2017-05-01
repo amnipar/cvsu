@@ -141,6 +141,32 @@ result pixel_image_create_from_data
   uint32 stride
 );
 
+/* create a header to an existing data buffer without owning or copying it */
+result pixel_image_borrow_data
+(
+  /** Pointer to target struct where image is stored */
+  pixel_image *target,
+  /** Pointer to existing image data */
+  data_pointer data,
+  /** Data type used for storing the pixel values */
+  pixel_type type,
+  /** Pixel format for multi-channel images or GREY for greyscale */
+  pixel_format format,
+  /** Width of image in pixels */
+  uint32 width,
+  /** Height of image in pixels */
+  uint32 height,
+  /** Step between columns of pixels (amount of channels per pixel) */
+  uint32 step,
+  /** Stride between rows of pixels (distance to same column on next row) */
+  uint32 stride
+);
+
+result pixel_image_return_data
+(
+  pixel_image *target
+);
+
 /**
  * Deallocates the pixel image data.
  * @see pixel_image_create

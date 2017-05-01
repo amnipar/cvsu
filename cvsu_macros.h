@@ -41,9 +41,13 @@
 /* remove them if they cause problems with other compilers                    */
 
 #include <math.h>
-
+/*
 #ifdef NEED_MINMAX
 #if INTEGRAL_IMAGE_DATA_TYPE == INTEGRAL_IMAGE_USING_FLOAT
+*/
+float powf(float base, float exponent);
+float sqrtf(float arg);
+float fabsf(float arg);
 float fminf(float __x, float __y);
 float fmaxf(float __x, float __y);
 float roundf(float __x);
@@ -52,6 +56,7 @@ long lroundf(float __x);
 #define getmax fmaxf
 #define getround roundf
 #define getlround lroundf
+/*
 #elif INTEGRAL_IMAGE_DATA_TYPE == INTEGRAL_IMAGE_USING_DOUBLE
 double fmin(double __x, double __y);
 double fmax(double __x, double __y);
@@ -65,7 +70,7 @@ long lround(double __x);
 #error "integral image data type not defined"
 #endif
 #endif
-
+*/
 /******************************************************************************/
 /* common mathematical constants                                              */
 
@@ -294,13 +299,15 @@ finally:
     for (image##_pos = image##_rows[y] + offset,\
          x = image->width; x--; image##_pos += image##_step)
 
+/* TODO: why there was ,x, at the end?? */
 #define FOR_DISCONTINUOUS_IMAGE_ROW(image)\
-  for (image##_pos = image##_rows[0],x,\
+  for (image##_pos = image##_rows[0],\
        y = 0; y < image->height; y++,\
        image##_pos = image##_rows[y])
 
+/* TODO: why there was ,y, at the end?? */
 #define FOR_DISCONTINUOUS_IMAGE_COL(image)\
-  for (image##_pos = image##_rows[0],y,\
+  for (image##_pos = image##_rows[0],\
        x = 0; x < image->width; x++,\
        image##_pos = image##_rows[0] + x * image##_step)
 
@@ -316,13 +323,15 @@ finally:
          target_pos = target_rows[y] + target_offset,\
          x = source->width; x--; source_pos += source_step, target_pos += target_step)
 
+/* TODO: why there was ,x, at the end?? */
 #define FOR_2_DISCONTINUOUS_IMAGE_ROWS()\
-  for (source_pos = source_rows[0], target_pos = target_rows[0],x,\
+  for (source_pos = source_rows[0], target_pos = target_rows[0],\
        y = 0; y < source->height;\
        source_pos = source_rows[y], target_pos = target_rows[y], y++)
 
+/* TODO: why there was ,y, at the end?? */
 #define FOR_2_DISCONTINUOUS_IMAGE_COLS()\
-  for (source_pos = source_rows[0], target_pos = target_rows[0],y,\
+  for (source_pos = source_rows[0], target_pos = target_rows[0],\
        x = 0; x < source->width;\
        source_pos = source_rows[0] + x * source_step,\
        target_pos = target_rows[0] + x * target_step,x++)

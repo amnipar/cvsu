@@ -255,9 +255,10 @@ typedef enum pixel_type_t {
 /* convenience definitions for integral images */
 
 /* TODO: should create a separate flag for determining real type */
+typedef real32 real;
 #if INTEGRAL_IMAGE_DATA_TYPE == INTEGRAL_IMAGE_USING_FLOAT
 
-typedef real32 real;
+/*typedef real32 real;*/
 typedef real32 integral_value;
 typedef real32 I_1_t;
 typedef real32 I_2_t;
@@ -265,7 +266,7 @@ typedef real32 I_2_t;
 
 #elif INTEGRAL_IMAGE_DATA_TYPE == INTEGRAL_IMAGE_USING_DOUBLE
 
-typedef real64 real;
+/*typedef real64 real;*/
 typedef real64 integral_value;
 typedef real64 I_1_t;
 typedef real64 I_2_t;
@@ -450,6 +451,29 @@ typedef struct pixel_value_t {
   uint32 token;
   real cache;
 } pixel_value;
+
+typedef enum scalar_type_t {
+  s_undef = 0,
+  s_u32,
+  s_s32,
+  s_f32,
+  s_f64
+} scalar_type;
+
+typedef struct scalar_value_t {
+  uint32 offset;
+  uint32 token;
+  /*scalar_type type;*/
+  uint32 label;
+  /*
+  union {
+    uint32 u32_val;
+    sint32 s32_val;
+    float  f32_val;
+    double f64_val;
+  };
+  */
+} scalar_value;
 
 /**
  * Caches the value by reading and casting from data array, if the token is not

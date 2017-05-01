@@ -46,6 +46,8 @@ string pixel_image_alloc_name = "pixel_image_alloc";
 string pixel_image_free_name = "pixel_image_free";
 string pixel_image_create_name = "pixel_image_create";
 string pixel_image_create_from_data_name = "pixel_image_create_from_data";
+string pixel_image_borrow_data_name = "pixel_image_borrow_data";
+string pixel_image_return_data_name = "pixel_image_return_data";
 string pixel_image_destroy_name = "pixel_image_destroy";
 string pixel_image_nullify_name = "pixel_image_nullify";
 string pixel_image_convert_name = "pixel_image_convert";
@@ -309,6 +311,49 @@ result pixel_image_create_from_data
 
 /******************************************************************************/
 
+result pixel_image_borrow_data
+(
+  pixel_image *target,
+  data_pointer data,
+  pixel_type type,
+  pixel_format format,
+  uint32 width,
+  uint32 height,
+  uint32 step,
+  uint32 stride
+)
+{
+  TRY();
+  uint32 size;
+
+  CHECK_POINTER(target);
+  CHECK_POINTER(data);
+
+  size = height * stride;
+  CHECK(pixel_image_init(target, data, type, format, 0, 0, width, height, 0, step, stride, size));
+
+  FINALLY(pixel_image_borrow_data);
+  RETURN();
+}
+
+result pixel_image_return_data
+(
+  pixel_image *target
+)
+{
+  TRY();
+
+  CHECK_POINTER(target);
+
+  CHECK(memory_deallocate((data_pointer*)&target->rows));
+  CHECK(pixel_image_nullify(target));
+
+  FINALLY(pixel_image_return_data);
+  RETURN();
+}
+
+/******************************************************************************/
+
 result pixel_image_destroy
 (
   pixel_image *target
@@ -550,7 +595,7 @@ result pixel_image_copy
     memory_copy(target->data, source->data, source->size, pixel_size);
   }
   else {
-    uint32 x, y;
+    uint32 y;
     switch (source->type) {
     case p_U8:
       {
@@ -559,6 +604,7 @@ result pixel_image_copy
             memory_copy((data_pointer)POINTER_TO_PIXEL(target),
                         (data_pointer)POINTER_TO_PIXEL(source),
                         source->width * source_step, sizeof(byte));
+        (void)target_step;
       }
       break;
     case p_S8:
@@ -568,6 +614,7 @@ result pixel_image_copy
             memory_copy((data_pointer)POINTER_TO_PIXEL(target),
                         (data_pointer)POINTER_TO_PIXEL(source),
                         source->width * source_step, sizeof(sint8));
+        (void)target_step;
       }
       break;
     case p_U16:
@@ -577,6 +624,7 @@ result pixel_image_copy
             memory_copy((data_pointer)POINTER_TO_PIXEL(target),
                         (data_pointer)POINTER_TO_PIXEL(source),
                         source->width * source_step, sizeof(word));
+        (void)target_step;
       }
       break;
     case p_S16:
@@ -586,6 +634,7 @@ result pixel_image_copy
             memory_copy((data_pointer)POINTER_TO_PIXEL(target),
                         (data_pointer)POINTER_TO_PIXEL(source),
                         source->width * source_step, sizeof(sint16));
+        (void)target_step;
       }
       break;
     case p_U32:
@@ -595,6 +644,7 @@ result pixel_image_copy
             memory_copy((data_pointer)POINTER_TO_PIXEL(target),
                         (data_pointer)POINTER_TO_PIXEL(source),
                         source->width * source_step, sizeof(dword));
+        (void)target_step;
       }
       break;
     case p_S32:
@@ -604,6 +654,7 @@ result pixel_image_copy
             memory_copy((data_pointer)POINTER_TO_PIXEL(target),
                         (data_pointer)POINTER_TO_PIXEL(source),
                         source->width * source_step, sizeof(sint32));
+        (void)target_step;
       }
       break;
     case p_F32:
@@ -613,6 +664,7 @@ result pixel_image_copy
             memory_copy((data_pointer)POINTER_TO_PIXEL(target),
                         (data_pointer)POINTER_TO_PIXEL(source),
                         source->width * source_step, sizeof(real32));
+        (void)target_step;
       }
       break;
     case p_F64:
@@ -622,6 +674,7 @@ result pixel_image_copy
             memory_copy((data_pointer)POINTER_TO_PIXEL(target),
                         (data_pointer)POINTER_TO_PIXEL(source),
                       source->width * source_step, sizeof(real64));
+        (void)target_step;
       }
       break;
     default:
@@ -678,7 +731,7 @@ result pixel_image_clear
     memory_clear((data_pointer)target->data, target->size, pixel_size);
   }
   else {
-    uint32 x, y;
+    uint32 y;
     switch (target->type) {
     case p_U8:
       {
@@ -845,6 +898,7 @@ result pixel_image_read
   CHECK_POINTER(target);
   CHECK_POINTER(source);
 
+  file = NULL;
   /*printf("Starting to read image '%s'...\n", source);*/
   file = fopen(source, "rb");
   if (file == NULL) {
@@ -1035,6 +1089,7 @@ result pixel_image_write
   CHECK_PARAM(source->type == p_U8 || source->type == p_U16);
   CHECK_PARAM(source->format == MONO || source->format == GREY || source->format == RGB);
 
+  file = NULL;
   printf("Starting to write image '%s'...\n", target);
   file = fopen(target, "wb");
   if (file == NULL) {

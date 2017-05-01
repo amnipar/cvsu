@@ -1159,7 +1159,7 @@ result list_insert_unique_index
 )
 {
   TRY();
-  byte *chunk_item;
+  /*byte *chunk_item;*/
   list *master;
   list_item *item;
   list_item *i;
@@ -1170,7 +1170,7 @@ result list_insert_unique_index
     ERROR(BAD_PARAM);
   }
   else {
-    chunk_item = chunk_return_item(&master->data_chunk, index);
+    /*chunk_item = chunk_return_item(&master->data_chunk, index);*/
 
     i = target->first.next;
     while (i != &target->last) {
